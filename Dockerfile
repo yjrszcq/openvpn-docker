@@ -10,8 +10,10 @@ RUN apt-get update \
         iproute2 \
         iptables \
         openvpn \
+        openssl \
         procps \
         tini \
+        util-linux \
     && rm -rf /var/lib/apt/lists/*
 
 COPY rootfs/ /

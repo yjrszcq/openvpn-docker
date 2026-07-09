@@ -6,6 +6,12 @@ LIB_DIR="${OVPN_LIB_DIR:-/usr/local/lib/openvpn-container}"
 . "$LIB_DIR/common.sh"
 . "$LIB_DIR/config.sh"
 . "$LIB_DIR/render.sh"
+. "$LIB_DIR/lock.sh"
+. "$LIB_DIR/state.sh"
+. "$LIB_DIR/pki.sh"
+. "$LIB_DIR/metadata.sh"
+. "$LIB_DIR/init.sh"
+. "$LIB_DIR/start.sh"
 
 command="${1:-help}"
 if [ "$#" -gt 0 ]; then
@@ -25,7 +31,16 @@ case "$command" in
   render)
     ovpn_render_command "$@"
     ;;
-  start|init|doctor|state|repair|recover|add-client|export-client|list-clients|revoke-client|status|healthcheck|capabilities)
+  state)
+    ovpn_state_command "$@"
+    ;;
+  init)
+    ovpn_init_command "$@"
+    ;;
+  start)
+    ovpn_start_command "$@"
+    ;;
+  doctor|repair|recover|add-client|export-client|list-clients|revoke-client|status|healthcheck|capabilities)
     ovpn_not_implemented "$command"
     ;;
   *)

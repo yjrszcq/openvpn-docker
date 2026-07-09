@@ -20,15 +20,15 @@ if ! grep -q '"image_version": "0.1.0-dev"' /tmp/ovpn-version.out; then
 fi
 
 set +e
-"$OVPN" init >/tmp/ovpn-init.out 2>/tmp/ovpn-init.err
+"$OVPN" doctor >/tmp/ovpn-doctor.out 2>/tmp/ovpn-doctor.err
 status=$?
 set -e
 if [ "$status" -ne 2 ]; then
-  echo "init returned $status, expected 2 for phase stub" >&2
+  echo "doctor returned $status, expected 2 for phase stub" >&2
   exit 1
 fi
-if ! grep -q "not implemented" /tmp/ovpn-init.err; then
-  echo 'init stub did not explain not implemented state' >&2
+if ! grep -q "not implemented" /tmp/ovpn-doctor.err; then
+  echo 'doctor stub did not explain not implemented state' >&2
   exit 1
 fi
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 OVPN_TEMPLATE_DIR="${OVPN_TEMPLATE_DIR:-/usr/local/share/openvpn-container/templates/openvpn-2.7}"
+OVPN_RENDER_DATA_DIR="${OVPN_RENDER_DATA_DIR:-$OVPN_DATA_DIR}"
 
 ovpn_cidr_ip() {
   printf '%s\n' "${1%/*}"
@@ -21,7 +22,7 @@ ovpn_template_apply() {
   template="${template//\{\{OVPN_PORT\}\}/$OVPN_PORT}"
   template="${template//\{\{OVPN_PROTO\}\}/$OVPN_PROTO}"
   template="${template//\{\{OVPN_ENDPOINT\}\}/$OVPN_ENDPOINT}"
-  template="${template//\{\{OVPN_DATA_DIR\}\}/$OVPN_DATA_DIR}"
+  template="${template//\{\{OVPN_DATA_DIR\}\}/$OVPN_RENDER_DATA_DIR}"
   template="${template//\{\{OVPN_NETWORK_ADDRESS\}\}/$OVPN_NETWORK_ADDRESS}"
   template="${template//\{\{OVPN_NETWORK_NETMASK\}\}/$OVPN_NETWORK_NETMASK}"
   template="${template//\{\{OVPN_CLIENT_TO_CLIENT_DIRECTIVE\}\}/$OVPN_CLIENT_TO_CLIENT_DIRECTIVE}"

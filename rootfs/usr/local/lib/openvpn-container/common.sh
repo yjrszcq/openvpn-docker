@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 OVPN_DATA_DIR="${OVPN_DATA_DIR:-/etc/openvpn}"
+OVPN_RUNTIME_DIR="${OVPN_RUNTIME_DIR:-/run/openvpn-container}"
+OVPN_SERVER_NAME="${OVPN_SERVER_NAME:-openvpn-server}"
 OVPN_BUILD_INFO="${OVPN_BUILD_INFO:-/usr/local/share/openvpn-container/build-info.json}"
 
 ovpn_log() {
