@@ -22,6 +22,8 @@ $OVPN_DATA_DIR/pki/ca.crt
 $OVPN_DATA_DIR/pki/private/ca.key
 $OVPN_DATA_DIR/pki/issued/$OVPN_SERVER_NAME.crt
 $OVPN_DATA_DIR/pki/private/$OVPN_SERVER_NAME.key
+$OVPN_DATA_DIR/pki/index.txt
+$OVPN_DATA_DIR/pki/serial
 $OVPN_DATA_DIR/pki/crl.pem
 $OVPN_DATA_DIR/secrets/tls-crypt.key
 $OVPN_DATA_DIR/server/server.conf

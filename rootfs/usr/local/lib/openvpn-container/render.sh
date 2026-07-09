@@ -103,7 +103,7 @@ ovpn_read_required_file() {
 
 ovpn_validate_client_name() {
   local name="$1"
-  if ! [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  if ! [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
     ovpn_die "invalid client name: $name"
   fi
 }

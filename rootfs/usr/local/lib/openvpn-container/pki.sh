@@ -53,3 +53,21 @@ ovpn_tls_crypt_generate() {
   "$bin" --genkey secret "$OVPN_DATA_DIR/secrets/tls-crypt.key"
   chmod 600 "$OVPN_DATA_DIR/secrets/tls-crypt.key"
 }
+
+
+ovpn_pki_issue_client() {
+  local name="$1"
+  EASYRSA_REQ_CN="$name" ovpn_run_easyrsa build-client-full "$name" nopass
+  [ -r "$OVPN_DATA_DIR/pki/issued/$name.crt" ] || ovpn_die "Easy-RSA did not create client cert for $name"
+  [ -r "$OVPN_DATA_DIR/pki/private/$name.key" ] || ovpn_die "Easy-RSA did not create client key for $name"
+  chmod 644 "$OVPN_DATA_DIR/pki/issued/$name.crt"
+  chmod 600 "$OVPN_DATA_DIR/pki/private/$name.key"
+}
+
+ovpn_pki_revoke_client() {
+  local name="$1"
+  ovpn_run_easyrsa revoke "$name"
+  ovpn_run_easyrsa gen-crl
+  [ -s "$OVPN_DATA_DIR/pki/crl.pem" ] || ovpn_die "Easy-RSA did not refresh CRL"
+  chmod 644 "$OVPN_DATA_DIR/pki/crl.pem"
+}

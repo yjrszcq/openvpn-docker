@@ -39,6 +39,7 @@ tests/check.sh
 tests/cli-smoke.sh
 tests/render-smoke.sh
 tests/init-start-smoke.sh
+tests/client-lifecycle-smoke.sh
 ```
 
 Build the current development image:
