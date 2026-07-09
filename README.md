@@ -37,6 +37,7 @@ Run the local checks:
 ```bash
 tests/check.sh
 tests/cli-smoke.sh
+tests/render-smoke.sh
 ```
 
 Build the current development image:

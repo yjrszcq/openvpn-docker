@@ -4,6 +4,8 @@ set -euo pipefail
 LIB_DIR="${OVPN_LIB_DIR:-/usr/local/lib/openvpn-container}"
 # shellcheck source=/usr/local/lib/openvpn-container/common.sh
 . "$LIB_DIR/common.sh"
+. "$LIB_DIR/config.sh"
+. "$LIB_DIR/render.sh"
 
 command="${1:-help}"
 if [ "$#" -gt 0 ]; then
@@ -17,7 +19,13 @@ case "$command" in
   version|--version)
     ovpn_version
     ;;
-  start|init|doctor|state|repair|recover|config|render|add-client|export-client|list-clients|revoke-client|status|healthcheck|capabilities)
+  config)
+    ovpn_config_command "$@"
+    ;;
+  render)
+    ovpn_render_command "$@"
+    ;;
+  start|init|doctor|state|repair|recover|add-client|export-client|list-clients|revoke-client|status|healthcheck|capabilities)
     ovpn_not_implemented "$command"
     ;;
   *)
