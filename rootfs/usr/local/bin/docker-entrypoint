@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "$#" -eq 0 ]; then
+  set -- ovpn start
+fi
+
+case "$1" in
+  ovpn|/usr/local/bin/ovpn|openvpn|bash|sh)
+    exec "$@"
+    ;;
+  *)
+    exec ovpn "$@"
+    ;;
+esac

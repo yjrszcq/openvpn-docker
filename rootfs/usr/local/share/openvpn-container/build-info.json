@@ -1,0 +1,7 @@
+{
+  "image_version": "0.1.0-dev",
+  "runtime_strategy": "debian-package-phase1",
+  "openvpn_version": "system",
+  "easy_rsa_version": "system",
+  "supported_openvpn_range": "unchecked"
+}

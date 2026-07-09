@@ -36,4 +36,14 @@ Run the local checks:
 
 ```bash
 tests/check.sh
+tests/cli-smoke.sh
 ```
+
+Build the current development image:
+
+```bash
+docker build -t szcq/openvpn-server:dev .
+```
+
+For local smoke checks, pass `OVPN_NETWORK=10.88.0.0/24` explicitly. The
+Compose example keeps the product default configurable.

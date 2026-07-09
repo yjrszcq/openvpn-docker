@@ -1,0 +1,38 @@
+x-openvpn-data: &openvpn-data
+  volumes:
+    - ./openvpn-data:/etc/openvpn
+
+services:
+  openvpn:
+    build: .
+    image: szcq/openvpn-server:dev
+    container_name: openvpn
+    restart: unless-stopped
+
+    <<: *openvpn-data
+
+    cap_add:
+      - NET_ADMIN
+
+    devices:
+      - /dev/net/tun:/dev/net/tun
+
+    ports:
+      - "1194:1194/udp"
+
+    environment:
+      OVPN_ENDPOINT: ${OVPN_ENDPOINT:-vpn.example.com}
+      OVPN_PROTO: ${OVPN_PROTO:-udp}
+      OVPN_PORT: ${OVPN_PORT:-1194}
+      OVPN_NETWORK: ${OVPN_NETWORK:-10.8.0.0/24}
+
+  openvpn-maintenance:
+    image: szcq/openvpn-server:dev
+
+    <<: *openvpn-data
+
+    profiles:
+      - maintenance
+
+    entrypoint:
+      - /usr/local/bin/ovpn
