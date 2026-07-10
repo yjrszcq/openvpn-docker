@@ -9,6 +9,7 @@ ovpn_start_command() {
       ovpn_die "data directory is EMPTY; run 'ovpn init' before start in this phase"
       ;;
     HEALTHY)
+      ovpn_compatibility_require_supported
       config_path="$OVPN_DATA_DIR/server/server.conf"
       ovpn_render_server --output "$config_path"
       openvpn_bin="$(ovpn_openvpn_bin)" || ovpn_die "openvpn is required to start"

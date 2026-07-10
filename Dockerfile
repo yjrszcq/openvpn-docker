@@ -75,6 +75,7 @@ RUN apt-get update \
 
 COPY --from=builder /out/ /
 COPY rootfs/ /
+COPY compatibility/ /usr/local/share/openvpn-container/compatibility/
 COPY scripts/generate-build-info.sh /usr/local/bin/generate-build-info
 
 RUN openvpn --version >/tmp/openvpn-version \

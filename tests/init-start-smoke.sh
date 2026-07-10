@@ -42,17 +42,24 @@ chmod +x "$FAKE_BIN/easyrsa"
 cat >"$FAKE_BIN/openvpn" <<'FAKE_OPENVPN'
 #!/usr/bin/env bash
 set -euo pipefail
-if [ "${1:-}" = "--genkey" ]; then
-  printf 'FAKE TLS CRYPT KEY\n' >"$3"
-  exit 0
-fi
-printf 'fake-openvpn %s\n' "$*"
+case "${1:-}" in
+  --version)
+    printf 'OpenVPN %s test-build\n' "${FAKE_OPENVPN_VERSION:-2.7.5}"
+    ;;
+  --genkey)
+    printf 'FAKE TLS CRYPT KEY\n' >"$3"
+    ;;
+  *)
+    printf 'fake-openvpn %s\n' "$*"
+    ;;
+esac
 FAKE_OPENVPN
 chmod +x "$FAKE_BIN/openvpn"
 
 export OVPN_LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
 export OVPN_TEMPLATE_DIR="$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates/openvpn-2.7"
 export OVPN_DATA_DIR="$TMP_DIR/openvpn"
+export OVPN_COMPATIBILITY_DIR="$ROOT_DIR/compatibility"
 export OVPN_RUNTIME_DIR="$TMP_DIR/run"
 export OVPN_ENDPOINT="vpn.example.test"
 export OVPN_NETWORK="10.88.0.0/24"
@@ -91,5 +98,15 @@ test -f "$OVPN_DATA_DIR/secrets/tls-crypt.key"
 
 "$OVPN" start >"$TMP_DIR/start.out" 2>"$TMP_DIR/start.err"
 grep -q -- "--config $OVPN_DATA_DIR/server/server.conf" "$TMP_DIR/start.out"
+set +e
+FAKE_OPENVPN_VERSION=2.8.0 "$OVPN" start >"$TMP_DIR/unsupported-start.out" 2>"$TMP_DIR/unsupported-start.err"
+status=$?
+set -e
+if [ "$status" -eq 0 ]; then
+  echo 'start unexpectedly accepted an unsupported runtime' >&2
+  exit 1
+fi
+grep -q 'outside supported range' "$TMP_DIR/unsupported-start.err"
+
 
 printf 'init/start smoke passed\n'
