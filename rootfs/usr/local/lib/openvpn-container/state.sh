@@ -36,6 +36,10 @@ ovpn_data_dir_is_empty() {
   [ -z "$(ovpn_data_dir_first_nonempty_entry)" ]
 }
 
+ovpn_initialization_transaction_present() {
+  [ -e "$OVPN_DATA_DIR/.init-transaction" ]
+}
+
 ovpn_required_files() {
   cat <<EOF
 $OVPN_DATA_DIR/config/project.env
@@ -66,6 +70,11 @@ ovpn_missing_required_files() {
 ovpn_state_detect() {
   if ovpn_data_dir_is_empty; then
     printf 'EMPTY\n'
+    return 0
+  fi
+
+  if ovpn_initialization_transaction_present; then
+    printf 'DEGRADED\n'
     return 0
   fi
 

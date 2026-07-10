@@ -16,10 +16,28 @@ ovpn_layout_create() {
   chmod 750 "$OVPN_DATA_DIR" "$OVPN_DATA_DIR/config" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/server" "$OVPN_DATA_DIR/pki" "$OVPN_DATA_DIR/secrets"
 }
 
+ovpn_init_write_transaction_marker() {
+  local transaction_file="$1"
+  local transaction_id="$2"
+  local transaction_tmp="${transaction_file}.tmp"
+
+  umask 077
+  cat >"$transaction_tmp" <<EOF
+transaction_id=$transaction_id
+started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+EOF
+  mv "$transaction_tmp" "$transaction_file"
+  chmod 600 "$transaction_file"
+}
+
 ovpn_init_inner() {
   local final_data_dir="$OVPN_DATA_DIR"
-  local stage_dir="$final_data_dir/.staging-init-$$"
-  local state entry
+  local transaction_id stage_dir transaction_file transaction_tmp state entry commit_started=false
+
+  transaction_id="$(ovpn_instance_id)"
+  stage_dir="$final_data_dir/.staging-init-$transaction_id"
+  transaction_file="$final_data_dir/.init-transaction"
+  transaction_tmp="${transaction_file}.tmp"
 
   mkdir -p "$final_data_dir"
   state="$(ovpn_state_detect)"
@@ -27,12 +45,14 @@ ovpn_init_inner() {
     ovpn_die "refusing to initialize non-empty data directory; current state is $state"
   fi
 
-  rm -rf "$stage_dir"
-  mkdir -p "$stage_dir"
+  mkdir "$stage_dir"
   cleanup_stage() {
     local status=$?
     if [ "$status" -ne 0 ]; then
       rm -rf "$stage_dir"
+      if [ "$commit_started" = false ]; then
+        rm -f "$transaction_file" "$transaction_tmp"
+      fi
     fi
     return "$status"
   }
@@ -53,18 +73,22 @@ ovpn_init_inner() {
   ovpn_metadata_write
   ovpn_require_healthy_state
 
+  ovpn_init_write_transaction_marker "$transaction_file" "$transaction_id"
+  commit_started=true
   for entry in ccd clients config meta pki repair secrets server; do
     mv "$stage_dir/$entry" "$final_data_dir/$entry"
   done
   rmdir "$stage_dir"
-  trap - EXIT
 
   OVPN_DATA_DIR="$final_data_dir"
   OVPN_CONFIG_DIR="$OVPN_DATA_DIR/config"
   OVPN_PROJECT_ENV="$OVPN_CONFIG_DIR/project.env"
   OVPN_SCHEMA_VERSION_FILE="$OVPN_CONFIG_DIR/schema-version"
   unset OVPN_RENDER_DATA_DIR OVPN_INSTANCE_DATA_DIR
+  rm -f "$transaction_file"
   ovpn_require_healthy_state
+  commit_started=false
+  trap - EXIT
   ovpn_log "initialized OpenVPN data directory at $OVPN_DATA_DIR"
 }
 

@@ -5,7 +5,7 @@ OVPN_PROJECT_ENV="${OVPN_PROJECT_ENV:-$OVPN_CONFIG_DIR/project.env}"
 OVPN_SCHEMA_VERSION_FILE="${OVPN_SCHEMA_VERSION_FILE:-$OVPN_CONFIG_DIR/schema-version}"
 
 ovpn_config_defaults() {
-  OVPN_CONFIG_VERSION="${OVPN_CONFIG_VERSION:-1}"
+  OVPN_CONFIG_VERSION=1
   OVPN_ENDPOINT="${OVPN_ENDPOINT:-}"
   OVPN_PROTO="${OVPN_PROTO:-udp}"
   OVPN_PORT="${OVPN_PORT:-1194}"
@@ -16,6 +16,27 @@ ovpn_config_defaults() {
   OVPN_CLIENT_TO_CLIENT="${OVPN_CLIENT_TO_CLIENT:-false}"
   OVPN_DNS="${OVPN_DNS:-}"
   OVPN_ROUTES="${OVPN_ROUTES:-}"
+}
+
+ovpn_validate_single_line() {
+  local name="$1"
+  local value="$2"
+
+  case "$value" in
+    *$'\n'*|*$'\r'*) ovpn_die "$name must not contain a newline" ;;
+  esac
+}
+
+ovpn_validate_bootstrap_endpoint() {
+  if ! [[ "$OVPN_ENDPOINT" =~ ^[A-Za-z0-9][A-Za-z0-9._:-]*$ ]]; then
+    ovpn_die "OVPN_ENDPOINT must be a hostname or IP address"
+  fi
+}
+
+ovpn_config_normalize_bootstrap() {
+  ovpn_config_defaults
+  ovpn_validate_bootstrap_endpoint
+  ovpn_config_validate
 }
 
 ovpn_config_set_key() {
@@ -98,6 +119,11 @@ ovpn_validate_cidr() {
 }
 
 ovpn_config_validate() {
+  [ "$OVPN_CONFIG_VERSION" = 1 ] || ovpn_die "unsupported OVPN_CONFIG_VERSION: $OVPN_CONFIG_VERSION"
+  ovpn_validate_single_line OVPN_ENDPOINT "$OVPN_ENDPOINT"
+  ovpn_validate_single_line OVPN_NAT_INTERFACE "$OVPN_NAT_INTERFACE"
+  ovpn_validate_single_line OVPN_DNS "$OVPN_DNS"
+  ovpn_validate_single_line OVPN_ROUTES "$OVPN_ROUTES"
   ovpn_validate_proto
   ovpn_validate_port
   ovpn_validate_cidr "$OVPN_NETWORK"
@@ -132,11 +158,7 @@ EOF
 }
 
 ovpn_config_write() {
-  ovpn_config_defaults
-  if [ -z "$OVPN_ENDPOINT" ]; then
-    ovpn_die "OVPN_ENDPOINT is required to initialize project config"
-  fi
-  ovpn_config_validate
+  ovpn_config_normalize_bootstrap
 
   mkdir -p "$OVPN_CONFIG_DIR"
   umask 077
