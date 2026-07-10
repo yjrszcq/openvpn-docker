@@ -5,8 +5,22 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OVPN="$ROOT_DIR/rootfs/usr/local/bin/ovpn"
 TMP_DIR="$(mktemp -d)"
 
+FAKE_BIN="$TMP_DIR/bin"
+mkdir -p "$FAKE_BIN"
+cat >"$FAKE_BIN/openvpn" <<'FAKE_OPENVPN'
+#!/usr/bin/env bash
+set -euo pipefail
+if [ "${1:-}" = --version ]; then
+  printf 'OpenVPN 2.7.5 test-build\n'
+  exit 0
+fi
+exit 64
+FAKE_OPENVPN
+chmod +x "$FAKE_BIN/openvpn"
 export OVPN_LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
-export OVPN_TEMPLATE_DIR="$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates/openvpn-2.7"
+export OVPN_COMPATIBILITY_DIR="$ROOT_DIR/compatibility"
+export OVPN_OPENVPN_BIN="$FAKE_BIN/openvpn"
+export OVPN_TEMPLATE_ROOT="$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates"
 export OVPN_DATA_DIR="$TMP_DIR/openvpn"
 export OVPN_ENDPOINT="vpn.example.test"
 export OVPN_PROTO="udp"

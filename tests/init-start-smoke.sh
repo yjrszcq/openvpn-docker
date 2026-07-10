@@ -57,7 +57,7 @@ FAKE_OPENVPN
 chmod +x "$FAKE_BIN/openvpn"
 
 export OVPN_LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
-export OVPN_TEMPLATE_DIR="$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates/openvpn-2.7"
+export OVPN_TEMPLATE_ROOT="$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates"
 export OVPN_DATA_DIR="$TMP_DIR/openvpn"
 export OVPN_COMPATIBILITY_DIR="$ROOT_DIR/compatibility"
 export OVPN_RUNTIME_DIR="$TMP_DIR/run"

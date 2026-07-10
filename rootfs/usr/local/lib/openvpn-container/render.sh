@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 
-OVPN_TEMPLATE_DIR="${OVPN_TEMPLATE_DIR:-/usr/local/share/openvpn-container/templates/openvpn-2.7}"
+OVPN_TEMPLATE_ROOT="${OVPN_TEMPLATE_ROOT:-/usr/local/share/openvpn-container/templates}"
 OVPN_RENDER_DATA_DIR="${OVPN_RENDER_DATA_DIR:-$OVPN_DATA_DIR}"
+
+ovpn_template_dir() {
+  local family
+
+  family="$(ovpn_compatibility_template_family)" || return 1
+  printf '%s/%s\n' "$OVPN_TEMPLATE_ROOT" "$family"
+}
 
 ovpn_cidr_ip() {
   printf '%s\n' "${1%/*}"
@@ -85,7 +92,9 @@ ovpn_prepare_render_context() {
 }
 
 ovpn_render_server_content() {
-  local template_path="$OVPN_TEMPLATE_DIR/server.conf.tpl"
+  local template_dir template_path
+  template_dir="$(ovpn_template_dir)" || ovpn_die "no compatible template family for OpenVPN runtime"
+  template_path="$template_dir/server.conf.tpl"
   [ -r "$template_path" ] || ovpn_die "missing server template: $template_path"
   ovpn_prepare_render_context
   CA_CERT=""
@@ -110,7 +119,9 @@ ovpn_validate_client_name() {
 
 ovpn_render_client_content() {
   local client_name="$1"
-  local template_path="$OVPN_TEMPLATE_DIR/client.ovpn.tpl"
+  local template_dir template_path
+  template_dir="$(ovpn_template_dir)" || ovpn_die "no compatible template family for OpenVPN runtime"
+  template_path="$template_dir/client.ovpn.tpl"
   [ -r "$template_path" ] || ovpn_die "missing client template: $template_path"
   ovpn_validate_client_name "$client_name"
   ovpn_prepare_render_context

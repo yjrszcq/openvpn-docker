@@ -45,7 +45,7 @@ ovpn_semver_compare() {
 ovpn_compatibility_load_contract() {
   [ -r "$OVPN_COMPATIBILITY_CONTRACT" ] || return 1
 
-  unset OPENVPN_SUPPORTED_MIN OPENVPN_SUPPORTED_MAX_EXCLUSIVE
+  unset OPENVPN_SUPPORTED_MIN OPENVPN_SUPPORTED_MAX_EXCLUSIVE OPENVPN_ADAPTER OPENVPN_TEMPLATE_FAMILY OPENVPN_REQUIRED_FEATURES
   # shellcheck source=/usr/local/share/openvpn-container/compatibility/contract.env
   . "$OVPN_COMPATIBILITY_CONTRACT"
 
@@ -86,4 +86,33 @@ ovpn_compatibility_require_supported() {
   if ! ovpn_compatibility_runtime_supported; then
     ovpn_die "OpenVPN runtime $runtime is outside supported range [$OPENVPN_SUPPORTED_MIN, $OPENVPN_SUPPORTED_MAX_EXCLUSIVE)"
   fi
+}
+
+ovpn_compatibility_load_adapter() {
+  local adapter_path
+
+  ovpn_compatibility_load_contract || return 1
+  case "${OPENVPN_ADAPTER:-}" in
+    ''|*[!A-Za-z0-9._-]*) return 1 ;;
+  esac
+  adapter_path="$OVPN_COMPATIBILITY_DIR/adapters/$OPENVPN_ADAPTER.sh"
+  [ -r "$adapter_path" ] || return 1
+
+  unset OVPN_ADAPTER_NAME OVPN_ADAPTER_TEMPLATE_FAMILY
+  # shellcheck source=/usr/local/share/openvpn-container/compatibility/adapters/openvpn-2.7.sh
+  . "$adapter_path"
+  [ "${OVPN_ADAPTER_NAME:-}" = "$OPENVPN_ADAPTER" ] || return 1
+  [ "${OVPN_ADAPTER_TEMPLATE_FAMILY:-}" = "${OPENVPN_TEMPLATE_FAMILY:-}" ]
+}
+
+ovpn_compatibility_adapter_name() {
+  ovpn_compatibility_runtime_supported || return 1
+  ovpn_compatibility_load_adapter || return 1
+  printf '%s\n' "$OVPN_ADAPTER_NAME"
+}
+
+ovpn_compatibility_template_family() {
+  ovpn_compatibility_runtime_supported || return 1
+  ovpn_compatibility_load_adapter || return 1
+  printf '%s\n' "$OVPN_ADAPTER_TEMPLATE_FAMILY"
 }

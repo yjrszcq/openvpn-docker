@@ -66,16 +66,23 @@ chmod +x "$FAKE_BIN/easyrsa"
 cat >"$FAKE_BIN/openvpn" <<'FAKE_OPENVPN'
 #!/usr/bin/env bash
 set -euo pipefail
-if [ "${1:-}" = "--genkey" ]; then
-  printf 'FAKE TLS CRYPT KEY\n' >"$3"
-  exit 0
-fi
-printf 'fake-openvpn %s\n' "$*"
+case "${1:-}" in
+  --version)
+    printf 'OpenVPN 2.7.5 test-build\n'
+    ;;
+  --genkey)
+    printf 'FAKE TLS CRYPT KEY\n' >"$3"
+    ;;
+  *)
+    printf 'fake-openvpn %s\n' "$*"
+    ;;
+esac
 FAKE_OPENVPN
 chmod +x "$FAKE_BIN/openvpn"
 
 export OVPN_LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
-export OVPN_TEMPLATE_DIR="$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates/openvpn-2.7"
+export OVPN_TEMPLATE_ROOT="$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates"
+export OVPN_COMPATIBILITY_DIR="$ROOT_DIR/compatibility"
 export OVPN_DATA_DIR="$TMP_DIR/openvpn"
 export OVPN_RUNTIME_DIR="$TMP_DIR/run"
 export OVPN_ENDPOINT="vpn.example.test"
