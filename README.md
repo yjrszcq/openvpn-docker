@@ -40,7 +40,10 @@ tests/cli-smoke.sh
 tests/render-smoke.sh
 tests/init-start-smoke.sh
 tests/client-lifecycle-smoke.sh
+tests/e2e-container-smoke.sh
 ```
+
+`tests/e2e-container-smoke.sh` sets `OVPN_NETWORK=10.88.0.0/24` internally and skips when Docker or `/dev/net/tun` is unavailable. Set `OVPN_E2E_REQUIRED=1` to make missing E2E prerequisites fail.
 
 Build the current development image:
 
