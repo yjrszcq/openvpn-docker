@@ -42,6 +42,7 @@ tests/render-smoke.sh
 tests/init-start-smoke.sh
 tests/client-lifecycle-smoke.sh
 tests/build-info-smoke.sh
+tests/source-fetch-smoke.sh
 tests/e2e-container-smoke.sh
 ```
 
@@ -62,3 +63,5 @@ Start the locally built development image with Compose:
 ```bash
 docker compose up -d
 ```
+
+`tests/source-fetch-smoke.sh` downloads the pinned upstream archive and therefore requires outbound network access.
