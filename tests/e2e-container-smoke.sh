@@ -54,7 +54,7 @@ if [ ! -c /dev/net/tun ]; then
 fi
 
 if [ "$SKIP_BUILD" != 1 ]; then
-  docker build -t "$IMAGE" "$ROOT_DIR"
+  "$ROOT_DIR/scripts/docker-build.sh" -t "$IMAGE" "$ROOT_DIR"
 fi
 
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ovpn-e2e.XXXXXX")"

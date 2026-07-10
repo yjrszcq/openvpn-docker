@@ -3,9 +3,20 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OVPN="$ROOT_DIR/rootfs/usr/local/bin/ovpn"
+build_info_path="$(mktemp "${TMPDIR:-/tmp}/openvpn-cli-build-info.XXXXXX")"
+trap 'rm -f "$build_info_path"' EXIT
 
 export OVPN_LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
-export OVPN_BUILD_INFO="$ROOT_DIR/rootfs/usr/local/share/openvpn-container/build-info.json"
+set -a
+# shellcheck source=../versions.env
+. "$ROOT_DIR/versions.env"
+set +a
+OVPN_RUNTIME_STRATEGY=debian-package-phase1 \
+OVPN_RUNTIME_OPENVPN_VERSION=system \
+OVPN_VCS_REF=test-revision \
+OVPN_BUILD_DATE=1970-01-01T00:00:00Z \
+"$ROOT_DIR/scripts/generate-build-info.sh" "$build_info_path"
+export OVPN_BUILD_INFO="$build_info_path"
 
 "$OVPN" help >/tmp/ovpn-help.out
 if ! grep -q 'Usage: ovpn' /tmp/ovpn-help.out; then
@@ -14,8 +25,12 @@ if ! grep -q 'Usage: ovpn' /tmp/ovpn-help.out; then
 fi
 
 "$OVPN" version >/tmp/ovpn-version.out
-if ! grep -q '"image_version": "0.1.0-dev"' /tmp/ovpn-version.out; then
+if ! grep -Fq "\"image_version\": \"$IMAGE_VERSION\"" /tmp/ovpn-version.out; then
   echo 'version output missing image_version' >&2
+  exit 1
+fi
+if ! grep -Fq "\"openvpn_source_version\": \"$OPENVPN_VERSION\"" /tmp/ovpn-version.out; then
+  echo 'version output missing openvpn_source_version' >&2
   exit 1
 fi
 

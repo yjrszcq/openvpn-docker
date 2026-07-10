@@ -20,7 +20,8 @@ The implementation starts with a minimal VPN slice:
 2. Add the `ovpn` CLI and entrypoint.
 3. Add explicit initialization and start flows.
 4. Add basic client lifecycle commands.
-5. Expand toward state detection, safe repair, recovery, compatibility gates,
+5. Pin the upstream OpenVPN source inputs and build metadata.
+6. Expand toward state detection, safe repair, recovery, compatibility gates,
    and release automation.
 
 Local validation must avoid the already-used `10.8.0.0/24` network. Tests and
@@ -40,16 +41,24 @@ tests/cli-smoke.sh
 tests/render-smoke.sh
 tests/init-start-smoke.sh
 tests/client-lifecycle-smoke.sh
+tests/build-info-smoke.sh
 tests/e2e-container-smoke.sh
 ```
 
 `tests/e2e-container-smoke.sh` sets `OVPN_NETWORK=10.88.0.0/24` internally and skips when Docker or `/dev/net/tun` is unavailable. Set `OVPN_E2E_REQUIRED=1` to make missing E2E prerequisites fail.
 
-Build the current development image:
+Build the current development image with the pinned inputs from `versions.env`:
 
 ```bash
-docker build -t szcq/openvpn-server:dev .
+scripts/docker-build.sh -t szcq/openvpn-server:dev .
 ```
 
-For local smoke checks, pass `OVPN_NETWORK=10.88.0.0/24` explicitly. The
-Compose example keeps the product default configurable.
+`ovpn version` reports both the currently packaged runtime and the pinned source version. Phase 2.3 replaces the packaged runtime with that verified source build.
+
+For local smoke checks, pass `OVPN_NETWORK=10.88.0.0/24` explicitly. The Compose example keeps the product default configurable.
+
+Start the locally built development image with Compose:
+
+```bash
+docker compose up -d
+```

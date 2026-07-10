@@ -4,7 +4,6 @@ x-openvpn-data: &openvpn-data
 
 services:
   openvpn:
-    build: .
     image: szcq/openvpn-server:dev
     container_name: openvpn
     restart: unless-stopped
