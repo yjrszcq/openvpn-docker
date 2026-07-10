@@ -54,8 +54,11 @@ case "$command" in
   revoke-client)
     ovpn_revoke_client_command "$@"
     ;;
-  doctor|repair|recover|status|healthcheck|capabilities)
+  doctor|repair|recover|status|healthcheck)
     ovpn_not_implemented "$command"
+    ;;
+  capabilities)
+    ovpn_capabilities_command "$@"
     ;;
   *)
     ovpn_log "unknown command '$command'"

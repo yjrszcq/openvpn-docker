@@ -21,8 +21,8 @@ The implementation starts with a minimal VPN slice:
 3. Add explicit initialization and start flows.
 4. Add basic client lifecycle commands.
 5. Pin the upstream OpenVPN source inputs and build metadata.
-6. Expand toward state detection, safe repair, recovery, compatibility gates,
-   and release automation.
+6. Enforce the runtime compatibility contract, adapter-selected templates, and capability gate.
+7. Expand toward state detection, safe repair, recovery, and release automation.
 
 Local validation must avoid the already-used `10.8.0.0/24` network. Tests and
 smoke checks use:
@@ -38,6 +38,7 @@ Run the local checks:
 ```bash
 tests/check.sh
 tests/cli-smoke.sh
+tests/capabilities-smoke.sh
 tests/render-smoke.sh
 tests/init-start-smoke.sh
 tests/client-lifecycle-smoke.sh
@@ -45,10 +46,15 @@ tests/build-info-smoke.sh
 tests/source-fetch-smoke.sh
 tests/source-build-layout-smoke.sh
 tests/runtime-image-smoke.sh
+tests/config-load-smoke.sh
 tests/e2e-container-smoke.sh
 ```
 
 `tests/e2e-container-smoke.sh` sets `OVPN_NETWORK=10.88.0.0/24` internally and skips when Docker or `/dev/net/tun` is unavailable. Set `OVPN_E2E_REQUIRED=1` to make missing E2E prerequisites fail.
+
+`ovpn capabilities` emits the runtime version, supported-range result, adapter, and required feature probes. It exits nonzero when the compatibility gate fails.
+
+`tests/config-load-smoke.sh` validates generated server and client configurations with the actual OpenVPN crypto self-test and uses `OVPN_NETWORK=10.88.0.0/24`. It skips when Docker is unavailable; set `OVPN_CONFIG_LOAD_REQUIRED=1` to require it.
 
 Build the current development image with the pinned inputs from `versions.env`:
 

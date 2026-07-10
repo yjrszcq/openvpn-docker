@@ -86,6 +86,9 @@ ovpn_compatibility_require_supported() {
   if ! ovpn_compatibility_runtime_supported; then
     ovpn_die "OpenVPN runtime $runtime is outside supported range [$OPENVPN_SUPPORTED_MIN, $OPENVPN_SUPPORTED_MAX_EXCLUSIVE)"
   fi
+  if ! ovpn_compatibility_required_features_supported; then
+    ovpn_die "OpenVPN runtime $runtime lacks required capabilities"
+  fi
 }
 
 ovpn_compatibility_load_adapter() {
@@ -115,4 +118,113 @@ ovpn_compatibility_template_family() {
   ovpn_compatibility_runtime_supported || return 1
   ovpn_compatibility_load_adapter || return 1
   printf '%s\n' "$OVPN_ADAPTER_TEMPLATE_FAMILY"
+}
+
+ovpn_compatibility_required_features() {
+  local feature
+  local -a features
+
+  ovpn_compatibility_load_contract || return 1
+  [ -n "${OPENVPN_REQUIRED_FEATURES:-}" ] || return 1
+  IFS=, read -ra features <<<"$OPENVPN_REQUIRED_FEATURES"
+  for feature in "${features[@]}"; do
+    [[ "$feature" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || return 1
+    printf '%s\n' "$feature"
+  done
+}
+
+ovpn_compatibility_runtime_help() {
+  local bin
+
+  bin="$(ovpn_openvpn_bin)" || return 1
+  "$bin" --help 2>&1 || true
+}
+
+ovpn_compatibility_probe_feature() {
+  local feature="$1"
+  local help_output="$2"
+
+  ovpn_compatibility_load_adapter || return 1
+  declare -F ovpn_adapter_probe_feature >/dev/null || return 1
+  ovpn_adapter_probe_feature "$feature" "$help_output"
+}
+
+ovpn_compatibility_required_features_supported() {
+  local feature_output help_output feature
+
+  ovpn_compatibility_adapter_name >/dev/null || return 1
+  feature_output="$(ovpn_compatibility_required_features)" || return 1
+  [ -n "$feature_output" ] || return 1
+  help_output="$(ovpn_compatibility_runtime_help)"
+  while IFS= read -r feature; do
+    ovpn_compatibility_probe_feature "$feature" "$help_output" || return 1
+  done <<<"$feature_output"
+}
+
+ovpn_compatibility_validate_config() {
+  local config_path="$1"
+  local bin
+
+  [ -r "$config_path" ] || return 1
+  ovpn_compatibility_adapter_name >/dev/null || return 1
+  [ -n "${OVPN_ADAPTER_CONFIG_TEST_CIPHER:-}" ] || return 1
+  bin="$(ovpn_openvpn_bin)" || return 1
+  "$bin" --config "$config_path" --cipher "$OVPN_ADAPTER_CONFIG_TEST_CIPHER" --test-crypto >/dev/null 2>&1
+}
+
+ovpn_capabilities_command() {
+  local runtime adapter help_output feature_output feature key status range_supported
+  local -a features feature_values
+
+  ovpn_compatibility_load_contract || ovpn_die "invalid compatibility contract: $OVPN_COMPATIBILITY_CONTRACT"
+  runtime="$(ovpn_runtime_version)" || ovpn_die "unable to parse OpenVPN runtime version"
+  feature_output="$(ovpn_compatibility_required_features)" || ovpn_die "invalid required features in compatibility contract"
+  [ -n "$feature_output" ] || ovpn_die "compatibility contract has no required features"
+  mapfile -t features <<<"$feature_output"
+
+  adapter=""
+  range_supported=false
+  status=0
+  if ovpn_compatibility_runtime_supported; then
+    range_supported=true
+    adapter="$(ovpn_compatibility_adapter_name)" || status=1
+  else
+    status=1
+  fi
+
+  help_output=""
+  if [ "$range_supported" = true ] && [ -n "$adapter" ]; then
+    help_output="$(ovpn_compatibility_runtime_help)"
+  fi
+
+  for feature in "${features[@]}"; do
+    if [ "$range_supported" = true ] && [ -n "$adapter" ] && ovpn_compatibility_probe_feature "$feature" "$help_output"; then
+      feature_values+=(true)
+    else
+      feature_values+=(false)
+      status=1
+    fi
+  done
+
+  printf '{\n'
+  printf '  "openvpn_version": "%s",\n' "$runtime"
+  printf '  "supported_range": %s,\n' "$range_supported"
+  if [ -n "$adapter" ]; then
+    printf '  "adapter": "%s",\n' "$adapter"
+  else
+    printf '  "adapter": null,\n'
+  fi
+  printf '  "features": {\n'
+  for ((index = 0; index < ${#features[@]}; index++)); do
+    feature="${features[index]}"
+    key="${feature//-/_}"
+    printf '    "%s": %s' "$key" "${feature_values[index]}"
+    if [ "$index" -lt $((${#features[@]} - 1)) ]; then
+      printf ','
+    fi
+    printf '\n'
+  done
+  printf '  }\n'
+  printf '}\n'
+  return "$status"
 }

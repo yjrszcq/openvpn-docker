@@ -46,6 +46,21 @@ case "${1:-}" in
   --version)
     printf 'OpenVPN %s test-build\n' "${FAKE_OPENVPN_VERSION:-2.7.5}"
     ;;
+  --help)
+    if [ "${FAKE_OPENVPN_MISSING_FEATURE:-}" != tls-crypt ]; then
+      printf '%s\n' '--tls-crypt key'
+    fi
+    if [ "${FAKE_OPENVPN_MISSING_FEATURE:-}" != data-ciphers ]; then
+      printf '%s\n' '--data-ciphers list'
+    fi
+    if [ "${FAKE_OPENVPN_MISSING_FEATURE:-}" != crl-verify ]; then
+      printf '%s\n' '--crl-verify crl'
+    fi
+    if [ "${FAKE_OPENVPN_MISSING_FEATURE:-}" != topology-subnet ]; then
+      printf '%s\n' "--topology t: 'net30', 'p2p', or 'subnet'"
+    fi
+    exit 1
+    ;;
   --genkey)
     printf 'FAKE TLS CRYPT KEY\n' >"$3"
     ;;
@@ -92,6 +107,16 @@ fi
 
 grep -q 'vpn.example.test' "$OVPN_DATA_DIR/config/project.env"
 grep -q '^server 10.88.0.0 255.255.255.0$' "$OVPN_DATA_DIR/server/server.conf"
+set +e
+FAKE_OPENVPN_MISSING_FEATURE=tls-crypt "$OVPN" start >"$TMP_DIR/missing-capability-start.out" 2>"$TMP_DIR/missing-capability-start.err"
+status=$?
+set -e
+if [ "$status" -eq 0 ]; then
+  echo 'start unexpectedly accepted a runtime missing a required capability' >&2
+  exit 1
+fi
+grep -q 'lacks required capabilities' "$TMP_DIR/missing-capability-start.err"
+
 grep -q "$OVPN_DATA_DIR/pki/ca.crt" "$OVPN_DATA_DIR/server/server.conf"
 test -f "$OVPN_DATA_DIR/meta/instance.json"
 test -f "$OVPN_DATA_DIR/secrets/tls-crypt.key"
