@@ -43,6 +43,7 @@ tests/init-start-smoke.sh
 tests/client-lifecycle-smoke.sh
 tests/build-info-smoke.sh
 tests/source-fetch-smoke.sh
+tests/source-build-layout-smoke.sh
 tests/e2e-container-smoke.sh
 ```
 

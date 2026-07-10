@@ -11,8 +11,8 @@ set -a
 # shellcheck source=../versions.env
 . "$ROOT_DIR/versions.env"
 set +a
-OVPN_RUNTIME_STRATEGY=debian-package-phase1 \
-OVPN_RUNTIME_OPENVPN_VERSION=system \
+OVPN_RUNTIME_STRATEGY=source-build \
+OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION" \
 OVPN_VCS_REF=test-revision \
 OVPN_BUILD_DATE=1970-01-01T00:00:00Z \
 "$ROOT_DIR/scripts/generate-build-info.sh" "$build_info_path"

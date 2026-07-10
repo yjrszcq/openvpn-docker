@@ -4,10 +4,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 output_dir="${1:?usage: fetch-openvpn-source.sh OUTPUT_DIR}"
 
-set -a
-# shellcheck source=../versions.env
-. "$ROOT_DIR/versions.env"
-set +a
+if [ -r "$ROOT_DIR/versions.env" ]; then
+  set -a
+  # shellcheck source=../versions.env
+  . "$ROOT_DIR/versions.env"
+  set +a
+fi
+
+: "${OPENVPN_VERSION:?OPENVPN_VERSION is required}"
+: "${OPENVPN_SOURCE_SHA256:?OPENVPN_SOURCE_SHA256 is required}"
 
 if ! [[ "$OPENVPN_SOURCE_SHA256" =~ ^[[:xdigit:]]{64}$ ]]; then
   echo 'OPENVPN_SOURCE_SHA256 must be a SHA-256 value' >&2

@@ -11,15 +11,15 @@ set -a
 . "$ROOT_DIR/versions.env"
 set +a
 
-OVPN_RUNTIME_STRATEGY=debian-package-phase1 \
-OVPN_RUNTIME_OPENVPN_VERSION=system \
+OVPN_RUNTIME_STRATEGY=source-build \
+OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION" \
 OVPN_VCS_REF=test-revision \
 OVPN_BUILD_DATE=1970-01-01T00:00:00Z \
 "$GENERATOR" "$output_path"
 
 grep -Fq "\"image_version\": \"$IMAGE_VERSION\"" "$output_path"
-grep -Fq '"runtime_strategy": "debian-package-phase1"' "$output_path"
-grep -Fq '"openvpn_version": "system"' "$output_path"
+grep -Fq '"runtime_strategy": "source-build"' "$output_path"
+grep -Fq "\"openvpn_version\": \"$OPENVPN_VERSION\"" "$output_path"
 grep -Fq "\"openvpn_source_version\": \"$OPENVPN_VERSION\"" "$output_path"
 grep -Fq "\"openvpn_source_sha256\": \"$OPENVPN_SOURCE_SHA256\"" "$output_path"
 grep -Fq "\"easy_rsa_version\": \"$EASYRSA_VERSION\"" "$output_path"
