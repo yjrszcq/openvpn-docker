@@ -56,7 +56,16 @@ Build the current development image with the pinned inputs from `versions.env`:
 scripts/docker-build.sh -t szcq/openvpn-server:dev .
 ```
 
-`ovpn version` reports both the currently packaged runtime and the pinned source version. Phase 2.3 replaces the packaged runtime with that verified source build.
+When a builder needs a host-local proxy to fetch pinned source, pass it explicitly:
+
+```bash
+OVPN_BUILD_NETWORK=host \
+OVPN_BUILD_HTTP_PROXY=http://proxy.example:port \
+OVPN_BUILD_HTTPS_PROXY=http://proxy.example:port \
+scripts/docker-build.sh -t szcq/openvpn-server:dev .
+```
+
+`ovpn version` reports both the currently packaged runtime and the pinned source version. The Phase 2 runtime is the verified pinned source build.
 
 For local smoke checks, pass `OVPN_NETWORK=10.88.0.0/24` explicitly. The Compose example keeps the product default configurable.
 

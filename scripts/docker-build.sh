@@ -23,8 +23,19 @@ done
 
 vcs_ref="${VCS_REF:-$(git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || printf unknown)}"
 build_date="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+build_http_proxy="${OVPN_BUILD_HTTP_PROXY:-}"
+build_https_proxy="${OVPN_BUILD_HTTPS_PROXY:-}"
+build_no_proxy="${OVPN_BUILD_NO_PROXY:-}"
+build_network="${OVPN_BUILD_NETWORK:-default}"
 
 exec docker build \
+  --network "$build_network" \
+  --build-arg "HTTP_PROXY=$build_http_proxy" \
+  --build-arg "HTTPS_PROXY=$build_https_proxy" \
+  --build-arg "NO_PROXY=$build_no_proxy" \
+  --build-arg "http_proxy=$build_http_proxy" \
+  --build-arg "https_proxy=$build_https_proxy" \
+  --build-arg "no_proxy=$build_no_proxy" \
   --build-arg "BASE_IMAGE=$BASE_IMAGE" \
   --build-arg "IMAGE_VERSION=$IMAGE_VERSION" \
   --build-arg "OPENVPN_VERSION=$OPENVPN_VERSION" \

@@ -10,6 +10,7 @@ WAIT_SECONDS="${OVPN_E2E_WAIT_SECONDS:-30}"
 REQUIRED="${OVPN_E2E_REQUIRED:-0}"
 SKIP_BUILD="${OVPN_E2E_SKIP_BUILD:-0}"
 RUN_ID="ovpn-e2e-$$-$(date +%s)"
+CONTROL_RUNTIME_DIR="/tmp/openvpn-container-$RUN_ID"
 
 containers=()
 networks=()
@@ -65,6 +66,7 @@ run_control() {
   shift 2
   docker run --rm \
     --user "$(id -u):$(id -g)" \
+    -e "OVPN_RUNTIME_DIR=$CONTROL_RUNTIME_DIR" \
     -e "OVPN_ENDPOINT=$endpoint" \
     -e "OVPN_NETWORK=$NETWORK" \
     -e "OVPN_PORT=$PORT" \

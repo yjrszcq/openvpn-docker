@@ -23,4 +23,9 @@ if ! grep -Fq 'ldd /out/usr/local/sbin/openvpn' "$dockerfile"; then
   exit 1
 fi
 
+if ! grep -Fq 'readlink -f "$library"' "$dockerfile" || ! grep -Fq 'ln -sf "$(basename "$resolved")"' "$dockerfile"; then
+  echo 'builder must preserve resolved runtime libraries and their SONAME links' >&2
+  exit 1
+fi
+
 printf 'source build layout smoke passed\n'
