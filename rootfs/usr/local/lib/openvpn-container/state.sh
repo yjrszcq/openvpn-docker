@@ -1,16 +1,39 @@
 #!/usr/bin/env bash
 
-ovpn_data_dir_is_empty() {
-  if [ ! -d "$OVPN_DATA_DIR" ]; then
+ovpn_empty_dir_entry_is_ignored() {
+  case "$1" in
+    lost+found|.DS_Store)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+ovpn_data_dir_first_nonempty_entry() (
+  local entry name
+
+  if [ ! -e "$OVPN_DATA_DIR" ]; then
+    return 0
+  fi
+  if [ ! -d "$OVPN_DATA_DIR" ] || [ ! -r "$OVPN_DATA_DIR" ] || [ ! -x "$OVPN_DATA_DIR" ]; then
+    printf '%s\n' "$OVPN_DATA_DIR"
     return 0
   fi
 
-  local entry
-  entry="$(find "$OVPN_DATA_DIR" -mindepth 1 -maxdepth 1 \
-    ! -name lost+found \
-    ! -name .DS_Store \
-    -print -quit)"
-  [ -z "$entry" ]
+  shopt -s dotglob nullglob
+  for entry in "$OVPN_DATA_DIR"/*; do
+    name="${entry##*/}"
+    if ! ovpn_empty_dir_entry_is_ignored "$name"; then
+      printf '%s\n' "$entry"
+      return 0
+    fi
+  done
+)
+
+ovpn_data_dir_is_empty() {
+  [ -z "$(ovpn_data_dir_first_nonempty_entry)" ]
 }
 
 ovpn_required_files() {
