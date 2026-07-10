@@ -10,6 +10,8 @@ grep -Fq 'make DESTDIR=/out install' "$dockerfile"
 grep -Fq 'fetch-openvpn-source /tmp/source' "$dockerfile"
 grep -Fq 'OVPN_RUNTIME_STRATEGY=source-build' "$dockerfile"
 grep -Fq 'OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION"' "$dockerfile"
+grep -Fq 'grep -Fq "OpenVPN $OPENVPN_VERSION" /tmp/openvpn-version' "$dockerfile"
+grep -Fq "! grep -Fq 'not found' /tmp/openvpn-ldd" "$dockerfile"
 
 if grep -Eq '^[[:space:]]+openvpn([[:space:]]|\\\\)' "$dockerfile"; then
   echo 'runtime Dockerfile must not install the Debian openvpn package' >&2

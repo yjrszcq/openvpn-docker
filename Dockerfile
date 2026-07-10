@@ -75,6 +75,12 @@ COPY --from=builder /out/ /
 COPY rootfs/ /
 COPY scripts/generate-build-info.sh /usr/local/bin/generate-build-info
 
+RUN openvpn --version >/tmp/openvpn-version \
+    && grep -Fq "OpenVPN $OPENVPN_VERSION" /tmp/openvpn-version \
+    && ldd /usr/local/sbin/openvpn >/tmp/openvpn-ldd \
+    && ! grep -Fq 'not found' /tmp/openvpn-ldd \
+    && rm /tmp/openvpn-version /tmp/openvpn-ldd
+
 RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/docker-entrypoint \
     && mkdir -p /etc/openvpn /usr/local/share/openvpn-container \
     && IMAGE_VERSION="$IMAGE_VERSION" \

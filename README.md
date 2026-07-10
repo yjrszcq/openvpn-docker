@@ -44,6 +44,7 @@ tests/client-lifecycle-smoke.sh
 tests/build-info-smoke.sh
 tests/source-fetch-smoke.sh
 tests/source-build-layout-smoke.sh
+tests/runtime-image-smoke.sh
 tests/e2e-container-smoke.sh
 ```
 
@@ -66,3 +67,5 @@ docker compose up -d
 ```
 
 `tests/source-fetch-smoke.sh` downloads the pinned upstream archive and therefore requires outbound network access.
+
+`tests/runtime-image-smoke.sh` builds and inspects the image when Docker is available. Set `OVPN_RUNTIME_REQUIRED=1` to make unavailable Docker prerequisites fail.
