@@ -112,8 +112,8 @@ fi
 export OVPN_DATA_DIR="$TMP_DIR/interrupted-commit"
 mkdir -p "$OVPN_DATA_DIR"
 : >"$OVPN_DATA_DIR/.init-transaction"
-if [ "$("$OVPN" state)" != DEGRADED ]; then
-  echo 'interrupted initialization should be DEGRADED' >&2
+if [ "$("$OVPN" state)" != CRITICAL ]; then
+  echo 'interrupted initialization should be CRITICAL' >&2
   exit 1
 fi
 

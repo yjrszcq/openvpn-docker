@@ -129,7 +129,7 @@ if [ "$status" -eq 0 ]; then
   echo 'start unexpectedly initialized partial data' >&2
   exit 1
 fi
-grep -q 'instance state is DEGRADED; refusing to start' "$TMP_DIR/partial-start.err"
+grep -q 'instance state is UNRECOVERABLE; refusing to start' "$TMP_DIR/partial-start.err"
 test ! -e "$OVPN_DATA_DIR/pki/private/ca.key"
 
 export OVPN_DATA_DIR="$TMP_DIR/openvpn"
