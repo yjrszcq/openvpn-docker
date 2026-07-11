@@ -8,6 +8,7 @@ LIB_DIR="${OVPN_LIB_DIR:-/usr/local/lib/openvpn-container}"
 . "$LIB_DIR/render.sh"
 . "$LIB_DIR/lock.sh"
 . "$LIB_DIR/state.sh"
+. "$LIB_DIR/repair.sh"
 . "$LIB_DIR/pki.sh"
 . "$LIB_DIR/compatibility.sh"
 . "$LIB_DIR/metadata.sh"
@@ -57,7 +58,10 @@ case "$command" in
   doctor)
     ovpn_doctor_command "$@"
     ;;
-  repair|recover|status|healthcheck)
+  repair)
+    ovpn_repair_plan_command "$@"
+    ;;
+  recover|status|healthcheck)
     ovpn_not_implemented "$command"
     ;;
   capabilities)

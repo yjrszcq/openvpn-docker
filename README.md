@@ -45,6 +45,7 @@ tests/state-scanner-smoke.sh
 tests/state-machine-smoke.sh
 tests/crypto-state-smoke.sh
 tests/doctor-smoke.sh
+tests/repair-plan-smoke.sh
 tests/bootstrap-init-smoke.sh
 tests/client-lifecycle-smoke.sh
 tests/build-info-smoke.sh
@@ -62,6 +63,8 @@ tests/e2e-container-smoke.sh
 `ovpn start` automatically initializes a data directory only when it is EMPTY. A valid `OVPN_ENDPOINT` is required for that first run; partial, interrupted, or otherwise non-empty data is never overwritten.
 
 `ovpn doctor` reports the read-only persisted-state diagnosis. Pass `--json` for a stable object containing the state plus every issue ID, severity, and recommended action. It returns `78` for `CRITICAL` and `UNRECOVERABLE` state after printing the diagnosis.
+
+`ovpn repair --plan` is read-only and lists only SAFE repair actions. Pass `--json` for an integration-friendly plan; CRITICAL and UNRECOVERABLE states still return `78`.
 
 `tests/config-load-smoke.sh` validates generated server and client configurations with the actual OpenVPN crypto self-test and uses `OVPN_NETWORK=10.88.0.0/24`. It skips when Docker is unavailable; set `OVPN_CONFIG_LOAD_REQUIRED=1` to require it.
 
