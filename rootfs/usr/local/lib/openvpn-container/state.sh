@@ -345,3 +345,85 @@ ovpn_require_healthy_state() {
     ovpn_exit_for_state "$OVPN_STATE"
   fi
 }
+
+ovpn_state_print_json_string() {
+  local value="$1"
+
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '"%s"' "$value"
+}
+
+ovpn_state_print_json() {
+  local index
+
+  printf '{\n'
+  printf '  "state": '
+  ovpn_state_print_json_string "$OVPN_STATE"
+  printf ',\n'
+  printf '  "issues": [\n'
+  for ((index = 0; index < ${#OVPN_STATE_ISSUE_IDS[@]}; index++)); do
+    printf '    {"id": '
+    ovpn_state_print_json_string "${OVPN_STATE_ISSUE_IDS[index]}"
+    printf ', "severity": '
+    ovpn_state_print_json_string "${OVPN_STATE_ISSUE_SEVERITIES[index]}"
+    printf ', "action": '
+    ovpn_state_print_json_string "${OVPN_STATE_ISSUE_ACTIONS[index]}"
+    printf '}'
+    if [ "$index" -lt $((${#OVPN_STATE_ISSUE_IDS[@]} - 1)) ]; then
+      printf ','
+    fi
+    printf '\n'
+  done
+  printf '  ]\n'
+  printf '}\n'
+}
+
+ovpn_doctor_command() {
+  local output_format=plain
+  local index
+
+  case "$#" in
+    0)
+      ;;
+    1)
+      if [ "$1" = --json ]; then
+        output_format=json
+      else
+        ovpn_log "usage: ovpn doctor [--json]"
+        exit 64
+      fi
+      ;;
+    *)
+      ovpn_log "usage: ovpn doctor [--json]"
+      exit 64
+      ;;
+  esac
+
+  ovpn_state_scan
+  if [ "$output_format" = json ]; then
+    ovpn_state_print_json
+  else
+    printf 'State: %s\n' "$OVPN_STATE"
+    if [ "${#OVPN_STATE_ISSUE_IDS[@]}" -eq 0 ]; then
+      printf 'Issues: none\n'
+    else
+      printf 'Issues:\n'
+      for ((index = 0; index < ${#OVPN_STATE_ISSUE_IDS[@]}; index++)); do
+        printf '  [%s] %s (action: %s)\n' \
+          "${OVPN_STATE_ISSUE_SEVERITIES[index]}" \
+          "${OVPN_STATE_ISSUE_IDS[index]}" \
+          "${OVPN_STATE_ISSUE_ACTIONS[index]}"
+      done
+    fi
+  fi
+
+  case "$OVPN_STATE" in
+    CRITICAL|UNRECOVERABLE)
+      ovpn_exit_for_state "$OVPN_STATE"
+      ;;
+  esac
+}

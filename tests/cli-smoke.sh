@@ -4,7 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OVPN="$ROOT_DIR/rootfs/usr/local/bin/ovpn"
 build_info_path="$(mktemp "${TMPDIR:-/tmp}/openvpn-cli-build-info.XXXXXX")"
-trap 'rm -f "$build_info_path"' EXIT
+data_dir="$(mktemp -d "${TMPDIR:-/tmp}/openvpn-cli-data.XXXXXX")"
+trap 'rm -f "$build_info_path"; rm -rf "$data_dir"' EXIT
 
 export OVPN_LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
 set -a
@@ -33,17 +34,14 @@ if ! grep -Fq "\"openvpn_source_version\": \"$OPENVPN_VERSION\"" /tmp/ovpn-versi
   echo 'version output missing openvpn_source_version' >&2
   exit 1
 fi
-
-set +e
-"$OVPN" doctor >/tmp/ovpn-doctor.out 2>/tmp/ovpn-doctor.err
-status=$?
-set -e
-if [ "$status" -ne 2 ]; then
-  echo "doctor returned $status, expected 2 for phase stub" >&2
+export OVPN_DATA_DIR="$data_dir"
+"$OVPN" doctor --json >/tmp/ovpn-doctor.out 2>/tmp/ovpn-doctor.err
+if ! grep -Fq '"state": "EMPTY"' /tmp/ovpn-doctor.out; then
+  echo 'doctor JSON output missing EMPTY state' >&2
   exit 1
 fi
-if ! grep -q "not implemented" /tmp/ovpn-doctor.err; then
-  echo 'doctor stub did not explain not implemented state' >&2
+if [ -s /tmp/ovpn-doctor.err ]; then
+  echo 'doctor emitted unexpected stderr output' >&2
   exit 1
 fi
 
