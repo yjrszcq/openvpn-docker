@@ -165,39 +165,116 @@ ovpn_repair_plan_command() {
   esac
 }
 
-ovpn_repair_write_schema_version() {
-  ovpn_config_load
-  printf '%s\n' "$OVPN_CONFIG_VERSION" >"$OVPN_SCHEMA_VERSION_FILE.tmp"
-  mv "$OVPN_SCHEMA_VERSION_FILE.tmp" "$OVPN_SCHEMA_VERSION_FILE"
-  chmod 600 "$OVPN_SCHEMA_VERSION_FILE"
+OVPN_REPAIR_TRANSACTION_ID=''
+OVPN_REPAIR_STAGE_DIR=''
+OVPN_REPAIR_SNAPSHOT_DIR=''
+OVPN_REPAIR_JOURNAL_PATH=''
+OVPN_REPAIR_BEFORE_STATE=''
+OVPN_REPAIR_TRANSACTION_SUCCESS=false
+OVPN_REPAIR_RUNTIME_WAS_PRESENT=false
+
+ovpn_repair_target_is_persistent() {
+  case "$1" in
+    /*) return 1 ;;
+    *) return 0 ;;
+  esac
 }
 
-ovpn_repair_apply_action() {
+ovpn_repair_checksum() {
+  local path="$1"
+  local checksum
+
+  if [ ! -e "$path" ]; then
+    printf 'missing\n'
+    return 0
+  fi
+  if checksum="$(sha256sum "$path" 2>/dev/null)"; then
+    printf '%s\n' "${checksum%% *}"
+    return 0
+  fi
+  printf 'unavailable\n'
+}
+
+ovpn_repair_transaction_start() {
+  local repair_root
+
+  repair_root="$OVPN_DATA_DIR/repair"
+  OVPN_REPAIR_TRANSACTION_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$-$(ovpn_instance_id)"
+  if [ -d "$OVPN_RUNTIME_DIR" ]; then
+    OVPN_REPAIR_RUNTIME_WAS_PRESENT=true
+  else
+    OVPN_REPAIR_RUNTIME_WAS_PRESENT=false
+  fi
+  OVPN_REPAIR_STAGE_DIR="$repair_root/.stage-$OVPN_REPAIR_TRANSACTION_ID"
+  OVPN_REPAIR_SNAPSHOT_DIR="$repair_root/snapshots/$OVPN_REPAIR_TRANSACTION_ID"
+  OVPN_REPAIR_JOURNAL_PATH="$repair_root/journal/$OVPN_REPAIR_TRANSACTION_ID.json"
+  mkdir -p "$OVPN_REPAIR_STAGE_DIR" "$OVPN_REPAIR_SNAPSHOT_DIR" "$(dirname "$OVPN_REPAIR_JOURNAL_PATH")"
+  chmod 700 "$repair_root" "$OVPN_REPAIR_STAGE_DIR" "$OVPN_REPAIR_SNAPSHOT_DIR" "$(dirname "$OVPN_REPAIR_JOURNAL_PATH")"
+}
+
+ovpn_repair_snapshot_actions() {
+  local index target source snapshot_path
+  local manifest="$OVPN_REPAIR_SNAPSHOT_DIR/manifest.tsv"
+
+  : >"$manifest"
+  chmod 600 "$manifest"
+  for ((index = 0; index < ${#OVPN_REPAIR_ACTION_IDS[@]}; index++)); do
+    target="${OVPN_REPAIR_ACTION_TARGETS[index]}"
+    ovpn_repair_target_is_persistent "$target" || continue
+    source="$OVPN_DATA_DIR/$target"
+    if [ -e "$source" ]; then
+      snapshot_path="$OVPN_REPAIR_SNAPSHOT_DIR/$target"
+      mkdir -p "$(dirname "$snapshot_path")"
+      cp -a "$source" "$snapshot_path"
+      printf 'present\t%s\n' "$target" >>"$manifest"
+    else
+      printf 'missing\t%s\n' "$target" >>"$manifest"
+    fi
+  done
+}
+
+ovpn_repair_stage_schema_version() {
+  local output_path="$OVPN_REPAIR_STAGE_DIR/config/schema-version"
+
+  ovpn_config_load
+  mkdir -p "$(dirname "$output_path")"
+  printf '%s\n' "$OVPN_CONFIG_VERSION" >"$output_path"
+  chmod 600 "$output_path"
+}
+
+ovpn_repair_stage_crl() {
+  rm -rf "$OVPN_REPAIR_STAGE_DIR/pki"
+  cp -a "$OVPN_DATA_DIR/pki" "$OVPN_REPAIR_STAGE_DIR/pki"
+  (
+    OVPN_DATA_DIR="$OVPN_REPAIR_STAGE_DIR"
+    ovpn_pki_generate_crl
+  )
+}
+
+ovpn_repair_stage_action() {
   local id="$1"
   local target="$2"
   local client_name
 
   case "$id" in
     WRITE_SCHEMA_VERSION)
-      ovpn_repair_write_schema_version
+      ovpn_repair_stage_schema_version
       ;;
     REBUILD_METADATA)
-      ovpn_metadata_write
+      ovpn_metadata_write_to "$OVPN_REPAIR_STAGE_DIR/$target" "$OVPN_DATA_DIR"
       ;;
     RENDER_SERVER_CONFIG)
-      ovpn_render_server --output "$OVPN_DATA_DIR/server/server.conf"
+      ovpn_render_server --output "$OVPN_REPAIR_STAGE_DIR/$target"
       ;;
     REGENERATE_CRL)
-      ovpn_pki_generate_crl
+      ovpn_repair_stage_crl
       ;;
     RENDER_CLIENT_PROFILE)
       client_name="${target#clients/active/}"
       client_name="${client_name%.ovpn}"
-      ovpn_render_client "$client_name" --output "$OVPN_DATA_DIR/$target"
+      ovpn_render_client "$client_name" --output "$OVPN_REPAIR_STAGE_DIR/$target"
       ;;
     ENSURE_RUNTIME_DIRECTORY)
-      mkdir -p "$OVPN_RUNTIME_DIR"
-      chmod 750 "$OVPN_RUNTIME_DIR"
       ;;
     *)
       ovpn_die "unsupported safe repair action: $id"
@@ -205,9 +282,152 @@ ovpn_repair_apply_action() {
   esac
 }
 
-ovpn_repair_apply_inner() {
+ovpn_repair_stage_actions() {
   local index
 
+  for ((index = 0; index < ${#OVPN_REPAIR_ACTION_IDS[@]}; index++)); do
+    ovpn_repair_stage_action \
+      "${OVPN_REPAIR_ACTION_IDS[index]}" \
+      "${OVPN_REPAIR_ACTION_TARGETS[index]}"
+  done
+}
+
+ovpn_repair_validate_stage() {
+  local validation_dir="$OVPN_REPAIR_STAGE_DIR/validation"
+  local entry index target source validation_state
+  local saved_data_dir="$OVPN_DATA_DIR"
+  local saved_config_dir="$OVPN_CONFIG_DIR"
+  local saved_project_env="$OVPN_PROJECT_ENV"
+  local saved_schema_version_file="$OVPN_SCHEMA_VERSION_FILE"
+
+  mkdir -p "$validation_dir"
+  for entry in ccd clients config meta pki secrets server; do
+    if [ -e "$OVPN_DATA_DIR/$entry" ]; then
+      cp -a "$OVPN_DATA_DIR/$entry" "$validation_dir/$entry"
+    fi
+  done
+  for ((index = 0; index < ${#OVPN_REPAIR_ACTION_IDS[@]}; index++)); do
+    target="${OVPN_REPAIR_ACTION_TARGETS[index]}"
+    ovpn_repair_target_is_persistent "$target" || continue
+    source="$OVPN_REPAIR_STAGE_DIR/$target"
+    [ -e "$source" ] || ovpn_die "missing staged repair target: $target"
+    mkdir -p "$(dirname "$validation_dir/$target")"
+    cp -a "$source" "$validation_dir/$target"
+  done
+
+  OVPN_DATA_DIR="$validation_dir"
+  OVPN_CONFIG_DIR="$validation_dir/config"
+  OVPN_PROJECT_ENV="$OVPN_CONFIG_DIR/project.env"
+  OVPN_SCHEMA_VERSION_FILE="$OVPN_CONFIG_DIR/schema-version"
+  ovpn_state_scan
+  validation_state="$OVPN_STATE"
+  OVPN_DATA_DIR="$saved_data_dir"
+  OVPN_CONFIG_DIR="$saved_config_dir"
+  OVPN_PROJECT_ENV="$saved_project_env"
+  OVPN_SCHEMA_VERSION_FILE="$saved_schema_version_file"
+
+  [ "$validation_state" = HEALTHY ] || ovpn_die "staged safe repair is not healthy: $validation_state"
+}
+
+ovpn_repair_install_staged_actions() {
+  local index id target source destination
+
+  for ((index = 0; index < ${#OVPN_REPAIR_ACTION_IDS[@]}; index++)); do
+    id="${OVPN_REPAIR_ACTION_IDS[index]}"
+    target="${OVPN_REPAIR_ACTION_TARGETS[index]}"
+    if ! ovpn_repair_target_is_persistent "$target"; then
+      mkdir -p "$OVPN_RUNTIME_DIR"
+      chmod 750 "$OVPN_RUNTIME_DIR"
+    else
+      source="$OVPN_REPAIR_STAGE_DIR/$target"
+      destination="$OVPN_DATA_DIR/$target"
+      mkdir -p "$(dirname "$destination")"
+      mv "$source" "$destination"
+    fi
+    if [ "${OVPN_REPAIR_FAIL_AFTER_INSTALL:-}" = "$id" ]; then
+      ovpn_die "injected repair failure after $id"
+    fi
+  done
+}
+
+ovpn_repair_rollback() {
+  local status target destination snapshot_path
+  local manifest="$OVPN_REPAIR_SNAPSHOT_DIR/manifest.tsv"
+
+  [ -r "$manifest" ] || return 0
+  while IFS=$'\t' read -r status target; do
+    [ -n "$target" ] || continue
+    destination="$OVPN_DATA_DIR/$target"
+    case "$status" in
+      present)
+        snapshot_path="$OVPN_REPAIR_SNAPSHOT_DIR/$target"
+        mkdir -p "$(dirname "$destination")"
+        rm -f "$destination"
+        cp -a "$snapshot_path" "$destination"
+        ;;
+      missing)
+        rm -f "$destination"
+        ;;
+    esac
+  done <"$manifest"
+  if [ "$OVPN_REPAIR_RUNTIME_WAS_PRESENT" = false ]; then
+    rm -rf "$OVPN_RUNTIME_DIR"
+  fi
+}
+
+ovpn_repair_write_journal() {
+  local result="$1"
+  local index target before_path before_checksum after_checksum
+  local first=true
+  local temporary_path="${OVPN_REPAIR_JOURNAL_PATH}.tmp"
+
+  umask 077
+  {
+    printf '{\n  "transaction_id": '
+    ovpn_state_print_json_string "$OVPN_REPAIR_TRANSACTION_ID"
+    printf ',\n  "before_state": '
+    ovpn_state_print_json_string "$OVPN_REPAIR_BEFORE_STATE"
+    printf ',\n  "result": '
+    ovpn_state_print_json_string "$result"
+    printf ',\n  "actions": [\n'
+    for ((index = 0; index < ${#OVPN_REPAIR_ACTION_IDS[@]}; index++)); do
+      target="${OVPN_REPAIR_ACTION_TARGETS[index]}"
+      ovpn_repair_target_is_persistent "$target" || continue
+      if [ "$first" = false ]; then
+        printf ',\n'
+      fi
+      first=false
+      before_path="$OVPN_REPAIR_SNAPSHOT_DIR/$target"
+      before_checksum="$(ovpn_repair_checksum "$before_path")"
+      after_checksum="$(ovpn_repair_checksum "$OVPN_DATA_DIR/$target")"
+      printf '    {"id": '
+      ovpn_state_print_json_string "${OVPN_REPAIR_ACTION_IDS[index]}"
+      printf ', "target": '
+      ovpn_state_print_json_string "$target"
+      printf ', "before_sha256": '
+      ovpn_state_print_json_string "$before_checksum"
+      printf ', "after_sha256": '
+      ovpn_state_print_json_string "$after_checksum"
+      printf '}'
+    done
+    printf '\n  ]\n}\n'
+  } >"$temporary_path"
+  mv "$temporary_path" "$OVPN_REPAIR_JOURNAL_PATH"
+  chmod 600 "$OVPN_REPAIR_JOURNAL_PATH"
+}
+
+ovpn_repair_transaction_cleanup() {
+  local status=$?
+
+  if [ "$OVPN_REPAIR_TRANSACTION_SUCCESS" != true ]; then
+    ovpn_repair_rollback
+    ovpn_repair_write_journal failed || true
+  fi
+  [ -z "$OVPN_REPAIR_STAGE_DIR" ] || rm -rf "$OVPN_REPAIR_STAGE_DIR"
+  return "$status"
+}
+
+ovpn_repair_apply_inner() {
   ovpn_repair_plan_build
   case "$OVPN_STATE" in
     HEALTHY|DEGRADED_REPAIRABLE)
@@ -218,18 +438,26 @@ ovpn_repair_apply_inner() {
       exit 78
       ;;
   esac
-
-  for ((index = 0; index < ${#OVPN_REPAIR_ACTION_IDS[@]}; index++)); do
-    ovpn_repair_apply_action \
-      "${OVPN_REPAIR_ACTION_IDS[index]}" \
-      "${OVPN_REPAIR_ACTION_TARGETS[index]}"
-  done
-
-  ovpn_state_scan
-  if [ "$OVPN_STATE" != HEALTHY ]; then
-    ovpn_log "safe repair did not restore a healthy instance; state is $OVPN_STATE"
-    ovpn_exit_for_state "$OVPN_STATE"
+  if [ "${#OVPN_REPAIR_ACTION_IDS[@]}" -eq 0 ]; then
+    ovpn_log 'no safe repair actions are required'
+    return 0
   fi
+
+  OVPN_REPAIR_BEFORE_STATE="$OVPN_STATE"
+  OVPN_REPAIR_TRANSACTION_SUCCESS=false
+  OVPN_REPAIR_RUNTIME_WAS_PRESENT=false
+  ovpn_repair_transaction_start
+  trap ovpn_repair_transaction_cleanup EXIT
+  ovpn_repair_snapshot_actions
+  ovpn_repair_stage_actions
+  ovpn_repair_validate_stage
+  ovpn_repair_install_staged_actions
+  ovpn_state_scan
+  [ "$OVPN_STATE" = HEALTHY ] || ovpn_die "safe repair did not restore a healthy instance: $OVPN_STATE"
+  ovpn_repair_write_journal success
+  OVPN_REPAIR_TRANSACTION_SUCCESS=true
+  rm -rf "$OVPN_REPAIR_STAGE_DIR"
+  trap - EXIT
   ovpn_log "completed ${#OVPN_REPAIR_ACTION_IDS[@]} safe repair actions"
 }
 

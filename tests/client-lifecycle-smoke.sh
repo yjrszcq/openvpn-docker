@@ -94,6 +94,12 @@ export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
 "$OVPN" init >/tmp/ovpn-client-init.out 2>/tmp/ovpn-client-init.err
 "$OVPN" add-client laptop >/tmp/ovpn-add-client.out 2>/tmp/ovpn-add-client.err
 
+repair_snapshot() {
+  find "$OVPN_DATA_DIR" \
+    \( -path "$OVPN_DATA_DIR/repair" -o -name .ovpn-data.lock \) -prune -o \
+    -type f -print0 | sort -z | xargs -0 sha256sum
+}
+
 identity_before="$(sha256sum \
   "$OVPN_DATA_DIR/pki/ca.crt" \
   "$OVPN_DATA_DIR/pki/private/ca.key" \
@@ -130,6 +136,42 @@ identity_after="$(sha256sum \
   exit 1
 }
 grep -Fq 'completed 6 safe repair actions' "$TMP_DIR/repair.err"
+rm "$OVPN_DATA_DIR/server/server.conf" "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
+before_failed_repair="$(repair_snapshot)"
+set +e
+OVPN_REPAIR_FAIL_AFTER_INSTALL=RENDER_SERVER_CONFIG "$OVPN" repair >"$TMP_DIR/failed-repair.out" 2>"$TMP_DIR/failed-repair.err"
+status=$?
+set -e
+if [ "$status" -eq 0 ]; then
+  echo 'injected repair failure unexpectedly succeeded' >&2
+  exit 1
+fi
+after_failed_repair="$(repair_snapshot)"
+[ "$before_failed_repair" = "$after_failed_repair" ] || {
+  echo 'failed repair did not roll back persisted targets' >&2
+  exit 1
+}
+test ! -e "$OVPN_DATA_DIR/server/server.conf"
+test ! -e "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
+if compgen -G "$OVPN_DATA_DIR/repair/.stage-*" >/dev/null; then
+  echo 'failed repair left a staging directory' >&2
+  exit 1
+fi
+journal="$(rg -l '"result": "failed"' "$OVPN_DATA_DIR/repair/journal" | head -n 1)"
+[ -n "$journal" ] || {
+  echo 'failed repair did not create a journal' >&2
+  exit 1
+}
+if grep -Fq 'FAKE CLIENT KEY laptop' "$journal"; then
+  echo 'repair journal contains private profile material' >&2
+  exit 1
+fi
+"$OVPN" repair >"$TMP_DIR/retry-repair.out" 2>"$TMP_DIR/retry-repair.err"
+if [ "$("$OVPN" state)" != HEALTHY ]; then
+  echo 'retry after failed repair did not restore HEALTHY state' >&2
+  exit 1
+fi
+
 
 grep -q '^laptop active$' <("$OVPN" list-clients)
 test -f "$OVPN_DATA_DIR/clients/active/laptop.ovpn"

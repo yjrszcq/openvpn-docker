@@ -34,15 +34,15 @@ ovpn_ca_fingerprint() {
   printf 'unavailable\n'
 }
 
-ovpn_metadata_write() {
-  local data_dir="${OVPN_INSTANCE_DATA_DIR:-$OVPN_DATA_DIR}"
+ovpn_metadata_content() {
+  local data_dir="$1"
   local instance_id created_at ca_fingerprint
-  mkdir -p "$OVPN_DATA_DIR/meta"
+
   instance_id="$(ovpn_instance_id)"
   created_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   ca_fingerprint="$(ovpn_ca_fingerprint)"
 
-  cat >"$OVPN_DATA_DIR/meta/instance.json.tmp" <<EOF
+  cat <<METADATA
 {
   "schema_version": 1,
   "instance_id": "$(ovpn_json_escape "$instance_id")",
@@ -51,7 +51,22 @@ ovpn_metadata_write() {
   "data_dir": "$(ovpn_json_escape "$data_dir")",
   "ca_fingerprint_sha256": "$(ovpn_json_escape "$ca_fingerprint")"
 }
-EOF
-  mv "$OVPN_DATA_DIR/meta/instance.json.tmp" "$OVPN_DATA_DIR/meta/instance.json"
-  chmod 600 "$OVPN_DATA_DIR/meta/instance.json"
+METADATA
+}
+
+ovpn_metadata_write_to() {
+  local output_path="$1"
+  local data_dir="${2:-${OVPN_INSTANCE_DATA_DIR:-$OVPN_DATA_DIR}}"
+  local temporary_path="${output_path}.tmp"
+
+  mkdir -p "$(dirname "$output_path")"
+  umask 077
+  ovpn_metadata_content "$data_dir" >"$temporary_path"
+  mv "$temporary_path" "$output_path"
+  chmod 600 "$output_path"
+}
+
+ovpn_metadata_write() {
+  local data_dir="${OVPN_INSTANCE_DATA_DIR:-$OVPN_DATA_DIR}"
+  ovpn_metadata_write_to "$OVPN_DATA_DIR/meta/instance.json" "$data_dir"
 }
