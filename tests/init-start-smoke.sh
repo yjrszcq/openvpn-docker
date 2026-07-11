@@ -86,24 +86,31 @@ if [ "$("$OVPN" state)" != EMPTY ]; then
   exit 1
 fi
 
-set +e
 "$OVPN" start >"$TMP_DIR/empty-start.out" 2>"$TMP_DIR/empty-start.err"
+if [ "$("$OVPN" state)" != HEALTHY ]; then
+  echo 'auto-initialized data dir should be HEALTHY' >&2
+  exit 1
+fi
+grep -q 'initialized OpenVPN data directory' "$TMP_DIR/empty-start.err"
+grep -q -- "--config $OVPN_DATA_DIR/server/server.conf" "$TMP_DIR/empty-start.out"
+
+grep -q 'vpn.example.test' "$OVPN_DATA_DIR/config/project.env"
+grep -q '^server 10.88.0.0 255.255.255.0$' "$OVPN_DATA_DIR/server/server.conf"
+
+export OVPN_DATA_DIR="$TMP_DIR/partial"
+mkdir -p "$OVPN_DATA_DIR/pki"
+set +e
+"$OVPN" start >"$TMP_DIR/partial-start.out" 2>"$TMP_DIR/partial-start.err"
 status=$?
 set -e
 if [ "$status" -eq 0 ]; then
-  echo 'start unexpectedly succeeded for EMPTY data dir' >&2
+  echo 'start unexpectedly initialized partial data' >&2
   exit 1
 fi
-if ! grep -q "run 'ovpn init'" "$TMP_DIR/empty-start.err"; then
-  echo 'empty start did not explain explicit init requirement' >&2
-  exit 1
-fi
+grep -q 'instance state is DEGRADED; refusing to start' "$TMP_DIR/partial-start.err"
+test ! -e "$OVPN_DATA_DIR/pki/private/ca.key"
 
-"$OVPN" init >"$TMP_DIR/init.out" 2>"$TMP_DIR/init.err"
-if [ "$("$OVPN" state)" != HEALTHY ]; then
-  echo 'initialized data dir should be HEALTHY' >&2
-  exit 1
-fi
+export OVPN_DATA_DIR="$TMP_DIR/openvpn"
 
 grep -q 'vpn.example.test' "$OVPN_DATA_DIR/config/project.env"
 grep -q '^server 10.88.0.0 255.255.255.0$' "$OVPN_DATA_DIR/server/server.conf"

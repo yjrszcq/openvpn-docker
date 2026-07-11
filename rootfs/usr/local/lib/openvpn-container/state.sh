@@ -2,7 +2,7 @@
 
 ovpn_empty_dir_entry_is_ignored() {
   case "$1" in
-    lost+found|.DS_Store)
+    lost+found|.DS_Store|.ovpn-init.lock)
       return 0
       ;;
     *)

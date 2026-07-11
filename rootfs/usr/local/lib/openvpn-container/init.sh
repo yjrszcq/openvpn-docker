@@ -93,5 +93,5 @@ ovpn_init_inner() {
 }
 
 ovpn_init_command() {
-  ovpn_with_lock init ovpn_init_inner
+  ovpn_with_data_lock init ovpn_init_inner
 }
