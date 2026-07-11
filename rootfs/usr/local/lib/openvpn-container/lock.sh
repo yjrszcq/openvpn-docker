@@ -29,13 +29,13 @@ ovpn_with_data_lock() {
   local lock_file
 
   case "$name" in
-    init) ;;
+    init|repair|client) ;;
     *) ovpn_die "unsupported data lock: $name" ;;
   esac
 
   command -v flock >/dev/null 2>&1 || ovpn_die "flock is required for data-volume initialization"
   mkdir -p "$OVPN_DATA_DIR"
-  lock_file="$OVPN_DATA_DIR/.ovpn-$name.lock"
+  lock_file="$OVPN_DATA_DIR/.ovpn-data.lock"
   (
     umask 077
     : >>"$lock_file"

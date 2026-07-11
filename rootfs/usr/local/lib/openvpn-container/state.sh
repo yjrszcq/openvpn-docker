@@ -7,7 +7,7 @@ OVPN_STATE_ISSUE_ACTIONS=()
 
 ovpn_empty_dir_entry_is_ignored() {
   case "$1" in
-    lost+found|.DS_Store|.ovpn-init.lock)
+    lost+found|.DS_Store|.ovpn-init.lock|.ovpn-data.lock)
       return 0
       ;;
     *)
@@ -142,6 +142,11 @@ ovpn_state_scan_client_profiles() {
   done <"$index"
 }
 
+ovpn_state_add_repairable_issue() {
+  ovpn_state_add_issue "$1" repairable "$2"
+  ovpn_state_consider DEGRADED_REPAIRABLE
+}
+
 ovpn_state_add_critical_issue() {
   ovpn_state_add_issue "$1" critical "$2"
   ovpn_state_consider CRITICAL
@@ -157,6 +162,20 @@ ovpn_state_metadata_ca_fingerprint() {
     fi
   done <"$OVPN_DATA_DIR/meta/instance.json"
   return 1
+}
+
+ovpn_state_crl_is_expired() {
+  local openssl_bin="$1"
+  local crl="$2"
+  local next_update expires_at now
+
+  next_update="$("$openssl_bin" crl -in "$crl" -noout -nextupdate 2>/dev/null || true)"
+  next_update="${next_update#nextUpdate=}"
+  [ -n "$next_update" ] || return 0
+  expires_at="$(date -u -d "$next_update" +%s 2>/dev/null || true)"
+  [ -n "$expires_at" ] || return 0
+  now="$(date -u +%s)"
+  [ "$expires_at" -le "$now" ]
 }
 
 ovpn_state_validate_crypto() {
@@ -229,9 +248,15 @@ ovpn_state_validate_crypto() {
     if "$openssl_bin" crl -in "$crl" -noout >/dev/null 2>&1; then
       issuer="$("$openssl_bin" crl -in "$crl" -noout -issuer 2>/dev/null || true)"
       subject="$("$openssl_bin" x509 -in "$ca_cert" -noout -subject 2>/dev/null || true)"
-      [ -n "$issuer" ] && [ "${issuer#*=}" = "${subject#*=}" ] || ovpn_state_add_critical_issue CRL_CA_MISMATCH REGENERATE_CRL
+      if [ -n "$issuer" ] && [ "${issuer#*=}" = "${subject#*=}" ]; then
+        if ovpn_state_crl_is_expired "$openssl_bin" "$crl"; then
+          ovpn_state_add_repairable_issue CRL_EXPIRED REGENERATE_CRL
+        fi
+      else
+        ovpn_state_add_repairable_issue CRL_CA_MISMATCH REGENERATE_CRL
+      fi
     else
-      ovpn_state_add_critical_issue CRL_INVALID REGENERATE_CRL
+      ovpn_state_add_repairable_issue CRL_INVALID REGENERATE_CRL
     fi
   fi
 

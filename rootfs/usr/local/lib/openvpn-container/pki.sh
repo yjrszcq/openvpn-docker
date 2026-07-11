@@ -34,7 +34,7 @@ ovpn_pki_init() {
   ovpn_run_easyrsa init-pki
   EASYRSA_REQ_CN="OpenVPN Container CA" ovpn_run_easyrsa build-ca nopass
   EASYRSA_REQ_CN="$OVPN_SERVER_NAME" ovpn_run_easyrsa build-server-full "$OVPN_SERVER_NAME" nopass
-  ovpn_run_easyrsa gen-crl
+  ovpn_pki_generate_crl
 
   [ -r "$OVPN_DATA_DIR/pki/ca.crt" ] || ovpn_die "Easy-RSA did not create ca.crt"
   [ -r "$OVPN_DATA_DIR/pki/private/ca.key" ] || ovpn_die "Easy-RSA did not create ca.key"
@@ -44,6 +44,12 @@ ovpn_pki_init() {
 
   chmod 600 "$OVPN_DATA_DIR/pki/private/ca.key" "$OVPN_DATA_DIR/pki/private/$OVPN_SERVER_NAME.key"
   chmod 644 "$OVPN_DATA_DIR/pki/ca.crt" "$OVPN_DATA_DIR/pki/issued/$OVPN_SERVER_NAME.crt" "$OVPN_DATA_DIR/pki/crl.pem"
+}
+
+ovpn_pki_generate_crl() {
+  ovpn_run_easyrsa gen-crl
+  [ -s "$OVPN_DATA_DIR/pki/crl.pem" ] || ovpn_die "Easy-RSA did not create CRL"
+  chmod 644 "$OVPN_DATA_DIR/pki/crl.pem"
 }
 
 ovpn_tls_crypt_generate() {
@@ -67,7 +73,7 @@ ovpn_pki_issue_client() {
 ovpn_pki_revoke_client() {
   local name="$1"
   ovpn_run_easyrsa revoke "$name"
-  ovpn_run_easyrsa gen-crl
+  ovpn_pki_generate_crl
   [ -s "$OVPN_DATA_DIR/pki/crl.pem" ] || ovpn_die "Easy-RSA did not refresh CRL"
   chmod 644 "$OVPN_DATA_DIR/pki/crl.pem"
 }

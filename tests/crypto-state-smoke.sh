@@ -91,7 +91,7 @@ assert_issue SERVER_CERT_KEY_MISMATCH
 invalid_crl="$TMP_DIR/invalid-crl"
 make_crypto_healthy "$invalid_crl"
 printf 'not a CRL\n' >"$invalid_crl/pki/crl.pem"
-assert_state "$invalid_crl" CRITICAL
+assert_state "$invalid_crl" DEGRADED_REPAIRABLE
 assert_issue CRL_INVALID
 
 metadata_mismatch="$TMP_DIR/metadata-mismatch"

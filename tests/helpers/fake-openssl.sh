@@ -23,6 +23,7 @@ case "${1:-}" in
   crl)
     case " $* " in
       *' -issuer '*) printf 'issuer=CN = OpenVPN Container CA\n' ;;
+      *' -nextupdate '*) printf 'nextUpdate=Jan  1 00:00:00 3000 GMT\n' ;;
       *) exit 0 ;;
     esac
     ;;

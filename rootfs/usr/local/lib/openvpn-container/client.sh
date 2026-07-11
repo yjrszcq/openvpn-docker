@@ -64,7 +64,7 @@ ovpn_client_refuse_duplicate() {
   fi
 }
 
-ovpn_add_client_command() {
+ovpn_add_client_inner() {
   local name="${1:-}"
   [ -n "$name" ] || ovpn_die "usage: ovpn add-client <name>"
   ovpn_client_name_or_die "$name"
@@ -90,7 +90,7 @@ ovpn_list_clients_command() {
   ovpn_client_records
 }
 
-ovpn_revoke_client_command() {
+ovpn_revoke_client_inner() {
   local name="${1:-}"
   [ -n "$name" ] || ovpn_die "usage: ovpn revoke-client <name>"
   ovpn_client_name_or_die "$name"
@@ -103,4 +103,18 @@ ovpn_revoke_client_command() {
     mv "$OVPN_DATA_DIR/clients/active/$name.ovpn" "$OVPN_DATA_DIR/clients/revoked/$name.ovpn"
   fi
   ovpn_log "revoked client '$name'"
+}
+
+ovpn_add_client_command() {
+  local name="${1:-}"
+  [ -n "$name" ] || ovpn_die "usage: ovpn add-client <name>"
+  ovpn_client_name_or_die "$name"
+  ovpn_with_data_lock client ovpn_add_client_inner "$name"
+}
+
+ovpn_revoke_client_command() {
+  local name="${1:-}"
+  [ -n "$name" ] || ovpn_die "usage: ovpn revoke-client <name>"
+  ovpn_client_name_or_die "$name"
+  ovpn_with_data_lock client ovpn_revoke_client_inner "$name"
 }

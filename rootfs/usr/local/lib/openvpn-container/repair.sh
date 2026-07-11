@@ -164,3 +164,79 @@ ovpn_repair_plan_command() {
       ;;
   esac
 }
+
+ovpn_repair_write_schema_version() {
+  ovpn_config_load
+  printf '%s\n' "$OVPN_CONFIG_VERSION" >"$OVPN_SCHEMA_VERSION_FILE.tmp"
+  mv "$OVPN_SCHEMA_VERSION_FILE.tmp" "$OVPN_SCHEMA_VERSION_FILE"
+  chmod 600 "$OVPN_SCHEMA_VERSION_FILE"
+}
+
+ovpn_repair_apply_action() {
+  local id="$1"
+  local target="$2"
+  local client_name
+
+  case "$id" in
+    WRITE_SCHEMA_VERSION)
+      ovpn_repair_write_schema_version
+      ;;
+    REBUILD_METADATA)
+      ovpn_metadata_write
+      ;;
+    RENDER_SERVER_CONFIG)
+      ovpn_render_server --output "$OVPN_DATA_DIR/server/server.conf"
+      ;;
+    REGENERATE_CRL)
+      ovpn_pki_generate_crl
+      ;;
+    RENDER_CLIENT_PROFILE)
+      client_name="${target#clients/active/}"
+      client_name="${client_name%.ovpn}"
+      ovpn_render_client "$client_name" --output "$OVPN_DATA_DIR/$target"
+      ;;
+    ENSURE_RUNTIME_DIRECTORY)
+      mkdir -p "$OVPN_RUNTIME_DIR"
+      chmod 750 "$OVPN_RUNTIME_DIR"
+      ;;
+    *)
+      ovpn_die "unsupported safe repair action: $id"
+      ;;
+  esac
+}
+
+ovpn_repair_apply_inner() {
+  local index
+
+  ovpn_repair_plan_build
+  case "$OVPN_STATE" in
+    HEALTHY|DEGRADED_REPAIRABLE)
+      ;;
+    *)
+      ovpn_log "instance state is $OVPN_STATE; refusing safe repair"
+      ovpn_repair_plan_print >&2
+      exit 78
+      ;;
+  esac
+
+  for ((index = 0; index < ${#OVPN_REPAIR_ACTION_IDS[@]}; index++)); do
+    ovpn_repair_apply_action \
+      "${OVPN_REPAIR_ACTION_IDS[index]}" \
+      "${OVPN_REPAIR_ACTION_TARGETS[index]}"
+  done
+
+  ovpn_state_scan
+  if [ "$OVPN_STATE" != HEALTHY ]; then
+    ovpn_log "safe repair did not restore a healthy instance; state is $OVPN_STATE"
+    ovpn_exit_for_state "$OVPN_STATE"
+  fi
+  ovpn_log "completed ${#OVPN_REPAIR_ACTION_IDS[@]} safe repair actions"
+}
+
+ovpn_repair_command() {
+  if [ "$#" -gt 0 ]; then
+    ovpn_repair_plan_command "$@"
+    return 0
+  fi
+  ovpn_with_data_lock repair ovpn_repair_apply_inner
+}

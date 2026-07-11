@@ -103,6 +103,14 @@ grep -q -- "--config $OVPN_DATA_DIR/server/server.conf" "$TMP_DIR/empty-start.ou
 
 grep -q 'vpn.example.test' "$OVPN_DATA_DIR/config/project.env"
 grep -q '^server 10.88.0.0 255.255.255.0$' "$OVPN_DATA_DIR/server/server.conf"
+rm "$OVPN_DATA_DIR/server/server.conf"
+"$OVPN" start >"$TMP_DIR/auto-repair-start.out" 2>"$TMP_DIR/auto-repair-start.err"
+if [ "$("$OVPN" state)" != HEALTHY ]; then
+  echo 'repairable start did not restore HEALTHY state' >&2
+  exit 1
+fi
+grep -Fq 'applying safe repairs' "$TMP_DIR/auto-repair-start.err"
+test -f "$OVPN_DATA_DIR/server/server.conf"
 
 export OVPN_DATA_DIR="$TMP_DIR/missing-endpoint"
 set +e

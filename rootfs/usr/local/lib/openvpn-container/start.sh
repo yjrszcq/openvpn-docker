@@ -16,6 +16,11 @@ ovpn_start_command() {
 
   ovpn_auto_init_if_empty
   state="$(ovpn_state_detect)"
+  if [ "$state" = DEGRADED_REPAIRABLE ]; then
+    ovpn_log 'instance state is DEGRADED_REPAIRABLE; applying safe repairs'
+    ovpn_repair_command
+    state="$(ovpn_state_detect)"
+  fi
   if [ "$state" != HEALTHY ]; then
     ovpn_log "instance state is $state; refusing to start"
     ovpn_missing_required_files | while IFS= read -r file; do

@@ -59,7 +59,7 @@ case "$command" in
     ovpn_doctor_command "$@"
     ;;
   repair)
-    ovpn_repair_plan_command "$@"
+    ovpn_repair_command "$@"
     ;;
   recover|status|healthcheck)
     ovpn_not_implemented "$command"

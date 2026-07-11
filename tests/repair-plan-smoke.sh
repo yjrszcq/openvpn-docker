@@ -30,7 +30,7 @@ make_healthy() {
 }
 
 snapshot() {
-  find "$1" -type f -print0 | sort -z | xargs -0 sha256sum
+  find "$1" -type f ! -name .ovpn-data.lock -print0 | sort -z | xargs -0 sha256sum
 }
 
 repairable="$TMP_DIR/repairable"
@@ -101,13 +101,25 @@ fi
   exit 1
 }
 grep -Fq '[BLOCKED] PKI_INDEX_MISSING' "$TMP_DIR/critical.txt"
+set +e
+OVPN_DATA_DIR="$critical" "$OVPN" repair >"$TMP_DIR/critical-repair.out" 2>"$TMP_DIR/critical-repair.err"
+exit_code=$?
+set -e
+if [ "$exit_code" -ne 78 ]; then
+  echo "critical repair returned $exit_code instead of 78" >&2
+  exit 1
+fi
+[ "$before" = "$(snapshot "$critical")" ] || {
+  echo 'critical repair modified a fixture' >&2
+  exit 1
+}
 
 set +e
-OVPN_DATA_DIR="$repairable" "$OVPN" repair >"$TMP_DIR/usage.out" 2>"$TMP_DIR/usage.err"
+OVPN_DATA_DIR="$repairable" "$OVPN" repair --unsupported >"$TMP_DIR/usage.out" 2>"$TMP_DIR/usage.err"
 exit_code=$?
 set -e
 if [ "$exit_code" -ne 64 ]; then
-  echo "repair without --plan returned $exit_code instead of 64" >&2
+  echo "repair with an unsupported argument returned $exit_code instead of 64" >&2
   exit 1
 fi
 grep -Fq 'usage: ovpn repair --plan [--json]' "$TMP_DIR/usage.err"

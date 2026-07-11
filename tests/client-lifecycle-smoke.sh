@@ -94,6 +94,43 @@ export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
 "$OVPN" init >/tmp/ovpn-client-init.out 2>/tmp/ovpn-client-init.err
 "$OVPN" add-client laptop >/tmp/ovpn-add-client.out 2>/tmp/ovpn-add-client.err
 
+identity_before="$(sha256sum \
+  "$OVPN_DATA_DIR/pki/ca.crt" \
+  "$OVPN_DATA_DIR/pki/private/ca.key" \
+  "$OVPN_DATA_DIR/pki/issued/openvpn-server.crt" \
+  "$OVPN_DATA_DIR/pki/private/openvpn-server.key" \
+  "$OVPN_DATA_DIR/pki/issued/laptop.crt" \
+  "$OVPN_DATA_DIR/pki/private/laptop.key")"
+rm "$OVPN_DATA_DIR/config/schema-version" \
+  "$OVPN_DATA_DIR/meta/instance.json" \
+  "$OVPN_DATA_DIR/server/server.conf" \
+  "$OVPN_DATA_DIR/pki/crl.pem" \
+  "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
+rm -rf "$OVPN_RUNTIME_DIR"
+"$OVPN" repair >"$TMP_DIR/repair.out" 2>"$TMP_DIR/repair.err"
+if [ "$("$OVPN" state)" != HEALTHY ]; then
+  echo 'safe repair did not restore HEALTHY state' >&2
+  exit 1
+fi
+[ -d "$OVPN_RUNTIME_DIR" ]
+test -f "$OVPN_DATA_DIR/config/schema-version"
+test -f "$OVPN_DATA_DIR/meta/instance.json"
+test -f "$OVPN_DATA_DIR/server/server.conf"
+test -f "$OVPN_DATA_DIR/pki/crl.pem"
+test -f "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
+identity_after="$(sha256sum \
+  "$OVPN_DATA_DIR/pki/ca.crt" \
+  "$OVPN_DATA_DIR/pki/private/ca.key" \
+  "$OVPN_DATA_DIR/pki/issued/openvpn-server.crt" \
+  "$OVPN_DATA_DIR/pki/private/openvpn-server.key" \
+  "$OVPN_DATA_DIR/pki/issued/laptop.crt" \
+  "$OVPN_DATA_DIR/pki/private/laptop.key")"
+[ "$identity_before" = "$identity_after" ] || {
+  echo 'safe repair changed identity material' >&2
+  exit 1
+}
+grep -Fq 'completed 6 safe repair actions' "$TMP_DIR/repair.err"
+
 grep -q '^laptop active$' <("$OVPN" list-clients)
 test -f "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 
