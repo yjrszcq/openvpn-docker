@@ -1,20 +1,10 @@
 #!/usr/bin/env bash
 
 ovpn_auto_init_if_empty_inner() {
-  local state
-
-  state="$(ovpn_state_detect)"
-  case "$state" in
-    EMPTY)
-      ovpn_init_inner
-      ;;
-    HEALTHY)
-      return 0
-      ;;
-    *)
-      ovpn_die "refusing automatic initialization; current state is $state"
-      ;;
-  esac
+  if [ "$(ovpn_state_detect)" = EMPTY ]; then
+    ovpn_log "data directory is EMPTY; initializing a new instance"
+    ovpn_init_inner
+  fi
 }
 
 ovpn_auto_init_if_empty() {
@@ -24,13 +14,8 @@ ovpn_auto_init_if_empty() {
 ovpn_start_command() {
   local state openvpn_bin config_path
 
+  ovpn_auto_init_if_empty
   state="$(ovpn_state_detect)"
-  if [ "$state" = EMPTY ]; then
-    ovpn_log "data directory is EMPTY; initializing a new instance"
-    ovpn_auto_init_if_empty
-    state="$(ovpn_state_detect)"
-  fi
-
   if [ "$state" != HEALTHY ]; then
     ovpn_log "instance state is $state; refusing to start"
     ovpn_missing_required_files | while IFS= read -r file; do

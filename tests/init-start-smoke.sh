@@ -11,6 +11,12 @@ cat >"$FAKE_BIN/easyrsa" <<'FAKE_EASYRSA'
 #!/usr/bin/env bash
 set -euo pipefail
 mkdir -p "$EASYRSA_PKI"
+if [ -n "${FAKE_EASYRSA_LOG:-}" ]; then
+  printf '%s\n' "${1:-}" >>"$FAKE_EASYRSA_LOG"
+fi
+if [ "${FAKE_EASYRSA_SLEEP_ON:-}" = "${1:-}" ]; then
+  sleep "${FAKE_EASYRSA_SLEEP_SECONDS:-1}"
+fi
 case "${1:-}" in
   init-pki)
     mkdir -p "$EASYRSA_PKI/private" "$EASYRSA_PKI/issued" "$EASYRSA_PKI/reqs" "$EASYRSA_PKI/revoked" "$EASYRSA_PKI/certs_by_serial"
@@ -97,6 +103,22 @@ grep -q -- "--config $OVPN_DATA_DIR/server/server.conf" "$TMP_DIR/empty-start.ou
 grep -q 'vpn.example.test' "$OVPN_DATA_DIR/config/project.env"
 grep -q '^server 10.88.0.0 255.255.255.0$' "$OVPN_DATA_DIR/server/server.conf"
 
+export OVPN_DATA_DIR="$TMP_DIR/missing-endpoint"
+set +e
+OVPN_ENDPOINT= "$OVPN" start >"$TMP_DIR/missing-endpoint.out" 2>"$TMP_DIR/missing-endpoint.err"
+status=$?
+set -e
+if [ "$status" -eq 0 ]; then
+  echo 'start unexpectedly initialized without an endpoint' >&2
+  exit 1
+fi
+grep -q 'OVPN_ENDPOINT must be a hostname or IP address' "$TMP_DIR/missing-endpoint.err"
+if [ "$("$OVPN" state)" != EMPTY ]; then
+  echo 'missing endpoint left non-empty data' >&2
+  exit 1
+fi
+test ! -e "$OVPN_DATA_DIR/pki/ca.key"
+
 export OVPN_DATA_DIR="$TMP_DIR/partial"
 mkdir -p "$OVPN_DATA_DIR/pki"
 set +e
@@ -140,5 +162,38 @@ if [ "$status" -eq 0 ]; then
 fi
 grep -q 'outside supported range' "$TMP_DIR/unsupported-start.err"
 
+
+export OVPN_DATA_DIR="$TMP_DIR/concurrent"
+export FAKE_EASYRSA_LOG="$TMP_DIR/concurrent-easyrsa.log"
+export FAKE_EASYRSA_SLEEP_ON=build-ca
+export FAKE_EASYRSA_SLEEP_SECONDS=1
+: >"$FAKE_EASYRSA_LOG"
+"$OVPN" start >"$TMP_DIR/concurrent-first.out" 2>"$TMP_DIR/concurrent-first.err" &
+first_pid=$!
+deadline=$((SECONDS + 5))
+while ! grep -Fqx build-ca "$FAKE_EASYRSA_LOG"; do
+  if [ "$SECONDS" -ge "$deadline" ]; then
+    wait "$first_pid" || true
+    echo 'first concurrent start did not reach PKI generation' >&2
+    exit 1
+  fi
+  sleep 0.1
+done
+"$OVPN" start >"$TMP_DIR/concurrent-second.out" 2>"$TMP_DIR/concurrent-second.err" &
+second_pid=$!
+wait "$first_pid"
+wait "$second_pid"
+build_ca_count="$(grep -Fxc build-ca "$FAKE_EASYRSA_LOG" || true)"
+if [ "$build_ca_count" -ne 1 ]; then
+  echo "concurrent starts created $build_ca_count certificate authorities" >&2
+  exit 1
+fi
+if [ "$("$OVPN" state)" != HEALTHY ]; then
+  echo 'concurrent starts did not leave a HEALTHY data directory' >&2
+  exit 1
+fi
+test -f "$OVPN_DATA_DIR/pki/private/ca.key"
+test ! -e "$OVPN_DATA_DIR/.init-transaction"
+unset FAKE_EASYRSA_LOG FAKE_EASYRSA_SLEEP_ON FAKE_EASYRSA_SLEEP_SECONDS
 
 printf 'init/start smoke passed\n'

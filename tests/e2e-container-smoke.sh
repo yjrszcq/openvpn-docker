@@ -39,8 +39,8 @@ cleanup() {
     docker network rm "$item" >/dev/null 2>&1 || true
   done
   if [ -n "$WORK_DIR" ]; then
-    chmod -R u+rwX "$WORK_DIR" >/dev/null 2>&1 || true
-    rm -rf "$WORK_DIR"
+    docker run --rm -v "$WORK_DIR:/work" --entrypoint /bin/sh "$IMAGE" -ec 'rm -rf /work/*' >/dev/null 2>&1 || true
+    rm -rf "$WORK_DIR" || true
   fi
 }
 trap cleanup EXIT
@@ -65,7 +65,6 @@ run_control() {
   local endpoint="$2"
   shift 2
   docker run --rm \
-    --user "$(id -u):$(id -g)" \
     -e "OVPN_RUNTIME_DIR=$CONTROL_RUNTIME_DIR" \
     -e "OVPN_ENDPOINT=$endpoint" \
     -e "OVPN_NETWORK=$NETWORK" \
@@ -74,6 +73,14 @@ run_control() {
     -v "$data_dir:/etc/openvpn" \
     "$IMAGE" \
     "$@"
+}
+
+data_grep() {
+  local data_dir="$1"
+  local pattern="$2"
+  local path="$3"
+
+  docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/grep "$IMAGE" -q "$pattern" "/etc/openvpn/$path"
 }
 
 start_server() {
@@ -197,13 +204,14 @@ for proto in udp tcp; do
   networks+=("$network_name")
   containers+=("$server_name")
 
-  run_control "$data_dir" "$endpoint" ovpn init
+  start_server "$data_dir" "$endpoint" "$server_name" "$network_name"
+  wait_for_log "$server_name" 'Initialization Sequence Completed' "$WORK_DIR/server-$proto-active.log"
   test "$(run_control "$data_dir" "$endpoint" ovpn state)" = HEALTHY
 
-  grep -q "^OVPN_NETWORK=$NETWORK$" "$data_dir/config/project.env"
-  grep -q "^OVPN_PROTO=$proto$" "$data_dir/config/project.env"
-  grep -q '^server 10.88.0.0 255.255.255.0$' "$data_dir/server/server.conf"
-  grep -q "^proto $proto$" "$data_dir/server/server.conf"
+  data_grep "$data_dir" "^OVPN_NETWORK=$NETWORK$" config/project.env
+  data_grep "$data_dir" "^OVPN_PROTO=$proto$" config/project.env
+  data_grep "$data_dir" '^server 10.88.0.0 255.255.255.0$' server/server.conf
+  data_grep "$data_dir" "^proto $proto$" server/server.conf
 
   run_control "$data_dir" "$endpoint" ovpn add-client "client-$proto"
   run_control "$data_dir" "$endpoint" ovpn export-client "client-$proto" >"$profile_path"
@@ -211,8 +219,6 @@ for proto in udp tcp; do
   grep -q "^proto $proto$" "$profile_path"
   grep -q "^client-$proto active$" <(run_control "$data_dir" "$endpoint" ovpn list-clients)
 
-  start_server "$data_dir" "$endpoint" "$server_name" "$network_name"
-  wait_for_log "$server_name" 'Initialization Sequence Completed' "$WORK_DIR/server-$proto-active.log"
   assert_client_connects "$network_name" "$profile_path" "$WORK_DIR/client-$proto-active.log"
 
   docker rm -f "$server_name" >/dev/null
