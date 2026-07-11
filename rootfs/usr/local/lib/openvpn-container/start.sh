@@ -22,7 +22,7 @@ ovpn_start_command() {
       [ -n "$file" ] || continue
       ovpn_log "missing required file: $file"
     done
-    exit 1
+    ovpn_exit_for_state "$state"
   fi
 
   ovpn_compatibility_require_supported

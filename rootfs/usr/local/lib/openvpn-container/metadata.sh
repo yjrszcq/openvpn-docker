@@ -9,17 +9,25 @@ ovpn_json_escape() {
 }
 
 ovpn_instance_id() {
+  local openssl_bin
+
   if [ -r /proc/sys/kernel/random/uuid ]; then
     cat /proc/sys/kernel/random/uuid
     return 0
   fi
-  openssl rand -hex 16
+  openssl_bin="$(ovpn_openssl_bin)" || return 1
+  "$openssl_bin" rand -hex 16
 }
 
 ovpn_ca_fingerprint() {
   local ca="$OVPN_DATA_DIR/pki/ca.crt"
-  local output
-  if output="$(openssl x509 -in "$ca" -noout -fingerprint -sha256 2>/dev/null)"; then
+  local openssl_bin output
+
+  openssl_bin="$(ovpn_openssl_bin)" || {
+    printf 'unavailable\n'
+    return 0
+  }
+  if output="$("$openssl_bin" x509 -in "$ca" -noout -fingerprint -sha256 2>/dev/null)"; then
     printf '%s\n' "${output#*=}"
     return 0
   fi

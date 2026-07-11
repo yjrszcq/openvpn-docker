@@ -142,6 +142,111 @@ ovpn_state_scan_client_profiles() {
   done <"$index"
 }
 
+ovpn_state_add_critical_issue() {
+  ovpn_state_add_issue "$1" critical "$2"
+  ovpn_state_consider CRITICAL
+}
+
+ovpn_state_metadata_ca_fingerprint() {
+  local line
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [[ "$line" =~ \"ca_fingerprint_sha256\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
+      printf '%s\n' "${BASH_REMATCH[1]}"
+      return 0
+    fi
+  done <"$OVPN_DATA_DIR/meta/instance.json"
+  return 1
+}
+
+ovpn_state_validate_crypto() {
+  local openssl_bin
+  local ca_cert="$OVPN_DATA_DIR/pki/ca.crt"
+  local ca_key="$OVPN_DATA_DIR/pki/private/ca.key"
+  local server_cert="$OVPN_DATA_DIR/pki/issued/$OVPN_SERVER_NAME.crt"
+  local server_key="$OVPN_DATA_DIR/pki/private/$OVPN_SERVER_NAME.key"
+  local crl="$OVPN_DATA_DIR/pki/crl.pem"
+  local metadata="$OVPN_DATA_DIR/meta/instance.json"
+  local ca_cert_valid=false ca_key_valid=false server_cert_valid=false server_key_valid=false
+  local ca_cert_pub ca_key_pub server_cert_pub server_key_pub issuer subject metadata_fingerprint current_fingerprint fingerprint_output
+
+  openssl_bin="$(ovpn_openssl_bin)" || {
+    ovpn_state_add_critical_issue OPENSSL_UNAVAILABLE INSTALL_OPENSSL
+    return 0
+  }
+
+  if [ -e "$ca_cert" ]; then
+    if "$openssl_bin" x509 -in "$ca_cert" -noout >/dev/null 2>&1; then
+      ca_cert_valid=true
+    else
+      ovpn_state_add_critical_issue CA_CERT_INVALID RESTORE_BACKUP
+    fi
+  fi
+  if [ -e "$ca_key" ]; then
+    if "$openssl_bin" pkey -in "$ca_key" -noout >/dev/null 2>&1; then
+      ca_key_valid=true
+    else
+      ovpn_state_add_critical_issue CA_KEY_INVALID RESTORE_BACKUP
+    fi
+  fi
+  if [ "$ca_cert_valid" = true ] && [ "$ca_key_valid" = true ]; then
+    if ca_cert_pub="$("$openssl_bin" x509 -in "$ca_cert" -noout -pubkey 2>/dev/null)" && ca_key_pub="$("$openssl_bin" pkey -in "$ca_key" -pubout 2>/dev/null)"; then
+      [ "$ca_cert_pub" = "$ca_key_pub" ] || ovpn_state_add_critical_issue CA_CERT_KEY_MISMATCH RESTORE_BACKUP
+    else
+      ovpn_state_add_critical_issue CA_PUBLIC_KEY_UNREADABLE RESTORE_BACKUP
+    fi
+  fi
+
+  if [ -e "$server_cert" ]; then
+    if "$openssl_bin" x509 -in "$server_cert" -noout >/dev/null 2>&1; then
+      server_cert_valid=true
+    else
+      ovpn_state_add_critical_issue SERVER_CERT_INVALID RESTORE_BACKUP
+    fi
+  fi
+  if [ -e "$server_key" ]; then
+    if "$openssl_bin" pkey -in "$server_key" -noout >/dev/null 2>&1; then
+      server_key_valid=true
+    else
+      ovpn_state_add_critical_issue SERVER_KEY_INVALID RESTORE_BACKUP
+    fi
+  fi
+  if [ "$server_cert_valid" = true ] && [ "$server_key_valid" = true ]; then
+    if server_cert_pub="$("$openssl_bin" x509 -in "$server_cert" -noout -pubkey 2>/dev/null)" && server_key_pub="$("$openssl_bin" pkey -in "$server_key" -pubout 2>/dev/null)"; then
+      [ "$server_cert_pub" = "$server_key_pub" ] || ovpn_state_add_critical_issue SERVER_CERT_KEY_MISMATCH RESTORE_BACKUP
+    else
+      ovpn_state_add_critical_issue SERVER_PUBLIC_KEY_UNREADABLE RESTORE_BACKUP
+    fi
+  fi
+  if [ "$ca_cert_valid" = true ] && [ "$server_cert_valid" = true ]; then
+    "$openssl_bin" verify -CAfile "$ca_cert" "$server_cert" >/dev/null 2>&1 || ovpn_state_add_critical_issue SERVER_CERT_CA_MISMATCH RESTORE_BACKUP
+    if ! "$openssl_bin" x509 -in "$server_cert" -noout -purpose 2>/dev/null | grep -Fq 'SSL server : Yes'; then
+      ovpn_state_add_critical_issue SERVER_CERT_PURPOSE_INVALID RESTORE_BACKUP
+    fi
+  fi
+
+  if [ -e "$crl" ] && [ "$ca_cert_valid" = true ]; then
+    if "$openssl_bin" crl -in "$crl" -noout >/dev/null 2>&1; then
+      issuer="$("$openssl_bin" crl -in "$crl" -noout -issuer 2>/dev/null || true)"
+      subject="$("$openssl_bin" x509 -in "$ca_cert" -noout -subject 2>/dev/null || true)"
+      [ -n "$issuer" ] && [ "${issuer#*=}" = "${subject#*=}" ] || ovpn_state_add_critical_issue CRL_CA_MISMATCH REGENERATE_CRL
+    else
+      ovpn_state_add_critical_issue CRL_INVALID REGENERATE_CRL
+    fi
+  fi
+
+  if [ -e "$metadata" ] && [ "$ca_cert_valid" = true ]; then
+    metadata_fingerprint="$(ovpn_state_metadata_ca_fingerprint || true)"
+    if [ -z "$metadata_fingerprint" ]; then
+      ovpn_state_add_critical_issue METADATA_FINGERPRINT_MISSING REBUILD_METADATA
+    else
+      fingerprint_output="$("$openssl_bin" x509 -in "$ca_cert" -noout -fingerprint -sha256 2>/dev/null || true)"
+      current_fingerprint="${fingerprint_output#*=}"
+      [ -n "$current_fingerprint" ] && [ "$metadata_fingerprint" = "$current_fingerprint" ] || ovpn_state_add_critical_issue METADATA_CA_FINGERPRINT_MISMATCH RESTORE_BACKUP
+    fi
+  fi
+}
+
 ovpn_state_scan() {
   ovpn_state_reset
 
@@ -215,6 +320,7 @@ ovpn_state_scan() {
     ovpn_state_consider DEGRADED_REPAIRABLE
   fi
 
+  ovpn_state_validate_crypto
   ovpn_state_scan_client_profiles
 }
 
@@ -236,6 +342,6 @@ ovpn_require_healthy_state() {
     for ((index = 0; index < ${#OVPN_STATE_ISSUE_IDS[@]}; index++)); do
       ovpn_log "state issue: ${OVPN_STATE_ISSUE_IDS[index]} (action: ${OVPN_STATE_ISSUE_ACTIONS[index]})"
     done
-    exit 1
+    ovpn_exit_for_state "$OVPN_STATE"
   fi
 }

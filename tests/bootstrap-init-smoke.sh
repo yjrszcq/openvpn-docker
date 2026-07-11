@@ -64,6 +64,7 @@ export OVPN_COMPATIBILITY_DIR="$ROOT_DIR/compatibility"
 export OVPN_RUNTIME_DIR="$TMP_DIR/run"
 export OVPN_EASYRSA_BIN="$FAKE_BIN/easyrsa"
 export OVPN_OPENVPN_BIN="$FAKE_BIN/openvpn"
+export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
 export OVPN_NETWORK=10.88.0.0/24
 export OVPN_DATA_DIR="$TMP_DIR/valid"
 export OVPN_ENDPOINT=vpn.example.test

@@ -89,6 +89,7 @@ export OVPN_ENDPOINT="vpn.example.test"
 export OVPN_NETWORK="10.88.0.0/24"
 export OVPN_EASYRSA_BIN="$FAKE_BIN/easyrsa"
 export OVPN_OPENVPN_BIN="$FAKE_BIN/openvpn"
+export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
 
 "$OVPN" init >/tmp/ovpn-client-init.out 2>/tmp/ovpn-client-init.err
 "$OVPN" add-client laptop >/tmp/ovpn-add-client.out 2>/tmp/ovpn-add-client.err

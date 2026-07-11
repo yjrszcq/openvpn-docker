@@ -3,6 +3,21 @@
 OVPN_DATA_DIR="${OVPN_DATA_DIR:-/etc/openvpn}"
 OVPN_RUNTIME_DIR="${OVPN_RUNTIME_DIR:-/run/openvpn-container}"
 OVPN_SERVER_NAME="${OVPN_SERVER_NAME:-openvpn-server}"
+ovpn_openssl_bin() {
+  if [ -n "${OVPN_OPENSSL_BIN:-}" ]; then
+    printf '%s\n' "$OVPN_OPENSSL_BIN"
+    return 0
+  fi
+  command -v openssl
+}
+
+ovpn_exit_for_state() {
+  case "$1" in
+    CRITICAL|UNRECOVERABLE) exit 78 ;;
+    *) exit 1 ;;
+  esac
+}
+
 OVPN_BUILD_INFO="${OVPN_BUILD_INFO:-/usr/local/share/openvpn-container/build-info.json}"
 
 ovpn_log() {

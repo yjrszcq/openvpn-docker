@@ -7,6 +7,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 export OVPN_LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
 export OVPN_RUNTIME_DIR="$TMP_DIR/run"
+export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
 export OVPN_SERVER_NAME=openvpn-server
 # shellcheck source=../rootfs/usr/local/lib/openvpn-container/common.sh
 . "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/common.sh"
@@ -18,7 +19,7 @@ make_healthy() {
   mkdir -p "$data_dir/config" "$data_dir/meta" "$data_dir/server" "$data_dir/pki/private" "$data_dir/pki/issued" "$data_dir/secrets"
   : >"$data_dir/config/project.env"
   : >"$data_dir/config/schema-version"
-  : >"$data_dir/meta/instance.json"
+  printf '{\n  "ca_fingerprint_sha256": "FAKE:CA:FINGERPRINT"\n}\n' >"$data_dir/meta/instance.json"
   : >"$data_dir/pki/ca.crt"
   : >"$data_dir/pki/private/ca.key"
   : >"$data_dir/pki/issued/$OVPN_SERVER_NAME.crt"
