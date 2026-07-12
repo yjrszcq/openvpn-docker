@@ -14,6 +14,7 @@ LIB_DIR="${OVPN_LIB_DIR:-/usr/local/lib/openvpn-container}"
 . "$LIB_DIR/compatibility.sh"
 . "$LIB_DIR/metadata.sh"
 . "$LIB_DIR/init.sh"
+. "$LIB_DIR/maintenance.sh"
 . "$LIB_DIR/start.sh"
 . "$LIB_DIR/client.sh"
 
@@ -62,7 +63,13 @@ case "$command" in
   repair)
     ovpn_repair_command "$@"
     ;;
-  recover|status|healthcheck)
+  status)
+    ovpn_status_command "$@"
+    ;;
+  healthcheck)
+    ovpn_healthcheck_command "$@"
+    ;;
+  recover)
     ovpn_not_implemented "$command"
     ;;
   capabilities)

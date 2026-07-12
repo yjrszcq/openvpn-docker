@@ -207,6 +207,7 @@ for proto in udp tcp; do
   start_server "$data_dir" "$endpoint" "$server_name" "$network_name"
   wait_for_log "$server_name" 'Initialization Sequence Completed' "$WORK_DIR/server-$proto-active.log"
   test "$(run_control "$data_dir" "$endpoint" ovpn state)" = HEALTHY
+  docker exec "$server_name" ovpn healthcheck
 
   data_grep "$data_dir" "^OVPN_NETWORK=$NETWORK$" config/project.env
   data_grep "$data_dir" "^OVPN_PROTO=$proto$" config/project.env

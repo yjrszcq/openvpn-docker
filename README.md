@@ -48,6 +48,9 @@ tests/doctor-smoke.sh
 tests/repair-plan-smoke.sh
 tests/recovery-shared-smoke.sh
 tests/recovery-container-smoke.sh
+tests/maintenance-smoke.sh
+tests/maintenance-compose-smoke.sh
+tests/maintenance-container-smoke.sh
 tests/repair-container-smoke.sh
 tests/bootstrap-init-smoke.sh
 tests/client-lifecycle-smoke.sh
@@ -73,6 +76,8 @@ tests/e2e-container-smoke.sh
 `ovpn repair --plan` is read-only and lists SAFE actions plus validated equivalent `RECOVER` actions. Pass `--json` for an integration-friendly plan; CRITICAL and UNRECOVERABLE states still return `78`.
 
 `ovpn repair` stages, validates, snapshots, and atomically applies SAFE repairs plus strictly validated, byte-equivalent recovery from embedded profile material. It never reissues certificates or generates identity keys; failed transactions restore affected files and record redacted journals under `repair/`.
+
+Use one-shot maintenance commands with `docker compose run --rm openvpn-maintenance doctor` or `docker compose run --rm openvpn-maintenance repair --plan`. Set `OVPN_CRITICAL_MODE=maintenance` only when an operator needs a CRITICAL container to remain running and unhealthy for inspection; the default `exit` behavior fails immediately.
 
 `tests/config-load-smoke.sh` validates generated server and client configurations with the actual OpenVPN crypto self-test and uses `OVPN_NETWORK=10.88.0.0/24`. It skips when Docker is unavailable; set `OVPN_CONFIG_LOAD_REQUIRED=1` to require it.
 

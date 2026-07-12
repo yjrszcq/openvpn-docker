@@ -24,14 +24,18 @@ services:
       OVPN_PROTO: ${OVPN_PROTO:-udp}
       OVPN_PORT: ${OVPN_PORT:-1194}
       OVPN_NETWORK: ${OVPN_NETWORK:-10.8.0.0/24}
+      OVPN_CRITICAL_MODE: ${OVPN_CRITICAL_MODE:-exit}
 
   openvpn-maintenance:
     image: szcq/openvpn-server:dev
+    restart: "no"
 
     <<: *openvpn-data
 
     profiles:
       - maintenance
 
+    command:
+      - doctor
     entrypoint:
       - /usr/local/bin/ovpn
