@@ -79,7 +79,9 @@ ovpn_recovery_tls_crypt_is_valid() {
       next
     }
     {
-      if (!inside || $0 !~ /^[0-9A-Fa-f]+$/) {
+      if (!inside) {
+        if ($0 != "" && $0 !~ /^#/) invalid = 1
+      } else if ($0 !~ /^[0-9A-Fa-f]+$/) {
         invalid = 1
       } else {
         hex_length += length($0)

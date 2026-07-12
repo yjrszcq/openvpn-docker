@@ -45,33 +45,44 @@ unset OVPN_OPENSSL_BIN
 
 write_tls_crypt_key() {
   local path="$1"
+  local offset="${2:-0}"
   local number
 
   {
     printf '%s\n' '-----BEGIN OpenVPN Static key V1-----'
     for number in 1 2 3 4 5 6 7 8; do
-      printf '%064x\n' "$number"
+      printf '%064x\n' "$((number + offset))"
     done
     printf '%s\n' '-----END OpenVPN Static key V1-----'
   } >"$path"
+}
+
+write_profile_material() {
+  local path="$1"
+  local ca_path="$2"
+  local certificate_path="$3"
+  local key_path="$4"
+  local tls_crypt_path="$5"
+
+  {
+    printf '%s\n' '<ca>'
+    cat "$ca_path"
+    printf '%s\n' '</ca>' '<cert>'
+    cat "$certificate_path"
+    printf '%s\n' '</cert>' '<key>'
+    cat "$key_path"
+    printf '%s\n' '</key>' '<tls-crypt>'
+    cat "$tls_crypt_path"
+    printf '%s\n' '</tls-crypt>'
+  } >"$path"
+  chmod 600 "$path"
 }
 
 write_profile() {
   local data_dir="$1"
   local path="$2"
 
-  {
-    printf '%s\n' '<ca>'
-    cat "$data_dir/pki/ca.crt"
-    printf '%s\n' '</ca>' '<cert>'
-    cat "$data_dir/pki/issued/laptop.crt"
-    printf '%s\n' '</cert>' '<key>'
-    cat "$data_dir/pki/private/laptop.key"
-    printf '%s\n' '</key>' '<tls-crypt>'
-    cat "$data_dir/secrets/tls-crypt.key"
-    printf '%s\n' '</tls-crypt>'
-  } >"$path"
-  chmod 600 "$path"
+  write_profile_material "$path" "$data_dir/pki/ca.crt" "$data_dir/pki/issued/laptop.crt" "$data_dir/pki/private/laptop.key" "$data_dir/secrets/tls-crypt.key"
 }
 
 make_fixture() {
@@ -129,6 +140,52 @@ CRL_CONFIG
   write_profile "$data_dir" "$data_dir/clients/active/phone.ovpn"
   fingerprint="$(openssl x509 -in "$data_dir/pki/ca.crt" -noout -fingerprint -sha256)"
   printf '{\n  "ca_fingerprint_sha256": "%s"\n}\n' "${fingerprint#*=}" >"$data_dir/meta/instance.json"
+}
+
+snapshot_data_dir() (
+  cd "$1"
+  find . -type f ! -name .ovpn-data.lock -printf '%P\n' | LC_ALL=C sort | while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    printf '%s %s ' "$(stat -c '%a' "$path")" "$path"
+    sha256sum "$path"
+  done
+)
+
+assert_critical_recovery() {
+  local fixture="$1"
+  local issue="$2"
+  local label="$3"
+  local before after status
+
+  export OVPN_DATA_DIR="$fixture"
+  [ "$("$OVPN" state)" = CRITICAL ]
+  before="$(snapshot_data_dir "$fixture")"
+
+  set +e
+  "$OVPN" doctor --json >"$TMP_DIR/$label-doctor.out" 2>"$TMP_DIR/$label-doctor.err"
+  status=$?
+  set -e
+  [ "$status" -eq 78 ]
+  grep -Fq "$issue" "$TMP_DIR/$label-doctor.out"
+  after="$(snapshot_data_dir "$fixture")"
+  [ "$before" = "$after" ]
+
+  set +e
+  "$OVPN" repair --plan >"$TMP_DIR/$label-plan.out" 2>"$TMP_DIR/$label-plan.err"
+  status=$?
+  set -e
+  [ "$status" -eq 78 ]
+  grep -Fq "[BLOCKED] $issue" "$TMP_DIR/$label-plan.out"
+  after="$(snapshot_data_dir "$fixture")"
+  [ "$before" = "$after" ]
+
+  set +e
+  "$OVPN" start >"$TMP_DIR/$label-start.out" 2>"$TMP_DIR/$label-start.err"
+  status=$?
+  set -e
+  [ "$status" -eq 78 ]
+  after="$(snapshot_data_dir "$fixture")"
+  [ "$before" = "$after" ]
 }
 
 data_dir="$TMP_DIR/openvpn"
@@ -208,4 +265,39 @@ status=$?
 set -e
 [ "$status" -eq 78 ]
 
-printf 'shared recovery smoke passed\n'
+
+conflicting_ca_data="$TMP_DIR/conflicting-ca"
+make_fixture "$conflicting_ca_data"
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=Conflicting Recovery CA' -keyout "$TMP_DIR/conflicting-ca.key" -out "$TMP_DIR/conflicting-ca.crt" >/dev/null 2>&1
+write_profile_material "$conflicting_ca_data/clients/active/phone.ovpn" "$TMP_DIR/conflicting-ca.crt" "$conflicting_ca_data/pki/issued/laptop.crt" "$conflicting_ca_data/pki/private/laptop.key" "$conflicting_ca_data/secrets/tls-crypt.key"
+rm "$conflicting_ca_data/pki/ca.crt"
+assert_critical_recovery "$conflicting_ca_data" CRITICAL_RECOVERY_CONFLICT conflicting-ca
+
+conflicting_tls_data="$TMP_DIR/conflicting-tls"
+make_fixture "$conflicting_tls_data"
+write_tls_crypt_key "$TMP_DIR/conflicting-tls.key" 8
+write_profile_material "$conflicting_tls_data/clients/active/phone.ovpn" "$conflicting_tls_data/pki/ca.crt" "$conflicting_tls_data/pki/issued/laptop.crt" "$conflicting_tls_data/pki/private/laptop.key" "$TMP_DIR/conflicting-tls.key"
+rm "$conflicting_tls_data/secrets/tls-crypt.key"
+assert_critical_recovery "$conflicting_tls_data" CRITICAL_RECOVERY_CONFLICT conflicting-tls
+
+malformed_ca_data="$TMP_DIR/malformed-ca"
+make_fixture "$malformed_ca_data"
+printf '%s\n' '<ca>' 'not-a-certificate' >>"$malformed_ca_data/clients/active/phone.ovpn"
+rm "$malformed_ca_data/pki/ca.crt"
+assert_critical_recovery "$malformed_ca_data" CA_CERT_RECOVERY_INVALID malformed-ca
+
+non_equivalent_ca_data="$TMP_DIR/non-equivalent-ca"
+make_fixture "$non_equivalent_ca_data"
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=Non-equivalent Recovery CA' -keyout "$TMP_DIR/non-equivalent-ca.key" -out "$TMP_DIR/non-equivalent-ca.crt" >/dev/null 2>&1
+write_profile_material "$non_equivalent_ca_data/clients/active/laptop.ovpn" "$TMP_DIR/non-equivalent-ca.crt" "$non_equivalent_ca_data/pki/issued/laptop.crt" "$non_equivalent_ca_data/pki/private/laptop.key" "$non_equivalent_ca_data/secrets/tls-crypt.key"
+write_profile_material "$non_equivalent_ca_data/clients/active/phone.ovpn" "$TMP_DIR/non-equivalent-ca.crt" "$non_equivalent_ca_data/pki/issued/laptop.crt" "$non_equivalent_ca_data/pki/private/laptop.key" "$non_equivalent_ca_data/secrets/tls-crypt.key"
+rm "$non_equivalent_ca_data/pki/ca.crt"
+assert_critical_recovery "$non_equivalent_ca_data" CA_CERT_RECOVERY_INVALID non-equivalent-ca
+
+mismatched_client_data="$TMP_DIR/mismatched-client"
+make_fixture "$mismatched_client_data"
+openssl genpkey -algorithm RSA -out "$TMP_DIR/mismatched-client.key" >/dev/null 2>&1
+write_profile_material "$mismatched_client_data/clients/active/laptop.ovpn" "$mismatched_client_data/pki/ca.crt" "$mismatched_client_data/pki/issued/laptop.crt" "$TMP_DIR/mismatched-client.key" "$mismatched_client_data/secrets/tls-crypt.key"
+rm "$mismatched_client_data/pki/private/laptop.key"
+assert_critical_recovery "$mismatched_client_data" CLIENT_IDENTITY_RECOVERY_INVALID_laptop mismatched-client
+printf 'recovery smoke passed\n'

@@ -47,10 +47,12 @@ tests/crypto-state-smoke.sh
 tests/doctor-smoke.sh
 tests/repair-plan-smoke.sh
 tests/recovery-shared-smoke.sh
+tests/recovery-container-smoke.sh
 tests/repair-container-smoke.sh
 tests/bootstrap-init-smoke.sh
 tests/client-lifecycle-smoke.sh
 tests/build-info-smoke.sh
+tests/docker-build-wrapper-smoke.sh
 tests/source-fetch-smoke.sh
 tests/source-build-layout-smoke.sh
 tests/runtime-image-smoke.sh
@@ -59,6 +61,8 @@ tests/e2e-container-smoke.sh
 ```
 
 `tests/e2e-container-smoke.sh` sets `OVPN_NETWORK=10.88.0.0/24` internally and skips when Docker or `/dev/net/tun` is unavailable. Set `OVPN_E2E_REQUIRED=1` to make missing E2E prerequisites fail.
+
+`tests/recovery-container-smoke.sh` rebuilds the image by default, recovers CA, tls-crypt, and a client identity from active profile material, and verifies hashes and modes on `10.88.0.0/24`. Set `OVPN_RECOVERY_REQUIRED=1` to require its Docker prerequisites.
 
 `ovpn capabilities` emits the runtime version, supported-range result, adapter, and required feature probes. It exits nonzero when the compatibility gate fails.
 
@@ -80,6 +84,8 @@ scripts/docker-build.sh -t szcq/openvpn-server:dev .
 
 When a builder needs a host-local proxy to fetch pinned source, pass it explicitly:
 
+`docker-build.sh` inherits standard `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` variables when their `OVPN_BUILD_*` counterparts are unset. It filters loopback HTTP(S) proxies for the default Docker network, because that network cannot reach the host loopback; use `OVPN_BUILD_NETWORK=host` with explicit `OVPN_BUILD_*` values for a host-local proxy.
+
 ```bash
 OVPN_BUILD_NETWORK=host \
 OVPN_BUILD_HTTP_PROXY=http://proxy.example:port \
@@ -98,5 +104,7 @@ docker compose up -d
 ```
 
 `tests/source-fetch-smoke.sh` downloads the pinned upstream archive and therefore requires outbound network access.
+
+Source retrieval prefers `swupdate.openvpn.org` and falls back to the matching official OpenVPN GitHub release asset. Both paths must satisfy the pinned SHA-256 in `versions.env`.
 
 `tests/runtime-image-smoke.sh` builds and inspects the image when Docker is available. Set `OVPN_RUNTIME_REQUIRED=1` to make unavailable Docker prerequisites fail.

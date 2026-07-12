@@ -23,10 +23,39 @@ done
 
 vcs_ref="${VCS_REF:-$(git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || printf unknown)}"
 build_date="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
-build_http_proxy="${OVPN_BUILD_HTTP_PROXY:-}"
-build_https_proxy="${OVPN_BUILD_HTTPS_PROXY:-}"
-build_no_proxy="${OVPN_BUILD_NO_PROXY:-}"
 build_network="${OVPN_BUILD_NETWORK:-default}"
+
+ovpn_proxy_is_loopback() {
+  case "$1" in
+    http://127.*|https://127.*|http://localhost|http://localhost:*|https://localhost|https://localhost:*|http://[[]::1[]]*|https://[[]::1[]]*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+ovpn_standard_build_proxy() {
+  local proxy="${1:-}"
+
+  if [ "$build_network" != host ] && ovpn_proxy_is_loopback "$proxy"; then
+    return 0
+  fi
+  printf '%s\n' "$proxy"
+}
+
+if [ "${OVPN_BUILD_HTTP_PROXY+x}" = x ]; then
+  build_http_proxy="$OVPN_BUILD_HTTP_PROXY"
+else
+  build_http_proxy="$(ovpn_standard_build_proxy "${HTTP_PROXY-${http_proxy-}}")"
+fi
+if [ "${OVPN_BUILD_HTTPS_PROXY+x}" = x ]; then
+  build_https_proxy="$OVPN_BUILD_HTTPS_PROXY"
+else
+  build_https_proxy="$(ovpn_standard_build_proxy "${HTTPS_PROXY-${https_proxy-}}")"
+fi
+if [ "${OVPN_BUILD_NO_PROXY+x}" = x ]; then
+  build_no_proxy="$OVPN_BUILD_NO_PROXY"
+else
+  build_no_proxy="${NO_PROXY-${no_proxy-}}"
+fi
 
 exec docker build \
   --network "$build_network" \
