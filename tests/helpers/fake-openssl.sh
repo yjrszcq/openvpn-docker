@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ -n "${FAKE_OPENSSL_LOG:-}" ]; then
+  printf '%s\n' "${1:-}" >>"$FAKE_OPENSSL_LOG"
+fi
+if [ "${FAKE_OPENSSL_SLEEP_ON:-}" = "${1:-}" ]; then
+  sleep "${FAKE_OPENSSL_SLEEP_SECONDS:-1}"
+fi
 case "${1:-}" in
   x509)
     case " $* " in

@@ -11,6 +11,9 @@ cat >"$FAKE_BIN/easyrsa" <<'FAKE_EASYRSA'
 #!/usr/bin/env bash
 set -euo pipefail
 mkdir -p "$EASYRSA_PKI"
+if [ -n "${FAKE_EASYRSA_LOG:-}" ]; then
+  printf '%s\n' "${1:-}" >>"$FAKE_EASYRSA_LOG"
+fi
 case "${1:-}" in
   init-pki)
     mkdir -p "$EASYRSA_PKI/private" "$EASYRSA_PKI/issued" "$EASYRSA_PKI/reqs" "$EASYRSA_PKI/revoked" "$EASYRSA_PKI/certs_by_serial"
@@ -136,6 +139,40 @@ identity_after="$(sha256sum \
   exit 1
 }
 grep -Fq 'completed 6 safe repair actions' "$TMP_DIR/repair.err"
+
+rm "$OVPN_DATA_DIR/server/server.conf"
+export FAKE_OPENSSL_LOG="$TMP_DIR/repair-lock-openssl.log"
+export FAKE_OPENSSL_SLEEP_ON=x509
+export FAKE_OPENSSL_SLEEP_SECONDS=1
+export FAKE_EASYRSA_LOG="$TMP_DIR/repair-lock-easyrsa.log"
+: >"$FAKE_OPENSSL_LOG"
+: >"$FAKE_EASYRSA_LOG"
+"$OVPN" repair >"$TMP_DIR/locked-repair.out" 2>"$TMP_DIR/locked-repair.err" &
+repair_pid=$!
+deadline=$((SECONDS + 5))
+while ! grep -Fqx x509 "$FAKE_OPENSSL_LOG"; do
+  if [ "$SECONDS" -ge "$deadline" ]; then
+    wait "$repair_pid" || true
+    echo 'repair did not reach the shared lock' >&2
+    exit 1
+  fi
+  sleep 0.1
+done
+"$OVPN" add-client tablet >"$TMP_DIR/locked-add-client.out" 2>"$TMP_DIR/locked-add-client.err" &
+add_client_pid=$!
+sleep 0.1
+if grep -Fqx build-client-full "$FAKE_EASYRSA_LOG"; then
+  echo 'add-client bypassed the repair data lock' >&2
+  exit 1
+fi
+wait "$repair_pid"
+wait "$add_client_pid"
+grep -Fqx build-client-full "$FAKE_EASYRSA_LOG"
+unset FAKE_OPENSSL_LOG FAKE_OPENSSL_SLEEP_ON FAKE_OPENSSL_SLEEP_SECONDS FAKE_EASYRSA_LOG
+if [ "$("$OVPN" state)" != HEALTHY ]; then
+  echo 'shared-lock repair and client mutation did not leave HEALTHY state' >&2
+  exit 1
+fi
 rm "$OVPN_DATA_DIR/server/server.conf" "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 before_failed_repair="$(repair_snapshot)"
 set +e
