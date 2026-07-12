@@ -80,6 +80,8 @@ grep -Fq '"action": "RESTORE_PKI_DATABASE"' "$TMP_DIR/critical.json"
 quoted="$TMP_DIR/quoted"
 cp -a "$healthy" "$quoted"
 printf 'V\t9999\t\t/CN=bad"client\n' >"$quoted/pki/index.txt"
+: >"$quoted/pki/issued/bad\"client.crt"
+: >"$quoted/pki/private/bad\"client.key"
 OVPN_DATA_DIR="$quoted" "$OVPN" doctor --json >"$TMP_DIR/quoted.json"
 grep -Fq '"id": "CLIENT_PROFILE_MISSING_bad\"client"' "$TMP_DIR/quoted.json"
 

@@ -41,6 +41,7 @@ ovpn_start_command() {
   fi
 
   ovpn_compatibility_require_supported
+  ovpn_network_configure
   config_path="$OVPN_DATA_DIR/server/server.conf"
   ovpn_render_server --output "$config_path"
   openvpn_bin="$(ovpn_openvpn_bin)" || ovpn_die "openvpn is required to start"

@@ -51,6 +51,7 @@ tests/recovery-container-smoke.sh
 tests/maintenance-smoke.sh
 tests/maintenance-compose-smoke.sh
 tests/maintenance-container-smoke.sh
+tests/network-policy-smoke.sh
 tests/repair-container-smoke.sh
 tests/bootstrap-init-smoke.sh
 tests/client-lifecycle-smoke.sh
@@ -78,6 +79,18 @@ tests/e2e-container-smoke.sh
 `ovpn repair` stages, validates, snapshots, and atomically applies SAFE repairs plus strictly validated, byte-equivalent recovery from embedded profile material. It never reissues certificates or generates identity keys; failed transactions restore affected files and record redacted journals under `repair/`.
 
 Use one-shot maintenance commands with `docker compose run --rm openvpn-maintenance doctor` or `docker compose run --rm openvpn-maintenance repair --plan`. Set `OVPN_CRITICAL_MODE=maintenance` only when an operator needs a CRITICAL container to remain running and unhealthy for inspection; the default `exit` behavior fails immediately.
+
+## Network Policy
+
+On first initialization, `OVPN_NAT`, `OVPN_NAT_INTERFACE`,
+`OVPN_REDIRECT_GATEWAY`, `OVPN_CLIENT_TO_CLIENT`, `OVPN_DNS`, and
+`OVPN_ROUTES` are persisted in `config/project.env`; later Compose environment
+changes do not override the instance. DNS and routes are IPv4-only in this
+release. When NAT, full-tunnel, or route push is enabled, the main service
+enables IPv4 forwarding and installs idempotent `iptables` rules only in its
+own network namespace. The Docker host must provide `/dev/net/tun`, permit
+`NET_ADMIN`, and allow namespaced IPv4 forwarding; the image does not alter
+host firewall or forwarding settings.
 
 `tests/config-load-smoke.sh` validates generated server and client configurations with the actual OpenVPN crypto self-test and uses `OVPN_NETWORK=10.88.0.0/24`. It skips when Docker is unavailable; set `OVPN_CONFIG_LOAD_REQUIRED=1` to require it.
 

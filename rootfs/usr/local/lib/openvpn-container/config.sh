@@ -118,6 +118,61 @@ ovpn_validate_cidr() {
   fi
 }
 
+ovpn_validate_ipv4() {
+  local address="$1"
+  local octet o1 o2 o3 o4
+
+  if ! [[ "$address" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    ovpn_die "invalid IPv4 address: $address"
+  fi
+
+  IFS=. read -r o1 o2 o3 o4 <<<"$address"
+  for octet in "$o1" "$o2" "$o3" "$o4"; do
+    if [ "$octet" -gt 255 ]; then
+      ovpn_die "invalid IPv4 address: $address"
+    fi
+  done
+}
+
+ovpn_validate_csv_cidrs() {
+  local value="$1"
+  local item
+  local -a items
+
+  [ -z "$value" ] && return 0
+  case "$value" in
+    ,*|*,|*,,*) ovpn_die 'OVPN_ROUTES must be a comma-separated list of IPv4 CIDRs' ;;
+  esac
+  IFS=, read -ra items <<<"$value"
+  for item in "${items[@]}"; do
+    ovpn_validate_cidr "$item"
+  done
+}
+
+ovpn_validate_dns_servers() {
+  local value="$1"
+  local item
+  local -a items
+
+  [ -z "$value" ] && return 0
+  case "$value" in
+    ,*|*,|*,,*) ovpn_die 'OVPN_DNS must be a comma-separated list of IPv4 addresses' ;;
+  esac
+  IFS=, read -ra items <<<"$value"
+  for item in "${items[@]}"; do
+    ovpn_validate_ipv4 "$item"
+  done
+}
+
+ovpn_validate_nat_interface() {
+  case "$OVPN_NAT_INTERFACE" in
+    auto) return 0 ;;
+  esac
+  if ! [[ "$OVPN_NAT_INTERFACE" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{0,14}$ ]]; then
+    ovpn_die 'OVPN_NAT_INTERFACE must be auto or a Linux interface name'
+  fi
+}
+
 ovpn_config_validate() {
   [ "$OVPN_CONFIG_VERSION" = 1 ] || ovpn_die "unsupported OVPN_CONFIG_VERSION: $OVPN_CONFIG_VERSION"
   ovpn_validate_single_line OVPN_ENDPOINT "$OVPN_ENDPOINT"
@@ -130,6 +185,9 @@ ovpn_config_validate() {
   ovpn_validate_bool OVPN_NAT "$OVPN_NAT"
   ovpn_validate_bool OVPN_REDIRECT_GATEWAY "$OVPN_REDIRECT_GATEWAY"
   ovpn_validate_bool OVPN_CLIENT_TO_CLIENT "$OVPN_CLIENT_TO_CLIENT"
+  ovpn_validate_nat_interface
+  ovpn_validate_csv_cidrs "$OVPN_ROUTES"
+  ovpn_validate_dns_servers "$OVPN_DNS"
 }
 
 ovpn_config_load() {

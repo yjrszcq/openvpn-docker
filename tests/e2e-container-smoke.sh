@@ -11,6 +11,12 @@ REQUIRED="${OVPN_E2E_REQUIRED:-0}"
 SKIP_BUILD="${OVPN_E2E_SKIP_BUILD:-0}"
 RUN_ID="ovpn-e2e-$$-$(date +%s)"
 CONTROL_RUNTIME_DIR="/tmp/openvpn-container-$RUN_ID"
+POLICY_NAT=true
+POLICY_NAT_INTERFACE=auto
+POLICY_REDIRECT_GATEWAY=false
+POLICY_CLIENT_TO_CLIENT=false
+POLICY_DNS=''
+POLICY_ROUTES=''
 
 containers=()
 networks=()
@@ -70,6 +76,12 @@ run_control() {
     -e "OVPN_NETWORK=$NETWORK" \
     -e "OVPN_PORT=$PORT" \
     -e "OVPN_PROTO=$proto" \
+    -e "OVPN_NAT=$POLICY_NAT" \
+    -e "OVPN_NAT_INTERFACE=$POLICY_NAT_INTERFACE" \
+    -e "OVPN_REDIRECT_GATEWAY=$POLICY_REDIRECT_GATEWAY" \
+    -e "OVPN_CLIENT_TO_CLIENT=$POLICY_CLIENT_TO_CLIENT" \
+    -e "OVPN_DNS=$POLICY_DNS" \
+    -e "OVPN_ROUTES=$POLICY_ROUTES" \
     -v "$data_dir:/etc/openvpn" \
     "$IMAGE" \
     "$@"
@@ -81,6 +93,47 @@ data_grep() {
   local path="$3"
 
   docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/grep "$IMAGE" -q "$pattern" "/etc/openvpn/$path"
+}
+
+data_absent() {
+  local data_dir="$1"
+  local pattern="$2"
+  local path="$3"
+
+  if docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/grep "$IMAGE" -q "$pattern" "/etc/openvpn/$path"; then
+    echo "unexpected pattern in $path: $pattern" >&2
+    exit 1
+  fi
+}
+
+assert_nat_policy() {
+  local server_name="$1"
+  local nat="$2"
+
+  docker exec "$server_name" /bin/sh -ec '
+    interface=""
+    next=false
+    for word in $(ip -4 route show default); do
+      if [ "$next" = true ]; then
+        interface="$word"
+        break
+      fi
+      [ "$word" = dev ] && next=true
+    done
+    test -n "$interface"
+    case "$2" in
+      true)
+        test "$(cat /proc/sys/net/ipv4/ip_forward)" = 1
+        iptables -w -t nat -C POSTROUTING -s "$1" -o "$interface" -j MASQUERADE
+        ;;
+      false)
+        if iptables -w -t nat -C POSTROUTING -s "$1" -o "$interface" -j MASQUERADE >/dev/null 2>&1; then
+          echo "unexpected NAT rule" >&2
+          exit 1
+        fi
+        ;;
+    esac
+  ' sh "$NETWORK" "$nat"
 }
 
 start_server() {
@@ -99,6 +152,12 @@ start_server() {
     -e "OVPN_NETWORK=$NETWORK" \
     -e "OVPN_PORT=$PORT" \
     -e "OVPN_PROTO=$proto" \
+    -e "OVPN_NAT=$POLICY_NAT" \
+    -e "OVPN_NAT_INTERFACE=$POLICY_NAT_INTERFACE" \
+    -e "OVPN_REDIRECT_GATEWAY=$POLICY_REDIRECT_GATEWAY" \
+    -e "OVPN_CLIENT_TO_CLIENT=$POLICY_CLIENT_TO_CLIENT" \
+    -e "OVPN_DNS=$POLICY_DNS" \
+    -e "OVPN_ROUTES=$POLICY_ROUTES" \
     -v "$data_dir:/etc/openvpn" \
     "$IMAGE" \
     ovpn start >/dev/null
@@ -198,6 +257,21 @@ for proto in udp tcp; do
   network_name="$RUN_ID-$proto-net"
   server_name="$RUN_ID-$proto-server"
   endpoint="$server_name"
+  if [ "$proto" = udp ]; then
+    POLICY_NAT=true
+    POLICY_NAT_INTERFACE=auto
+    POLICY_REDIRECT_GATEWAY=true
+    POLICY_CLIENT_TO_CLIENT=true
+    POLICY_DNS='1.1.1.1,8.8.8.8'
+    POLICY_ROUTES='192.168.50.0/24'
+  else
+    POLICY_NAT=false
+    POLICY_NAT_INTERFACE=auto
+    POLICY_REDIRECT_GATEWAY=false
+    POLICY_CLIENT_TO_CLIENT=false
+    POLICY_DNS=''
+    POLICY_ROUTES=''
+  fi
   mkdir -p "$data_dir"
 
   docker network create "$network_name" >/dev/null
@@ -213,6 +287,25 @@ for proto in udp tcp; do
   data_grep "$data_dir" "^OVPN_PROTO=$proto$" config/project.env
   data_grep "$data_dir" '^server 10.88.0.0 255.255.255.0$' server/server.conf
   data_grep "$data_dir" "^proto $proto$" server/server.conf
+  data_grep "$data_dir" "^OVPN_NAT=$POLICY_NAT$" config/project.env
+  data_grep "$data_dir" "^OVPN_NAT_INTERFACE=$POLICY_NAT_INTERFACE$" config/project.env
+  data_grep "$data_dir" "^OVPN_REDIRECT_GATEWAY=$POLICY_REDIRECT_GATEWAY$" config/project.env
+  data_grep "$data_dir" "^OVPN_CLIENT_TO_CLIENT=$POLICY_CLIENT_TO_CLIENT$" config/project.env
+  data_grep "$data_dir" "^OVPN_DNS=$POLICY_DNS$" config/project.env
+  data_grep "$data_dir" "^OVPN_ROUTES=$POLICY_ROUTES$" config/project.env
+  if [ "$POLICY_REDIRECT_GATEWAY" = true ]; then
+    data_grep "$data_dir" '^push "redirect-gateway def1"$' server/server.conf
+    data_grep "$data_dir" '^push "route 192.168.50.0 255.255.255.0"$' server/server.conf
+    data_grep "$data_dir" '^push "dhcp-option DNS 1.1.1.1"$' server/server.conf
+    data_grep "$data_dir" '^push "dhcp-option DNS 8.8.8.8"$' server/server.conf
+    data_grep "$data_dir" '^client-to-client$' server/server.conf
+  else
+    data_absent "$data_dir" '^push "redirect-gateway def1"$' server/server.conf
+    data_absent "$data_dir" '^push "route 192.168.50.0 255.255.255.0"$' server/server.conf
+    data_absent "$data_dir" '^push "dhcp-option DNS 1.1.1.1"$' server/server.conf
+    data_absent "$data_dir" '^client-to-client$' server/server.conf
+  fi
+  assert_nat_policy "$server_name" "$POLICY_NAT"
 
   run_control "$data_dir" "$endpoint" ovpn add-client "client-$proto"
   run_control "$data_dir" "$endpoint" ovpn export-client "client-$proto" >"$profile_path"
