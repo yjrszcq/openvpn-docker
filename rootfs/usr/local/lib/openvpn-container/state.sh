@@ -112,14 +112,6 @@ ovpn_state_add_issue() {
   OVPN_STATE_ISSUE_ACTIONS+=("$action")
 }
 
-ovpn_state_has_profile_candidates() (
-  local profile
-  shopt -s nullglob
-  for profile in "$OVPN_DATA_DIR"/clients/active/*.ovpn "$OVPN_DATA_DIR"/clients/revoked/*.ovpn "$OVPN_DATA_DIR"/clients/archive/*.ovpn; do
-    [ -f "$profile" ] && return 0
-  done
-  return 1
-)
 
 ovpn_state_scan_client_profiles() {
   local index="$OVPN_DATA_DIR/pki/index.txt"
@@ -145,6 +137,49 @@ ovpn_state_scan_client_profiles() {
 ovpn_state_add_repairable_issue() {
   ovpn_state_add_issue "$1" repairable "$2"
   ovpn_state_consider DEGRADED_REPAIRABLE
+}
+
+ovpn_state_add_recoverable_issue() {
+  ovpn_state_add_issue "$1" recoverable "$2"
+  ovpn_state_consider DEGRADED_RECOVERABLE
+}
+
+ovpn_state_classify_missing_ca_cert() {
+  if ovpn_recovery_assess_ca_cert; then
+    ovpn_state_add_recoverable_issue CA_CERT_MISSING RECOVER_CA_CERT
+    return 0
+  fi
+
+  case "$OVPN_RECOVERY_STATUS" in
+    conflict)
+      ovpn_state_add_critical_issue CRITICAL_RECOVERY_CONFLICT RESTORE_BACKUP
+      ;;
+    invalid)
+      ovpn_state_add_critical_issue CA_CERT_RECOVERY_INVALID RESTORE_BACKUP
+      ;;
+    *)
+      ovpn_state_add_critical_issue CA_CERT_MISSING RESTORE_BACKUP
+      ;;
+  esac
+}
+
+ovpn_state_classify_missing_tls_crypt_key() {
+  if ovpn_recovery_assess_tls_crypt_key; then
+    ovpn_state_add_recoverable_issue TLS_CRYPT_KEY_MISSING RECOVER_TLS_CRYPT_KEY
+    return 0
+  fi
+
+  case "$OVPN_RECOVERY_STATUS" in
+    conflict)
+      ovpn_state_add_critical_issue CRITICAL_RECOVERY_CONFLICT RESTORE_BACKUP
+      ;;
+    invalid)
+      ovpn_state_add_critical_issue TLS_CRYPT_KEY_RECOVERY_INVALID RESTORE_BACKUP
+      ;;
+    *)
+      ovpn_state_add_critical_issue TLS_CRYPT_KEY_MISSING RESTORE_BACKUP
+      ;;
+  esac
 }
 
 ovpn_state_add_critical_issue() {
@@ -307,22 +342,10 @@ ovpn_state_scan() {
     ovpn_state_consider UNRECOVERABLE
   fi
   if [ ! -e "$OVPN_DATA_DIR/pki/ca.crt" ]; then
-    if ovpn_state_has_profile_candidates; then
-      ovpn_state_add_issue CA_CERT_MISSING recoverable RECOVER_CA_CERT
-      ovpn_state_consider DEGRADED_RECOVERABLE
-    else
-      ovpn_state_add_issue CA_CERT_MISSING critical RESTORE_BACKUP
-      ovpn_state_consider CRITICAL
-    fi
+    ovpn_state_classify_missing_ca_cert
   fi
   if [ ! -e "$OVPN_DATA_DIR/secrets/tls-crypt.key" ]; then
-    if ovpn_state_has_profile_candidates; then
-      ovpn_state_add_issue TLS_CRYPT_KEY_MISSING recoverable RECOVER_TLS_CRYPT_KEY
-      ovpn_state_consider DEGRADED_RECOVERABLE
-    else
-      ovpn_state_add_issue TLS_CRYPT_KEY_MISSING critical RESTORE_BACKUP
-      ovpn_state_consider CRITICAL
-    fi
+    ovpn_state_classify_missing_tls_crypt_key
   fi
   if [ ! -e "$OVPN_DATA_DIR/pki/issued/$OVPN_SERVER_NAME.crt" ]; then
     ovpn_state_add_issue SERVER_CERT_MISSING reissuable REISSUE_SERVER_CERT

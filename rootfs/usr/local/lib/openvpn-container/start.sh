@@ -16,8 +16,8 @@ ovpn_start_command() {
 
   ovpn_auto_init_if_empty
   state="$(ovpn_state_detect)"
-  if [ "$state" = DEGRADED_REPAIRABLE ]; then
-    ovpn_log 'instance state is DEGRADED_REPAIRABLE; applying safe repairs'
+  if [ "$state" = DEGRADED_REPAIRABLE ] || [ "$state" = DEGRADED_RECOVERABLE ]; then
+    ovpn_log "instance state is $state; applying automatic repairs"
     ovpn_repair_command
     state="$(ovpn_state_detect)"
   fi

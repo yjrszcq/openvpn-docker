@@ -11,6 +11,7 @@ export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
 export OVPN_SERVER_NAME=openvpn-server
 # shellcheck source=../rootfs/usr/local/lib/openvpn-container/common.sh
 . "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/common.sh"
+. "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/recovery.sh"
 . "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/state.sh"
 
 make_healthy() {
@@ -73,7 +74,7 @@ assert_issue SERVER_CONFIG_MISSING
 recoverable="$TMP_DIR/recoverable"
 make_healthy "$recoverable"
 mkdir -p "$recoverable/clients/active"
-: >"$recoverable/clients/active/laptop.ovpn"
+printf '%s\n' '<ca>' 'FAKE CA CERT' '</ca>' >"$recoverable/clients/active/laptop.ovpn"
 rm "$recoverable/pki/ca.crt"
 assert_state "$recoverable" DEGRADED_RECOVERABLE
 assert_issue CA_CERT_MISSING

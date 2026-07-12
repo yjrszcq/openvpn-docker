@@ -38,7 +38,7 @@ Commands:
   init              initialize an empty data directory
   doctor            inspect state without modifying it
   state             print the detected state
-  repair            plan or run safe repairs
+  repair            plan or run SAFE/equivalent recovery actions
   recover           run explicit high-risk recovery actions
   config            inspect or update persistent project config
   render            render derived configuration

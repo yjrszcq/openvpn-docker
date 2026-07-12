@@ -109,7 +109,7 @@ if [ "$("$OVPN" state)" != HEALTHY ]; then
   echo 'repairable start did not restore HEALTHY state' >&2
   exit 1
 fi
-grep -Fq 'applying safe repairs' "$TMP_DIR/auto-repair-start.err"
+grep -Fq 'applying automatic repairs' "$TMP_DIR/auto-repair-start.err"
 test -f "$OVPN_DATA_DIR/server/server.conf"
 
 export OVPN_DATA_DIR="$TMP_DIR/missing-endpoint"

@@ -138,7 +138,7 @@ identity_after="$(sha256sum \
   echo 'safe repair changed identity material' >&2
   exit 1
 }
-grep -Fq 'completed 6 safe repair actions' "$TMP_DIR/repair.err"
+grep -Fq 'completed 6 automatic repair actions' "$TMP_DIR/repair.err"
 
 rm "$OVPN_DATA_DIR/server/server.conf"
 export FAKE_OPENSSL_LOG="$TMP_DIR/repair-lock-openssl.log"

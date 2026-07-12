@@ -2,6 +2,7 @@
 
 OVPN_REPAIR_ACTION_IDS=()
 OVPN_REPAIR_ACTION_TARGETS=()
+OVPN_REPAIR_ACTION_KINDS=()
 OVPN_REPAIR_BLOCKED_IDS=()
 OVPN_REPAIR_BLOCKED_SEVERITIES=()
 OVPN_REPAIR_BLOCKED_ACTIONS=()
@@ -9,6 +10,7 @@ OVPN_REPAIR_BLOCKED_ACTIONS=()
 ovpn_repair_plan_reset() {
   OVPN_REPAIR_ACTION_IDS=()
   OVPN_REPAIR_ACTION_TARGETS=()
+  OVPN_REPAIR_ACTION_KINDS=()
   OVPN_REPAIR_BLOCKED_IDS=()
   OVPN_REPAIR_BLOCKED_SEVERITIES=()
   OVPN_REPAIR_BLOCKED_ACTIONS=()
@@ -17,6 +19,7 @@ ovpn_repair_plan_reset() {
 ovpn_repair_plan_add_action() {
   OVPN_REPAIR_ACTION_IDS+=("$1")
   OVPN_REPAIR_ACTION_TARGETS+=("$2")
+  OVPN_REPAIR_ACTION_KINDS+=("${3:-safe}")
 }
 
 ovpn_repair_plan_add_blocked() {
@@ -31,27 +34,42 @@ ovpn_repair_plan_add_issue() {
   local action="$3"
   local client_name
 
-  if [ "$severity" != repairable ]; then
-    ovpn_repair_plan_add_blocked "$id" "$severity" "$action"
-    return 0
-  fi
-
-  case "$id" in
-    SCHEMA_VERSION_MISSING)
-      ovpn_repair_plan_add_action WRITE_SCHEMA_VERSION config/schema-version
+  case "$severity" in
+    repairable)
+      case "$id" in
+        SCHEMA_VERSION_MISSING)
+          ovpn_repair_plan_add_action WRITE_SCHEMA_VERSION config/schema-version
+          ;;
+        INSTANCE_METADATA_MISSING)
+          ovpn_repair_plan_add_action REBUILD_METADATA meta/instance.json
+          ;;
+        SERVER_CONFIG_MISSING)
+          ovpn_repair_plan_add_action RENDER_SERVER_CONFIG server/server.conf
+          ;;
+        CRL_MISSING|CRL_INVALID|CRL_CA_MISMATCH|CRL_EXPIRED)
+          ovpn_repair_plan_add_action REGENERATE_CRL pki/crl.pem
+          ;;
+        CLIENT_PROFILE_MISSING_*)
+          client_name="${id#CLIENT_PROFILE_MISSING_}"
+          ovpn_repair_plan_add_action RENDER_CLIENT_PROFILE "clients/active/$client_name.ovpn"
+          ;;
+        *)
+          ovpn_repair_plan_add_blocked "$id" "$severity" "$action"
+          ;;
+      esac
       ;;
-    INSTANCE_METADATA_MISSING)
-      ovpn_repair_plan_add_action REBUILD_METADATA meta/instance.json
-      ;;
-    SERVER_CONFIG_MISSING)
-      ovpn_repair_plan_add_action RENDER_SERVER_CONFIG server/server.conf
-      ;;
-    CRL_MISSING|CRL_INVALID|CRL_CA_MISMATCH|CRL_EXPIRED)
-      ovpn_repair_plan_add_action REGENERATE_CRL pki/crl.pem
-      ;;
-    CLIENT_PROFILE_MISSING_*)
-      client_name="${id#CLIENT_PROFILE_MISSING_}"
-      ovpn_repair_plan_add_action RENDER_CLIENT_PROFILE "clients/active/$client_name.ovpn"
+    recoverable)
+      case "$id" in
+        CA_CERT_MISSING)
+          ovpn_repair_plan_add_action RECOVER_CA_CERT pki/ca.crt recover
+          ;;
+        TLS_CRYPT_KEY_MISSING)
+          ovpn_repair_plan_add_action RECOVER_TLS_CRYPT_KEY secrets/tls-crypt.key recover
+          ;;
+        *)
+          ovpn_repair_plan_add_blocked "$id" "$severity" "$action"
+          ;;
+      esac
       ;;
     *)
       ovpn_repair_plan_add_blocked "$id" "$severity" "$action"
@@ -86,7 +104,9 @@ ovpn_repair_plan_print_json() {
   for ((index = 0; index < ${#OVPN_REPAIR_ACTION_IDS[@]}; index++)); do
     printf '    {"id": '
     ovpn_state_print_json_string "${OVPN_REPAIR_ACTION_IDS[index]}"
-    printf ', "kind": "safe", "target": '
+    printf ', "kind": '
+    ovpn_state_print_json_string "${OVPN_REPAIR_ACTION_KINDS[index]}"
+    printf ', "target": '
     ovpn_state_print_json_string "${OVPN_REPAIR_ACTION_TARGETS[index]}"
     printf '}'
     if [ "$index" -lt $((${#OVPN_REPAIR_ACTION_IDS[@]} - 1)) ]; then
@@ -112,11 +132,16 @@ ovpn_repair_plan_print_json() {
 }
 
 ovpn_repair_plan_print() {
-  local index
+  local index kind
 
   printf 'Instance: %s\n' "$OVPN_STATE"
   for ((index = 0; index < ${#OVPN_REPAIR_ACTION_IDS[@]}; index++)); do
-    printf '\n[SAFE] %s\n' "${OVPN_REPAIR_ACTION_IDS[index]}"
+    case "${OVPN_REPAIR_ACTION_KINDS[index]}" in
+      safe) kind=SAFE ;;
+      recover) kind=RECOVER ;;
+      *) kind=UNKNOWN ;;
+    esac
+    printf '\n[%s] %s\n' "$kind" "${OVPN_REPAIR_ACTION_IDS[index]}"
     printf 'Target: %s\n' "${OVPN_REPAIR_ACTION_TARGETS[index]}"
   done
   for ((index = 0; index < ${#OVPN_REPAIR_BLOCKED_IDS[@]}; index++)); do
@@ -274,10 +299,16 @@ ovpn_repair_stage_action() {
       client_name="${client_name%.ovpn}"
       ovpn_render_client "$client_name" --output "$OVPN_REPAIR_STAGE_DIR/$target"
       ;;
+    RECOVER_CA_CERT)
+      ovpn_recovery_stage_ca_cert "$OVPN_REPAIR_STAGE_DIR/$target"
+      ;;
+    RECOVER_TLS_CRYPT_KEY)
+      ovpn_recovery_stage_tls_crypt_key "$OVPN_REPAIR_STAGE_DIR/$target"
+      ;;
     ENSURE_RUNTIME_DIRECTORY)
       ;;
     *)
-      ovpn_die "unsupported safe repair action: $id"
+      ovpn_die "unsupported automatic repair action: $id"
       ;;
   esac
 }
@@ -326,7 +357,7 @@ ovpn_repair_validate_stage() {
   OVPN_PROJECT_ENV="$saved_project_env"
   OVPN_SCHEMA_VERSION_FILE="$saved_schema_version_file"
 
-  [ "$validation_state" = HEALTHY ] || ovpn_die "staged safe repair is not healthy: $validation_state"
+  [ "$validation_state" = HEALTHY ] || ovpn_die "staged automatic repair is not healthy: $validation_state"
 }
 
 ovpn_repair_install_staged_actions() {
@@ -430,16 +461,16 @@ ovpn_repair_transaction_cleanup() {
 ovpn_repair_apply_inner() {
   ovpn_repair_plan_build
   case "$OVPN_STATE" in
-    HEALTHY|DEGRADED_REPAIRABLE)
+    HEALTHY|DEGRADED_REPAIRABLE|DEGRADED_RECOVERABLE)
       ;;
     *)
-      ovpn_log "instance state is $OVPN_STATE; refusing safe repair"
+      ovpn_log "instance state is $OVPN_STATE; refusing automatic repair"
       ovpn_repair_plan_print >&2
       exit 78
       ;;
   esac
   if [ "${#OVPN_REPAIR_ACTION_IDS[@]}" -eq 0 ]; then
-    ovpn_log 'no safe repair actions are required'
+    ovpn_log 'no automatic repair actions are required'
     return 0
   fi
 
@@ -453,12 +484,12 @@ ovpn_repair_apply_inner() {
   ovpn_repair_validate_stage
   ovpn_repair_install_staged_actions
   ovpn_state_scan
-  [ "$OVPN_STATE" = HEALTHY ] || ovpn_die "safe repair did not restore a healthy instance: $OVPN_STATE"
+  [ "$OVPN_STATE" = HEALTHY ] || ovpn_die "automatic repair did not restore a healthy instance: $OVPN_STATE"
   ovpn_repair_write_journal success
   OVPN_REPAIR_TRANSACTION_SUCCESS=true
   rm -rf "$OVPN_REPAIR_STAGE_DIR"
   trap - EXIT
-  ovpn_log "completed ${#OVPN_REPAIR_ACTION_IDS[@]} safe repair actions"
+  ovpn_log "completed ${#OVPN_REPAIR_ACTION_IDS[@]} automatic repair actions"
 }
 
 ovpn_repair_command() {
