@@ -212,3 +212,172 @@ ovpn_recovery_stage_tls_crypt_key() {
   ovpn_recovery_assess_tls_crypt_key || ovpn_die "tls-crypt recovery evidence is $OVPN_RECOVERY_STATUS"
   ovpn_recovery_write_value "$destination" "$OVPN_RECOVERY_SELECTED_VALUE" 600
 }
+
+ovpn_recovery_normalize_serial() {
+  local serial="${1#serial=}"
+
+  serial="${serial^^}"
+  [[ "$serial" =~ ^[0-9A-F]+$ ]] || return 1
+  while [ "${#serial}" -gt 1 ] && [ "${serial:0:1}" = 0 ]; do
+    serial="${serial:1}"
+  done
+  printf '%s\n' "$serial"
+}
+
+ovpn_recovery_client_index_serial() {
+  local name="$1"
+  local line status serial subject found=''
+
+  [ -r "$OVPN_DATA_DIR/pki/index.txt" ] || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    status="${line%%$'\t'*}"
+    [ "$status" = V ] || continue
+    subject="${line##*$'\t'}"
+    [ "$subject" = "/CN=$name" ] || continue
+    serial="$(printf '%s\n' "$line" | awk -F '\t' 'NF >= 4 {print $4}')"
+    [ -n "$serial" ] || return 1
+    [ -z "$found" ] || return 1
+    found="$serial"
+  done <"$OVPN_DATA_DIR/pki/index.txt"
+  [ -n "$found" ] || return 1
+  printf '%s\n' "$found"
+}
+
+ovpn_recovery_cert_public_key() {
+  local value="$1"
+  local openssl_bin
+
+  openssl_bin="$(ovpn_openssl_bin)" || return 1
+  printf '%s\n' "$value" | "$openssl_bin" x509 -noout -pubkey 2>/dev/null
+}
+
+ovpn_recovery_key_public_key() {
+  local value="$1"
+  local openssl_bin
+
+  openssl_bin="$(ovpn_openssl_bin)" || return 1
+  printf '%s\n' "$value" | "$openssl_bin" pkey -pubout 2>/dev/null
+}
+
+ovpn_recovery_verify_certificate_with_available_ca() {
+  local certificate="$1"
+  local openssl_bin
+
+  openssl_bin="$(ovpn_openssl_bin)" || return 1
+  if [ -r "$OVPN_DATA_DIR/pki/ca.crt" ]; then
+    "$openssl_bin" verify -CAfile "$OVPN_DATA_DIR/pki/ca.crt" <(printf '%s\n' "$certificate") >/dev/null 2>&1
+    return $?
+  fi
+  ovpn_recovery_assess_ca_cert || return 1
+  "$openssl_bin" verify -CAfile <(printf '%s\n' "$OVPN_RECOVERY_SELECTED_VALUE") <(printf '%s\n' "$certificate") >/dev/null 2>&1
+}
+
+ovpn_recovery_validate_client_cert() {
+  local value="$1"
+  local name="$2"
+  local serial="$3"
+  local openssl_bin subject certificate_serial expected_serial
+
+  openssl_bin="$(ovpn_openssl_bin)" || return 1
+  "$openssl_bin" x509 -noout >/dev/null 2>&1 <<<"$value" || return 1
+  subject="$(printf '%s\n' "$value" | "$openssl_bin" x509 -noout -subject -nameopt RFC2253 2>/dev/null)" || return 1
+  subject="${subject#subject=}"
+  case ",$subject," in
+    *",CN=$name,"*) ;;
+    *) return 1 ;;
+  esac
+  certificate_serial="$(printf '%s\n' "$value" | "$openssl_bin" x509 -noout -serial 2>/dev/null)" || return 1
+  certificate_serial="$(ovpn_recovery_normalize_serial "$certificate_serial")" || return 1
+  expected_serial="$(ovpn_recovery_normalize_serial "$serial")" || return 1
+  [ "$certificate_serial" = "$expected_serial" ] || return 1
+  ovpn_recovery_verify_certificate_with_available_ca "$value"
+}
+
+ovpn_recovery_assess_client_identity() {
+  local name="$1"
+  local serial="$2"
+  local profile="$OVPN_DATA_DIR/clients/active/$name.ovpn"
+  local certificate key certificate_status key_status certificate_pub key_pub local_value local_pub
+
+  ovpn_recovery_reset
+  [ -r "$profile" ] || return 1
+  if certificate="$(ovpn_recovery_extract_profile_block "$profile" cert)"; then
+    certificate_status=0
+  else
+    certificate_status=$?
+  fi
+  if key="$(ovpn_recovery_extract_profile_block "$profile" key)"; then
+    key_status=0
+  else
+    key_status=$?
+  fi
+  if [ "$certificate_status" -ne 0 ] || [ "$key_status" -ne 0 ]; then
+    if [ "$certificate_status" -eq 3 ] || [ "$key_status" -eq 3 ]; then
+      OVPN_RECOVERY_STATUS=unavailable
+    else
+      OVPN_RECOVERY_STATUS=invalid
+    fi
+    return 1
+  fi
+  ovpn_recovery_validate_client_cert "$certificate" "$name" "$serial" || {
+    [ "$OVPN_RECOVERY_STATUS" = conflict ] || OVPN_RECOVERY_STATUS=invalid
+    return 1
+  }
+  certificate_pub="$(ovpn_recovery_cert_public_key "$certificate")" || {
+    OVPN_RECOVERY_STATUS=invalid
+    return 1
+  }
+  key_pub="$(ovpn_recovery_key_public_key "$key")" || {
+    OVPN_RECOVERY_STATUS=invalid
+    return 1
+  }
+  [ "$certificate_pub" = "$key_pub" ] || {
+    OVPN_RECOVERY_STATUS=invalid
+    return 1
+  }
+  if [ -e "$OVPN_DATA_DIR/pki/issued/$name.crt" ]; then
+    local_value="$(cat "$OVPN_DATA_DIR/pki/issued/$name.crt")"
+    ovpn_recovery_validate_client_cert "$local_value" "$name" "$serial" || {
+      OVPN_RECOVERY_STATUS=invalid
+      return 1
+    }
+    [ "$(ovpn_recovery_candidate_hash "$local_value")" = "$(ovpn_recovery_candidate_hash "$certificate")" ] || {
+      OVPN_RECOVERY_STATUS=invalid
+      return 1
+    }
+  fi
+  if [ -e "$OVPN_DATA_DIR/pki/private/$name.key" ]; then
+    local_value="$(cat "$OVPN_DATA_DIR/pki/private/$name.key")"
+    local_pub="$(ovpn_recovery_key_public_key "$local_value")" || {
+      OVPN_RECOVERY_STATUS=invalid
+      return 1
+    }
+    [ "$local_pub" = "$certificate_pub" ] || {
+      OVPN_RECOVERY_STATUS=invalid
+      return 1
+    }
+  fi
+  OVPN_RECOVERY_CLIENT_CERTIFICATE="$certificate"
+  OVPN_RECOVERY_CLIENT_KEY="$key"
+  OVPN_RECOVERY_STATUS=recoverable
+}
+
+ovpn_recovery_stage_client_certificate() {
+  local name="$1"
+  local destination="$2"
+  local serial
+
+  serial="$(ovpn_recovery_client_index_serial "$name")" || ovpn_die "unable to find active client serial: $name"
+  ovpn_recovery_assess_client_identity "$name" "$serial" || ovpn_die "client certificate recovery evidence is $OVPN_RECOVERY_STATUS"
+  ovpn_recovery_write_value "$destination" "$OVPN_RECOVERY_CLIENT_CERTIFICATE" 644
+}
+
+ovpn_recovery_stage_client_key() {
+  local name="$1"
+  local destination="$2"
+  local serial
+
+  serial="$(ovpn_recovery_client_index_serial "$name")" || ovpn_die "unable to find active client serial: $name"
+  ovpn_recovery_assess_client_identity "$name" "$serial" || ovpn_die "client key recovery evidence is $OVPN_RECOVERY_STATUS"
+  ovpn_recovery_write_value "$destination" "$OVPN_RECOVERY_CLIENT_KEY" 600
+}

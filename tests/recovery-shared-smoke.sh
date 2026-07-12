@@ -63,7 +63,11 @@ write_profile() {
   {
     printf '%s\n' '<ca>'
     cat "$data_dir/pki/ca.crt"
-    printf '%s\n' '</ca>' '<tls-crypt>'
+    printf '%s\n' '</ca>' '<cert>'
+    cat "$data_dir/pki/issued/laptop.crt"
+    printf '%s\n' '</cert>' '<key>'
+    cat "$data_dir/pki/private/laptop.key"
+    printf '%s\n' '</key>' '<tls-crypt>'
     cat "$data_dir/secrets/tls-crypt.key"
     printf '%s\n' '</tls-crypt>'
   } >"$path"
@@ -98,6 +102,10 @@ make_fixture() {
   openssl req -newkey rsa:2048 -nodes -subj '/CN=openvpn-server' -keyout "$data_dir/pki/private/openvpn-server.key" -out "$data_dir/server.csr" >/dev/null 2>&1
   printf '%s\n' 'basicConstraints=CA:FALSE' 'keyUsage=digitalSignature,keyEncipherment' 'extendedKeyUsage=serverAuth' >"$data_dir/server.ext"
   openssl x509 -req -in "$data_dir/server.csr" -CA "$data_dir/pki/ca.crt" -CAkey "$data_dir/pki/private/ca.key" -CAcreateserial -days 1 -out "$data_dir/pki/issued/openvpn-server.crt" -extfile "$data_dir/server.ext" >/dev/null 2>&1
+  openssl req -newkey rsa:2048 -nodes -subj '/CN=laptop' -keyout "$data_dir/pki/private/laptop.key" -out "$data_dir/laptop.csr" >/dev/null 2>&1
+  printf '%s\n' 'basicConstraints=CA:FALSE' 'keyUsage=digitalSignature,keyEncipherment' 'extendedKeyUsage=clientAuth' >"$data_dir/laptop.ext"
+  openssl x509 -req -in "$data_dir/laptop.csr" -CA "$data_dir/pki/ca.crt" -CAkey "$data_dir/pki/private/ca.key" -set_serial 0x01 -days 1 -out "$data_dir/pki/issued/laptop.crt" -extfile "$data_dir/laptop.ext" >/dev/null 2>&1
+  printf 'V\t30000101000000Z\t\t01\tunknown\t/CN=laptop\n' >"$data_dir/pki/index.txt"
   cat >"$data_dir/crl.cnf" <<CRL_CONFIG
 [ ca ]
 default_ca = CA_default
@@ -157,6 +165,40 @@ fi
 [ "$("$OVPN" state)" = HEALTHY ]
 [ "$(sha256sum "$data_dir/pki/ca.crt")" = "$ca_hash" ]
 [ "$(sha256sum "$data_dir/secrets/tls-crypt.key")" = "$tls_hash" ]
+client_certificate_hash="$(sha256sum "$data_dir/pki/issued/laptop.crt")"
+client_key_hash="$(sha256sum "$data_dir/pki/private/laptop.key")"
+rm "$data_dir/pki/issued/laptop.crt"
+client_state="$("$OVPN" state)"
+if [ "$client_state" != DEGRADED_RECOVERABLE ]; then
+  "$OVPN" doctor --json >&2 || true
+  echo "expected DEGRADED_RECOVERABLE after client certificate loss, got $client_state" >&2
+  exit 1
+fi
+"$OVPN" repair --plan >"$TMP_DIR/client-cert-plan.out"
+grep -Fq '[RECOVER] RECOVER_CLIENT_CERT' "$TMP_DIR/client-cert-plan.out"
+"$OVPN" repair >"$TMP_DIR/client-cert-repair.out" 2>"$TMP_DIR/client-cert-repair.err"
+[ "$("$OVPN" state)" = HEALTHY ]
+[ "$(sha256sum "$data_dir/pki/issued/laptop.crt")" = "$client_certificate_hash" ]
+[ "$(stat -c '%a' "$data_dir/pki/issued/laptop.crt")" = 644 ]
+
+rm "$data_dir/pki/private/laptop.key"
+[ "$("$OVPN" state)" = DEGRADED_RECOVERABLE ]
+"$OVPN" repair --plan >"$TMP_DIR/client-key-plan.out"
+grep -Fq '[RECOVER] RECOVER_CLIENT_KEY' "$TMP_DIR/client-key-plan.out"
+"$OVPN" repair >"$TMP_DIR/client-key-repair.out" 2>"$TMP_DIR/client-key-repair.err"
+[ "$("$OVPN" state)" = HEALTHY ]
+[ "$(sha256sum "$data_dir/pki/private/laptop.key")" = "$client_key_hash" ]
+[ "$(stat -c '%a' "$data_dir/pki/private/laptop.key")" = 600 ]
+
+rm "$data_dir/pki/issued/laptop.crt" "$data_dir/pki/private/laptop.key"
+[ "$("$OVPN" state)" = DEGRADED_RECOVERABLE ]
+if ! "$OVPN" start >"$TMP_DIR/client-start.out" 2>"$TMP_DIR/client-start.err"; then
+  cat "$TMP_DIR/client-start.err" >&2
+  exit 1
+fi
+[ "$("$OVPN" state)" = HEALTHY ]
+[ "$(sha256sum "$data_dir/pki/issued/laptop.crt")" = "$client_certificate_hash" ]
+[ "$(sha256sum "$data_dir/pki/private/laptop.key")" = "$client_key_hash" ]
 
 rm "$data_dir/clients/active/laptop.ovpn" "$data_dir/clients/active/phone.ovpn" "$data_dir/pki/ca.crt"
 [ "$("$OVPN" state)" = CRITICAL ]

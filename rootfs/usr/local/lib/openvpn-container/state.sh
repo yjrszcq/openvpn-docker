@@ -115,7 +115,7 @@ ovpn_state_add_issue() {
 
 ovpn_state_scan_client_profiles() {
   local index="$OVPN_DATA_DIR/pki/index.txt"
-  local line status subject name profile
+  local line status subject name profile serial
 
   [ -r "$index" ] || return 0
   while IFS= read -r line || [ -n "$line" ]; do
@@ -126,10 +126,14 @@ ovpn_state_scan_client_profiles() {
     name="${name%%/*}"
     [ -n "$name" ] || continue
     [ "$name" != "$OVPN_SERVER_NAME" ] || continue
+    serial="$(printf '%s\n' "$line" | awk -F '\t' 'NF >= 4 {print $4}')"
     profile="$OVPN_DATA_DIR/clients/active/$name.ovpn"
     if [ ! -e "$profile" ]; then
       ovpn_state_add_issue "CLIENT_PROFILE_MISSING_$name" repairable RENDER_CLIENT_PROFILE
       ovpn_state_consider DEGRADED_REPAIRABLE
+    fi
+    if [ ! -e "$OVPN_DATA_DIR/pki/issued/$name.crt" ] || [ ! -e "$OVPN_DATA_DIR/pki/private/$name.key" ]; then
+      ovpn_state_classify_missing_client_identity "$name" "$serial"
     fi
   done <"$index"
 }
@@ -182,6 +186,30 @@ ovpn_state_classify_missing_tls_crypt_key() {
   esac
 }
 
+ovpn_state_classify_missing_client_identity() {
+  local name="$1"
+  local serial="$2"
+  local certificate="$OVPN_DATA_DIR/pki/issued/$name.crt"
+  local key="$OVPN_DATA_DIR/pki/private/$name.key"
+
+  if ovpn_recovery_assess_client_identity "$name" "$serial"; then
+    [ -e "$certificate" ] || ovpn_state_add_recoverable_issue "CLIENT_CERT_MISSING_$name" RECOVER_CLIENT_CERT
+    [ -e "$key" ] || ovpn_state_add_recoverable_issue "CLIENT_KEY_MISSING_$name" RECOVER_CLIENT_KEY
+    return 0
+  fi
+
+  case "$OVPN_RECOVERY_STATUS" in
+    conflict)
+      ovpn_state_add_critical_issue CRITICAL_RECOVERY_CONFLICT RESTORE_BACKUP
+      ;;
+    invalid)
+      ovpn_state_add_critical_issue "CLIENT_IDENTITY_RECOVERY_INVALID_$name" RESTORE_BACKUP
+      ;;
+    *)
+      ovpn_state_add_critical_issue "CLIENT_IDENTITY_RECOVERY_UNAVAILABLE_$name" RESTORE_BACKUP
+      ;;
+  esac
+}
 ovpn_state_add_critical_issue() {
   ovpn_state_add_issue "$1" critical "$2"
   ovpn_state_consider CRITICAL

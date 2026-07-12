@@ -66,6 +66,14 @@ ovpn_repair_plan_add_issue() {
         TLS_CRYPT_KEY_MISSING)
           ovpn_repair_plan_add_action RECOVER_TLS_CRYPT_KEY secrets/tls-crypt.key recover
           ;;
+        CLIENT_CERT_MISSING_*)
+          client_name="${id#CLIENT_CERT_MISSING_}"
+          ovpn_repair_plan_add_action RECOVER_CLIENT_CERT "pki/issued/$client_name.crt" recover
+          ;;
+        CLIENT_KEY_MISSING_*)
+          client_name="${id#CLIENT_KEY_MISSING_}"
+          ovpn_repair_plan_add_action RECOVER_CLIENT_KEY "pki/private/$client_name.key" recover
+          ;;
         *)
           ovpn_repair_plan_add_blocked "$id" "$severity" "$action"
           ;;
@@ -304,6 +312,16 @@ ovpn_repair_stage_action() {
       ;;
     RECOVER_TLS_CRYPT_KEY)
       ovpn_recovery_stage_tls_crypt_key "$OVPN_REPAIR_STAGE_DIR/$target"
+      ;;
+    RECOVER_CLIENT_CERT)
+      client_name="${target#pki/issued/}"
+      client_name="${client_name%.crt}"
+      ovpn_recovery_stage_client_certificate "$client_name" "$OVPN_REPAIR_STAGE_DIR/$target"
+      ;;
+    RECOVER_CLIENT_KEY)
+      client_name="${target#pki/private/}"
+      client_name="${client_name%.key}"
+      ovpn_recovery_stage_client_key "$client_name" "$OVPN_REPAIR_STAGE_DIR/$target"
       ;;
     ENSURE_RUNTIME_DIRECTORY)
       ;;
