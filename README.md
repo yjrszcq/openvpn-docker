@@ -40,7 +40,7 @@ Kubernetes integration.
 
 ### Configure and start
 
-Copy `docker-compose.example.yaml` to `compose.yaml`, or create `compose.yaml` with the following content:
+Create a minimal `compose.yaml`:
 
 ```yaml
 x-openvpn-data: &openvpn-data
@@ -72,17 +72,10 @@ services:
       OVPN_ROUTES: ${OVPN_ROUTES:-}
       OVPN_CRITICAL_MODE: ${OVPN_CRITICAL_MODE:-exit}
 
-  openvpn-maintenance:
-    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
-    restart: "no"
-    <<: *openvpn-data
-    profiles:
-      - maintenance
-    command:
-      - doctor
-    entrypoint:
-      - /usr/local/bin/ovpn
 ```
+
+The repository's `docker-compose.example.yaml` also includes the optional
+`openvpn-maintenance` service described below.
 
 Copy the root `.env.example` to `.env`, then adjust it:
 
@@ -165,9 +158,23 @@ the active-client set.
 
 ## Operations and Maintenance
 
-Use the maintenance profile for one-shot state inspection and repair. It mounts
-the same persistent data but does not request TUN, `NET_ADMIN`, or published
-ports.
+The minimal quick-start configuration omits maintenance. To add one-shot state
+inspection and repair, append this service under `services:`; the repository
+template already includes it. It mounts the same data but does not request TUN,
+`NET_ADMIN`, or published ports.
+
+```yaml
+  openvpn-maintenance:
+    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
+    restart: "no"
+    <<: *openvpn-data
+    profiles:
+      - maintenance
+    command:
+      - doctor
+    entrypoint:
+      - /usr/local/bin/ovpn
+```
 
 ```bash
 docker compose run --rm openvpn-maintenance doctor

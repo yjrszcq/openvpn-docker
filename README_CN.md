@@ -28,7 +28,7 @@
 
 ### 配置并启动
 
-将 `docker-compose.example.yaml` 复制为 `compose.yaml`，或按以下内容创建 `compose.yaml`：
+创建最小的 `compose.yaml`：
 
 ```yaml
 x-openvpn-data: &openvpn-data
@@ -60,17 +60,10 @@ services:
       OVPN_ROUTES: ${OVPN_ROUTES:-}
       OVPN_CRITICAL_MODE: ${OVPN_CRITICAL_MODE:-exit}
 
-  openvpn-maintenance:
-    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
-    restart: "no"
-    <<: *openvpn-data
-    profiles:
-      - maintenance
-    command:
-      - doctor
-    entrypoint:
-      - /usr/local/bin/ovpn
 ```
+
+仓库中的 `docker-compose.example.yaml` 也包含下文说明的可选
+`openvpn-maintenance` 服务。
 
 将根目录 `.env.example` 复制为 `.env`，再修改其中的值：
 
@@ -145,7 +138,22 @@ docker compose exec openvpn ovpn revoke-client laptop
 
 ## 运维与维护
 
-使用 maintenance profile 对同一份持久化数据执行一次性诊断和修复。该服务不申请 TUN、`NET_ADMIN` 或公开端口。
+最小快速开始配置不包含 maintenance 服务。需要一次性诊断或修复时，在 `services:`
+下追加以下服务；仓库模板已包含它。它挂载同一份持久化数据，但不申请 TUN、
+`NET_ADMIN` 或公开端口。
+
+```yaml
+  openvpn-maintenance:
+    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
+    restart: "no"
+    <<: *openvpn-data
+    profiles:
+      - maintenance
+    command:
+      - doctor
+    entrypoint:
+      - /usr/local/bin/ovpn
+```
 
 ```bash
 docker compose run --rm openvpn-maintenance doctor
