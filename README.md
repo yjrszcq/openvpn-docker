@@ -117,6 +117,48 @@ persisted values with:
 docker compose exec openvpn ovpn config print
 ```
 
+### Change an existing configuration
+
+To change a running instance, update the Compose configuration first. For
+example, to change OpenVPN from UDP to TCP on port 1194:
+
+```yaml
+ports:
+  - "1194:1194/tcp"
+environment:
+  OVPN_PROTO: tcp
+  OVPN_PORT: "1194"
+```
+
+Open the matching TCP port in the host and cloud firewall. Then apply the full
+current Compose environment to the existing data directory:
+
+```bash
+docker compose config --quiet
+docker compose down # Do not use `-v`.
+docker compose run --rm openvpn ovpn config init
+docker compose up -d openvpn
+docker compose exec openvpn ovpn config print
+```
+
+`config init` rewrites only the persisted configuration; it does not remove or
+reissue client certificates, keys, or profiles. It writes every configuration
+value from the Compose environment, so keep all `OVPN_*` values complete and
+correct before running it.
+
+When `OVPN_ENDPOINT`, `OVPN_PROTO`, or `OVPN_PORT` changes, export and
+redistribute a new profile for every active client. The temporary file prevents
+a failed export from replacing an existing local profile:
+
+```bash
+docker compose exec -T openvpn ovpn export-client laptop > laptop.ovpn.tmp &&
+mv laptop.ovpn.tmp laptop.ovpn
+```
+
+Do not run `add-client` again for an existing name. Existing client
+certificates remain valid; clients need the newly rendered profile to use the
+new endpoint, protocol, or port.
+
 ## Client Management
 
 Create a client certificate and profile:
