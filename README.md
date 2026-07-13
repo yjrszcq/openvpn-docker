@@ -43,56 +43,37 @@ Kubernetes integration.
 Create a minimal `compose.yaml`:
 
 ```yaml
-x-openvpn-data: &openvpn-data
-  volumes:
-    - ./openvpn-data:/etc/openvpn
-
 services:
   openvpn:
-    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
+    image: szcq/openvpn:2.7.5
     container_name: openvpn
     restart: unless-stopped
-    <<: *openvpn-data
     cap_add:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ./openvpn-data:/etc/openvpn
     ports:
-      - "${OVPN_PORT:-1194}:${OVPN_PORT:-1194}/${OVPN_PROTO:-udp}"
+      - "1194:1194/udp"
     environment:
-      OVPN_ENDPOINT: ${OVPN_ENDPOINT:-vpn.example.com}
-      OVPN_PROTO: ${OVPN_PROTO:-udp}
-      OVPN_PORT: ${OVPN_PORT:-1194}
-      OVPN_NETWORK: ${OVPN_NETWORK:-10.8.0.0/24}
-      OVPN_NAT: ${OVPN_NAT:-true}
-      OVPN_NAT_INTERFACE: ${OVPN_NAT_INTERFACE:-auto}
-      OVPN_REDIRECT_GATEWAY: ${OVPN_REDIRECT_GATEWAY:-false}
-      OVPN_CLIENT_TO_CLIENT: ${OVPN_CLIENT_TO_CLIENT:-false}
-      OVPN_DNS: ${OVPN_DNS:-}
-      OVPN_ROUTES: ${OVPN_ROUTES:-}
-      OVPN_CRITICAL_MODE: ${OVPN_CRITICAL_MODE:-exit}
+      OVPN_ENDPOINT: vpn.example.com
+      OVPN_PROTO: udp
+      OVPN_PORT: "1194"
+      OVPN_NETWORK: 10.42.0.0/24
+      OVPN_NAT: "true"
+      OVPN_NAT_INTERFACE: auto
+      OVPN_REDIRECT_GATEWAY: "false"
+      OVPN_CLIENT_TO_CLIENT: "false"
+      OVPN_DNS: ""
+      OVPN_ROUTES: ""
+      OVPN_CRITICAL_MODE: exit
 
 ```
 
 The repository's `docker-compose.example.yaml` also includes the optional
 `openvpn-maintenance` service described below.
 
-Copy the root `.env.example` to `.env`, then adjust it:
-
-```dotenv
-OVPN_IMAGE=szcq/openvpn:2.7.5
-OVPN_ENDPOINT=vpn.example.com
-OVPN_PROTO=udp
-OVPN_PORT=1194
-OVPN_NETWORK=10.42.0.0/24
-OVPN_NAT=true
-OVPN_NAT_INTERFACE=auto
-OVPN_REDIRECT_GATEWAY=false
-OVPN_CLIENT_TO_CLIENT=false
-OVPN_DNS=
-OVPN_ROUTES=
-OVPN_CRITICAL_MODE=exit
-```
 
 Replace `vpn.example.com` with the public hostname or IP address clients use.
 Choose a network that is unused in the deployment; the example deliberately
@@ -165,9 +146,10 @@ template already includes it. It mounts the same data but does not request TUN,
 
 ```yaml
   openvpn-maintenance:
-    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
+    image: szcq/openvpn:2.7.5
     restart: "no"
-    <<: *openvpn-data
+    volumes:
+      - ./openvpn-data:/etc/openvpn
     profiles:
       - maintenance
     command:

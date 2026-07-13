@@ -31,56 +31,37 @@
 创建最小的 `compose.yaml`：
 
 ```yaml
-x-openvpn-data: &openvpn-data
-  volumes:
-    - ./openvpn-data:/etc/openvpn
-
 services:
   openvpn:
-    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
+    image: szcq/openvpn:2.7.5
     container_name: openvpn
     restart: unless-stopped
-    <<: *openvpn-data
     cap_add:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ./openvpn-data:/etc/openvpn
     ports:
-      - "${OVPN_PORT:-1194}:${OVPN_PORT:-1194}/${OVPN_PROTO:-udp}"
+      - "1194:1194/udp"
     environment:
-      OVPN_ENDPOINT: ${OVPN_ENDPOINT:-vpn.example.com}
-      OVPN_PROTO: ${OVPN_PROTO:-udp}
-      OVPN_PORT: ${OVPN_PORT:-1194}
-      OVPN_NETWORK: ${OVPN_NETWORK:-10.8.0.0/24}
-      OVPN_NAT: ${OVPN_NAT:-true}
-      OVPN_NAT_INTERFACE: ${OVPN_NAT_INTERFACE:-auto}
-      OVPN_REDIRECT_GATEWAY: ${OVPN_REDIRECT_GATEWAY:-false}
-      OVPN_CLIENT_TO_CLIENT: ${OVPN_CLIENT_TO_CLIENT:-false}
-      OVPN_DNS: ${OVPN_DNS:-}
-      OVPN_ROUTES: ${OVPN_ROUTES:-}
-      OVPN_CRITICAL_MODE: ${OVPN_CRITICAL_MODE:-exit}
+      OVPN_ENDPOINT: vpn.example.com
+      OVPN_PROTO: udp
+      OVPN_PORT: "1194"
+      OVPN_NETWORK: 10.42.0.0/24
+      OVPN_NAT: "true"
+      OVPN_NAT_INTERFACE: auto
+      OVPN_REDIRECT_GATEWAY: "false"
+      OVPN_CLIENT_TO_CLIENT: "false"
+      OVPN_DNS: ""
+      OVPN_ROUTES: ""
+      OVPN_CRITICAL_MODE: exit
 
 ```
 
 仓库中的 `docker-compose.example.yaml` 也包含下文说明的可选
 `openvpn-maintenance` 服务。
 
-将根目录 `.env.example` 复制为 `.env`，再修改其中的值：
-
-```dotenv
-OVPN_IMAGE=szcq/openvpn:2.7.5
-OVPN_ENDPOINT=vpn.example.com
-OVPN_PROTO=udp
-OVPN_PORT=1194
-OVPN_NETWORK=10.42.0.0/24
-OVPN_NAT=true
-OVPN_NAT_INTERFACE=auto
-OVPN_REDIRECT_GATEWAY=false
-OVPN_CLIENT_TO_CLIENT=false
-OVPN_DNS=
-OVPN_ROUTES=
-OVPN_CRITICAL_MODE=exit
-```
 
 将 `vpn.example.com` 替换为客户端实际连接的公网域名或 IP。请按部署环境选择未使用的网段；示例没有假定 `10.8.0.0/24` 一定可用。
 
@@ -144,9 +125,10 @@ docker compose exec openvpn ovpn revoke-client laptop
 
 ```yaml
   openvpn-maintenance:
-    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
+    image: szcq/openvpn:2.7.5
     restart: "no"
-    <<: *openvpn-data
+    volumes:
+      - ./openvpn-data:/etc/openvpn
     profiles:
       - maintenance
     command:
