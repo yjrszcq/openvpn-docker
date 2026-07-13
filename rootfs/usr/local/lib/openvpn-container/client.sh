@@ -76,13 +76,22 @@ ovpn_add_client_inner() {
   ovpn_log "added client '$name'"
 }
 
+ovpn_export_client_inner() {
+  local name="$1"
+  local profile
+
+  ovpn_require_healthy_state
+  ovpn_client_require_active "$name"
+  profile="$(ovpn_render_client_content "$name")"
+  ovpn_write_or_print "$OVPN_DATA_DIR/clients/active/$name.ovpn" "$profile"
+  ovpn_write_or_print - "$profile"
+}
+
 ovpn_export_client_command() {
   local name="${1:-}"
   [ -n "$name" ] || ovpn_die "usage: ovpn export-client <name>"
   ovpn_client_name_or_die "$name"
-  ovpn_require_healthy_state
-  ovpn_client_require_active "$name"
-  ovpn_render_client "$name" --stdout
+  ovpn_with_data_lock client ovpn_export_client_inner "$name"
 }
 
 ovpn_list_clients_command() {

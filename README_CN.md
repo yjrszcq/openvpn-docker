@@ -137,6 +137,14 @@ mv laptop.ovpn.tmp laptop.ovpn
 不要为已有名称再次执行 `add-client`。客户端证书仍有效，但客户端必须使用新渲染的
 profile 才能连接到新的地址、协议或端口。
 
+健康实例执行 `export-client` 时，会先原子刷新对应的
+`clients/active/<name>.ovpn`，再将相同 profile 写入标准输出。若活动 profile 已被
+删除，实例会正确进入 `DEGRADED_REPAIRABLE`；应先按当前持久化配置修复，再导出：
+
+```bash
+docker compose run --rm openvpn-maintenance repair
+```
+
 ## 客户端管理
 
 创建客户端证书并导出 profile：

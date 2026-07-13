@@ -159,6 +159,16 @@ Do not run `add-client` again for an existing name. Existing client
 certificates remain valid; clients need the newly rendered profile to use the
 new endpoint, protocol, or port.
 
+On a healthy instance, `export-client` atomically refreshes the matching
+`clients/active/<name>.ovpn` file before writing the same profile to standard
+output. If an active profile was deleted, the instance correctly becomes
+`DEGRADED_REPAIRABLE`; restore it from the current persisted configuration
+before exporting:
+
+```bash
+docker compose run --rm openvpn-maintenance repair
+```
+
 ## Client Management
 
 Create a client certificate and profile:

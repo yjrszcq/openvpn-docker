@@ -219,6 +219,37 @@ grep -q '^remote vpn.example.test 1194$' "$TMP_DIR/laptop.ovpn"
 grep -q 'FAKE CLIENT CERT laptop' "$TMP_DIR/laptop.ovpn"
 grep -q 'FAKE CLIENT KEY laptop' "$TMP_DIR/laptop.ovpn"
 
+OVPN_ENDPOINT=changed.example.test \
+  OVPN_PROTO=tcp \
+  OVPN_PORT=443 \
+  OVPN_NETWORK=10.88.0.0/24 \
+  OVPN_NAT=true \
+  OVPN_NAT_INTERFACE=auto \
+  OVPN_REDIRECT_GATEWAY=false \
+  OVPN_CLIENT_TO_CLIENT=false \
+  OVPN_DNS='' \
+  OVPN_ROUTES='' \
+  "$OVPN" config init
+"$OVPN" export-client laptop >"$TMP_DIR/laptop-updated.ovpn" 2>"$TMP_DIR/export-updated.err"
+test ! -s "$TMP_DIR/export-updated.err"
+grep -q '^remote changed.example.test 443$' "$TMP_DIR/laptop-updated.ovpn"
+grep -q '^proto tcp$' "$TMP_DIR/laptop-updated.ovpn"
+cmp "$TMP_DIR/laptop-updated.ovpn" "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
+
+rm "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
+set +e
+"$OVPN" export-client laptop >"$TMP_DIR/missing-profile-export.out" 2>"$TMP_DIR/missing-profile-export.err"
+status=$?
+set -e
+if [ "$status" -eq 0 ]; then
+  echo 'missing profile export unexpectedly succeeded' >&2
+  exit 1
+fi
+grep -q 'DEGRADED_REPAIRABLE' "$TMP_DIR/missing-profile-export.err"
+"$OVPN" repair >"$TMP_DIR/missing-profile-repair.out" 2>"$TMP_DIR/missing-profile-repair.err"
+grep -q '^remote changed.example.test 443$' "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
+grep -q '^proto tcp$' "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
+
 set +e
 "$OVPN" add-client laptop >"$TMP_DIR/duplicate.out" 2>"$TMP_DIR/duplicate.err"
 status=$?
