@@ -4,7 +4,7 @@ x-openvpn-data: &openvpn-data
 
 services:
   openvpn:
-    image: szcq/openvpn-server:dev
+    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
     container_name: openvpn
     restart: unless-stopped
 
@@ -17,7 +17,7 @@ services:
       - /dev/net/tun:/dev/net/tun
 
     ports:
-      - "1194:1194/udp"
+      - "${OVPN_PORT:-1194}:${OVPN_PORT:-1194}/${OVPN_PROTO:-udp}"
 
     environment:
       OVPN_ENDPOINT: ${OVPN_ENDPOINT:-vpn.example.com}
@@ -33,7 +33,7 @@ services:
       OVPN_CRITICAL_MODE: ${OVPN_CRITICAL_MODE:-exit}
 
   openvpn-maintenance:
-    image: szcq/openvpn-server:dev
+    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
     restart: "no"
 
     <<: *openvpn-data

@@ -1,141 +1,220 @@
 # OpenVPN Server Docker Image
 
-This repository implements a Docker image for OpenVPN Community Edition with a
-small shell-based control plane.
+[中文文档](README_CN.md)
 
-The project direction is defined in `goal/`, which is intentionally ignored by
-Git in this working copy. Implementation follows a private checkpoint workflow:
+A Docker image for running an OpenVPN Community Edition server with an
+operator-focused shell control plane. It targets home labs, small teams, and
+Linux servers that need certificate-authenticated IPv4 TUN VPN access without a
+web administration layer.
 
-- `.checkpoint-karpathy/roadmap.md`
-- `.checkpoint-karpathy/progress.md`
-- `.checkpoint-karpathy/private/`
+## Highlights
 
-Those checkpoint files are local planning state and are not committed.
+- Builds a checksum-pinned OpenVPN runtime from source for `linux/amd64` and
+  `linux/arm64`.
+- Starts an empty persistent volume by creating the PKI, server identity, CRL,
+  tls-crypt key, and OpenVPN configuration automatically.
+- Supports UDP or TCP, IPv4 NAT, route push, full-tunnel routing, DNS push, and
+  client-to-client traffic.
+- Manages client certificates and profiles with `add-client`, `export-client`,
+  `list-clients`, and `revoke-client`.
+- Detects inconsistent persistent state before startup, performs only safe or
+  byte-equivalent repairs, and fails closed for critical states.
+- Includes a low-privilege maintenance service for diagnosis and repair.
 
-## Current Phase
+## Scope
 
-The implementation starts with a minimal VPN slice:
+This image supports IPv4 TUN deployments with mutual certificate
+authentication, Easy-RSA, tls-crypt, and CRL enforcement. It does not provide a
+web UI, TAP mode, IPv6, external/offline CA workflows, LDAP/RADIUS/OIDC, or
+Kubernetes integration.
 
-1. Create a fixed-runtime container image.
-2. Add the `ovpn` CLI and entrypoint.
-3. Add explicit initialization and start flows.
-4. Add basic client lifecycle commands.
-5. Pin the upstream OpenVPN source inputs and build metadata.
-6. Enforce the runtime compatibility contract, adapter-selected templates, and capability gate.
-7. Expand toward state detection, safe repair, recovery, and release automation.
+## Quick Start
 
-Local validation must avoid the already-used `10.8.0.0/24` network. Tests and
-smoke checks use:
+### Requirements
 
-```text
-OVPN_NETWORK=10.88.0.0/24
+- Docker Engine with the Docker Compose plugin.
+- A Linux host exposing `/dev/net/tun` and allowing the `NET_ADMIN` capability.
+- A publicly reachable hostname or IP address and an open UDP or TCP port.
+- An unused private IPv4 CIDR that does not overlap with the server or client
+  networks.
+
+### Configure and start
+
+From a checkout of this repository, create a `.env` file beside `compose.yaml`:
+
+```dotenv
+OVPN_IMAGE=szcq/openvpn:2.7.5
+OVPN_ENDPOINT=vpn.example.com
+OVPN_PROTO=udp
+OVPN_PORT=1194
+OVPN_NETWORK=10.42.0.0/24
+OVPN_NAT=true
+OVPN_NAT_INTERFACE=auto
+OVPN_REDIRECT_GATEWAY=false
+OVPN_CLIENT_TO_CLIENT=false
+OVPN_DNS=
+OVPN_ROUTES=
 ```
 
-## Verification
+Replace `vpn.example.com` with the public hostname or IP address clients use.
+Choose a network that is unused in the deployment; the example deliberately
+does not assume that `10.8.0.0/24` is available.
 
-Run the local checks:
+Start the server:
+
+```bash
+docker compose up -d
+docker compose logs -f openvpn
+```
+
+The first start initializes only an empty `./openvpn-data` directory. It then
+persists bootstrap configuration in `config/project.env`. Later changes to
+bootstrap environment variables do not rewrite an existing instance.
+
+The Compose port mapping follows `OVPN_PORT` and `OVPN_PROTO`. When either
+value changes, open the same port and protocol in the host and cloud firewall.
+
+## Configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `OVPN_IMAGE` | `szcq/openvpn:2.7.5` | Image used by Compose. Pin a released OpenVPN-version tag. |
+| `OVPN_ENDPOINT` | required | Public hostname or IP embedded in client profiles on initialization. |
+| `OVPN_PROTO` | `udp` | Transport protocol: `udp` or `tcp`. |
+| `OVPN_PORT` | `1194` | OpenVPN listen port. |
+| `OVPN_NETWORK` | `10.8.0.0/24` | IPv4 tunnel network. Select a non-overlapping CIDR. |
+| `OVPN_NAT` | `true` | Masquerade client traffic leaving the VPN container namespace. |
+| `OVPN_NAT_INTERFACE` | `auto` | Egress interface for NAT, or a specific Linux interface name. |
+| `OVPN_REDIRECT_GATEWAY` | `false` | Route client default traffic through the VPN. |
+| `OVPN_CLIENT_TO_CLIENT` | `false` | Allow direct traffic between VPN clients. |
+| `OVPN_DNS` | empty | Comma-separated IPv4 DNS servers pushed to clients. |
+| `OVPN_ROUTES` | empty | Comma-separated IPv4 CIDRs pushed to clients. |
+| `OVPN_CRITICAL_MODE` | `exit` | Use `maintenance` only to hold a critical container for inspection. |
+
+Bootstrap values are instance facts, not ordinary runtime overrides. Inspect the
+persisted values with:
+
+```bash
+docker compose exec openvpn ovpn config print
+```
+
+## Client Management
+
+Create a client certificate and profile:
+
+```bash
+docker compose exec openvpn ovpn add-client laptop
+docker compose exec -T openvpn ovpn export-client laptop > laptop.ovpn
+```
+
+`export-client` writes only the profile to standard output, so redirection does
+not mix it with status output. List or revoke clients with:
+
+```bash
+docker compose exec openvpn ovpn list-clients
+docker compose exec openvpn ovpn revoke-client laptop
+```
+
+A revoked certificate is added to the CRL and its active profile is moved out of
+the active-client set.
+
+## Operations and Maintenance
+
+Use the maintenance profile for one-shot state inspection and repair. It mounts
+the same persistent data but does not request TUN, `NET_ADMIN`, or published
+ports.
+
+```bash
+docker compose run --rm openvpn-maintenance doctor
+docker compose run --rm openvpn-maintenance doctor --json
+docker compose run --rm openvpn-maintenance repair --plan
+docker compose run --rm openvpn-maintenance repair
+```
+
+`doctor` is read-only. `repair --plan` is also read-only and shows eligible
+SAFE and equivalent recovery actions. `repair` stages, validates, snapshots,
+and atomically applies only permitted repairs. Critical and unrecoverable states
+fail closed with exit code `78`; use `OVPN_CRITICAL_MODE=maintenance` only when
+an operator needs an unhealthy container to stay available for inspection.
+
+Runtime and compatibility information is available through:
+
+```bash
+docker compose exec openvpn ovpn status
+docker compose exec openvpn ovpn healthcheck
+docker compose exec openvpn ovpn capabilities
+docker compose exec openvpn ovpn version
+```
+
+## Persistent Data and Backups
+
+`./openvpn-data` contains the CA private key, server and client private keys,
+profiles, tls-crypt key, and instance metadata. Restrict access to this
+directory and back it up securely.
+
+A consistent backup includes at least `config/`, `meta/`, `pki/`, `secrets/`,
+and `ccd/`; retaining `clients/` is also recommended because profiles can be
+redundant recovery material. Prefer stopping the service before taking a
+backup. After restoring data, run `doctor`, review `repair --plan`, and then
+start the server.
+
+Do not delete or point the bind mount at a different empty directory by
+mistake: an empty directory is intentionally treated as a request to create a
+new VPN instance.
+
+## Security Notes
+
+- The default design keeps the CA online inside the persistent data volume for
+  operational convenience. Compromise of that volume can compromise the CA.
+- Private keys and exported `.ovpn` profiles are sensitive credentials. Store
+  them with restrictive permissions and deliver them over a trusted channel.
+- The container changes forwarding and firewall rules only inside its own
+  network namespace. Host firewall, cloud security-group, and port-forwarding
+  configuration remain the operator's responsibility.
+- This image validates source checksums, runtime version, configuration load,
+  and required capabilities before publishing a stable release.
+
+## Images, Builds, and Releases
+
+Docker Hub stable releases use the OpenVPN runtime version as their only tag:
+
+```text
+szcq/openvpn:<OPENVPN_VERSION>
+```
+
+Pin an explicit tag in production rather than relying on a moving tag. GitHub
+Container Registry also receives project-version tags for release management.
+
+Build the current source tree locally:
+
+```bash
+scripts/docker-build.sh -t szcq/openvpn-server:dev .
+OVPN_IMAGE=szcq/openvpn-server:dev docker compose up -d
+```
+
+GitHub Actions runs compatibility, container, E2E, upgrade-state, and
+multi-architecture gates. A default-branch Candidate publishes the GHCR
+candidate; a successful Candidate automatically triggers Release, which
+promotes stable GHCR tags and publishes the Docker Hub OpenVPN-version tag.
+
+Maintainers: if `DOCKER_TOKEN` expires, replace it in `Settings -> Secrets and
+variables -> Actions`, then manually start a new default-branch Candidate. The
+successful Candidate queues a fresh Release. Do not rely on rerunning the old
+Release after replacing a repository secret.
+
+## Development
+
+The tracked release inputs are in `versions.env`. The OpenVPN version, source
+checksum, supported range, and project image version are verified by CI.
+
+Run the focused local checks before changing control-plane or workflow code:
 
 ```bash
 tests/check.sh
 tests/cli-smoke.sh
-tests/capabilities-smoke.sh
-tests/render-smoke.sh
-tests/init-start-smoke.sh
-tests/state-scanner-smoke.sh
-tests/state-machine-smoke.sh
-tests/crypto-state-smoke.sh
-tests/doctor-smoke.sh
-tests/repair-plan-smoke.sh
-tests/recovery-shared-smoke.sh
-tests/recovery-container-smoke.sh
-tests/maintenance-smoke.sh
-tests/maintenance-compose-smoke.sh
-tests/maintenance-container-smoke.sh
-tests/network-policy-smoke.sh
-tests/repair-container-smoke.sh
-tests/bootstrap-init-smoke.sh
-tests/client-lifecycle-smoke.sh
-tests/build-info-smoke.sh
-tests/docker-build-wrapper-smoke.sh
-tests/source-fetch-smoke.sh
-tests/source-build-layout-smoke.sh
-tests/runtime-image-smoke.sh
-tests/config-load-smoke.sh
-tests/e2e-container-smoke.sh
+tests/workflow-smoke.sh
 ```
 
-`tests/e2e-container-smoke.sh` sets `OVPN_NETWORK=10.88.0.0/24` internally and skips when Docker or `/dev/net/tun` is unavailable. Set `OVPN_E2E_REQUIRED=1` to make missing E2E prerequisites fail.
-
-`tests/recovery-container-smoke.sh` rebuilds the image by default, recovers CA, tls-crypt, and a client identity from active profile material, and verifies hashes and modes on `10.88.0.0/24`. Set `OVPN_RECOVERY_REQUIRED=1` to require its Docker prerequisites.
-
-`ovpn capabilities` emits the runtime version, supported-range result, adapter, and required feature probes. It exits nonzero when the compatibility gate fails.
-
-`ovpn start` automatically initializes a data directory only when it is EMPTY. A valid `OVPN_ENDPOINT` is required for that first run; partial, interrupted, or otherwise non-empty data is never overwritten.
-
-`ovpn doctor` reports the read-only persisted-state diagnosis. Pass `--json` for a stable object containing the state plus every issue ID, severity, and recommended action. It returns `78` for `CRITICAL` and `UNRECOVERABLE` state after printing the diagnosis.
-
-`ovpn repair --plan` is read-only and lists SAFE actions plus validated equivalent `RECOVER` actions. Pass `--json` for an integration-friendly plan; CRITICAL and UNRECOVERABLE states still return `78`.
-
-`ovpn repair` stages, validates, snapshots, and atomically applies SAFE repairs plus strictly validated, byte-equivalent recovery from embedded profile material. It never reissues certificates or generates identity keys; failed transactions restore affected files and record redacted journals under `repair/`.
-
-Use one-shot maintenance commands with `docker compose run --rm openvpn-maintenance doctor` or `docker compose run --rm openvpn-maintenance repair --plan`. Set `OVPN_CRITICAL_MODE=maintenance` only when an operator needs a CRITICAL container to remain running and unhealthy for inspection; the default `exit` behavior fails immediately.
-
-## Network Policy
-
-On first initialization, `OVPN_NAT`, `OVPN_NAT_INTERFACE`,
-`OVPN_REDIRECT_GATEWAY`, `OVPN_CLIENT_TO_CLIENT`, `OVPN_DNS`, and
-`OVPN_ROUTES` are persisted in `config/project.env`; later Compose environment
-changes do not override the instance. DNS and routes are IPv4-only in this
-release. When NAT, full-tunnel, or route push is enabled, the main service
-enables IPv4 forwarding and installs idempotent `iptables` rules only in its
-own network namespace. The Docker host must provide `/dev/net/tun`, permit
-`NET_ADMIN`, and allow namespaced IPv4 forwarding; the image does not alter
-host firewall or forwarding settings.
-
-`tests/config-load-smoke.sh` validates generated server and client configurations with the actual OpenVPN crypto self-test and uses `OVPN_NETWORK=10.88.0.0/24`. It skips when Docker is unavailable; set `OVPN_CONFIG_LOAD_REQUIRED=1` to require it.
-
-Build the current development image with the pinned inputs from `versions.env`:
-
-```bash
-scripts/docker-build.sh -t szcq/openvpn-server:dev .
-```
-
-When a builder needs a host-local proxy to fetch pinned source, pass it explicitly:
-
-`docker-build.sh` inherits standard `HTTP_PROXY`, `HTTPS_PROXY`, and `NO_PROXY` variables when their `OVPN_BUILD_*` counterparts are unset. It filters loopback HTTP(S) proxies for the default Docker network, because that network cannot reach the host loopback; use `OVPN_BUILD_NETWORK=host` with explicit `OVPN_BUILD_*` values for a host-local proxy.
-
-```bash
-OVPN_BUILD_NETWORK=host \
-OVPN_BUILD_HTTP_PROXY=http://proxy.example:port \
-OVPN_BUILD_HTTPS_PROXY=http://proxy.example:port \
-scripts/docker-build.sh -t szcq/openvpn-server:dev .
-```
-
-`ovpn version` reports both the currently packaged runtime and the pinned source version. The Phase 2 runtime is the verified pinned source build.
-
-For local smoke checks, pass `OVPN_NETWORK=10.88.0.0/24` explicitly. The Compose example keeps the product default configurable.
-
-Start the locally built development image with Compose:
-
-```bash
-docker compose up -d
-```
-
-`tests/source-fetch-smoke.sh` downloads the pinned upstream archive and therefore requires outbound network access.
-
-Source retrieval prefers `swupdate.openvpn.org` and falls back to the matching official OpenVPN GitHub release asset. Both paths must satisfy the pinned SHA-256 in `versions.env`.
-
-`tests/runtime-image-smoke.sh` builds and inspects the image when Docker is available. Set `OVPN_RUNTIME_REQUIRED=1` to make unavailable Docker prerequisites fail.
-
-## CI and Release
-
-GitHub Actions owns upstream discovery, candidate publication, compatibility verification, and stable promotion.
-
-- `test.yml`: gates G0-G13: source integrity, exact version and configuration checks, PKI/client lifecycle, UDP/TCP E2E, repair/recovery, persisted-state upgrade, and amd64/arm64 build records.
-- `upstream-check.yml`: checks the official OpenVPN release feed weekly and opens a checksum-pinned update pull request instead of changing a release branch directly.
-- `candidate.yml`: publishes `ghcr.io/<owner>/<repo>:candidate-ovpn<version>` from the default branch after the applicable compatibility gates pass.
-- `release.yml`: promotes the tested candidate only when the OpenVPN version is inside `OPENVPN_SUPPORTED_RANGE` and `IMAGE_VERSION` is a final SemVer value. GitHub Container Registry receives project-version tags from `IMAGE_VERSION`; Docker Hub receives only `szcq/openvpn:<OPENVPN_VERSION>` after stable promotion. Same-branch releases promote automatically. Cross-branch releases wait on the `stable-cross-branch` GitHub Environment; configure its required reviewers before relying on that path. Out-of-range and prerelease images remain candidates only. Configure Docker Hub secret `DOCKER_TOKEN` before a stable release.
-
-If `DOCKER_TOKEN` expires, replace it in `Settings -> Secrets and variables -> Actions`, then manually start a new `Candidate` run from the default branch. Its successful completion automatically queues a fresh `Release` run, which promotes the candidate and publishes the Docker Hub tag. Do not rely on rerunning the old `Release` after replacing a repository secret.
-
-`versions.env` is the sole version source. Run `tests/update-openvpn-smoke.sh`, `tests/release-policy-smoke.sh`, and `tests/workflow-smoke.sh` locally. To require the persisted-state check against already-built images, set `OVPN_UPGRADE_SKIP_BUILD=1`, `OVPN_UPGRADE_REQUIRED=1`, `OVPN_UPGRADE_SOURCE_IMAGE`, and `OVPN_UPGRADE_TARGET_IMAGE` before running `tests/upgrade-state-smoke.sh`.
+Container and E2E tests use `OVPN_NETWORK=10.88.0.0/24` to avoid the common
+`10.8.0.0/24` test collision. Some checks require Docker, outbound source
+access, and `/dev/net/tun`.
