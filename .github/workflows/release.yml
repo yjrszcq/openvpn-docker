@@ -1,0 +1,145 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows:
+      - Candidate
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  policy:
+    name: Evaluate stable release policy
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    outputs:
+      same_branch: ${{ steps.policy.outputs.same_branch }}
+      in_range: ${{ steps.policy.outputs.in_range }}
+      release_eligible: ${{ steps.policy.outputs.release_eligible }}
+      decision: ${{ steps.policy.outputs.decision }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 2
+      - id: policy
+        name: Classify candidate promotion
+        run: |
+          set -a
+          . ./versions.env
+          set +a
+          previous="$(git show HEAD^:versions.env 2>/dev/null | awk -F= '$1 == "OPENVPN_VERSION" {print $2}' || true)"
+          [ -n "$previous" ] || previous="$OPENVPN_VERSION"
+          scripts/release-policy.sh \
+            --previous-version "$previous" \
+            --target-version "$OPENVPN_VERSION" \
+            --supported-range "$OPENVPN_SUPPORTED_RANGE" \
+            --image-version "$IMAGE_VERSION" \
+            --github-output "$GITHUB_OUTPUT" > release-policy.env
+          cat release-policy.env >> "$GITHUB_STEP_SUMMARY"
+
+  blocked:
+    name: Record blocked stable promotion
+    needs: policy
+    if: >-
+      needs.policy.outputs.decision == 'RANGE_BLOCKED' ||
+      needs.policy.outputs.decision == 'IMAGE_VERSION_BLOCKED'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          {
+            echo "## Stable promotion blocked"
+            echo "decision=${{ needs.policy.outputs.decision }}"
+            echo 'The candidate remains available; stable tags were not created.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish-same-branch:
+    name: Promote same-branch candidate to stable
+    needs: policy
+    if: needs.policy.outputs.decision == 'READY_SAME_BRANCH'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Authenticate to GitHub Container Registry
+        run: printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Promote tested candidate and write release notes
+        run: |
+          set -a
+          . ./versions.env
+          set +a
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          IFS=. read -r image_major image_minor _ <<<"$IMAGE_VERSION"
+          docker buildx imagetools create \
+            --tag "$image:$IMAGE_VERSION" \
+            --tag "$image:$image_major.$image_minor" \
+            --tag "$image:$image_major" \
+            --tag "$image:latest" \
+            --tag "$image:ovpn$OPENVPN_VERSION" \
+            "$image:candidate-ovpn$OPENVPN_VERSION"
+          {
+            echo '## Stable release'
+            echo "- Image version: $IMAGE_VERSION"
+            echo "- OpenVPN version: $OPENVPN_VERSION"
+            echo "- Easy-RSA version: $EASYRSA_VERSION"
+            echo "- Supported range: $OPENVPN_SUPPORTED_RANGE"
+            echo '- Schema version: 1'
+            echo '- Branch transition: same branch'
+            echo '- Approval: not required'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish-cross-branch:
+    name: Promote cross-branch candidate after approval
+    needs: policy
+    if: needs.policy.outputs.decision == 'WAITING_CROSS_BRANCH_APPROVAL'
+    runs-on: ubuntu-latest
+    environment:
+      name: stable-cross-branch
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Authenticate to GitHub Container Registry
+        run: printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Promote approved candidate and write release notes
+        run: |
+          set -a
+          . ./versions.env
+          set +a
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          IFS=. read -r image_major image_minor _ <<<"$IMAGE_VERSION"
+          docker buildx imagetools create \
+            --tag "$image:$IMAGE_VERSION" \
+            --tag "$image:$image_major.$image_minor" \
+            --tag "$image:$image_major" \
+            --tag "$image:latest" \
+            --tag "$image:ovpn$OPENVPN_VERSION" \
+            "$image:candidate-ovpn$OPENVPN_VERSION"
+          {
+            echo '## Stable release'
+            echo "- Image version: $IMAGE_VERSION"
+            echo "- OpenVPN version: $OPENVPN_VERSION"
+            echo "- Easy-RSA version: $EASYRSA_VERSION"
+            echo "- Supported range: $OPENVPN_SUPPORTED_RANGE"
+            echo '- Schema version: 1'
+            echo '- Branch transition: cross branch'
+            echo '- Approval: stable-cross-branch Environment approved'
+          } >> "$GITHUB_STEP_SUMMARY"

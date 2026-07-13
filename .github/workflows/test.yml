@@ -1,0 +1,165 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Static, control plane, and policy tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Lint workflow and Milestone 10 tooling
+        run: |
+          docker run --rm -v "$PWD:/work:ro" -w /work rhysd/actionlint:1.7.7
+          docker run --rm -v "$PWD:/work:ro" -w /work koalaman/shellcheck:v0.10.0 -e SC1091 \
+            scripts/update-openvpn.sh \
+            scripts/release-policy.sh \
+            tests/update-openvpn-smoke.sh \
+            tests/release-policy-smoke.sh \
+            tests/upgrade-state-smoke.sh \
+            tests/workflow-smoke.sh
+          docker run --rm -v "$PWD:/work:ro" -w /work mvdan/shfmt:v3.10.0 -i 2 -d scripts/update-openvpn.sh scripts/release-policy.sh tests/update-openvpn-smoke.sh tests/release-policy-smoke.sh tests/upgrade-state-smoke.sh tests/workflow-smoke.sh
+      - name: Run shell and control-plane smoke tests
+        run: |
+          tests/check.sh
+          tests/cli-smoke.sh
+          tests/capabilities-smoke.sh
+          tests/compatibility-contract-smoke.sh
+          tests/adapter-selection-smoke.sh
+          tests/render-smoke.sh
+          tests/init-start-smoke.sh
+          tests/bootstrap-init-smoke.sh
+          tests/state-scanner-smoke.sh
+          tests/state-machine-smoke.sh
+          tests/crypto-state-smoke.sh
+          tests/doctor-smoke.sh
+          tests/repair-plan-smoke.sh
+          tests/recovery-shared-smoke.sh
+          tests/client-lifecycle-smoke.sh
+          tests/maintenance-smoke.sh
+          tests/maintenance-compose-smoke.sh
+          tests/network-policy-smoke.sh
+          tests/source-build-layout-smoke.sh
+          tests/build-info-smoke.sh
+          tests/docker-build-wrapper-smoke.sh
+          tests/update-openvpn-smoke.sh
+          tests/release-policy-smoke.sh
+          tests/workflow-smoke.sh
+
+  source-integrity:
+    name: G0 source integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Fetch and verify pinned OpenVPN source
+        run: tests/source-fetch-smoke.sh
+
+  image:
+    name: G1-G11 runtime, PKI, repair, and E2E
+    needs:
+      - static
+      - source-integrity
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: openvpn-ci:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build pinned runtime image
+        run: scripts/docker-build.sh -t "$IMAGE" .
+      - name: Verify runtime and generated configuration
+        run: |
+          OVPN_RUNTIME_SKIP_BUILD=1 OVPN_RUNTIME_REQUIRED=1 OVPN_RUNTIME_IMAGE="$IMAGE" tests/runtime-image-smoke.sh
+          OVPN_CONFIG_LOAD_SKIP_BUILD=1 OVPN_CONFIG_LOAD_REQUIRED=1 OVPN_CONFIG_LOAD_IMAGE="$IMAGE" tests/config-load-smoke.sh
+      - name: Verify repair, recovery, maintenance, and upgrade-state handoff
+        run: |
+          OVPN_REPAIR_SKIP_BUILD=1 OVPN_REPAIR_REQUIRED=1 OVPN_REPAIR_IMAGE="$IMAGE" tests/repair-container-smoke.sh
+          OVPN_RECOVERY_SKIP_BUILD=1 OVPN_RECOVERY_REQUIRED=1 OVPN_RECOVERY_IMAGE="$IMAGE" tests/recovery-container-smoke.sh
+          OVPN_MAINTENANCE_SKIP_BUILD=1 OVPN_MAINTENANCE_REQUIRED=1 OVPN_MAINTENANCE_IMAGE="$IMAGE" tests/maintenance-container-smoke.sh
+      - name: Verify UDP and TCP VPN E2E
+        run: OVPN_E2E_SKIP_BUILD=1 OVPN_E2E_REQUIRED=1 OVPN_E2E_IMAGE="$IMAGE" tests/e2e-container-smoke.sh
+      - name: Collect runtime metadata
+        if: always()
+        run: |
+          mkdir -p artifacts
+          docker run --rm --entrypoint ovpn "$IMAGE" version > artifacts/build-info.json || true
+          printf 'commit=%s\nimage=%s\n' "$GITHUB_SHA" "$IMAGE" > artifacts/test-summary.txt
+      - name: Upload test metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-${{ github.sha }}
+          path: artifacts
+          if-no-files-found: warn
+
+  upgrade-state:
+    name: G12 previous-commit upgrade state
+    needs:
+      - static
+      - source-integrity
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_IMAGE: openvpn-upgrade-source:${{ github.sha }}
+      TARGET_IMAGE: openvpn-upgrade-target:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+      - name: Build source image from the parent commit
+        run: |
+          previous="$RUNNER_TEMP/openvpn-previous"
+          mkdir -p "$previous"
+          git archive HEAD^ | tar -x -C "$previous"
+          "$previous/scripts/docker-build.sh" -t "$SOURCE_IMAGE" "$previous"
+      - name: Build target image and verify persisted-state handoff
+        run: |
+          scripts/docker-build.sh -t "$TARGET_IMAGE" .
+          OVPN_UPGRADE_SKIP_BUILD=1 OVPN_UPGRADE_REQUIRED=1 OVPN_UPGRADE_SOURCE_IMAGE="$SOURCE_IMAGE" OVPN_UPGRADE_TARGET_IMAGE="$TARGET_IMAGE" tests/upgrade-state-smoke.sh
+
+  multiarch:
+    name: G13 multi-architecture build
+    needs:
+      - static
+      - source-integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build amd64 and arm64 OCI image
+        run: |
+          set -a
+          . ./versions.env
+          set +a
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg "BASE_IMAGE=$BASE_IMAGE" \
+            --build-arg "IMAGE_VERSION=$IMAGE_VERSION" \
+            --build-arg "OPENVPN_VERSION=$OPENVPN_VERSION" \
+            --build-arg "OPENVPN_SOURCE_SHA256=$OPENVPN_SOURCE_SHA256" \
+            --build-arg "EASYRSA_VERSION=$EASYRSA_VERSION" \
+            --build-arg "OPENVPN_SUPPORTED_RANGE=$OPENVPN_SUPPORTED_RANGE" \
+            --build-arg "VCS_REF=$GITHUB_SHA" \
+            --build-arg "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --output type=oci,dest="$RUNNER_TEMP/openvpn-multiarch.tar" \
+            .
+          test -s "$RUNNER_TEMP/openvpn-multiarch.tar"
+      - name: Upload multi-architecture build record
+        uses: actions/upload-artifact@v4
+        with:
+          name: multiarch-${{ github.sha }}
+          path: ${{ runner.temp }}/openvpn-multiarch.tar

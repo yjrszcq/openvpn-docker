@@ -126,3 +126,14 @@ docker compose up -d
 Source retrieval prefers `swupdate.openvpn.org` and falls back to the matching official OpenVPN GitHub release asset. Both paths must satisfy the pinned SHA-256 in `versions.env`.
 
 `tests/runtime-image-smoke.sh` builds and inspects the image when Docker is available. Set `OVPN_RUNTIME_REQUIRED=1` to make unavailable Docker prerequisites fail.
+
+## CI and Release
+
+GitHub Actions owns upstream discovery, candidate publication, compatibility verification, and stable promotion.
+
+- `test.yml`: gates G0-G13: source integrity, exact version and configuration checks, PKI/client lifecycle, UDP/TCP E2E, repair/recovery, persisted-state upgrade, and amd64/arm64 build records.
+- `upstream-check.yml`: checks the official OpenVPN release feed weekly and opens a checksum-pinned update pull request instead of changing a release branch directly.
+- `candidate.yml`: publishes `ghcr.io/<owner>/<repo>:candidate-ovpn<version>` from the default branch after the applicable compatibility gates pass.
+- `release.yml`: promotes the tested candidate only when the OpenVPN version is inside `OPENVPN_SUPPORTED_RANGE` and `IMAGE_VERSION` is a final SemVer value. Same-branch releases promote automatically. Cross-branch releases wait on the `stable-cross-branch` GitHub Environment; configure its required reviewers before relying on that path. Out-of-range and prerelease images remain candidates only.
+
+`versions.env` is the sole version source. Run `tests/update-openvpn-smoke.sh`, `tests/release-policy-smoke.sh`, and `tests/workflow-smoke.sh` locally. To require the persisted-state check against already-built images, set `OVPN_UPGRADE_SKIP_BUILD=1`, `OVPN_UPGRADE_REQUIRED=1`, `OVPN_UPGRADE_SOURCE_IMAGE`, and `OVPN_UPGRADE_TARGET_IMAGE` before running `tests/upgrade-state-smoke.sh`.
