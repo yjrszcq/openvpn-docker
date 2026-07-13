@@ -205,7 +205,7 @@ grep -Fq '[RECOVER] RECOVER_TLS_CRYPT_KEY' "$TMP_DIR/plan.out"
 [ "$(sha256sum "$data_dir/secrets/tls-crypt.key")" = "$tls_hash" ]
 [ "$(stat -c '%a' "$data_dir/pki/ca.crt")" = 644 ]
 [ "$(stat -c '%a' "$data_dir/secrets/tls-crypt.key")" = 600 ]
-journal="$(rg -l '"result": "success"' "$data_dir/repair/journal" | tail -n 1)"
+journal="$(grep -rl -- '"result": "success"' "$data_dir/repair/journal" | tail -n 1)"
 [ -n "$journal" ]
 grep -Fq 'RECOVER_CA_CERT' "$journal"
 grep -Fq 'RECOVER_TLS_CRYPT_KEY' "$journal"

@@ -194,7 +194,7 @@ if compgen -G "$OVPN_DATA_DIR/repair/.stage-*" >/dev/null; then
   echo 'failed repair left a staging directory' >&2
   exit 1
 fi
-journal="$(rg -l '"result": "failed"' "$OVPN_DATA_DIR/repair/journal" | head -n 1)"
+journal="$(grep -rl -- '"result": "failed"' "$OVPN_DATA_DIR/repair/journal" | head -n 1)"
 [ -n "$journal" ] || {
   echo 'failed repair did not create a journal' >&2
   exit 1
