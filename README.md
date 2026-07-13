@@ -179,6 +179,9 @@ docker compose run --rm openvpn-maintenance repair
 
 Create a client certificate and profile:
 
+`laptop` is only an example client name. Replace it consistently with a unique
+device name, such as `phone` or `nas`.
+
 ```bash
 docker compose exec openvpn ovpn add-client laptop
 docker compose exec -T openvpn ovpn export-client laptop > laptop.ovpn

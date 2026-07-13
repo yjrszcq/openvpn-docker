@@ -151,6 +151,9 @@ docker compose run --rm openvpn-maintenance repair
 
 创建客户端证书并导出 profile：
 
+`laptop` 仅是示例客户端名称。请在后续命令中一致地替换为唯一的设备名称，例如
+`phone` 或 `nas`。
+
 ```bash
 docker compose exec openvpn ovpn add-client laptop
 docker compose exec -T openvpn ovpn export-client laptop > laptop.ovpn
