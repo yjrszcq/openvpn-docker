@@ -23,7 +23,8 @@
 
 - 已安装 Docker Engine 和 Docker Compose plugin。
 - Linux 主机提供 `/dev/net/tun`，并允许容器使用 `NET_ADMIN`。
-- 有可被客户端访问的公网域名或 IP，以及开放的 UDP 或 TCP 端口。
+- 有可被客户端访问的公网域名或 IP，并在主机与云防火墙中开放 `1194/udp`。
+  若修改默认值，则开放所选端口和协议。
 - 选择一个不与服务器或客户端网络重叠的私有 IPv4 CIDR。
 
 ### 配置并启动
@@ -36,14 +37,13 @@ services:
     image: szcq/openvpn:2.7.5
     container_name: openvpn
     restart: unless-stopped
+    network_mode: host
     cap_add:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
     volumes:
       - ./openvpn-data:/etc/openvpn
-    ports:
-      - "1194:1194/udp"
     environment:
       OVPN_ENDPOINT: vpn.example.com
       OVPN_PROTO: udp
@@ -60,7 +60,10 @@ services:
 ```
 
 仓库中的 `docker-compose.example.yaml` 也包含下文说明的可选
-`openvpn-maintenance` 服务。
+`openvpn-maintenance` 服务。默认示例使用 host 网络模式：OpenVPN 直接监听宿主机，
+因此不使用 Docker 的 `ports:` 映射。启动前须在主机与云防火墙中开放 `1194/udp`。
+host 网络模式会使 VPN 网关地址成为宿主机地址，`NET_ADMIN` 因而会影响宿主机网络，
+仅应在受控的 Linux 主机上使用。
 
 
 将 `vpn.example.com` 替换为客户端实际连接的公网域名或 IP。请按部署环境选择未使用的网段；示例没有假定 `10.8.0.0/24` 一定可用。
@@ -74,7 +77,8 @@ docker compose logs -f openvpn
 
 首次启动只会初始化空的 `./openvpn-data` 目录。初始化配置会写入 `config/project.env`；之后修改 bootstrap 环境变量不会重写已有实例。
 
-Compose 的端口映射随 `OVPN_PORT` 与 `OVPN_PROTO` 变化。修改其中任一值后，还必须在主机与云防火墙中开放同一端口和协议。
+host 网络模式下，OpenVPN 直接监听 `OVPN_PORT` 与 `OVPN_PROTO`。修改其中任一值后，
+还必须在主机与云防火墙中开放同一端口和协议。
 
 ## 配置项
 
@@ -85,7 +89,7 @@ Compose 的端口映射随 `OVPN_PORT` 与 `OVPN_PROTO` 变化。修改其中任
 | `OVPN_PROTO` | `udp` | 传输协议：`udp` 或 `tcp`。 |
 | `OVPN_PORT` | `1194` | OpenVPN 监听端口。 |
 | `OVPN_NETWORK` | `10.8.0.0/24` | IPv4 隧道网段，必须选择无重叠 CIDR。 |
-| `OVPN_NAT` | `true` | 对离开 VPN 容器网络命名空间的客户端流量执行 NAT。 |
+| `OVPN_NAT` | `true` | 对离开 VPN 网络命名空间的客户端流量执行 NAT。 |
 | `OVPN_NAT_INTERFACE` | `auto` | NAT 出口接口，也可指定 Linux 接口名。 |
 | `OVPN_REDIRECT_GATEWAY` | `false` | 将客户端默认流量经 VPN 转发。 |
 | `OVPN_CLIENT_TO_CLIENT` | `false` | 允许 VPN 客户端直接互访。 |
@@ -105,15 +109,13 @@ docker compose exec openvpn ovpn config print
 端口仍为 1194：
 
 ```yaml
-ports:
-  - "1194:1194/tcp"
 environment:
   OVPN_PROTO: tcp
   OVPN_PORT: "1194"
 ```
 
-同时在主机和云防火墙中开放对应的 TCP 端口。随后将完整的当前 Compose 环境写入
-已有数据目录：
+host 网络模式没有 Docker `ports:` 映射；同时在主机和云防火墙中开放对应的 TCP
+端口。随后将完整的当前 Compose 环境写入已有数据目录：
 
 ```bash
 docker compose config --quiet

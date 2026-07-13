@@ -11,11 +11,22 @@ if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>
 fi
 
 docker compose --profile maintenance -f "$ROOT_DIR/docker-compose.example.yaml" config >"$TMP_DIR/compose.yaml"
+openvpn_service="$(awk '
+  /^  openvpn:$/ { inside = 1; next }
+  inside && /^  [^[:space:]]/ { exit }
+  inside { print }
+' "$TMP_DIR/compose.yaml")"
 maintenance_service="$(awk '
   /^  openvpn-maintenance:$/ { inside = 1; next }
   inside && /^  [^[:space:]]/ { exit }
   inside { print }
 ' "$TMP_DIR/compose.yaml")"
+
+printf '%s\n' "$openvpn_service" | grep -Fq 'network_mode: host'
+if printf '%s\n' "$openvpn_service" | grep -Eq '^[[:space:]]+ports:'; then
+  echo 'host-networked OpenVPN service must not publish Docker ports' >&2
+  exit 1
+fi
 
 printf '%s\n' "$maintenance_service" | grep -Fq 'profiles:'
 printf '%s\n' "$maintenance_service" | grep -Fq -- '- maintenance'

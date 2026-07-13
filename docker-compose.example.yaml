@@ -7,6 +7,7 @@ services:
     image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
     container_name: openvpn
     restart: unless-stopped
+    network_mode: host
 
     <<: *openvpn-data
 
@@ -15,9 +16,6 @@ services:
 
     devices:
       - /dev/net/tun:/dev/net/tun
-
-    ports:
-      - "${OVPN_PORT:-1194}:${OVPN_PORT:-1194}/${OVPN_PROTO:-udp}"
 
     environment:
       OVPN_ENDPOINT: ${OVPN_ENDPOINT:-vpn.example.com}

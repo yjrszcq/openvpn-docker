@@ -34,7 +34,9 @@ Kubernetes integration.
 
 - Docker Engine with the Docker Compose plugin.
 - A Linux host exposing `/dev/net/tun` and allowing the `NET_ADMIN` capability.
-- A publicly reachable hostname or IP address and an open UDP or TCP port.
+- A publicly reachable hostname or IP address, with `1194/udp` open in the
+  host and cloud firewall. Use the selected port and protocol if you change
+  the default.
 - An unused private IPv4 CIDR that does not overlap with the server or client
   networks.
 
@@ -48,14 +50,13 @@ services:
     image: szcq/openvpn:2.7.5
     container_name: openvpn
     restart: unless-stopped
+    network_mode: host
     cap_add:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
     volumes:
       - ./openvpn-data:/etc/openvpn
-    ports:
-      - "1194:1194/udp"
     environment:
       OVPN_ENDPOINT: vpn.example.com
       OVPN_PROTO: udp
@@ -72,7 +73,12 @@ services:
 ```
 
 The repository's `docker-compose.example.yaml` also includes the optional
-`openvpn-maintenance` service described below.
+`openvpn-maintenance` service described below. The default uses host networking:
+OpenVPN listens directly on the host, so it has no Docker `ports:` mapping.
+Before starting it, allow `1194/udp` in the host and cloud firewall. Host
+networking makes the VPN gateway address a host address; the `NET_ADMIN`
+capability therefore affects host networking and should be used only on a
+controlled Linux host.
 
 
 Replace `vpn.example.com` with the public hostname or IP address clients use.
@@ -90,8 +96,9 @@ The first start initializes only an empty `./openvpn-data` directory. It then
 persists bootstrap configuration in `config/project.env`. Later changes to
 bootstrap environment variables do not rewrite an existing instance.
 
-The Compose port mapping follows `OVPN_PORT` and `OVPN_PROTO`. When either
-value changes, open the same port and protocol in the host and cloud firewall.
+With host networking, OpenVPN listens directly on `OVPN_PORT` and `OVPN_PROTO`.
+When either value changes, open the same port and protocol in the host and
+cloud firewall.
 
 ## Configuration
 
@@ -102,7 +109,7 @@ value changes, open the same port and protocol in the host and cloud firewall.
 | `OVPN_PROTO` | `udp` | Transport protocol: `udp` or `tcp`. |
 | `OVPN_PORT` | `1194` | OpenVPN listen port. |
 | `OVPN_NETWORK` | `10.8.0.0/24` | IPv4 tunnel network. Select a non-overlapping CIDR. |
-| `OVPN_NAT` | `true` | Masquerade client traffic leaving the VPN container namespace. |
+| `OVPN_NAT` | `true` | Masquerade client traffic leaving the VPN network namespace. |
 | `OVPN_NAT_INTERFACE` | `auto` | Egress interface for NAT, or a specific Linux interface name. |
 | `OVPN_REDIRECT_GATEWAY` | `false` | Route client default traffic through the VPN. |
 | `OVPN_CLIENT_TO_CLIENT` | `false` | Allow direct traffic between VPN clients. |
@@ -123,15 +130,14 @@ To change a running instance, update the Compose configuration first. For
 example, to change OpenVPN from UDP to TCP on port 1194:
 
 ```yaml
-ports:
-  - "1194:1194/tcp"
 environment:
   OVPN_PROTO: tcp
   OVPN_PORT: "1194"
 ```
 
-Open the matching TCP port in the host and cloud firewall. Then apply the full
-current Compose environment to the existing data directory:
+Host networking has no Docker `ports:` mapping. Open the matching TCP port in
+the host and cloud firewall. Then apply the full current Compose environment to
+the existing data directory:
 
 ```bash
 docker compose config --quiet
