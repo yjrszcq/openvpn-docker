@@ -25,5 +25,9 @@ grep -Fq 'workflow_run:' "$WORKFLOWS/release.yml"
 grep -Fq 'stable-cross-branch' "$WORKFLOWS/release.yml"
 grep -Fq 'docker buildx imagetools create' "$WORKFLOWS/release.yml"
 grep -Fq 'IMAGE_VERSION_BLOCKED' "$WORKFLOWS/release.yml"
+grep -Fq 'DOCKERHUB_USERNAME: szcq' "$WORKFLOWS/release.yml"
+grep -Fq 'DOCKERHUB_IMAGE: openvpn' "$WORKFLOWS/release.yml"
+grep -Fq 'secrets.DOCKER_TOKEN' "$WORKFLOWS/release.yml"
+grep -Fq 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"' "$WORKFLOWS/release.yml"
 
 printf 'workflow smoke passed\n'
