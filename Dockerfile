@@ -74,6 +74,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /out/ /
+COPY --from=builder /work/openvpn/COPYING /usr/local/share/licenses/openvpn/COPYING
+COPY LICENSE NOTICE /usr/local/share/licenses/openvpn-container/
 COPY rootfs/ /
 COPY compatibility/ /usr/local/share/openvpn-container/compatibility/
 COPY scripts/generate-build-info.sh /usr/local/bin/generate-build-info

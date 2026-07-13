@@ -204,3 +204,17 @@ tests/workflow-smoke.sh
 ```
 
 容器与 E2E 测试使用 `OVPN_NETWORK=10.88.0.0/24`，避免常见的 `10.8.0.0/24` 测试冲突。部分检查需要 Docker、可访问的源码下载网络和 `/dev/net/tun`。
+
+## 许可证
+
+Copyright (C) 2026 yjrszcq。
+
+本仓库中的原创源代码和构建配置采用 [GPL-2.0-only](LICENSE)；
+[NOTICE](NOTICE) 说明其适用范围并列出第三方组件边界。容器镜像包含 OpenVPN
+Community Edition 及其他第三方组件，它们继续适用各自的许可证，不会因本项目
+而被重新许可。镜像在 `/usr/local/share/licenses/` 中提供本项目许可文件和
+OpenVPN 的 `COPYING` 文件。
+
+发布镜像由本源码树和 [versions.env](versions.env) 中声明并校验和固定的 OpenVPN
+源码构建；获取逻辑见
+[scripts/fetch-openvpn-source.sh](scripts/fetch-openvpn-source.sh)。

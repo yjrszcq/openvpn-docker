@@ -15,6 +15,7 @@ grep -Fq 'koalaman/shellcheck:v0.10.0' "$WORKFLOWS/test.yml"
 grep -Fq 'OVPN_E2E_REQUIRED=1' "$WORKFLOWS/test.yml"
 grep -Fq 'linux/amd64,linux/arm64' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/upgrade-state-smoke.sh' "$WORKFLOWS/test.yml"
+grep -Fq 'tests/license-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'candidate-ovpn' "$WORKFLOWS/candidate.yml"
 grep -Fq 'packages: write' "$WORKFLOWS/candidate.yml"
 grep -Fq 'scripts/release-policy.sh' "$WORKFLOWS/candidate.yml"
@@ -28,6 +29,7 @@ grep -Fq 'IMAGE_VERSION_BLOCKED' "$WORKFLOWS/release.yml"
 grep -Fq 'DOCKERHUB_USERNAME: szcq' "$WORKFLOWS/release.yml"
 grep -Fq 'DOCKERHUB_IMAGE: openvpn' "$WORKFLOWS/release.yml"
 grep -Fq 'secrets.DOCKER_TOKEN' "$WORKFLOWS/release.yml"
+# shellcheck disable=SC2016 # This asserts the literal shell assignment in the workflow.
 grep -Fq 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"' "$WORKFLOWS/release.yml"
 
 printf 'workflow smoke passed\n'

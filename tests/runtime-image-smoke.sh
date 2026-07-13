@@ -51,4 +51,12 @@ grep -Fq '"runtime_strategy": "source-build"' <<<"$metadata"
 grep -Fq "\"openvpn_version\": \"$OPENVPN_VERSION\"" <<<"$metadata"
 grep -Fq "\"openvpn_source_version\": \"$OPENVPN_VERSION\"" <<<"$metadata"
 
+docker run --rm --entrypoint sh "$IMAGE" -ec '
+  test -s /usr/local/share/licenses/openvpn-container/LICENSE
+  test -s /usr/local/share/licenses/openvpn-container/NOTICE
+  test -s /usr/local/share/licenses/openvpn/COPYING
+  grep -Fq "GNU GENERAL PUBLIC LICENSE" /usr/local/share/licenses/openvpn-container/LICENSE
+  grep -Fq "GPL-2.0-only" /usr/local/share/licenses/openvpn-container/NOTICE
+  grep -Fq "OpenVPN" /usr/local/share/licenses/openvpn/COPYING
+'
 printf 'runtime image smoke passed (openvpn=%s)\n' "$OPENVPN_VERSION"

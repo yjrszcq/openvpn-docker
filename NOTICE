@@ -1,0 +1,18 @@
+OpenVPN Server Docker Image
+Copyright (C) 2026 yjrszcq
+
+SPDX-License-Identifier: GPL-2.0-only
+
+Unless a file states otherwise, the original source code and build
+configuration in this repository are licensed under GPL-2.0-only. The full
+license text is in LICENSE.
+
+Container images built from this repository include OpenVPN Community Edition.
+OpenVPN remains a separate third-party component under GPL version 2 with its
+own copyright notices and license exceptions in its COPYING file. This notice
+does not relicense OpenVPN or any other third-party component.
+
+Other third-party components, including Debian packages and Easy-RSA, remain
+subject to their respective licenses. The pinned OpenVPN source version and
+checksum are recorded in versions.env, and scripts/fetch-openvpn-source.sh
+retrieves the corresponding official source archive during image builds.

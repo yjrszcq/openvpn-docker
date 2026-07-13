@@ -30,8 +30,9 @@ jobs:
             tests/update-openvpn-smoke.sh \
             tests/release-policy-smoke.sh \
             tests/upgrade-state-smoke.sh \
-            tests/workflow-smoke.sh
-          docker run --rm -v "$PWD:/work:ro" -w /work mvdan/shfmt:v3.10.0 -i 2 -d scripts/update-openvpn.sh scripts/release-policy.sh tests/update-openvpn-smoke.sh tests/release-policy-smoke.sh tests/upgrade-state-smoke.sh tests/workflow-smoke.sh
+            tests/workflow-smoke.sh \
+            tests/license-smoke.sh
+          docker run --rm -v "$PWD:/work:ro" -w /work mvdan/shfmt:v3.10.0 -i 2 -d scripts/update-openvpn.sh scripts/release-policy.sh tests/update-openvpn-smoke.sh tests/release-policy-smoke.sh tests/upgrade-state-smoke.sh tests/workflow-smoke.sh tests/license-smoke.sh
       - name: Run shell and control-plane smoke tests
         run: |
           tests/check.sh
@@ -58,6 +59,7 @@ jobs:
           tests/update-openvpn-smoke.sh
           tests/release-policy-smoke.sh
           tests/workflow-smoke.sh
+          tests/license-smoke.sh
 
   source-integrity:
     name: G0 source integrity

@@ -252,3 +252,18 @@ tests/workflow-smoke.sh
 Container and E2E tests use `OVPN_NETWORK=10.88.0.0/24` to avoid the common
 `10.8.0.0/24` test collision. Some checks require Docker, outbound source
 access, and `/dev/net/tun`.
+
+## License
+
+Copyright (C) 2026 yjrszcq.
+
+The original source code and build configuration in this repository are
+licensed under [GPL-2.0-only](LICENSE). [NOTICE](NOTICE) defines that scope and
+identifies third-party components. Container images include OpenVPN Community
+Edition and other third-party components under their own licenses; they are not
+relicensed by this project. The image includes this project's license files and
+OpenVPN's `COPYING` file under `/usr/local/share/licenses/`.
+
+Release images are built from this source tree and the checksum-pinned OpenVPN
+source declared in [versions.env](versions.env). The build retrieval logic is
+in [scripts/fetch-openvpn-source.sh](scripts/fetch-openvpn-source.sh).
