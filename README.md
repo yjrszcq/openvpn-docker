@@ -40,7 +40,51 @@ Kubernetes integration.
 
 ### Configure and start
 
-From a checkout of this repository, create a `.env` file beside `compose.yaml`:
+Copy `docker-compose.example.yaml` to `compose.yaml`, or create `compose.yaml` with the following content:
+
+```yaml
+x-openvpn-data: &openvpn-data
+  volumes:
+    - ./openvpn-data:/etc/openvpn
+
+services:
+  openvpn:
+    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
+    container_name: openvpn
+    restart: unless-stopped
+    <<: *openvpn-data
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - "${OVPN_PORT:-1194}:${OVPN_PORT:-1194}/${OVPN_PROTO:-udp}"
+    environment:
+      OVPN_ENDPOINT: ${OVPN_ENDPOINT:-vpn.example.com}
+      OVPN_PROTO: ${OVPN_PROTO:-udp}
+      OVPN_PORT: ${OVPN_PORT:-1194}
+      OVPN_NETWORK: ${OVPN_NETWORK:-10.8.0.0/24}
+      OVPN_NAT: ${OVPN_NAT:-true}
+      OVPN_NAT_INTERFACE: ${OVPN_NAT_INTERFACE:-auto}
+      OVPN_REDIRECT_GATEWAY: ${OVPN_REDIRECT_GATEWAY:-false}
+      OVPN_CLIENT_TO_CLIENT: ${OVPN_CLIENT_TO_CLIENT:-false}
+      OVPN_DNS: ${OVPN_DNS:-}
+      OVPN_ROUTES: ${OVPN_ROUTES:-}
+      OVPN_CRITICAL_MODE: ${OVPN_CRITICAL_MODE:-exit}
+
+  openvpn-maintenance:
+    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
+    restart: "no"
+    <<: *openvpn-data
+    profiles:
+      - maintenance
+    command:
+      - doctor
+    entrypoint:
+      - /usr/local/bin/ovpn
+```
+
+Copy the root `.env.example` to `.env`, then adjust it:
 
 ```dotenv
 OVPN_IMAGE=szcq/openvpn:2.7.5
@@ -54,6 +98,7 @@ OVPN_REDIRECT_GATEWAY=false
 OVPN_CLIENT_TO_CLIENT=false
 OVPN_DNS=
 OVPN_ROUTES=
+OVPN_CRITICAL_MODE=exit
 ```
 
 Replace `vpn.example.com` with the public hostname or IP address clients use.

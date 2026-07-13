@@ -10,7 +10,7 @@ if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>
   exit 0
 fi
 
-docker compose --profile maintenance -f "$ROOT_DIR/compose.yaml" config >"$TMP_DIR/compose.yaml"
+docker compose --profile maintenance -f "$ROOT_DIR/docker-compose.example.yaml" config >"$TMP_DIR/compose.yaml"
 maintenance_service="$(awk '
   /^  openvpn-maintenance:$/ { inside = 1; next }
   inside && /^  [^[:space:]]/ { exit }

@@ -1,4 +1,5 @@
 goal/
+.env
 .checkpoint-karpathy/roadmap.md
 .checkpoint-karpathy/progress.md
 .checkpoint-karpathy/private/

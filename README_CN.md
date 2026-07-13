@@ -28,7 +28,51 @@
 
 ### 配置并启动
 
-在本仓库根目录、与 `compose.yaml` 同级的位置创建 `.env`：
+将 `docker-compose.example.yaml` 复制为 `compose.yaml`，或按以下内容创建 `compose.yaml`：
+
+```yaml
+x-openvpn-data: &openvpn-data
+  volumes:
+    - ./openvpn-data:/etc/openvpn
+
+services:
+  openvpn:
+    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
+    container_name: openvpn
+    restart: unless-stopped
+    <<: *openvpn-data
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - "${OVPN_PORT:-1194}:${OVPN_PORT:-1194}/${OVPN_PROTO:-udp}"
+    environment:
+      OVPN_ENDPOINT: ${OVPN_ENDPOINT:-vpn.example.com}
+      OVPN_PROTO: ${OVPN_PROTO:-udp}
+      OVPN_PORT: ${OVPN_PORT:-1194}
+      OVPN_NETWORK: ${OVPN_NETWORK:-10.8.0.0/24}
+      OVPN_NAT: ${OVPN_NAT:-true}
+      OVPN_NAT_INTERFACE: ${OVPN_NAT_INTERFACE:-auto}
+      OVPN_REDIRECT_GATEWAY: ${OVPN_REDIRECT_GATEWAY:-false}
+      OVPN_CLIENT_TO_CLIENT: ${OVPN_CLIENT_TO_CLIENT:-false}
+      OVPN_DNS: ${OVPN_DNS:-}
+      OVPN_ROUTES: ${OVPN_ROUTES:-}
+      OVPN_CRITICAL_MODE: ${OVPN_CRITICAL_MODE:-exit}
+
+  openvpn-maintenance:
+    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
+    restart: "no"
+    <<: *openvpn-data
+    profiles:
+      - maintenance
+    command:
+      - doctor
+    entrypoint:
+      - /usr/local/bin/ovpn
+```
+
+将根目录 `.env.example` 复制为 `.env`，再修改其中的值：
 
 ```dotenv
 OVPN_IMAGE=szcq/openvpn:2.7.5
@@ -42,6 +86,7 @@ OVPN_REDIRECT_GATEWAY=false
 OVPN_CLIENT_TO_CLIENT=false
 OVPN_DNS=
 OVPN_ROUTES=
+OVPN_CRITICAL_MODE=exit
 ```
 
 将 `vpn.example.com` 替换为客户端实际连接的公网域名或 IP。请按部署环境选择未使用的网段；示例没有假定 `10.8.0.0/24` 一定可用。
