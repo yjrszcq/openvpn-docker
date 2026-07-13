@@ -61,10 +61,10 @@ services:
       OVPN_PROTO: udp
       OVPN_PORT: "1194"
       OVPN_NETWORK: 10.42.0.0/24
-      OVPN_NAT: "true"
+      OVPN_NAT: "false"
       OVPN_NAT_INTERFACE: auto
       OVPN_REDIRECT_GATEWAY: "false"
-      OVPN_CLIENT_TO_CLIENT: "false"
+      OVPN_CLIENT_TO_CLIENT: "true"
       OVPN_DNS: ""
       OVPN_ROUTES: ""
       OVPN_CRITICAL_MODE: exit
