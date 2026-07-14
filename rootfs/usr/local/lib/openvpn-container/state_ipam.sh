@@ -55,7 +55,7 @@ ovpn_state_ipam_audit_is_valid() {
     [[ "$line" =~ $regex ]] && continue
     regex="^\\{\"timestamp\":\"${timestamp}\",\"event\":\"network_migration\",\"outcome\":\"(applied|rejected)\"\\}$"
     [[ "$line" =~ $regex ]] && continue
-    regex="^\\{\"timestamp\":\"${timestamp}\",\"operation\":\"(revoke|reissue|delete)\",\"result\":\"(applied|rejected|failed)\"\\}$"
+    regex="^\\{\"timestamp\":\"${timestamp}\",\"operation\":\"(revoke|reissue|delete|release_ip)\",\"result\":\"(applied|rejected|failed)\"\\}$"
     [[ "$line" =~ $regex ]] && continue
     return 1
   done <"$audit_file"

@@ -89,6 +89,7 @@ docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/grep "$IMAGE" -
 run_control client revoke "$client" >/tmp/ovpn-lifecycle-revoke.out 2>/tmp/ovpn-lifecycle-revoke.err
 grep -Fqx "$client revoked" <(run_control client list)
 run_control client release-ip "$client" >/tmp/ovpn-lifecycle-release-ip.out 2>/tmp/ovpn-lifecycle-release-ip.err
+grep -Fqx "$client revoked" <(run_control client list)
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/grep "$IMAGE" -Fqx "$client," /etc/openvpn/data/client-ip.csv
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/test "$IMAGE" -f "/etc/openvpn/clients/revoked/$client.ovpn"
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/test "$IMAGE" -f "/etc/openvpn/pki/private/$client.key"

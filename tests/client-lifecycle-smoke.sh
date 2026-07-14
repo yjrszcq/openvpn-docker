@@ -333,7 +333,7 @@ grep -q "^laptop revoked$" <("$OVPN" client list)
 test ! -e "$OVPN_DATA_DIR/ccd/laptop"
 test -f "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
 test -f "$OVPN_DATA_DIR/pki/private/laptop.key"
-grep -Fq release-ip "$OVPN_DATA_DIR/meta/audit.jsonl"
+grep -Fq release_ip "$OVPN_DATA_DIR/meta/audit.jsonl"
 if "$OVPN" client release-ip laptop >"$TMP_DIR/repeated-release-ip.out" 2>"$TMP_DIR/repeated-release-ip.err"; then
   echo "repeated client IP release unexpectedly succeeded" >&2
   exit 1

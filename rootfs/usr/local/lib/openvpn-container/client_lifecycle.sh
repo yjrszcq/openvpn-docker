@@ -144,10 +144,10 @@ ovpn_client_release_ip_inner() {
   [ "$OVPN_IPAM_DYNAMIC_POOL_SIZE" -gt 0 ] || ovpn_die "cannot release a static IP: dynamic pool capacity is 0; enlarge the dynamic pool first"
   ovpn_client_ip_set_current_assignment "$name" ""
   if ! ovpn_client_ip_apply_current_mutation; then
-    ovpn_client_lifecycle_audit release-ip failed || true
+    ovpn_client_lifecycle_audit release_ip failed || true
     ovpn_die "failed to release the client IP; the registry was restored"
   fi
-  ovpn_client_lifecycle_audit release-ip applied || true
+  ovpn_client_lifecycle_audit release_ip applied || true
   ovpn_log "released static IP for revoked client $name"
 }
 
