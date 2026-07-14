@@ -55,6 +55,9 @@ jobs:
             tests/compatibility-contract-smoke.sh \
             tests/adapter-selection-smoke.sh \
             tests/render-smoke.sh \
+            tests/ipam-layout-smoke.sh \
+            tests/registry-migration-smoke.sh \
+            tests/client-ip-apply-smoke.sh \
             tests/init-start-smoke.sh \
             tests/bootstrap-init-smoke.sh \
             tests/state-scanner-smoke.sh \
