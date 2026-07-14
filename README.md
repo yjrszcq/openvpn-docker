@@ -231,6 +231,7 @@ not mix it with status output. The lifecycle commands are:
 ```bash
 docker compose exec openvpn ovpn client list
 docker compose exec openvpn ovpn client revoke laptop
+docker compose exec openvpn ovpn client release-ip laptop
 docker compose exec openvpn ovpn client revoke laptop --release-ip
 docker compose exec openvpn ovpn client reissue laptop
 docker compose exec openvpn ovpn client delete laptop
@@ -238,8 +239,12 @@ docker compose exec openvpn ovpn client delete laptop
 
 `client revoke` adds the certificate to the CRL, disconnects the client, and
 moves its active profile out of the active-client set. It retains the IP
-assignment by default. `--release-ip` releases a static reservation, but
-requires a non-zero dynamic pool so the revoked registry record remains valid.
+assignment by default. `client revoke --release-ip` releases the static
+reservation as part of revocation. To release it later, use
+`client release-ip <name>`. It accepts only a revoked client with a retained
+static reservation and keeps its revoked profile, private key, and audit
+history. Both release paths require a non-zero dynamic pool so the revoked
+registry record remains valid.
 
 `client reissue` revokes the old certificate, creates a new private key and
 certificate for the same client name, and retains the existing IP assignment.

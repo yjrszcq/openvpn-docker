@@ -315,16 +315,36 @@ tablet_index_after="$(sha256sum "$OVPN_DATA_DIR/pki/index.txt")"
   exit 1
 }
 
+if "$OVPN" client release-ip laptop >"$TMP_DIR/active-release-ip.out" 2>"$TMP_DIR/active-release-ip.err"; then
+  echo "active client IP release unexpectedly succeeded" >&2
+  exit 1
+fi
+grep -Fq "is not revoked" "$TMP_DIR/active-release-ip.err"
+
 "$OVPN" revoke-client laptop >"$TMP_DIR/revoke.out" 2>"$TMP_DIR/revoke.err"
-grep -q '^laptop revoked$' <("$OVPN" list-clients)
+grep -q "^laptop revoked$" <("$OVPN" list-clients)
+grep -Fqx "laptop,10.88.0.2" "$OVPN_DATA_DIR/data/client-ip.csv"
 test -f "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
 test ! -e "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 
+"$OVPN" client release-ip laptop >"$TMP_DIR/release-ip.out" 2>"$TMP_DIR/release-ip.err"
+grep -Fqx "laptop," "$OVPN_DATA_DIR/data/client-ip.csv"
+grep -q "^laptop revoked$" <("$OVPN" client list)
+test ! -e "$OVPN_DATA_DIR/ccd/laptop"
+test -f "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
+test -f "$OVPN_DATA_DIR/pki/private/laptop.key"
+grep -Fq release-ip "$OVPN_DATA_DIR/meta/audit.jsonl"
+if "$OVPN" client release-ip laptop >"$TMP_DIR/repeated-release-ip.out" 2>"$TMP_DIR/repeated-release-ip.err"; then
+  echo "repeated client IP release unexpectedly succeeded" >&2
+  exit 1
+fi
+grep -Fq "does not have a static IP reservation" "$TMP_DIR/repeated-release-ip.err"
+
 if "$OVPN" export-client laptop >"$TMP_DIR/revoked-export.out" 2>"$TMP_DIR/revoked-export.err"; then
-  echo 'revoked client export unexpectedly succeeded' >&2
+  echo "revoked client export unexpectedly succeeded" >&2
   exit 1
 fi
 
-grep -q 'is revoked' "$TMP_DIR/revoked-export.err"
+grep -q "is revoked" "$TMP_DIR/revoked-export.err"
 
 printf 'client lifecycle smoke passed\n'

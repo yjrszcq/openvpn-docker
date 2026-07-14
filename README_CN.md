@@ -194,14 +194,17 @@ docker compose exec -T openvpn ovpn export-client laptop > laptop.ovpn
 ```bash
 docker compose exec openvpn ovpn client list
 docker compose exec openvpn ovpn client revoke laptop
+docker compose exec openvpn ovpn client release-ip laptop
 docker compose exec openvpn ovpn client revoke laptop --release-ip
 docker compose exec openvpn ovpn client reissue laptop
 docker compose exec openvpn ovpn client delete laptop
 ```
 
 `client revoke` 会将证书写入 CRL、断开客户端，并将其 active profile 移出活动客户端集合；
-默认保留 IP 分配。使用 `--release-ip` 可释放静态地址保留，但动态池容量必须非零，才能使
-被吊销的清单记录仍然合法。
+默认保留 IP 分配。`client revoke --release-ip` 可在吊销时释放静态地址保留。若此前已吊销
+但保留了地址，使用 `client release-ip <名称>`；它只接受仍持有静态地址保留的已吊销客户端，
+并保留其已吊销 profile、私钥和审计历史。两种释放方式均要求动态池容量非零，才能使被吊销的
+清单记录仍然合法。
 
 `client reissue` 会吊销旧证书，为相同 client 名称生成新私钥和证书，并保留原有 IP 分配。
 它会先确认镜像中的 Easy-RSA 支持同 CN 重签；不支持时会拒绝且不修改 PKI 索引。完成后须重新

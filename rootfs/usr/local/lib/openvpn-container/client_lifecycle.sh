@@ -129,6 +129,36 @@ ovpn_client_revoke_command() {
   ovpn_with_data_lock client ovpn_client_revoke_inner "$name" "$release_ip"
 }
 
+ovpn_client_release_ip_inner() {
+  local name="$1"
+  local status index assignment
+
+  ovpn_client_name_or_die "$name"
+  ovpn_require_healthy_state
+  ovpn_client_ip_prepare_mutation
+  status="${OVPN_CLIENT_IP_PKI_STATES[$name]:-}"
+  [ "$status" = revoked ] || ovpn_die "client $name is not revoked"
+  index="$(ovpn_client_ip_assignment_index "$name")"
+  assignment="${OVPN_CLIENT_IP_VALUES[index]}"
+  [ -n "$assignment" ] || ovpn_die "client $name does not have a static IP reservation"
+  [ "$OVPN_IPAM_DYNAMIC_POOL_SIZE" -gt 0 ] || ovpn_die "cannot release a static IP: dynamic pool capacity is 0; enlarge the dynamic pool first"
+  ovpn_client_ip_set_current_assignment "$name" ""
+  if ! ovpn_client_ip_apply_current_mutation; then
+    ovpn_client_lifecycle_audit release-ip failed || true
+    ovpn_die "failed to release the client IP; the registry was restored"
+  fi
+  ovpn_client_lifecycle_audit release-ip applied || true
+  ovpn_log "released static IP for revoked client $name"
+}
+
+ovpn_client_release_ip_command() {
+  local name="${1:-}"
+
+  [ -n "$name" ] || ovpn_die "usage: ovpn client release-ip <name>"
+  [ "$#" -eq 1 ] || ovpn_die "usage: ovpn client release-ip <name>"
+  ovpn_with_data_lock client ovpn_client_release_ip_inner "$name"
+}
+
 ovpn_client_reissue_inner() {
   local name="$1"
   local status
@@ -232,17 +262,18 @@ ovpn_client_delete_command() {
 
 ovpn_client_command() {
   local subcommand="${1:-}"
-  [ -n "$subcommand" ] || ovpn_die 'usage: ovpn client <create|set-static|set-dynamic|revoke|reissue|delete|list> ...'
+  [ -n "$subcommand" ] || ovpn_die 'usage: ovpn client <create|set-static|set-dynamic|revoke|release-ip|reissue|delete|list> ...'
   shift
   case "$subcommand" in
     create) ovpn_client_create_command "$@" ;;
     set-static) ovpn_client_set_static_command "$@" ;;
     set-dynamic) ovpn_client_set_dynamic_command "$@" ;;
     revoke) ovpn_client_revoke_command "$@" ;;
+    release-ip) ovpn_client_release_ip_command "$@" ;;
     reissue) ovpn_client_reissue_command "$@" ;;
     delete) ovpn_client_delete_command "$@" ;;
     list) [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn client list'; ovpn_list_clients_command ;;
-    *) ovpn_die 'usage: ovpn client <create|set-static|set-dynamic|revoke|reissue|delete|list> ...' ;;
+    *) ovpn_die 'usage: ovpn client <create|set-static|set-dynamic|revoke|release-ip|reissue|delete|list> ...' ;;
   esac
 }
 
