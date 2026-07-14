@@ -106,6 +106,7 @@ ovpn_client_ip_collect_pki_clients() {
       return 1
     }
     [ "$name" = "$OVPN_SERVER_NAME" ] && continue
+    ovpn_registry_client_is_deleted "$name" && continue
     ovpn_registry_client_name_valid "$name" || {
       ovpn_client_ip_error "PKI index contains an invalid client name '$name'"
       return 1

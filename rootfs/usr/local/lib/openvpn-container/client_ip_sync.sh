@@ -54,6 +54,13 @@ ovpn_client_ip_sync_collect_changes() {
       OVPN_CLIENT_IP_SYNC_LEASE_CLIENTS+=("$name")
     fi
   done
+  for name in "${!old_assignments[@]}"; do
+    [ -z "${new_assignments[$name]+present}" ] || continue
+    OVPN_CLIENT_IP_SYNC_CHANGED_CLIENTS+=("$name")
+    if [ -z "${old_assignments[$name]}" ]; then
+      OVPN_CLIENT_IP_SYNC_LEASE_CLIENTS+=("$name")
+    fi
+  done
 }
 
 ovpn_client_ip_sync_stage_ccd() {
@@ -109,6 +116,23 @@ ovpn_client_ip_sync_swap_leases() {
   mv "$OVPN_CLIENT_IP_SYNC_LEASE_STAGE" "$OVPN_POOL_PERSIST_FILE"
   OVPN_CLIENT_IP_SYNC_LEASE_STAGE=''
   OVPN_CLIENT_IP_SYNC_LEASE_SWAPPED=true
+}
+
+ovpn_client_ip_clear_dynamic_lease() {
+  local client_name="$1"
+  local pool_file="$OVPN_POOL_PERSIST_FILE"
+  local temporary line name
+
+  [ -e "$pool_file" ] || return 0
+  temporary="$(mktemp "$(dirname "$pool_file")/.pool-persist.XXXXXX")"
+  umask 077
+  while IFS= read -r line || [ -n "$line" ]; do
+    name="${line%%,*}"
+    [ "$name" = "$client_name" ] && continue
+    printf '%s\n' "$line"
+  done <"$pool_file" >"$temporary"
+  chmod 600 "$temporary"
+  mv "$temporary" "$pool_file"
 }
 
 ovpn_client_ip_kick_changed_clients() {

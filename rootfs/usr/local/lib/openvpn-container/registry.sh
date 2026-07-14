@@ -132,3 +132,18 @@ ovpn_registry_upgrade_v1_inner() {
 ovpn_registry_upgrade_v1() {
   ovpn_with_data_lock registry ovpn_registry_upgrade_v1_inner
 }
+
+ovpn_registry_client_is_deleted() {
+  local wanted="$1"
+  local state_file line name state
+
+  state_file="$(ovpn_registry_client_state_file)"
+  [ -r "$state_file" ] || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ "$line" = '# client,state' ] && continue
+    name="${line%%,*}"
+    state="${line#*,}"
+    [ "$name" = "$wanted" ] && [ "$state" = deleted ] && return 0
+  done <"$state_file"
+  return 1
+}

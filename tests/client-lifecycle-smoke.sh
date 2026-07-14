@@ -41,8 +41,18 @@ case "${1:-}" in
   build-client-full)
     name="$2"
     mkdir -p "$EASYRSA_PKI/private" "$EASYRSA_PKI/issued"
-    printf 'FAKE CLIENT CERT %s\n' "$name" >"$EASYRSA_PKI/issued/$name.crt"
-    printf 'FAKE CLIENT KEY %s\n' "$name" >"$EASYRSA_PKI/private/$name.key"
+    sequence_file="$EASYRSA_PKI/.fake-client-sequence"
+    if [ "${FAKE_EASYRSA_FAIL_BUILD_CLIENT:-}" = "$name" ]; then
+      echo "injected Easy-RSA client issuance failure" >&2
+      exit 1
+    fi
+
+    sequence=0
+    [ ! -r "$sequence_file" ] || sequence="$(cat "$sequence_file")"
+    sequence=$((sequence + 1))
+    printf '%s\n' "$sequence" >"$sequence_file"
+    printf 'FAKE CLIENT CERT %s %s\n' "$name" "$sequence" >"$EASYRSA_PKI/issued/$name.crt"
+    printf 'FAKE CLIENT KEY %s %s\n' "$name" "$sequence" >"$EASYRSA_PKI/private/$name.key"
     printf 'V\t30000101000000Z\t\t01\tunknown\t/CN=%s\n' "$name" >>"$EASYRSA_PKI/index.txt"
     ;;
   revoke)
@@ -268,6 +278,42 @@ if "$OVPN" add-client laptop >"$TMP_DIR/duplicate.out" 2>"$TMP_DIR/duplicate.err
 fi
 
 grep -q 'already exists' "$TMP_DIR/duplicate.err"
+
+"$OVPN" client revoke phone --release-ip >"$TMP_DIR/phone-revoke.out" 2>"$TMP_DIR/phone-revoke.err"
+grep -q '^phone revoked$' <("$OVPN" client list)
+grep -Fqx 'phone,' "$OVPN_DATA_DIR/data/client-ip.csv"
+test ! -e "$OVPN_DATA_DIR/ccd/phone"
+test -f "$OVPN_DATA_DIR/clients/revoked/phone.ovpn"
+phone_key_before="$(sha256sum "$OVPN_DATA_DIR/pki/private/phone.key")"
+"$OVPN" client reissue phone >"$TMP_DIR/phone-reissue.out" 2>"$TMP_DIR/phone-reissue.err"
+phone_key_after="$(sha256sum "$OVPN_DATA_DIR/pki/private/phone.key")"
+[ "$phone_key_before" != "$phone_key_after" ] || {
+  echo 'reissue did not generate a new private key' >&2
+  exit 1
+}
+grep -q '^phone active$' <("$OVPN" client list)
+grep -Fqx 'phone,' "$OVPN_DATA_DIR/data/client-ip.csv"
+test -f "$OVPN_DATA_DIR/clients/active/phone.ovpn"
+"$OVPN" client delete phone >"$TMP_DIR/phone-delete.out" 2>"$TMP_DIR/phone-delete.err"
+if grep -q '^phone,' "$OVPN_DATA_DIR/data/client-ip.csv"; then
+  echo 'deleted client remained in the IP registry' >&2
+  exit 1
+fi
+grep -Fqx 'phone,deleted' "$OVPN_DATA_DIR/meta/client-state.csv"
+test ! -e "$OVPN_DATA_DIR/pki/private/phone.key"
+test ! -e "$OVPN_DATA_DIR/clients/active/phone.ovpn"
+
+tablet_index_before="$(sha256sum "$OVPN_DATA_DIR/pki/index.txt")"
+if FAKE_EASYRSA_FAIL_BUILD_CLIENT=tablet "$OVPN" client reissue tablet >"$TMP_DIR/tablet-reissue.out" 2>"$TMP_DIR/tablet-reissue.err"; then
+  echo 'unsupported same-CN reissue unexpectedly succeeded' >&2
+  exit 1
+fi
+grep -Fq 'does not support same-CN reissue' "$TMP_DIR/tablet-reissue.err"
+tablet_index_after="$(sha256sum "$OVPN_DATA_DIR/pki/index.txt")"
+[ "$tablet_index_before" = "$tablet_index_after" ] || {
+  echo 'unsupported reissue modified the PKI index' >&2
+  exit 1
+}
 
 "$OVPN" revoke-client laptop >"$TMP_DIR/revoke.out" 2>"$TMP_DIR/revoke.err"
 grep -q '^laptop revoked$' <("$OVPN" list-clients)
