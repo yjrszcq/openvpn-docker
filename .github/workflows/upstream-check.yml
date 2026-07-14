@@ -57,7 +57,7 @@ jobs:
           git commit -m "build: update OpenVPN to $target"
           git push origin "$branch"
           gh pr create \
-            --base "${{ github.event.repository.default_branch }}" \
+            --base dev \
             --head "$branch" \
             --title "build: update OpenVPN to $target" \
             --body "Updates versions.env with the official OpenVPN $target release and its SHA-256. Candidate and compatibility workflows must pass before promotion."
