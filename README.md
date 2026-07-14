@@ -17,6 +17,8 @@ web administration layer.
   client-to-client traffic.
 - Manages client certificates and profiles with `add-client`, `export-client`,
   `list-clients`, and `revoke-client`.
+- Maintains a single client-IP registry for static assignments and an isolated
+  dynamic pool; derived CCD state is applied explicitly and can be rolled back safely.
 - Detects inconsistent persistent state before startup, performs only safe or
   byte-equivalent repairs, and fails closed for critical states.
 - Includes a low-privilege maintenance service for diagnosis and repair.
@@ -81,7 +83,10 @@ OpenVPN listens directly on the host, so it has no Docker `ports:` mapping.
 Before starting it, allow `1194/udp` in the host and cloud firewall. Host
 networking makes the VPN gateway address a host address; the `NET_ADMIN`
 capability therefore affects host networking and should be used only on a
-controlled Linux host.
+controlled Linux host. When NAT, pushed routes, or full-tunnel routing is
+enabled, the service also changes IPv4 forwarding and iptables rules in that
+host network namespace. Review the resulting host rules and do not use this
+layout with untrusted workloads.
 
 
 Replace `vpn.example.com` with the public hostname or IP address clients use.
@@ -105,22 +110,26 @@ cloud firewall.
 
 ## Configuration
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `OVPN_IMAGE` | `szcq/openvpn:2.7.5` | Image used by Compose. Pin a released OpenVPN-version tag. |
-| `OVPN_ENDPOINT` | required | Public hostname or IP embedded in client profiles on initialization. |
-| `OVPN_PROTO` | `udp` | Transport protocol: `udp` or `tcp`. |
-| `OVPN_PORT` | `1194` | OpenVPN listen port. |
-| `OVPN_NETWORK` | `10.8.0.0/24` | IPv4 tunnel network. Select a non-overlapping canonical CIDR. |
-| `OVPN_TOPOLOGY` | `subnet` | Required IPv4 topology; no other topology is accepted. |
-| `OVPN_DYNAMIC_POOL_SIZE` | half of usable client addresses | Tail of the usable address range reserved for dynamic clients; 0 and full capacity are valid boundaries. |
-| `OVPN_NAT` | `true` | Masquerade client traffic leaving the VPN network namespace. |
-| `OVPN_NAT_INTERFACE` | `auto` | Egress interface for NAT, or a specific Linux interface name. |
-| `OVPN_REDIRECT_GATEWAY` | `false` | Route client default traffic through the VPN. |
-| `OVPN_CLIENT_TO_CLIENT` | `false` | Allow direct traffic between VPN clients. |
-| `OVPN_DNS` | empty | Comma-separated IPv4 DNS servers pushed to clients. |
-| `OVPN_ROUTES` | empty | Comma-separated IPv4 CIDRs pushed to clients. |
-| `OVPN_CRITICAL_MODE` | `exit` | Use `maintenance` only to hold a critical container for inspection. |
+| Variable | Runtime default / Compose fallback | Quick-start value | Purpose |
+| --- | --- | --- | --- |
+| `OVPN_IMAGE` | `szcq/openvpn:2.7.5` | `szcq/openvpn:2.7.5` | Image used by Compose. Pin a released OpenVPN-version tag. |
+| `OVPN_ENDPOINT` | required | `vpn.example.com` | Public hostname or IP embedded in client profiles on initialization. |
+| `OVPN_PROTO` | `udp` | `udp` | Transport protocol: `udp` or `tcp`. |
+| `OVPN_PORT` | `1194` | `1194` | OpenVPN listen port. |
+| `OVPN_NETWORK` | `10.8.0.0/24` | `10.42.0.0/24` | IPv4 tunnel network. Select a non-overlapping canonical CIDR. |
+| `OVPN_TOPOLOGY` | `subnet` | `subnet` | Required IPv4 topology; no other topology is accepted. |
+| `OVPN_DYNAMIC_POOL_SIZE` | half of usable client addresses | `64` | Tail of the usable address range reserved for dynamic clients; 0 and full capacity are valid boundaries. |
+| `OVPN_NAT` | `true` | `false` | Masquerade client traffic leaving the VPN network namespace. |
+| `OVPN_NAT_INTERFACE` | `auto` | `auto` | Egress interface for NAT, or a specific Linux interface name. |
+| `OVPN_REDIRECT_GATEWAY` | `false` | `false` | Route client default traffic through the VPN. |
+| `OVPN_CLIENT_TO_CLIENT` | `false` | `true` | Allow direct traffic between VPN clients. |
+| `OVPN_DNS` | empty | empty | Comma-separated IPv4 DNS servers pushed to clients. |
+| `OVPN_ROUTES` | empty | empty | Comma-separated IPv4 CIDRs pushed to clients. |
+| `OVPN_CRITICAL_MODE` | `exit` | `exit` | Use `maintenance` only to hold a critical container for inspection. |
+
+Runtime defaults apply only when the environment omits a value. The quick-start
+values are the deliberately opinionated values in `docker-compose.example.yaml`
+and `.env.example`; they are not an additional set of runtime defaults.
 
 For a canonical network with prefix length `p`, usable client capacity is
 `2^(32 - p) - 3`: the network address, server address (`network + 1`), and
@@ -128,6 +137,23 @@ broadcast address are reserved. For example, `10.42.0.0/24` provides 253 client
 addresses (`10.42.0.2` through `10.42.0.254`), so the dynamic pool may be
 `0` through `253` and its unset default is `floor(253 / 2) = 126`. The minimum
 `/30` network provides exactly one client address (`.2`).
+
+The dynamic pool is a contiguous tail of that usable range; the remaining
+prefix is the static region. For example, with `10.42.0.0/24` and
+`OVPN_DYNAMIC_POOL_SIZE=64`, dynamic clients receive addresses from
+`10.42.0.191` through `10.42.0.254`, while static assignments may use
+`10.42.0.2` through `10.42.0.190`. Static capacity is therefore usable
+client capacity minus the dynamic-pool size.
+
+Choose the routing model deliberately:
+
+- For routed private-network access, keep `OVPN_NAT=false` and
+  `OVPN_REDIRECT_GATEWAY=false`, and set `OVPN_ROUTES` for reachable private
+  networks. Each target network requires a return route to the VPN CIDR through
+  the VPN host.
+- For Internet full-tunnel access, set `OVPN_NAT=true` and
+  `OVPN_REDIRECT_GATEWAY=true`. Leave `OVPN_NAT_INTERFACE=auto` unless the
+  host has more than one possible egress interface.
 
 Bootstrap values are instance facts, not ordinary runtime overrides. Inspect the
 persisted values with:
@@ -189,26 +215,43 @@ docker compose run --rm openvpn-maintenance repair
 
 ## Client Management
 
-Create a client certificate and profile:
+Create a client certificate and profile with the standard command family:
 
 `laptop` is only an example client name. Replace it consistently with a unique
 device name, such as `phone` or `nas`.
 
 ```bash
-docker compose exec openvpn ovpn add-client laptop
+docker compose exec openvpn ovpn client create laptop
 docker compose exec -T openvpn ovpn export-client laptop > laptop.ovpn
 ```
 
 `export-client` writes only the profile to standard output, so redirection does
-not mix it with status output. List or revoke clients with:
+not mix it with status output. The lifecycle commands are:
 
 ```bash
-docker compose exec openvpn ovpn list-clients
-docker compose exec openvpn ovpn revoke-client laptop
+docker compose exec openvpn ovpn client list
+docker compose exec openvpn ovpn client revoke laptop
+docker compose exec openvpn ovpn client revoke laptop --release-ip
+docker compose exec openvpn ovpn client reissue laptop
+docker compose exec openvpn ovpn client delete laptop
 ```
 
-A revoked certificate is added to the CRL and its active profile is moved out of
-the active-client set.
+`client revoke` adds the certificate to the CRL, disconnects the client, and
+moves its active profile out of the active-client set. It retains the IP
+assignment by default. `--release-ip` releases a static reservation, but
+requires a non-zero dynamic pool so the revoked registry record remains valid.
+
+`client reissue` revokes the old certificate, creates a new private key and
+certificate for the same client name, and retains the existing IP assignment.
+It first verifies that the shipped Easy-RSA supports same-CN reissue; unsupported
+runtimes are rejected without changing the PKI index. Export and redistribute
+the new profile afterward.
+
+`client delete` revokes an active client if necessary, then removes its
+registry record, generated profile, and private key. Treat it as irreversible:
+recovering the old private key requires a secure backup. `add-client`,
+`list-clients`, and `revoke-client` remain compatibility aliases for their
+standard counterparts.
 
 ## Client IP Management
 
@@ -223,9 +266,41 @@ Create or change assignments through the standard commands:
 ~~~bash
 docker compose exec openvpn ovpn client create phone
 docker compose exec openvpn ovpn client create tablet --dynamic
+docker compose exec openvpn ovpn client set-static phone
 docker compose exec openvpn ovpn client set-static phone --ip 10.42.0.2
 docker compose exec openvpn ovpn client set-dynamic phone
 ~~~
+
+`client create <name>` creates a static assignment by default. For one client,
+`client set-static <name>` without `--ip` assigns the lowest unused address
+in the static region. Use `--ip <IPv4>` only when a specific address is
+required:
+
+~~~bash
+docker compose exec openvpn ovpn client set-static phone --ip 10.42.0.20
+~~~
+
+`--ip` accepts exactly one client name and cannot be used with `--all`. The
+address must be in the static region and unused by another client; a conflict
+is rejected before any registry, CCD, lease, or running configuration is
+changed. Reapplying the address already held by that same client is allowed.
+When deliberately changing an existing static assignment, specify `--ip`;
+omitting it requests automatic allocation and may select a different free
+address.
+
+For multiple names, or `client set-static --all`, the configured
+`OVPN_EDITOR` (or `EDITOR`) opens a temporary `client,ip` list. Enter
+`auto` to allocate the lowest unused static address or an explicit static IP.
+An empty IP keeps a selected client dynamic when changing named clients;
+`--all` rejects empty IPs.
+
+All standard client-assignment commands apply their changes as one transaction;
+they do not need `client-ip apply` afterward. A successful static change
+updates the registry snapshot and CCD immediately. If the OpenVPN management
+socket is available, affected online clients are disconnected and receive the
+new assignment when they reconnect. If the service is stopped, the persisted
+assignment is used on the client's next connection. A failed apply or disconnect
+request rolls the transaction back.
 
 For a deliberate direct edit, modify only
 ./openvpn-data/data/client-ip.csv, then explicitly validate and apply it:
@@ -250,8 +325,10 @@ it as waiting for explicit application.
 ## Network and Dynamic-Pool Migration
 
 Changing the tunnel CIDR or dynamic-pool size is a migration, not a config init
-update. Run it inside the live openvpn service (not the low-privilege
-maintenance container), because it uses that container's local root-only
+update. `--dry-run` only generates a read-only plan and does not contact the
+management socket, so it may also be run from the maintenance container. Applying
+the plan requires the live openvpn service (not the low-privilege maintenance
+container), because it reloads that service through its local root-only
 management socket:
 
 ~~~bash
@@ -319,12 +396,29 @@ docker compose exec openvpn ovpn version
 profiles, tls-crypt key, and instance metadata. Restrict access to this
 directory and back it up securely.
 
-A consistent backup includes config/, data/, meta/, pki/, secrets/, ccd/, and
-clients/, plus the separately mounted ./openvpn-runtime/pool-persist.txt
-dynamic-lease file. The audit log and applied registry snapshot are in meta/;
-do not copy private keys into tickets, logs, or ad-hoc recovery notes. Prefer
-stopping the service before taking a backup. After restoring both volumes, run
-doctor, review repair --plan, and then start the server.
+A consistent backup is the complete pair of mount directories, not a selected
+set of subdirectories. Stop the server before archiving so the data directory,
+rendered server configuration, CCD, registry snapshots, audit data, PKI, client
+profiles, repair journals, and the `./openvpn-runtime/pool-persist.txt` dynamic
+lease file correspond to the same point in time:
+
+```bash
+docker compose stop openvpn
+tar --numeric-owner -C . -czf openvpn-backup-YYYYMMDD.tar.gz \
+  openvpn-data openvpn-runtime
+```
+
+Keep the archive encrypted and access-controlled. Do not copy private keys into
+tickets, logs, or ad-hoc recovery notes. Restore both directories to their
+original mount paths. If the minimal quick-start Compose file is in use, add the
+maintenance service shown above, then run `doctor` and review `repair --plan`
+before starting the server:
+
+```bash
+docker compose run --rm openvpn-maintenance doctor
+docker compose run --rm openvpn-maintenance repair --plan
+docker compose up -d openvpn
+```
 
 Do not delete or point the bind mount at a different empty directory by
 mistake: an empty directory is intentionally treated as a request to create a
@@ -336,9 +430,12 @@ new VPN instance.
   operational convenience. Compromise of that volume can compromise the CA.
 - Private keys and exported `.ovpn` profiles are sensitive credentials. Store
   them with restrictive permissions and deliver them over a trusted channel.
-- The container changes forwarding and firewall rules only inside its own
-  network namespace. Host firewall, cloud security-group, and port-forwarding
-  configuration remain the operator's responsibility.
+- Network-rule scope follows the selected network mode. The quick-start host
+  network mode shares the host network namespace, so enabling NAT, routes, or
+  full-tunnel routing changes host IPv4 forwarding and iptables rules. In an
+  isolated container network those changes stay in that container namespace.
+  Host firewall, cloud security-group, and port-forwarding configuration remain
+  the operator's responsibility.
 - This image validates source checksums, runtime version, configuration load,
   and required capabilities before publishing a stable release.
 
@@ -364,6 +461,14 @@ GitHub Actions runs compatibility, container, E2E, upgrade-state, and
 multi-architecture gates. A default-branch Candidate publishes the GHCR
 candidate; a successful Candidate automatically triggers Release, which
 promotes stable GHCR tags and publishes the Docker Hub OpenVPN-version tag.
+
+The weekly (or manually dispatched) Upstream Check looks for a newer official
+OpenVPN release. When it finds one, it pushes an `automation/openvpn-<version>`
+branch and opens a pull request targeting `dev`. Review that pull request and
+merge it into `dev`; its pull-request checks run there, but Candidate does not
+publish from `dev`. Promote the reviewed change from `dev` to `main` to
+trigger Candidate and then Release. A manual Candidate dispatch should likewise
+use `main`.
 
 Maintainers: if `DOCKER_TOKEN` expires, replace it in `Settings -> Secrets and
 variables -> Actions`, then manually start a new default-branch Candidate. The
