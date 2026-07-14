@@ -16,7 +16,6 @@ ovpn_start_command() {
 
   critical_mode="$(ovpn_critical_mode)"
   ovpn_auto_init_if_empty
-  ovpn_registry_upgrade_v1
   state="$(ovpn_state_detect)"
   if [ "$state" = DEGRADED_REPAIRABLE ] || [ "$state" = DEGRADED_RECOVERABLE ]; then
     ovpn_log "instance state is $state; applying automatic repairs"
@@ -40,6 +39,7 @@ ovpn_start_command() {
     done
     ovpn_exit_for_state "$state"
   fi
+  ovpn_registry_upgrade_v1
 
   ovpn_compatibility_require_supported
   ovpn_network_configure

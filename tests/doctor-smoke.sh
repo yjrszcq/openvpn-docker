@@ -62,6 +62,17 @@ cat >"$pending/meta/client-ip.applied.csv" <<'EOF'
 # client,ip
 applied,
 EOF
+cat >"$pending/meta/client-state.csv" <<'EOF'
+# client,state
+applied,active
+EOF
+: >"$pending/meta/audit.jsonl"
+printf 'V\t9999\t\t01\tunknown\t/CN=applied\n' >"$pending/pki/index.txt"
+: >"$pending/pki/issued/applied.crt"
+: >"$pending/pki/private/applied.key"
+mkdir -p "$pending/clients/active"
+: >"$pending/clients/active/applied.ovpn"
+chmod 600 "$pending/data/client-ip.csv" "$pending/meta/client-ip.applied.csv" "$pending/meta/client-state.csv" "$pending/meta/audit.jsonl"
 before="$(snapshot "$pending")"
 OVPN_DATA_DIR="$pending" "$OVPN" doctor >"$TMP_DIR/pending.txt" 2>"$TMP_DIR/pending.err"
 after="$(snapshot "$pending")"

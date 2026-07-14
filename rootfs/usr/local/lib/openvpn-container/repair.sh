@@ -53,6 +53,13 @@ ovpn_repair_plan_add_issue() {
           client_name="${id#CLIENT_PROFILE_MISSING_}"
           ovpn_repair_plan_add_action RENDER_CLIENT_PROFILE "clients/active/$client_name.ovpn"
           ;;
+        CLIENT_IP_CCD_OUT_OF_SYNC)
+          ovpn_repair_plan_add_action SYNCHRONIZE_CLIENT_IP_CCD ccd
+          ;;
+        CLIENT_IP_REGISTRY_NOT_CANONICAL)
+          ovpn_repair_plan_add_action NORMALIZE_CLIENT_IP_DRAFT data/client-ip.csv
+          ovpn_repair_plan_add_action NORMALIZE_CLIENT_IP_APPLIED meta/client-ip.applied.csv
+          ;;
         *)
           ovpn_repair_plan_add_blocked "$id" "$severity" "$action"
           ;;
@@ -323,6 +330,12 @@ ovpn_repair_stage_action() {
       client_name="${client_name%.key}"
       ovpn_recovery_stage_client_key "$client_name" "$OVPN_REPAIR_STAGE_DIR/$target"
       ;;
+    SYNCHRONIZE_CLIENT_IP_CCD)
+      ovpn_state_ipam_stage_ccd "$OVPN_REPAIR_STAGE_DIR/$target"
+      ;;
+    NORMALIZE_CLIENT_IP_DRAFT|NORMALIZE_CLIENT_IP_APPLIED)
+      ovpn_state_ipam_stage_canonical_registry "$OVPN_REPAIR_STAGE_DIR/$target"
+      ;;
     ENSURE_RUNTIME_DIRECTORY)
       ;;
     *)
@@ -361,6 +374,7 @@ ovpn_repair_validate_stage() {
     source="$OVPN_REPAIR_STAGE_DIR/$target"
     [ -e "$source" ] || ovpn_die "missing staged repair target: $target"
     mkdir -p "$(dirname "$validation_dir/$target")"
+    rm -rf "$validation_dir/$target"
     cp -a "$source" "$validation_dir/$target"
   done
 
@@ -391,6 +405,7 @@ ovpn_repair_install_staged_actions() {
       source="$OVPN_REPAIR_STAGE_DIR/$target"
       destination="$OVPN_DATA_DIR/$target"
       mkdir -p "$(dirname "$destination")"
+      rm -rf "$destination"
       mv "$source" "$destination"
     fi
     if [ "${OVPN_REPAIR_FAIL_AFTER_INSTALL:-}" = "$id" ]; then
@@ -411,11 +426,11 @@ ovpn_repair_rollback() {
       present)
         snapshot_path="$OVPN_REPAIR_SNAPSHOT_DIR/$target"
         mkdir -p "$(dirname "$destination")"
-        rm -f "$destination"
+        rm -rf "$destination"
         cp -a "$snapshot_path" "$destination"
         ;;
       missing)
-        rm -f "$destination"
+        rm -rf "$destination"
         ;;
     esac
   done <"$manifest"

@@ -145,6 +145,7 @@ ovpn_state_scan_client_profiles() {
 ovpn_state_scan_client_ip_pending() {
   local draft applied
 
+  declare -F ovpn_registry_client_ip_file >/dev/null 2>&1 || return 0
   draft="$(ovpn_registry_client_ip_file)"
   applied="$(ovpn_registry_applied_file)"
   if [ -r "$draft" ] && [ -r "$applied" ] && ! cmp -s "$draft" "$applied"; then
@@ -413,7 +414,9 @@ ovpn_state_scan() {
   ovpn_state_validate_crypto
   ovpn_state_scan_client_profiles
   ovpn_state_scan_client_ip_pending
-  ovpn_state_scan_ipam_consistency
+  if declare -F ovpn_state_scan_ipam_consistency >/dev/null 2>&1; then
+    ovpn_state_scan_ipam_consistency
+  fi
 }
 
 ovpn_state_detect() {
