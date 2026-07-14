@@ -57,11 +57,14 @@ services:
       - /dev/net/tun:/dev/net/tun
     volumes:
       - ./openvpn-data:/etc/openvpn
+      - ./openvpn-runtime:/var/lib/openvpn
     environment:
       OVPN_ENDPOINT: vpn.example.com
       OVPN_PROTO: udp
       OVPN_PORT: "1194"
       OVPN_NETWORK: 10.42.0.0/24
+      OVPN_TOPOLOGY: subnet
+      OVPN_DYNAMIC_POOL_SIZE: "64"
       OVPN_NAT: "false"
       OVPN_NAT_INTERFACE: auto
       OVPN_REDIRECT_GATEWAY: "false"
@@ -108,7 +111,9 @@ cloud firewall.
 | `OVPN_ENDPOINT` | required | Public hostname or IP embedded in client profiles on initialization. |
 | `OVPN_PROTO` | `udp` | Transport protocol: `udp` or `tcp`. |
 | `OVPN_PORT` | `1194` | OpenVPN listen port. |
-| `OVPN_NETWORK` | `10.8.0.0/24` | IPv4 tunnel network. Select a non-overlapping CIDR. |
+| `OVPN_NETWORK` | `10.8.0.0/24` | IPv4 tunnel network. Select a non-overlapping canonical CIDR. |
+| `OVPN_TOPOLOGY` | `subnet` | Required IPv4 topology; no other topology is accepted. |
+| `OVPN_DYNAMIC_POOL_SIZE` | half of usable client addresses | Tail of the usable address range reserved for dynamic clients; 0 and full capacity are valid boundaries. |
 | `OVPN_NAT` | `true` | Masquerade client traffic leaving the VPN network namespace. |
 | `OVPN_NAT_INTERFACE` | `auto` | Egress interface for NAT, or a specific Linux interface name. |
 | `OVPN_REDIRECT_GATEWAY` | `false` | Route client default traffic through the VPN. |
@@ -150,7 +155,7 @@ docker compose exec openvpn ovpn config print
 `config init` rewrites only the persisted configuration; it does not remove or
 reissue client certificates, keys, or profiles. It writes every configuration
 value from the Compose environment, so keep all `OVPN_*` values complete and
-correct before running it.
+correct before running it. Do not use config init to change OVPN_NETWORK or OVPN_DYNAMIC_POOL_SIZE on an initialized instance; use the migration command below so the server can reload and roll back atomically.
 
 When `OVPN_ENDPOINT`, `OVPN_PROTO`, or `OVPN_PORT` changes, export and
 redistribute a new profile for every active client. The temporary file prevents
@@ -198,6 +203,65 @@ docker compose exec openvpn ovpn revoke-client laptop
 A revoked certificate is added to the CRL and its active profile is moved out of
 the active-client set.
 
+## Client IP Management
+
+data/client-ip.csv is the sole IP-assignment fact: a non-empty second column is
+a static address and an empty column is dynamic. The accepted registry is
+mirrored to meta/client-ip.applied.csv; CCD files and
+/var/lib/openvpn/pool-persist.txt are derived state, never a static-address
+source.
+
+Create or change assignments through the standard commands:
+
+~~~bash
+docker compose exec openvpn ovpn client create phone
+docker compose exec openvpn ovpn client create tablet --dynamic
+docker compose exec openvpn ovpn client set-static phone --ip 10.42.0.2
+docker compose exec openvpn ovpn client set-dynamic phone
+~~~
+
+For a deliberate direct edit, modify only
+./openvpn-data/data/client-ip.csv, then explicitly validate and apply it:
+
+~~~bash
+docker compose exec openvpn ovpn client-ip validate
+docker compose exec openvpn ovpn client-ip apply
+~~~
+
+validate is read-only. apply checks client identities, duplicate or out-of-range
+addresses, static/dynamic pool separation, capacity, and PKI state under the
+shared lock. On success it sorts static entries by numeric IP and dynamic
+entries by client name, regenerates CCD, clears affected dynamic leases, and
+disconnects affected online clients through the local root-only management
+socket. On rejection or a later transaction failure it restores the draft
+exactly from the applied snapshot. client-ip sync remains an alias for apply;
+client-ip edit only opens the draft.
+
+A pending direct edit is never started or repaired automatically. doctor reports
+it as waiting for explicit application.
+
+## Network and Dynamic-Pool Migration
+
+Changing the tunnel CIDR or dynamic-pool size is a migration, not a config init
+update. Run it inside the live openvpn service (not the low-privilege
+maintenance container), because it uses that container's local root-only
+management socket:
+
+~~~bash
+docker compose exec openvpn ovpn network reconfigure \
+  --network 10.43.0.0/24 --dynamic-pool-size 96 --dry-run
+docker compose exec openvpn ovpn network reconfigure \
+  --network 10.43.0.0/24 --dynamic-pool-size 96 --yes
+~~~
+
+The preview preserves valid static IPs where possible, otherwise retains the
+host portion or allocates the lowest free static address. The confirmed
+operation snapshots configuration, registries, CCD, leases, rendered server
+configuration, and the audit log; reloads OpenVPN with SIGHUP; and waits for
+management-socket and container health. A failed reload or health check restores
+the snapshot and reloads the old server configuration. Expect affected clients
+to reconnect.
+
 ## Operations and Maintenance
 
 The minimal quick-start configuration omits maintenance. To add one-shot state
@@ -211,6 +275,7 @@ template already includes it. It mounts the same data but does not request TUN,
     restart: "no"
     volumes:
       - ./openvpn-data:/etc/openvpn
+      - ./openvpn-runtime:/var/lib/openvpn
     profiles:
       - maintenance
     command:
@@ -247,11 +312,12 @@ docker compose exec openvpn ovpn version
 profiles, tls-crypt key, and instance metadata. Restrict access to this
 directory and back it up securely.
 
-A consistent backup includes at least `config/`, `meta/`, `pki/`, `secrets/`,
-and `ccd/`; retaining `clients/` is also recommended because profiles can be
-redundant recovery material. Prefer stopping the service before taking a
-backup. After restoring data, run `doctor`, review `repair --plan`, and then
-start the server.
+A consistent backup includes config/, data/, meta/, pki/, secrets/, ccd/, and
+clients/, plus the separately mounted ./openvpn-runtime/pool-persist.txt
+dynamic-lease file. The audit log and applied registry snapshot are in meta/;
+do not copy private keys into tickets, logs, or ad-hoc recovery notes. Prefer
+stopping the service before taking a backup. After restoring both volumes, run
+doctor, review repair --plan, and then start the server.
 
 Do not delete or point the bind mount at a different empty directory by
 mistake: an empty directory is intentionally treated as a request to create a
