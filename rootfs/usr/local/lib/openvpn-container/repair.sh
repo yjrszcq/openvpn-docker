@@ -350,7 +350,7 @@ ovpn_repair_validate_stage() {
   local saved_schema_version_file="$OVPN_SCHEMA_VERSION_FILE"
 
   mkdir -p "$validation_dir"
-  for entry in ccd clients config meta pki secrets server; do
+  for entry in ccd clients config data meta pki secrets server; do
     if [ -e "$OVPN_DATA_DIR/$entry" ]; then
       cp -a "$OVPN_DATA_DIR/$entry" "$validation_dir/$entry"
     fi

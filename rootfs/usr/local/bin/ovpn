@@ -26,6 +26,7 @@ LIB_DIR="${OVPN_LIB_DIR:-/usr/local/lib/openvpn-container}"
 . "$LIB_DIR/client.sh"
 . "$LIB_DIR/client_ip_mutation.sh"
 . "$LIB_DIR/client_lifecycle.sh"
+. "$LIB_DIR/network_migration.sh"
 
 command="${1:-help}"
 if [ "$#" -gt 0 ]; then
@@ -47,6 +48,11 @@ case "$command" in
     ;;
   client-ip)
     ovpn_client_ip_command "$@"
+    ;;
+  network)
+    [ "${1:-}" = reconfigure ] || ovpn_die 'usage: ovpn network reconfigure ...'
+    shift
+    ovpn_network_reconfigure_command "$@"
     ;;
   render)
     ovpn_render_command "$@"

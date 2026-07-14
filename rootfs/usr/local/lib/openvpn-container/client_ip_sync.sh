@@ -29,18 +29,20 @@ ovpn_client_ip_sync_reset() {
 ovpn_client_ip_sync_collect_changes() {
   local snapshot="$1"
   local draft="$2"
-  local index name old_ip new_ip
+  local index name old_ip new_ip line
   local -A old_assignments=()
   local -A new_assignments=()
 
+  [ -r "$snapshot" ] || return 1
   for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
     new_assignments["${OVPN_CLIENT_IP_NAMES[index]}"]="${OVPN_CLIENT_IP_VALUES[index]}"
   done
-  ovpn_client_ip_parse_file "$snapshot" || return 1
-  for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
-    old_assignments["${OVPN_CLIENT_IP_NAMES[index]}"]="${OVPN_CLIENT_IP_VALUES[index]}"
-  done
-  ovpn_client_ip_parse_file "$draft" || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ "$line" = '# client,ip' ] && continue
+    [ -n "$line" ] || continue
+    name="${line%%,*}"
+    old_assignments["$name"]="${line#*,}"
+  done <"$snapshot"
   for name in "${!new_assignments[@]}"; do
     if [ -n "${old_assignments[$name]+present}" ]; then
       old_ip="${old_assignments[$name]}"
