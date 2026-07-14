@@ -43,6 +43,7 @@ Commands:
   config            inspect or update persistent project config
   render            render derived configuration
   client-ip         inspect, validate, or apply the client IP registry
+  client            manage client assignments
   add-client        create a client certificate
   export-client     write a client profile to stdout
   list-clients      list known clients

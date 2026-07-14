@@ -42,11 +42,11 @@ ovpn_client_ip_sync_collect_changes() {
   done
   ovpn_client_ip_parse_file "$draft" || return 1
   for name in "${!new_assignments[@]}"; do
-    [ -n "${old_assignments[$name]+present}" ] || {
-      ovpn_client_ip_error "applied snapshot is missing client '$name'"
-      return 1
-    }
-    old_ip="${old_assignments[$name]}"
+    if [ -n "${old_assignments[$name]+present}" ]; then
+      old_ip="${old_assignments[$name]}"
+    else
+      old_ip=''
+    fi
     new_ip="${new_assignments[$name]}"
     [ "$old_ip" = "$new_ip" ] && continue
     OVPN_CLIENT_IP_SYNC_CHANGED_CLIENTS+=("$name")
