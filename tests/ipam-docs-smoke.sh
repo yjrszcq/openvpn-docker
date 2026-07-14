@@ -21,7 +21,7 @@ grep -Fq -- '--yes' "$EN_README"
 grep -Fq './openvpn-runtime/pool-persist.txt' "$EN_README"
 grep -Fq '2^(32 - p) - 3' "$EN_README"
 grep -Fq '10.42.0.0/24` provides 253 client' "$EN_README"
-grep -Fq 'lowest unused address in the static region' "$EN_README"
+grep -Fq 'assigns the lowest unused address' "$EN_README"
 grep -Fq "they do not need \`client-ip apply\` afterward" "$EN_README"
 grep -Fq 'rejected before any registry, CCD, lease, or running configuration is' "$EN_README"
 
