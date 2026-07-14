@@ -119,10 +119,10 @@ cloud firewall.
 | `OVPN_NETWORK` | `10.8.0.0/24` | `10.42.0.0/24` | IPv4 tunnel network. Select a non-overlapping canonical CIDR. |
 | `OVPN_TOPOLOGY` | `subnet` | `subnet` | Required IPv4 topology; no other topology is accepted. |
 | `OVPN_DYNAMIC_POOL_SIZE` | half of usable client addresses | `64` | Tail of the usable address range reserved for dynamic clients; 0 and full capacity are valid boundaries. |
-| `OVPN_NAT` | `true` | `false` | Masquerade client traffic leaving the VPN network namespace. |
+| `OVPN_NAT` | `false` | `false` | Masquerade client traffic leaving the VPN network namespace. |
 | `OVPN_NAT_INTERFACE` | `auto` | `auto` | Egress interface for NAT, or a specific Linux interface name. |
 | `OVPN_REDIRECT_GATEWAY` | `false` | `false` | Route client default traffic through the VPN. |
-| `OVPN_CLIENT_TO_CLIENT` | `false` | `true` | Allow direct traffic between VPN clients. |
+| `OVPN_CLIENT_TO_CLIENT` | `true` | `true` | Allow direct traffic between VPN clients. |
 | `OVPN_DNS` | empty | empty | Comma-separated IPv4 DNS servers pushed to clients. |
 | `OVPN_ROUTES` | empty | empty | Comma-separated IPv4 CIDRs pushed to clients. |
 | `OVPN_CRITICAL_MODE` | `exit` | `exit` | Use `maintenance` only to hold a critical container for inspection. |
