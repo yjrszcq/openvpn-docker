@@ -86,4 +86,32 @@ EOF
 "$OVPN" client-ip sync >"$TMP_DIR/sync.out"
 cmp "$TMP_DIR/expected.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
 
+cat >"$OVPN_DATA_DIR/data/client-ip.csv" <<'EOF'
+# client,ip
+alpha,10.88.0.128
+bravo,10.88.0.2
+zulu,
+EOF
+"$OVPN" client-ip apply >"$TMP_DIR/boundary.out"
+cat >"$TMP_DIR/boundary.csv" <<'EOF'
+# client,ip
+bravo,10.88.0.2
+alpha,10.88.0.128
+zulu,
+EOF
+cmp "$TMP_DIR/boundary.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
+
+cat >"$OVPN_DATA_DIR/data/client-ip.csv" <<'EOF'
+# client,ip
+alpha,10.88.0.129
+bravo,10.88.0.2
+zulu,
+EOF
+if "$OVPN" client-ip apply >"$TMP_DIR/pool-overlap.out" 2>"$TMP_DIR/pool-overlap.err"; then
+  echo 'dynamic-pool IP draft unexpectedly applied' >&2
+  exit 1
+fi
+grep -Fq 'outside the static address region' "$TMP_DIR/pool-overlap.err"
+cmp "$TMP_DIR/boundary.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
+
 printf 'client-ip apply smoke passed\n'
