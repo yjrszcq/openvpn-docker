@@ -227,9 +227,7 @@ OVPN_ROUTES=$OVPN_ROUTES
 EOF
 }
 
-ovpn_config_write() {
-  ovpn_config_normalize_bootstrap
-
+ovpn_config_write_loaded() {
   mkdir -p "$OVPN_CONFIG_DIR"
   umask 077
   cat >"$OVPN_PROJECT_ENV.tmp" <<EOF
@@ -250,6 +248,11 @@ EOF
   mv "$OVPN_PROJECT_ENV.tmp" "$OVPN_PROJECT_ENV"
   printf '%s\n' "$OVPN_CONFIG_VERSION" >"$OVPN_SCHEMA_VERSION_FILE"
   chmod 600 "$OVPN_PROJECT_ENV" "$OVPN_SCHEMA_VERSION_FILE"
+}
+
+ovpn_config_write() {
+  ovpn_config_normalize_bootstrap
+  ovpn_config_write_loaded
 }
 
 ovpn_config_command() {

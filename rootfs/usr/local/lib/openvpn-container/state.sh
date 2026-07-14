@@ -51,6 +51,10 @@ $OVPN_DATA_DIR/config/project.env
 $OVPN_DATA_DIR/config/schema-version
 $OVPN_DATA_DIR/meta/instance.json
 $OVPN_DATA_DIR/pki/ca.crt
+$OVPN_DATA_DIR/data/client-ip.csv
+$OVPN_DATA_DIR/meta/client-ip.applied.csv
+$OVPN_DATA_DIR/meta/client-state.csv
+$OVPN_DATA_DIR/meta/audit.jsonl
 $OVPN_DATA_DIR/pki/private/ca.key
 $OVPN_DATA_DIR/pki/issued/$OVPN_SERVER_NAME.crt
 $OVPN_DATA_DIR/pki/private/$OVPN_SERVER_NAME.key

@@ -29,7 +29,7 @@ ovpn_with_data_lock() {
   local lock_file
 
   case "$name" in
-    init|repair|client) ;;
+    init|registry|repair|client) ;;
     *) ovpn_die "unsupported data lock: $name" ;;
   esac
 

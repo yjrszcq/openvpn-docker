@@ -4,6 +4,7 @@ ovpn_layout_create() {
   mkdir -p \
     "$OVPN_DATA_DIR/config" \
     "$OVPN_DATA_DIR/meta" \
+    "$OVPN_DATA_DIR/data" \
     "$OVPN_DATA_DIR/server" \
     "$OVPN_DATA_DIR/pki" \
     "$OVPN_DATA_DIR/secrets" \
@@ -13,7 +14,7 @@ ovpn_layout_create() {
     "$OVPN_DATA_DIR/ccd" \
     "$OVPN_DATA_DIR/repair/journal" \
     "$OVPN_DATA_DIR/repair/snapshots"
-  chmod 750 "$OVPN_DATA_DIR" "$OVPN_DATA_DIR/config" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/server" "$OVPN_DATA_DIR/pki" "$OVPN_DATA_DIR/secrets"
+  chmod 750 "$OVPN_DATA_DIR" "$OVPN_DATA_DIR/config" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/data" "$OVPN_DATA_DIR/server" "$OVPN_DATA_DIR/pki" "$OVPN_DATA_DIR/secrets"
 }
 
 ovpn_init_write_transaction_marker() {
@@ -67,6 +68,7 @@ ovpn_init_inner() {
 
   ovpn_layout_create
   ovpn_config_write
+  ovpn_registry_initialize_empty
   ovpn_pki_init
   ovpn_tls_crypt_generate
   ovpn_render_server --output "$OVPN_DATA_DIR/server/server.conf"
@@ -75,7 +77,7 @@ ovpn_init_inner() {
 
   ovpn_init_write_transaction_marker "$transaction_file" "$transaction_id"
   commit_started=true
-  for entry in ccd clients config meta pki repair secrets server; do
+  for entry in ccd clients config data meta pki repair secrets server; do
     mv "$stage_dir/$entry" "$final_data_dir/$entry"
   done
   rmdir "$stage_dir"
