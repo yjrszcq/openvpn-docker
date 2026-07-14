@@ -413,6 +413,7 @@ ovpn_state_scan() {
   ovpn_state_validate_crypto
   ovpn_state_scan_client_profiles
   ovpn_state_scan_client_ip_pending
+  ovpn_state_scan_ipam_consistency
 }
 
 ovpn_state_detect() {
