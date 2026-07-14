@@ -51,6 +51,29 @@ OVPN_DATA_DIR="$healthy" "$OVPN" doctor >"$TMP_DIR/healthy.txt"
 grep -Fxq 'State: HEALTHY' "$TMP_DIR/healthy.txt"
 grep -Fxq 'Issues: none' "$TMP_DIR/healthy.txt"
 
+pending="$TMP_DIR/pending"
+cp -a "$healthy" "$pending"
+mkdir -p "$pending/data"
+cat >"$pending/data/client-ip.csv" <<'EOF'
+# client,ip
+draft,
+EOF
+cat >"$pending/meta/client-ip.applied.csv" <<'EOF'
+# client,ip
+applied,
+EOF
+before="$(snapshot "$pending")"
+OVPN_DATA_DIR="$pending" "$OVPN" doctor >"$TMP_DIR/pending.txt" 2>"$TMP_DIR/pending.err"
+after="$(snapshot "$pending")"
+[ "$before" = "$after" ] || {
+  echo 'doctor adopted a pending client-IP draft' >&2
+  exit 1
+}
+[ ! -s "$TMP_DIR/pending.err" ]
+grep -Fxq 'State: HEALTHY' "$TMP_DIR/pending.txt"
+grep -Fq 'client-IP draft is waiting for explicit application' "$TMP_DIR/pending.txt"
+grep -Fq 'ovpn client-ip apply' "$TMP_DIR/pending.txt"
+
 critical="$TMP_DIR/critical"
 cp -a "$healthy" "$critical"
 rm "$critical/pki/index.txt"

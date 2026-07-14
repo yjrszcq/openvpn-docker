@@ -202,7 +202,19 @@ ovpn_client_ip_audit_event() {
   chmod 600 "$audit_file"
 }
 
+ovpn_client_ip_apply_begin() {
+  return 0
+}
+
 ovpn_client_ip_apply_derived() {
+  return 0
+}
+
+ovpn_client_ip_apply_finalize() {
+  return 0
+}
+
+ovpn_client_ip_apply_rollback() {
   return 0
 }
 
@@ -224,6 +236,7 @@ ovpn_client_ip_apply_inner() (
       ovpn_client_ip_atomic_install "$backup" "$draft"
       ovpn_client_ip_atomic_install "$backup" "$snapshot"
       ovpn_client_ip_audit_event rejected || true
+      ovpn_client_ip_apply_rollback || true
     fi
     rm -f "$backup" "$candidate"
     exit "$status"
@@ -232,11 +245,13 @@ ovpn_client_ip_apply_inner() (
   if ! ovpn_client_ip_validate_file "$draft"; then
     exit 1
   fi
+  ovpn_client_ip_apply_begin
   ovpn_client_ip_write_canonical_file "$candidate"
   ovpn_client_ip_atomic_install "$candidate" "$draft"
   ovpn_client_ip_apply_derived
   ovpn_client_ip_atomic_install "$candidate" "$snapshot"
   ovpn_client_ip_audit_event applied
+  ovpn_client_ip_apply_finalize
   transaction_success=true
   printf 'client-ip registry applied\n'
 )

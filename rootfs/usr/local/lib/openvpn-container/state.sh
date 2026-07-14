@@ -142,6 +142,16 @@ ovpn_state_scan_client_profiles() {
   done <"$index"
 }
 
+ovpn_state_scan_client_ip_pending() {
+  local draft applied
+
+  draft="$(ovpn_registry_client_ip_file)"
+  applied="$(ovpn_registry_applied_file)"
+  if [ -r "$draft" ] && [ -r "$applied" ] && ! cmp -s "$draft" "$applied"; then
+    ovpn_state_add_issue CLIENT_IP_PENDING_EXPLICIT_APPLY manual RUN_CLIENT_IP_APPLY
+  fi
+}
+
 ovpn_state_add_repairable_issue() {
   ovpn_state_add_issue "$1" repairable "$2"
   ovpn_state_consider DEGRADED_REPAIRABLE
@@ -402,6 +412,7 @@ ovpn_state_scan() {
 
   ovpn_state_validate_crypto
   ovpn_state_scan_client_profiles
+  ovpn_state_scan_client_ip_pending
 }
 
 ovpn_state_detect() {
@@ -493,10 +504,14 @@ ovpn_doctor_command() {
     else
       printf 'Issues:\n'
       for ((index = 0; index < ${#OVPN_STATE_ISSUE_IDS[@]}; index++)); do
-        printf '  [%s] %s (action: %s)\n' \
-          "${OVPN_STATE_ISSUE_SEVERITIES[index]}" \
-          "${OVPN_STATE_ISSUE_IDS[index]}" \
-          "${OVPN_STATE_ISSUE_ACTIONS[index]}"
+        if [ "${OVPN_STATE_ISSUE_IDS[index]}" = CLIENT_IP_PENDING_EXPLICIT_APPLY ]; then
+          printf '  [manual] client-IP draft is waiting for explicit application (run: ovpn client-ip apply)\n'
+        else
+          printf '  [%s] %s (action: %s)\n' \
+            "${OVPN_STATE_ISSUE_SEVERITIES[index]}" \
+            "${OVPN_STATE_ISSUE_IDS[index]}" \
+            "${OVPN_STATE_ISSUE_ACTIONS[index]}"
+        fi
       done
     fi
   fi
