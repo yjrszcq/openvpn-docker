@@ -195,6 +195,7 @@ configure_runtime_network() {
     bash -c '
       set -euo pipefail
       . "$OVPN_LIB_DIR/common.sh"
+      . "$OVPN_LIB_DIR/ipam.sh"
       . "$OVPN_LIB_DIR/config.sh"
       . "$OVPN_LIB_DIR/network.sh"
       ovpn_network_configure
