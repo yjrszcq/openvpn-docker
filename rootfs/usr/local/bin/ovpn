@@ -7,6 +7,7 @@ LIB_DIR="${OVPN_LIB_DIR:-/usr/local/lib/openvpn-container}"
 . "$LIB_DIR/ipam.sh"
 . "$LIB_DIR/config.sh"
 . "$LIB_DIR/registry.sh"
+. "$LIB_DIR/client_ip.sh"
 . "$LIB_DIR/network.sh"
 . "$LIB_DIR/render.sh"
 . "$LIB_DIR/lock.sh"
@@ -35,6 +36,9 @@ case "$command" in
     ;;
   config)
     ovpn_config_command "$@"
+    ;;
+  client-ip)
+    ovpn_client_ip_command "$@"
     ;;
   render)
     ovpn_render_command "$@"
