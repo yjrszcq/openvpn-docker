@@ -63,6 +63,7 @@ jobs:
             tests/doctor-smoke.sh \
             tests/repair-plan-smoke.sh \
             tests/ipam-repair-smoke.sh \
+            tests/network-migration-smoke.sh \
             tests/recovery-shared-smoke.sh \
             tests/client-lifecycle-smoke.sh \
             tests/maintenance-smoke.sh \
@@ -108,6 +109,7 @@ jobs:
           OVPN_REPAIR_SKIP_BUILD=1 OVPN_REPAIR_REQUIRED=1 OVPN_REPAIR_IMAGE="$IMAGE" tests/repair-container-smoke.sh
           OVPN_RECOVERY_SKIP_BUILD=1 OVPN_RECOVERY_REQUIRED=1 OVPN_RECOVERY_IMAGE="$IMAGE" tests/recovery-container-smoke.sh
           OVPN_LIFECYCLE_SKIP_BUILD=1 OVPN_LIFECYCLE_REQUIRED=1 OVPN_LIFECYCLE_IMAGE="$IMAGE" tests/client-lifecycle-container-smoke.sh
+          OVPN_NETWORK_MIGRATION_SKIP_BUILD=1 OVPN_NETWORK_MIGRATION_REQUIRED=1 OVPN_NETWORK_MIGRATION_IMAGE="$IMAGE" tests/network-migration-container-smoke.sh
           OVPN_MAINTENANCE_SKIP_BUILD=1 OVPN_MAINTENANCE_REQUIRED=1 OVPN_MAINTENANCE_IMAGE="$IMAGE" tests/maintenance-container-smoke.sh
       - name: Verify UDP and TCP VPN E2E
         run: OVPN_E2E_SKIP_BUILD=1 OVPN_E2E_REQUIRED=1 OVPN_E2E_IMAGE="$IMAGE" tests/e2e-container-smoke.sh

@@ -3,6 +3,29 @@
 OVPN_POOL_PERSIST_FILE="${OVPN_POOL_PERSIST_FILE:-/var/lib/openvpn/pool-persist.txt}"
 OVPN_MANAGEMENT_SOCKET="${OVPN_MANAGEMENT_SOCKET:-$OVPN_RUNTIME_DIR/management.sock}"
 
+OVPN_MANAGEMENT_GREETING_DELAY_SECONDS="${OVPN_MANAGEMENT_GREETING_DELAY_SECONDS:-1}"
+
+ovpn_management_socket_request() {
+  local socket="$1"
+  local request="$2"
+  local socat_bin="${OVPN_SOCAT_BIN:-socat}"
+  local delay="$OVPN_MANAGEMENT_GREETING_DELAY_SECONDS"
+  local response
+
+  [ -S "$socket" ] || return 1
+  command -v "$socat_bin" >/dev/null 2>&1 || return 1
+  [[ "$delay" =~ ^(0|[1-9][0-9]*)(\.[0-9]+)?$ ]] || return 1
+  response="$(
+    {
+      sleep "$delay"
+      printf '%s\n' "$request"
+      sleep "$delay"
+      printf 'quit\n'
+    } | "$socat_bin" -T 5 - "UNIX-CONNECT:$socket" 2>&1
+  )" || return 1
+  printf '%s\n' "$response"
+}
+
 ovpn_prepare_ipam_render_context() {
   local dynamic_start dynamic_end
 

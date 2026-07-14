@@ -1,5 +1,67 @@
 #!/usr/bin/env bash
 
+ovpn_network_migration_management_command() {
+  ovpn_management_socket_request "$OVPN_MANAGEMENT_SOCKET" "$1"
+}
+
+ovpn_network_migration_management_version() {
+  local response
+
+  response="$(ovpn_network_migration_management_command version)" || return 1
+  [[ "$response" != *ERROR:* && "$response" == *'OpenVPN Version:'* ]]
+}
+
+ovpn_network_migration_signal_reload() {
+  local response
+
+  response="$(ovpn_network_migration_management_command 'signal SIGHUP')" || return 1
+  [[ "$response" != *ERROR:* && "$response" == *SUCCESS:* ]]
+}
+
+ovpn_network_migration_runtime_preflight() {
+  if ! ovpn_network_migration_management_version >/dev/null 2>&1; then
+    return 1
+  fi
+  ovpn_healthcheck_command >/dev/null 2>&1
+}
+
+ovpn_network_migration_wait_for_healthy() {
+  local rollback="$1"
+  local timeout="${OVPN_NETWORK_MIGRATION_HEALTH_TIMEOUT_SECONDS:-15}"
+  local deadline
+
+  [[ "$timeout" =~ ^[1-9][0-9]*$ ]] || return 1
+  deadline=$((SECONDS + timeout))
+  while :; do
+    if [ "$rollback" = false ] && [ "${OVPN_NETWORK_MIGRATION_FAIL_HEALTH:-false}" = true ]; then
+      return 1
+    fi
+    if ovpn_network_migration_management_version >/dev/null 2>&1 && ovpn_healthcheck_command >/dev/null 2>&1; then
+      return 0
+    fi
+    [ "$SECONDS" -ge "$deadline" ] && return 1
+    sleep 1
+  done
+}
+
+ovpn_network_migration_reload_and_check() {
+  local rollback="$1"
+
+  ovpn_network_migration_signal_reload || return 1
+  ovpn_network_migration_wait_for_healthy "$rollback"
+}
+
+ovpn_network_migration_audit_event() {
+  local outcome="$1"
+  local audit_file
+
+  audit_file="$(ovpn_registry_audit_file)"
+  printf '{"timestamp":"%s","event":"network_migration","outcome":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$outcome" >>"$audit_file"
+  chmod 600 "$audit_file"
+}
+
+
 ovpn_network_migration_plan() {
   local target_network="$1"
   local target_pool="$2"
@@ -70,34 +132,87 @@ ovpn_network_migration_print_plan() {
   done
 }
 
-ovpn_network_migration_apply_inner() {
-  local backup config_backup schema_backup draft applied server pool index
+ovpn_network_migration_apply_inner() (
+  local backup config_backup schema_backup draft applied audit server pool index
+  local server_existed=false pool_existed=false ccd_existed=false
+  local transaction_success=false rollback_ready=false runtime_reload_attempted=false
+
+  ovpn_network_migration_runtime_preflight || ovpn_die 'network migration requires a healthy running OpenVPN process and management socket'
 
   backup="$(mktemp -d "$OVPN_DATA_DIR/.network-migration.XXXXXX")"
   config_backup="$backup/project.env"
   schema_backup="$backup/schema-version"
   draft="$(ovpn_registry_client_ip_file)"
   applied="$(ovpn_registry_applied_file)"
+  audit="$(ovpn_registry_audit_file)"
   server="$OVPN_DATA_DIR/server/server.conf"
   pool="$OVPN_POOL_PERSIST_FILE"
-  cp "$OVPN_PROJECT_ENV" "$config_backup"
-  cp "$OVPN_SCHEMA_VERSION_FILE" "$schema_backup"
-  cp "$draft" "$backup/draft"
-  cp "$applied" "$backup/applied"
-  cp -a "$OVPN_DATA_DIR/ccd" "$backup/ccd"
-  [ -e "$server" ] && cp "$server" "$backup/server"
-  [ -e "$pool" ] && cp "$pool" "$backup/pool"
+
   rollback() {
     cp "$config_backup" "$OVPN_PROJECT_ENV"
     cp "$schema_backup" "$OVPN_SCHEMA_VERSION_FILE"
     cp "$backup/draft" "$draft"
     cp "$backup/applied" "$applied"
+    cp "$backup/audit" "$audit"
     rm -rf "$OVPN_DATA_DIR/ccd"
-    cp -a "$backup/ccd" "$OVPN_DATA_DIR/ccd"
-    [ ! -e "$backup/server" ] || cp "$backup/server" "$server"
-    if [ -e "$backup/pool" ]; then cp "$backup/pool" "$pool"; else rm -f "$pool"; fi
-    rm -rf "$backup"
+    if [ "$ccd_existed" = true ]; then
+      cp -a "$backup/ccd" "$OVPN_DATA_DIR/ccd"
+    fi
+    if [ "$server_existed" = true ]; then
+      cp "$backup/server" "$server"
+    else
+      rm -f "$server"
+    fi
+    mkdir -p "$(dirname "$pool")"
+    if [ "$pool_existed" = true ]; then
+      cp "$backup/pool" "$pool"
+    else
+      rm -f "$pool"
+    fi
   }
+
+  cleanup() {
+    local status=$?
+
+    trap - EXIT
+    set +e
+    if [ "$transaction_success" != true ] && [ "$rollback_ready" = true ]; then
+      rollback
+      if [ "$runtime_reload_attempted" = true ]; then
+        if ovpn_network_migration_reload_and_check true; then
+          ovpn_log 'network migration health check failed; rollback completed'
+        else
+          ovpn_log 'network migration rollback restored persisted state but could not confirm OpenVPN health'
+        fi
+      else
+        ovpn_log 'network migration rollback completed'
+      fi
+      ovpn_network_migration_audit_event rejected || true
+    fi
+    rm -rf "$backup"
+    exit "$status"
+  }
+  trap cleanup EXIT
+
+  cp "$OVPN_PROJECT_ENV" "$config_backup"
+  cp "$OVPN_SCHEMA_VERSION_FILE" "$schema_backup"
+  cp "$draft" "$backup/draft"
+  cp "$applied" "$backup/applied"
+  cp "$audit" "$backup/audit"
+  if [ -e "$OVPN_DATA_DIR/ccd" ]; then
+    cp -a "$OVPN_DATA_DIR/ccd" "$backup/ccd"
+    ccd_existed=true
+  fi
+  if [ -e "$server" ]; then
+    cp "$server" "$backup/server"
+    server_existed=true
+  fi
+  if [ -e "$pool" ]; then
+    cp "$pool" "$backup/pool"
+    pool_existed=true
+  fi
+  rollback_ready=true
+
   OVPN_NETWORK="$OVPN_NETWORK_MIGRATION_TARGET_NETWORK"
   OVPN_DYNAMIC_POOL_SIZE="$OVPN_NETWORK_MIGRATION_TARGET_POOL"
   OVPN_CONFIG_VERSION=2
@@ -109,15 +224,20 @@ ovpn_network_migration_apply_inner() {
   for ((index = 0; index < ${#OVPN_CLIENT_IP_VALUES[@]}; index++)); do
     if [ -n "${OVPN_CLIENT_IP_VALUES[index]}" ]; then OVPN_CLIENT_IP_INTS+=("$(ovpn_ipam_ipv4_to_int "${OVPN_CLIENT_IP_VALUES[index]}")"); else OVPN_CLIENT_IP_INTS+=(''); fi
   done
-  if ! ovpn_client_ip_apply_current_mutation; then rollback; ovpn_die 'network migration failed while applying client assignments'; fi
+  ovpn_client_ip_apply_current_mutation
   mkdir -p "$(dirname "$pool")"
   : >"$pool"
   chmod 600 "$pool"
-  if ! ovpn_render_server --output "$server"; then rollback; ovpn_die 'network migration failed while rendering server configuration'; fi
-  if [ "${OVPN_NETWORK_MIGRATION_FAIL_HEALTH:-false}" = true ]; then rollback; ovpn_die 'network migration health check failed; rollback completed'; fi
+  ovpn_render_server --output "$server"
+  runtime_reload_attempted=true
+  ovpn_network_migration_reload_and_check false || ovpn_die 'network migration health check failed'
+  ovpn_network_migration_audit_event applied
+
+  transaction_success=true
   rm -rf "$backup"
+  trap - EXIT
   ovpn_log 'network migration applied'
-}
+)
 
 ovpn_network_reconfigure_command() {
   local target_network='' target_pool='' dry_run=false yes=false

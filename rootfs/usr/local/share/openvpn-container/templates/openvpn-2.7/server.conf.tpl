@@ -8,6 +8,7 @@ server {{OVPN_NETWORK_ADDRESS}} {{OVPN_NETWORK_NETMASK}} nopool
 client-config-dir {{OVPN_CCD_DIR}}
 ifconfig-pool-persist {{OVPN_POOL_PERSIST_FILE}}
 management {{OVPN_MANAGEMENT_SOCKET}} unix
+management-client-user root
 
 
 ca {{OVPN_DATA_DIR}}/pki/ca.crt

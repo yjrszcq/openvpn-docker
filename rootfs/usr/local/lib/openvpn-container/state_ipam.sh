@@ -53,6 +53,8 @@ ovpn_state_ipam_audit_is_valid() {
   while IFS= read -r line || [ -n "$line" ]; do
     regex="^\\{\"timestamp\":\"${timestamp}\",\"event\":\"client_ip_apply\",\"outcome\":\"(applied|rejected)\"\\}$"
     [[ "$line" =~ $regex ]] && continue
+    regex="^\\{\"timestamp\":\"${timestamp}\",\"event\":\"network_migration\",\"outcome\":\"(applied|rejected)\"\\}$"
+    [[ "$line" =~ $regex ]] && continue
     regex="^\\{\"timestamp\":\"${timestamp}\",\"operation\":\"(revoke|reissue|delete)\",\"result\":\"(applied|rejected|failed)\"\\}$"
     [[ "$line" =~ $regex ]] && continue
     return 1

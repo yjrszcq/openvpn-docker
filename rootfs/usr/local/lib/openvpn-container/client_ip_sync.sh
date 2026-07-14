@@ -139,21 +139,18 @@ ovpn_client_ip_clear_dynamic_lease() {
 
 ovpn_client_ip_kick_changed_clients() {
   local client_name response
-  local socat_bin="${OVPN_SOCAT_BIN:-socat}"
 
   [ "${#OVPN_CLIENT_IP_SYNC_CHANGED_CLIENTS[@]}" -gt 0 ] || return 0
   [ -S "$OVPN_MANAGEMENT_SOCKET" ] || return 0
-  command -v "$socat_bin" >/dev/null 2>&1 || {
-    ovpn_log 'client-ip: management socket is present but socat is unavailable'
-    return 1
-  }
   for client_name in "${OVPN_CLIENT_IP_SYNC_CHANGED_CLIENTS[@]}"; do
-    if ! response="$(printf 'kill %s\nquit\n' "$client_name" | "$socat_bin" - "UNIX-CONNECT:$OVPN_MANAGEMENT_SOCKET" 2>&1)"; then
+    if ! response="$(ovpn_management_socket_request "$OVPN_MANAGEMENT_SOCKET" "kill $client_name")"; then
       ovpn_log 'client-ip: failed to contact the OpenVPN management socket'
       return 1
     fi
     case "$response" in
-      *'ERROR: client not found'*) ;;
+      *'ERROR: client not found'|*'ERROR: common name '*"' not found"*)
+        continue
+        ;;
       *ERROR:*)
         ovpn_log 'client-ip: OpenVPN rejected a management disconnect request'
         return 1

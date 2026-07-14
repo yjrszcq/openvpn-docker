@@ -50,30 +50,29 @@ ovpn_status_command() {
 ovpn_healthcheck_command() {
   [ "$#" -eq 0 ] || {
     ovpn_log 'usage: ovpn healthcheck'
-    exit 64
+    return 64
   }
   if [ ! -r "$OVPN_RUNTIME_STATE_FILE" ]; then
     ovpn_log 'runtime state is unavailable'
-    exit 1
+    return 1
   fi
   if grep -Fq '"maintenance": true' "$OVPN_RUNTIME_STATE_FILE"; then
     ovpn_log 'instance is in maintenance mode'
-    exit 1
+    return 1
   fi
   if ! grep -Fq '"instance_state": "HEALTHY"' "$OVPN_RUNTIME_STATE_FILE" || ! grep -Fq '"daemon": "running"' "$OVPN_RUNTIME_STATE_FILE"; then
     ovpn_log 'runtime state is not healthy'
-    exit 1
+    return 1
   fi
   if [ ! -c /dev/net/tun ]; then
     ovpn_log 'TUN device is unavailable'
-    exit 1
+    return 1
   fi
   if ! pgrep -x openvpn >/dev/null 2>&1; then
     ovpn_log 'OpenVPN daemon is not running'
-    exit 1
+    return 1
   fi
 }
-
 ovpn_maintenance_enter() {
   local state="$1"
 
