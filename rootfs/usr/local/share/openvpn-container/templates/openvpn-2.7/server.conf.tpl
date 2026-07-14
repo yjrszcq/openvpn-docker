@@ -3,7 +3,12 @@ proto {{OVPN_PROTO}}
 dev tun
 
 topology subnet
-server {{OVPN_NETWORK_ADDRESS}} {{OVPN_NETWORK_NETMASK}}
+server {{OVPN_NETWORK_ADDRESS}} {{OVPN_NETWORK_NETMASK}} nopool
+{{OVPN_DYNAMIC_POOL_DIRECTIVE}}
+client-config-dir {{OVPN_CCD_DIR}}
+ifconfig-pool-persist {{OVPN_POOL_PERSIST_FILE}}
+management {{OVPN_MANAGEMENT_SOCKET}} unix
+
 
 ca {{OVPN_DATA_DIR}}/pki/ca.crt
 cert {{OVPN_DATA_DIR}}/pki/issued/openvpn-server.crt

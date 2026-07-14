@@ -22,6 +22,7 @@ export OVPN_COMPATIBILITY_DIR="$ROOT_DIR/compatibility"
 export OVPN_OPENVPN_BIN="$FAKE_BIN/openvpn"
 export OVPN_TEMPLATE_ROOT="$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates"
 export OVPN_DATA_DIR="$TMP_DIR/openvpn"
+export OVPN_RUNTIME_DIR="$TMP_DIR/run"
 export OVPN_ENDPOINT="vpn.example.test"
 export OVPN_PROTO="udp"
 export OVPN_PORT="1194"
@@ -39,7 +40,11 @@ if ! grep -q '^OVPN_NETWORK=10.88.0.0/24$' "$TMP_DIR/project.env.out"; then
 fi
 
 "$OVPN" render server --stdout >"$TMP_DIR/server.conf"
-grep -q '^server 10.88.0.0 255.255.255.0$' "$TMP_DIR/server.conf"
+grep -q '^server 10.88.0.0 255.255.255.0 nopool$' "$TMP_DIR/server.conf"
+grep -q '^ifconfig-pool 10.88.0.129 10.88.0.254$' "$TMP_DIR/server.conf"
+grep -q "^client-config-dir $OVPN_DATA_DIR/ccd$" "$TMP_DIR/server.conf"
+grep -q '^ifconfig-pool-persist /var/lib/openvpn/pool-persist.txt$' "$TMP_DIR/server.conf"
+grep -q "^management $OVPN_RUNTIME_DIR/management.sock unix$" "$TMP_DIR/server.conf"
 grep -q '^client-to-client$' "$TMP_DIR/server.conf"
 grep -q '^push "redirect-gateway def1"$' "$TMP_DIR/server.conf"
 grep -q '^push "route 192.168.50.0 255.255.255.0"$' "$TMP_DIR/server.conf"
@@ -57,5 +62,13 @@ grep -q 'TEST CA CERT' "$TMP_DIR/laptop.ovpn"
 grep -q 'TEST CLIENT CERT' "$TMP_DIR/laptop.ovpn"
 grep -q 'TEST CLIENT KEY' "$TMP_DIR/laptop.ovpn"
 grep -q 'TEST TLS CRYPT KEY' "$TMP_DIR/laptop.ovpn"
+
+OVPN_DATA_DIR="$TMP_DIR/static" OVPN_DYNAMIC_POOL_SIZE=0 "$OVPN" config init
+OVPN_DATA_DIR="$TMP_DIR/static" "$OVPN" render server --stdout >"$TMP_DIR/static-server.conf"
+grep -q '^server 10.88.0.0 255.255.255.0 nopool$' "$TMP_DIR/static-server.conf"
+if grep -q '^ifconfig-pool ' "$TMP_DIR/static-server.conf"; then
+  echo 'pure static layout unexpectedly rendered a dynamic pool' >&2
+  exit 1
+fi
 
 printf 'render smoke passed\n'

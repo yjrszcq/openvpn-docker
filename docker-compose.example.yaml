@@ -1,6 +1,7 @@
 x-openvpn-data: &openvpn-data
   volumes:
     - ./openvpn-data:/etc/openvpn
+    - ./openvpn-runtime:/var/lib/openvpn
 
 services:
   openvpn:
@@ -22,6 +23,8 @@ services:
       OVPN_PROTO: ${OVPN_PROTO:-udp}
       OVPN_PORT: ${OVPN_PORT:-1194}
       OVPN_NETWORK: ${OVPN_NETWORK:-10.8.0.0/24}
+      OVPN_TOPOLOGY: ${OVPN_TOPOLOGY:-subnet}
+      OVPN_DYNAMIC_POOL_SIZE: ${OVPN_DYNAMIC_POOL_SIZE:-64}
       OVPN_NAT: ${OVPN_NAT:-false}
       OVPN_NAT_INTERFACE: ${OVPN_NAT_INTERFACE:-auto}
       OVPN_REDIRECT_GATEWAY: ${OVPN_REDIRECT_GATEWAY:-false}

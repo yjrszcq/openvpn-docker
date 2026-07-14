@@ -285,7 +285,7 @@ for proto in udp tcp; do
 
   data_grep "$data_dir" "^OVPN_NETWORK=$NETWORK$" config/project.env
   data_grep "$data_dir" "^OVPN_PROTO=$proto$" config/project.env
-  data_grep "$data_dir" '^server 10.88.0.0 255.255.255.0$' server/server.conf
+  data_grep "$data_dir" '^server 10.88.0.0 255.255.255.0 nopool$' server/server.conf
   data_grep "$data_dir" "^proto $proto$" server/server.conf
   data_grep "$data_dir" "^OVPN_NAT=$POLICY_NAT$" config/project.env
   data_grep "$data_dir" "^OVPN_NAT_INTERFACE=$POLICY_NAT_INTERFACE$" config/project.env

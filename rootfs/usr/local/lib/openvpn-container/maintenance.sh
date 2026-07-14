@@ -16,6 +16,7 @@ ovpn_runtime_write_state() {
   local temporary_path
 
   mkdir -p "$OVPN_RUNTIME_DIR"
+  chmod 750 "$OVPN_RUNTIME_DIR"
   temporary_path="$OVPN_RUNTIME_STATE_FILE.tmp"
   umask 077
   cat >"$temporary_path" <<EOF_STATE

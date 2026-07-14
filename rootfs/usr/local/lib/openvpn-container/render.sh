@@ -32,6 +32,10 @@ ovpn_template_apply() {
   template="${template//\{\{OVPN_DATA_DIR\}\}/$OVPN_RENDER_DATA_DIR}"
   template="${template//\{\{OVPN_NETWORK_ADDRESS\}\}/$OVPN_NETWORK_ADDRESS}"
   template="${template//\{\{OVPN_NETWORK_NETMASK\}\}/$OVPN_NETWORK_NETMASK}"
+  template="${template//\{\{OVPN_CCD_DIR\}\}/$OVPN_CCD_DIR}"
+  template="${template//\{\{OVPN_DYNAMIC_POOL_DIRECTIVE\}\}/$OVPN_DYNAMIC_POOL_DIRECTIVE}"
+  template="${template//\{\{OVPN_POOL_PERSIST_FILE\}\}/$OVPN_POOL_PERSIST_FILE}"
+  template="${template//\{\{OVPN_MANAGEMENT_SOCKET\}\}/$OVPN_MANAGEMENT_SOCKET}"
   template="${template//\{\{OVPN_CLIENT_TO_CLIENT_DIRECTIVE\}\}/$OVPN_CLIENT_TO_CLIENT_DIRECTIVE}"
   template="${template//\{\{OVPN_REDIRECT_GATEWAY_PUSH\}\}/$OVPN_REDIRECT_GATEWAY_PUSH}"
   template="${template//\{\{OVPN_ROUTE_PUSHES\}\}/$OVPN_ROUTE_PUSHES}"
@@ -76,6 +80,7 @@ ovpn_prepare_render_context() {
   ovpn_config_load
   OVPN_NETWORK_ADDRESS="$(ovpn_cidr_ip "$OVPN_NETWORK")"
   OVPN_NETWORK_NETMASK="$(ovpn_cidr_netmask "$OVPN_NETWORK")"
+  ovpn_prepare_ipam_render_context
 
   OVPN_CLIENT_TO_CLIENT_DIRECTIVE=""
   if [ "$OVPN_CLIENT_TO_CLIENT" = true ]; then

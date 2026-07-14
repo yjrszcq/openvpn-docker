@@ -70,6 +70,7 @@ RUN apt-get update \
         openssl \
         procps \
         tini \
+        socat \
         util-linux \
     && rm -rf /var/lib/apt/lists/*
 

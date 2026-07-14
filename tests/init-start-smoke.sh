@@ -103,7 +103,7 @@ grep -q 'initialized OpenVPN data directory' "$TMP_DIR/empty-start.err"
 grep -q -- "--config $OVPN_DATA_DIR/server/server.conf" "$TMP_DIR/empty-start.out"
 
 grep -q 'vpn.example.test' "$OVPN_DATA_DIR/config/project.env"
-grep -q '^server 10.88.0.0 255.255.255.0$' "$OVPN_DATA_DIR/server/server.conf"
+grep -q '^server 10.88.0.0 255.255.255.0 nopool$' "$OVPN_DATA_DIR/server/server.conf"
 rm "$OVPN_DATA_DIR/server/server.conf"
 "$OVPN" start >"$TMP_DIR/auto-repair-start.out" 2>"$TMP_DIR/auto-repair-start.err"
 if [ "$("$OVPN" state)" != HEALTHY ]; then
@@ -145,7 +145,7 @@ test ! -e "$OVPN_DATA_DIR/pki/private/ca.key"
 export OVPN_DATA_DIR="$TMP_DIR/openvpn"
 
 grep -q 'vpn.example.test' "$OVPN_DATA_DIR/config/project.env"
-grep -q '^server 10.88.0.0 255.255.255.0$' "$OVPN_DATA_DIR/server/server.conf"
+grep -q '^server 10.88.0.0 255.255.255.0 nopool$' "$OVPN_DATA_DIR/server/server.conf"
 set +e
 FAKE_OPENVPN_MISSING_FEATURE=tls-crypt "$OVPN" start >"$TMP_DIR/missing-capability-start.out" 2>"$TMP_DIR/missing-capability-start.err"
 status=$?
