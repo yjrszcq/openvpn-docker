@@ -122,6 +122,13 @@ cloud firewall.
 | `OVPN_ROUTES` | empty | Comma-separated IPv4 CIDRs pushed to clients. |
 | `OVPN_CRITICAL_MODE` | `exit` | Use `maintenance` only to hold a critical container for inspection. |
 
+For a canonical network with prefix length `p`, usable client capacity is
+`2^(32 - p) - 3`: the network address, server address (`network + 1`), and
+broadcast address are reserved. For example, `10.42.0.0/24` provides 253 client
+addresses (`10.42.0.2` through `10.42.0.254`), so the dynamic pool may be
+`0` through `253` and its unset default is `floor(253 / 2) = 126`. The minimum
+`/30` network provides exactly one client address (`.2`).
+
 Bootstrap values are instance facts, not ordinary runtime overrides. Inspect the
 persisted values with:
 
