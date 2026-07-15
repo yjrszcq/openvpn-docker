@@ -64,18 +64,6 @@ ovpn_client_refuse_duplicate() {
   fi
 }
 
-ovpn_add_client_inner() {
-  local name="${1:-}"
-  [ -n "$name" ] || ovpn_die "usage: ovpn client create <name>"
-  ovpn_client_name_or_die "$name"
-  ovpn_require_healthy_state
-  ovpn_client_refuse_duplicate "$name"
-
-  ovpn_pki_issue_client "$name"
-  ovpn_render_client "$name" --output "$OVPN_DATA_DIR/clients/active/$name.ovpn"
-  ovpn_log "added client '$name'"
-}
-
 ovpn_client_export_inner() {
   local name="$1"
   local profile
@@ -92,38 +80,4 @@ ovpn_client_export_command() {
   [ -n "$name" ] || ovpn_die "usage: ovpn client export <name>"
   ovpn_client_name_or_die "$name"
   ovpn_with_data_lock client ovpn_client_export_inner "$name"
-}
-
-ovpn_list_clients_command() {
-  ovpn_require_healthy_state
-  ovpn_client_records
-}
-
-ovpn_revoke_client_inner() {
-  local name="${1:-}"
-  [ -n "$name" ] || ovpn_die "usage: ovpn client revoke <name>"
-  ovpn_client_name_or_die "$name"
-  ovpn_require_healthy_state
-  ovpn_client_require_active "$name"
-
-  ovpn_pki_revoke_client "$name"
-  mkdir -p "$OVPN_DATA_DIR/clients/revoked"
-  if [ -e "$OVPN_DATA_DIR/clients/active/$name.ovpn" ]; then
-    mv "$OVPN_DATA_DIR/clients/active/$name.ovpn" "$OVPN_DATA_DIR/clients/revoked/$name.ovpn"
-  fi
-  ovpn_log "revoked client '$name'"
-}
-
-ovpn_add_client_command() {
-  local name="${1:-}"
-  [ -n "$name" ] || ovpn_die "usage: ovpn client create <name>"
-  ovpn_client_name_or_die "$name"
-  ovpn_with_data_lock client ovpn_add_client_inner "$name"
-}
-
-ovpn_revoke_client_command() {
-  local name="${1:-}"
-  [ -n "$name" ] || ovpn_die "usage: ovpn client revoke <name>"
-  ovpn_client_name_or_die "$name"
-  ovpn_with_data_lock client ovpn_revoke_client_inner "$name"
 }

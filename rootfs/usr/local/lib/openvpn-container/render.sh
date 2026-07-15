@@ -204,17 +204,31 @@ ovpn_render_client() {
   ovpn_write_or_print "$output_path" "$(ovpn_render_client_content "$client_name")"
 }
 
+
 ovpn_render_command() {
   local target="${1:-}"
+
+  if ovpn_help_requested "$@"; then
+    ovpn_render_usage
+    return 0
+  fi
   [ -n "$target" ] || ovpn_die "usage: ovpn render <server|client> ..."
   shift
 
   case "$target" in
     server)
-      ovpn_render_server "$@"
+      if ovpn_help_requested "$@"; then
+        ovpn_command_usage "ovpn render server [--stdout|--output <path>]" "Render the server configuration."
+      else
+        ovpn_render_server "$@"
+      fi
       ;;
     client)
-      ovpn_render_client "$@"
+      if ovpn_help_requested "$@"; then
+        ovpn_command_usage "ovpn render client <name> [--stdout|--output <path>]" "Render a client profile."
+      else
+        ovpn_render_client "$@"
+      fi
       ;;
     *)
       ovpn_log "unknown render target '$target'"

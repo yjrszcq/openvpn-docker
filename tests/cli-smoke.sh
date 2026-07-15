@@ -25,6 +25,57 @@ if ! grep -q 'Usage: ovpn' /tmp/ovpn-help.out; then
   exit 1
 fi
 
+
+assert_help() {
+  local expected="$1"
+  shift
+  "$OVPN" "$@" >/tmp/ovpn-help.out
+  if ! grep -Fq "$expected" /tmp/ovpn-help.out; then
+    echo "help output missing expected usage: $expected" >&2
+    exit 1
+  fi
+}
+
+assert_help "Usage: ovpn" -h
+assert_help "Usage: ovpn init" init --help
+assert_help "Usage: ovpn start" start -h
+assert_help "Usage: ovpn config <command>" config --help
+assert_help "Usage: ovpn config apply" config apply -h
+assert_help "Usage: ovpn client <command> [args]" client -h
+assert_help "Usage: ovpn client create <name> [--dynamic|--ip <IPv4>]" client create --help
+assert_help "Usage: ovpn client ip <command> [args]" client ip -h
+assert_help "Usage: ovpn client ip set-static <client...|--all> [--ip <IPv4>]" client ip set-static --help
+assert_help "Usage: ovpn network <command> [options]" network --help
+assert_help "Usage: ovpn network apply [--network <CIDR>] [--dynamic-pool-size <N>] [--yes]" network apply -h
+assert_help "Usage: ovpn repair <command>" repair --help
+assert_help "Usage: ovpn repair plan [--json]" repair plan -h
+assert_help "Usage: ovpn state <command>" state --help
+assert_help "Usage: ovpn state doctor [--json]" state doctor -h
+assert_help "Usage: ovpn render <target> [options]" render --help
+assert_help "Usage: ovpn render client <name> [--stdout|--output <path>]" render client -h
+assert_help "Usage: ovpn runtime <command>" runtime --help
+assert_help "Usage: ovpn runtime version" runtime version -h
+
+assert_help "Usage: ovpn config show" config show --help
+assert_help "Usage: ovpn client export <name>" client export -h
+assert_help "Usage: ovpn client list [--ip]" client list --help
+assert_help "Usage: ovpn client revoke <name> [--release-ip]" client revoke -h
+assert_help "Usage: ovpn client release-ip <name>" client release-ip --help
+assert_help "Usage: ovpn client reissue <name>" client reissue -h
+assert_help "Usage: ovpn client delete <name>" client delete --help
+assert_help "Usage: ovpn client ip list" client ip list -h
+assert_help "Usage: ovpn client ip validate" client ip validate --help
+assert_help "Usage: ovpn client ip apply" client ip apply -h
+assert_help "Usage: ovpn client ip edit" client ip edit --help
+assert_help "Usage: ovpn client ip set-dynamic <client...|--all>" client ip set-dynamic -h
+assert_help "Usage: ovpn network plan [--network <CIDR>] [--dynamic-pool-size <N>]" network plan --help
+assert_help "Usage: ovpn repair apply" repair apply -h
+assert_help "Usage: ovpn state show" state show --help
+assert_help "Usage: ovpn render server [--stdout|--output <path>]" render server -h
+assert_help "Usage: ovpn runtime status" runtime status --help
+assert_help "Usage: ovpn runtime health" runtime health -h
+assert_help "Usage: ovpn runtime capabilities" runtime capabilities --help
+
 "$OVPN" runtime version >/tmp/ovpn-version.out
 if ! grep -Fq "\"image_version\": \"$IMAGE_VERSION\"" /tmp/ovpn-version.out; then
   echo 'version output missing image_version' >&2

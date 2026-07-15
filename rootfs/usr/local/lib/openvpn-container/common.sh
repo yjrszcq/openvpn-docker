@@ -29,6 +29,128 @@ ovpn_die() {
   exit 1
 }
 
+
+ovpn_help_requested() {
+  [ "$#" -eq 1 ] || return 1
+  case "$1" in
+    -h|--help) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+ovpn_command_usage() {
+  printf "Usage: %s\n\n%s\n" "$1" "$2"
+}
+
+ovpn_config_usage() {
+  cat <<EOF
+Usage: ovpn config <command>
+
+Commands:
+  show              print persisted project configuration
+  apply             validate environment and write project configuration
+
+Run ovpn config <command> --help for command details.
+EOF
+}
+
+ovpn_client_usage() {
+  cat <<EOF
+Usage: ovpn client <command> [args]
+
+Commands:
+  create            create a client certificate and profile
+  export            write a client profile to stdout
+  list              list client certificates and assignments
+  revoke            revoke a client certificate
+  release-ip        release a revoked client static IP reservation
+  reissue           issue a new certificate for an existing client
+  delete            remove a client and its local credentials
+  ip                manage client IP assignments
+
+Run ovpn client <command> --help for command details.
+EOF
+}
+
+ovpn_client_ip_usage() {
+  cat <<EOF
+Usage: ovpn client ip <command> [args]
+
+Commands:
+  list              print the draft client-IP registry
+  validate          validate the draft registry without changing it
+  apply             validate and apply the draft registry
+  edit              open the draft registry in an editor
+  set-static        assign selected clients static IP addresses
+  set-dynamic       assign selected clients dynamic IP addresses
+
+Run ovpn client ip <command> --help for command details.
+EOF
+}
+
+ovpn_network_usage() {
+  cat <<EOF
+Usage: ovpn network <command> [options]
+
+Commands:
+  plan              preview a tunnel-network migration
+  apply             apply a tunnel-network migration
+
+Options:
+  --network CIDR            target tunnel network
+  --dynamic-pool-size N     target dynamic-pool size
+  --yes                     skip the apply confirmation prompt
+EOF
+}
+
+ovpn_repair_usage() {
+  cat <<EOF
+Usage: ovpn repair <command>
+
+Commands:
+  plan              inspect eligible repair actions
+  apply             apply eligible repair actions
+
+Run ovpn repair plan --help for JSON output details.
+EOF
+}
+
+ovpn_state_usage() {
+  cat <<EOF
+Usage: ovpn state <command>
+
+Commands:
+  show              print the detected instance state
+  doctor            print detected issues and recommended actions
+
+Run ovpn state doctor --help for JSON output details.
+EOF
+}
+
+ovpn_render_usage() {
+  cat <<EOF
+Usage: ovpn render <target> [options]
+
+Targets:
+  server            render the server configuration
+  client            render a client profile
+
+Run ovpn render <target> --help for output options.
+EOF
+}
+
+ovpn_runtime_usage() {
+  cat <<EOF
+Usage: ovpn runtime <command>
+
+Commands:
+  status            print runtime state JSON
+  health            return container health status
+  capabilities      print runtime capability information
+  version           print build information
+EOF
+}
+
 ovpn_usage() {
   cat <<'USAGE'
 Usage: ovpn <command> [args]
@@ -63,16 +185,47 @@ JSON
   fi
 }
 
+
 ovpn_runtime_command() {
   local subcommand="${1:-}"
 
-  [ -n "$subcommand" ] || ovpn_die 'usage: ovpn runtime <status|health|capabilities|version>'
+  if ovpn_help_requested "$@"; then
+    ovpn_runtime_usage
+    return 0
+  fi
+  [ -n "$subcommand" ] || ovpn_die "usage: ovpn runtime <status|health|capabilities|version>"
   shift
   case "$subcommand" in
-    status) ovpn_status_command "$@" ;;
-    health) ovpn_healthcheck_command "$@" ;;
-    capabilities) [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn runtime capabilities'; ovpn_capabilities_command ;;
-    version) [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn runtime version'; ovpn_version ;;
-    *) ovpn_die 'usage: ovpn runtime <status|health|capabilities|version>' ;;
+    status)
+      if ovpn_help_requested "$@"; then
+        ovpn_command_usage "ovpn runtime status" "Print runtime state as JSON."
+      else
+        ovpn_status_command "$@"
+      fi
+      ;;
+    health)
+      if ovpn_help_requested "$@"; then
+        ovpn_command_usage "ovpn runtime health" "Return success only when the container is healthy."
+      else
+        ovpn_healthcheck_command "$@"
+      fi
+      ;;
+    capabilities)
+      if ovpn_help_requested "$@"; then
+        ovpn_command_usage "ovpn runtime capabilities" "Print OpenVPN compatibility and feature information."
+      else
+        [ "$#" -eq 0 ] || ovpn_die "usage: ovpn runtime capabilities"
+        ovpn_capabilities_command
+      fi
+      ;;
+    version)
+      if ovpn_help_requested "$@"; then
+        ovpn_command_usage "ovpn runtime version" "Print image and runtime build information."
+      else
+        [ "$#" -eq 0 ] || ovpn_die "usage: ovpn runtime version"
+        ovpn_version
+      fi
+      ;;
+    *) ovpn_die "usage: ovpn runtime <status|health|capabilities|version>" ;;
   esac
 }

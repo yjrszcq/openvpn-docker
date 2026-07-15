@@ -424,15 +424,33 @@ ovpn_state_detect() {
   printf '%s\n' "$OVPN_STATE"
 }
 
+
 ovpn_state_command() {
   local subcommand="${1:-}"
 
-  [ -n "$subcommand" ] || ovpn_die 'usage: ovpn state <show|doctor>'
+  if ovpn_help_requested "$@"; then
+    ovpn_state_usage
+    return 0
+  fi
+  [ -n "$subcommand" ] || ovpn_die "usage: ovpn state <show|doctor>"
   shift
   case "$subcommand" in
-    show) [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn state show'; ovpn_state_detect ;;
-    doctor) ovpn_doctor_command "$@" ;;
-    *) ovpn_die 'usage: ovpn state <show|doctor>' ;;
+    show)
+      if ovpn_help_requested "$@"; then
+        ovpn_command_usage "ovpn state show" "Print the detected instance state."
+      else
+        [ "$#" -eq 0 ] || ovpn_die "usage: ovpn state show"
+        ovpn_state_detect
+      fi
+      ;;
+    doctor)
+      if ovpn_help_requested "$@"; then
+        ovpn_command_usage "ovpn state doctor [--json]" "Print detected issues and recommended actions."
+      else
+        ovpn_doctor_command "$@"
+      fi
+      ;;
+    *) ovpn_die "usage: ovpn state <show|doctor>" ;;
   esac
 }
 

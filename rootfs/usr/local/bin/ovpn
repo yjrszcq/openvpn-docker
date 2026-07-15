@@ -37,12 +37,22 @@ case "$command" in
   help|-h|--help)
     ovpn_usage
     ;;
+
   init)
-    ovpn_init_command "$@"
+    if ovpn_help_requested "$@"; then
+      ovpn_command_usage "ovpn init" "Initialize an empty OpenVPN data directory."
+    else
+      ovpn_init_command "$@"
+    fi
     ;;
   start)
-    ovpn_start_command "$@"
+    if ovpn_help_requested "$@"; then
+      ovpn_command_usage "ovpn start" "Scan state and start OpenVPN."
+    else
+      ovpn_start_command "$@"
+    fi
     ;;
+
   config)
     ovpn_config_command "$@"
     ;;

@@ -255,21 +255,34 @@ ovpn_config_write() {
   ovpn_config_write_loaded
 }
 
+
 ovpn_config_command() {
   local subcommand="${1:-}"
 
-  [ -n "$subcommand" ] || ovpn_die 'usage: ovpn config <show|apply>'
+  if ovpn_help_requested "$@"; then
+    ovpn_config_usage
+    return 0
+  fi
+  [ -n "$subcommand" ] || ovpn_die "usage: ovpn config <show|apply>"
   shift
   case "$subcommand" in
     show)
-      ovpn_config_print "$@"
+      if ovpn_help_requested "$@"; then
+        ovpn_command_usage "ovpn config show" "Print persisted project configuration."
+      else
+        ovpn_config_print "$@"
+      fi
       ;;
     apply)
-      ovpn_config_write "$@"
+      if ovpn_help_requested "$@"; then
+        ovpn_command_usage "ovpn config apply" "Validate the environment and write persistent project configuration."
+      else
+        ovpn_config_write "$@"
+      fi
       ;;
     *)
       ovpn_log "unknown config subcommand '$subcommand'"
-      ovpn_log 'usage: ovpn config <show|apply>'
+      ovpn_log "usage: ovpn config <show|apply>"
       exit 64
       ;;
   esac

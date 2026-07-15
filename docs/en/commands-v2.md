@@ -17,18 +17,49 @@ This is the complete command reference for the current CLI in this source tree.
 
 ## Command tree
 
-```text
-ovpn help | -h | --help
-ovpn init
-ovpn start
-ovpn config <show|apply>
-ovpn client <create|export|list|revoke|release-ip|reissue|delete|ip> ...
-ovpn client ip <list|validate|apply|edit|set-static|set-dynamic> ...
-ovpn network <plan|apply> [--network <CIDR>] [--dynamic-pool-size <N>] [--yes]
-ovpn repair <plan|apply>
-ovpn state <show|doctor>
-ovpn render <server|client> ...
-ovpn runtime <status|health|capabilities|version>
+Every command and subcommand supports `--help` / `-h`. The tree below shows
+every leaf with its `--help` description:
+
+```
+ovpn
+├── init                Initialize an empty OpenVPN data directory.
+├── start               Scan state and start OpenVPN.
+├── config
+│   ├── show            Print persisted project configuration.
+│   └── apply           Validate environment and write persistent project configuration.
+├── client
+│   ├── create          Create a client certificate, profile, and IP assignment.
+│   ├── export          Write an active client profile to stdout.
+│   ├── list            List client certificate state and IP assignment details.
+│   ├── revoke          Revoke a client certificate, optionally release its static IP.
+│   ├── release-ip      Release the retained static IP of a revoked client.
+│   ├── reissue         Issue a new certificate for an existing client.
+│   ├── delete          Remove a client and its local credentials.
+│   └── ip
+│       ├── list        Print the draft client-IP registry.
+│       ├── validate    Validate the draft registry without changing it.
+│       ├── apply       Validate and apply the draft registry.
+│       ├── edit        Open the draft registry in an editor.
+│       ├── set-static  Assign selected clients static IP addresses.
+│       └── set-dynamic Assign selected clients dynamic IP addresses.
+├── network
+│   ├── plan            Preview a tunnel-network migration.
+│   └── apply           Apply a tunnel-network migration.
+├── repair
+│   ├── plan            Inspect eligible repair actions.
+│   └── apply           Apply eligible repair actions.
+├── state
+│   ├── show            Print the detected instance state.
+│   └── doctor          Print detected issues and recommended actions.
+├── render
+│   ├── server          Render the server configuration.
+│   └── client          Render a client profile.
+├── runtime
+│   ├── status          Print runtime state as JSON.
+│   ├── health          Return success only when the container is healthy.
+│   ├── capabilities    Print compatibility and feature information.
+│   └── version         Print image and runtime build information.
+└── help                Print this help message.
 ```
 
 ## Help and lifecycle

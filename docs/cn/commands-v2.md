@@ -12,18 +12,48 @@
 
 ## 命令树
 
-```text
-ovpn help | -h | --help
-ovpn init
-ovpn start
-ovpn config <show|apply>
-ovpn client <create|export|list|revoke|release-ip|reissue|delete|ip> ...
-ovpn client ip <list|validate|apply|edit|set-static|set-dynamic> ...
-ovpn network <plan|apply> [--network <CIDR>] [--dynamic-pool-size <N>] [--yes]
-ovpn repair <plan|apply>
-ovpn state <show|doctor>
-ovpn render <server|client> ...
-ovpn runtime <status|health|capabilities|version>
+每个命令和子命令都支持 `--help` / `-h`。命令树如下（叶子节点的解释等价于其 `--help` 输出）：
+
+```
+ovpn
+├── init                初始化空的 OpenVPN 数据目录。
+├── start               扫描状态并启动 OpenVPN。
+├── config
+│   ├── show            打印持久化的项目配置。
+│   └── apply           验证环境变量并写入持久化项目配置。
+├── client
+│   ├── create          创建客户端证书、profile 和 IP 分配。
+│   ├── export          将活跃客户端 profile 写入标准输出。
+│   ├── list            列出客户端证书状态和 IP 分配详情。
+│   ├── revoke          吊销客户端证书，可选释放静态 IP。
+│   ├── release-ip      释放已吊销客户端的保留静态 IP。
+│   ├── reissue         为已有客户端签发新证书。
+│   ├── delete          删除客户端及其本地凭据。
+│   └── ip
+│       ├── list        打印草稿客户端 IP 清单。
+│       ├── validate    验证草稿清单而不修改。
+│       ├── apply       验证并应用草稿清单。
+│       ├── edit        在编辑器中打开草稿清单。
+│       ├── set-static  将选中客户端设为静态 IP 分配。
+│       └── set-dynamic 将选中客户端设为动态 IP 分配。
+├── network
+│   ├── plan            预览隧道网络迁移计划。
+│   └── apply           应用隧道网络迁移。
+├── repair
+│   ├── plan            检查符合条件的修复操作。
+│   └── apply           应用符合条件的修复操作。
+├── state
+│   ├── show            打印检测到的实例状态。
+│   └── doctor          打印检测到的问题和建议操作。
+├── render
+│   ├── server          渲染服务端配置。
+│   └── client          渲染客户端 profile。
+├── runtime
+│   ├── status          打印运行时状态 JSON。
+│   ├── health          仅当容器健康时返回成功。
+│   ├── capabilities    打印兼容性和特性信息。
+│   └── version         打印镜像和运行时构建信息。
+└── help                打印此帮助。
 ```
 
 ## 帮助与生命周期
