@@ -70,7 +70,7 @@ run_control init >/tmp/ovpn-recovery-init.out 2>/tmp/ovpn-recovery-init.err
 run_control client create recovery-client >/tmp/ovpn-recovery-add.out 2>/tmp/ovpn-recovery-add.err
 identity_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec 'sha256sum /etc/openvpn/pki/ca.crt /etc/openvpn/secrets/tls-crypt.key /etc/openvpn/pki/issued/recovery-client.crt /etc/openvpn/pki/private/recovery-client.key')"
 docker run --rm -v "$data_dir:/etc/openvpn" --entrypoint /bin/sh "$IMAGE" -ec 'rm /etc/openvpn/pki/ca.crt /etc/openvpn/secrets/tls-crypt.key /etc/openvpn/pki/issued/recovery-client.crt /etc/openvpn/pki/private/recovery-client.key'
-recovery_state="$(run_control state)"
+recovery_state="$(run_control state show)"
 if [ "$recovery_state" != DEGRADED_RECOVERABLE ]; then
   run_control state doctor --json >&2 || true
   printf 'expected DEGRADED_RECOVERABLE after identity loss, got %s\n' "$recovery_state" >&2
@@ -82,7 +82,7 @@ grep -Fq '[RECOVER] RECOVER_TLS_CRYPT_KEY' /tmp/ovpn-recovery-plan.out
 grep -Fq '[RECOVER] RECOVER_CLIENT_CERT' /tmp/ovpn-recovery-plan.out
 grep -Fq '[RECOVER] RECOVER_CLIENT_KEY' /tmp/ovpn-recovery-plan.out
 run_control repair apply >/tmp/ovpn-recovery-repair.out 2>/tmp/ovpn-recovery-repair.err
-[ "$(run_control state)" = HEALTHY ]
+[ "$(run_control state show)" = HEALTHY ]
 identity_after="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec 'sha256sum /etc/openvpn/pki/ca.crt /etc/openvpn/secrets/tls-crypt.key /etc/openvpn/pki/issued/recovery-client.crt /etc/openvpn/pki/private/recovery-client.key')"
 [ "$identity_before" = "$identity_after" ] || {
   echo 'container recovery changed identity material' >&2
