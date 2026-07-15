@@ -114,6 +114,7 @@ set -euo pipefail
 cat >/dev/null
 printf '%s\n' \
   'HEADER,ROUTING_TABLE,Virtual Address,Common Name,Real Address,Last Ref' \
+  'ROUTING_TABLE,10.88.0.2,laptop,198.51.100.11:1194,Wed Jul 15 00:00:00 2026' \
   'ROUTING_TABLE,10.88.0.200,online,198.51.100.10:1194,Wed Jul 15 00:00:00 2026' \
   'END'
 FAKE_SOCAT
@@ -273,6 +274,8 @@ OVPN_EDITOR=true "$OVPN" client set-static laptop phone >"$TMP_DIR/batch-static.
 grep -Fqx 'laptop,10.88.0.2' "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/laptop"
 
+"$OVPN" client create old --ip 10.88.0.30 >"$TMP_DIR/old-create.out" 2>"$TMP_DIR/old-create.err"
+"$OVPN" client revoke old >"$TMP_DIR/old-revoke.out" 2>"$TMP_DIR/old-revoke.err"
 "$OVPN" client create online --dynamic >"$TMP_DIR/online-create.out" 2>"$TMP_DIR/online-create.err"
 "$OVPN" client create known --dynamic >"$TMP_DIR/known-create.out" 2>"$TMP_DIR/known-create.err"
 "$OVPN" client create missing --dynamic >"$TMP_DIR/missing-create.out" 2>"$TMP_DIR/missing-create.err"
@@ -282,17 +285,23 @@ printf '%s\n' \
   'known,10.88.0.202' \
   'unrelated,10.88.0.203' >"$OVPN_POOL_PERSIST_FILE"
 "$OVPN" client list --ip >"$TMP_DIR/client-list-ip.out"
-grep -Fqx $'CLIENT\tSTATE\tASSIGNMENT\tIP\tSOURCE' "$TMP_DIR/client-list-ip.out"
-grep -Fqx $'laptop\tactive\tstatic\t10.88.0.2\tconfigured' "$TMP_DIR/client-list-ip.out"
-grep -Fqx $'online\tactive\tdynamic\t10.88.0.200\tconnected' "$TMP_DIR/client-list-ip.out"
-grep -Fqx $'known\tactive\tdynamic\t10.88.0.202\tlast-known' "$TMP_DIR/client-list-ip.out"
-grep -Fqx $'missing\tactive\tdynamic\t-\tunavailable' "$TMP_DIR/client-list-ip.out"
+grep -Fqx $'CLIENT\tSTATE\tMODE\tIP\tIP STATE\tCONNECTION' "$TMP_DIR/client-list-ip.out"
+grep -Fqx $'laptop\tactive\tstatic\t10.88.0.2\tconfigured\tonline' "$TMP_DIR/client-list-ip.out"
+grep -Fqx $'phone\tactive\tstatic\t10.88.0.20\tconfigured\toffline' "$TMP_DIR/client-list-ip.out"
+grep -Fqx $'old\trevoked\tstatic\t10.88.0.30\tretained\toffline' "$TMP_DIR/client-list-ip.out"
+grep -Fqx $'online\tactive\tdynamic\t10.88.0.200\tconnected\tonline' "$TMP_DIR/client-list-ip.out"
+grep -Fqx $'known\tactive\tdynamic\t10.88.0.202\tlast-known\toffline' "$TMP_DIR/client-list-ip.out"
+grep -Fqx $'missing\tactive\tdynamic\t-\tunavailable\toffline' "$TMP_DIR/client-list-ip.out"
 if grep -Fq 'unrelated' "$TMP_DIR/client-list-ip.out"; then
   echo 'client IP list included a lease for an unknown client' >&2
   exit 1
 fi
 grep -Fqx 'laptop active' <("$OVPN" client list)
-grep -Fqx $'online\tactive\tdynamic\t10.88.0.200\tconnected' <("$OVPN" list-clients --ip)
+grep -Fqx $'online\tactive\tdynamic\t10.88.0.200\tconnected\tonline' <("$OVPN" list-clients --ip)
+rm -f "$OVPN_MANAGEMENT_SOCKET"
+"$OVPN" client list --ip >"$TMP_DIR/client-list-ip-unknown.out"
+grep -Fqx $'laptop\tactive\tstatic\t10.88.0.2\tconfigured\tunknown' "$TMP_DIR/client-list-ip-unknown.out"
+grep -Fqx $'online\tactive\tdynamic\t10.88.0.201\tlast-known\tunknown' "$TMP_DIR/client-list-ip-unknown.out"
 
 "$OVPN" export-client laptop >"$TMP_DIR/laptop.ovpn" 2>"$TMP_DIR/export.err"
 test ! -s "$TMP_DIR/export.err"

@@ -260,14 +260,18 @@ recovering the old private key requires a secure backup. `add-client`,
 standard counterparts.
 
 `client list` retains its compact, compatibility-oriented `name state` output.
-Use `client list --ip` for tab-separated `CLIENT`, `STATE`, `ASSIGNMENT`, `IP`,
-and `SOURCE` columns. Static addresses are `configured`. Dynamic addresses are
-`connected` only when the local OpenVPN management socket reports a current
-route; otherwise `last-known` is read from `pool-persist.txt`, and `-`
-`unavailable` means no current or persisted lease is available. A dynamic IP is
-informational, never a reservation. This view reads the last applied registry,
-so direct CSV edits do not appear until `client-ip apply` succeeds. The
-`list-clients --ip` compatibility alias accepts the same option.
+Use `client list --ip` for tab-separated `CLIENT`, `STATE`, `MODE`, `IP`,
+`IP STATE`, and `CONNECTION` columns. `CONNECTION=online` means the local OpenVPN
+management socket reports a current route for the client; `offline` means the
+query succeeded but has no route, and `unknown` means the socket is unavailable
+or the query failed. An active static address is `configured`; a revoked static
+address that still occupies its reservation is `retained`. Dynamic addresses
+are `connected` only when that route supplies a current dynamic address;
+otherwise `last-known` is read from `pool-persist.txt`, and `-` `unavailable`
+means no current or persisted lease is available. A dynamic IP is informational,
+never a reservation. This view reads the last applied registry, so direct CSV
+edits do not appear until `client-ip apply` succeeds. The `list-clients --ip`
+compatibility alias accepts the same option.
 
 ## Client IP Management
 
