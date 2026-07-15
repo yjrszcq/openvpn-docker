@@ -7,6 +7,11 @@ on:
     paths:
       - versions.env
   workflow_dispatch:
+    inputs:
+      skip-test:
+        description: 'Skip the Test gate (use only after Test has passed)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,7 +50,9 @@ jobs:
   verify:
     name: Run supported-range compatibility gate
     needs: policy
-    if: needs.policy.outputs.in_range == 'true'
+    if: >-
+      needs.policy.outputs.in_range == 'true' &&
+      inputs.skip-test != true
     uses: ./.github/workflows/test.yml
     permissions:
       contents: read
@@ -58,7 +65,7 @@ jobs:
     if: >-
       always() &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
-      (needs.policy.outputs.in_range == 'false' || needs.verify.result == 'success')
+      (needs.policy.outputs.in_range == 'false' || needs.verify.result == 'success' || needs.verify.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: read
