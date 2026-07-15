@@ -71,7 +71,7 @@ run_control init >/tmp/ovpn-maintenance-init.out 2>/tmp/ovpn-maintenance-init.er
 docker run --rm -v "$data_dir:/etc/openvpn" --entrypoint /bin/sh "$IMAGE" -ec 'rm /etc/openvpn/pki/index.txt'
 
 set +e
-run_control doctor --json >"$WORK_DIR/doctor.json" 2>"$WORK_DIR/doctor.err"
+run_control state doctor --json >"$WORK_DIR/doctor.json" 2>"$WORK_DIR/doctor.err"
 status=$?
 set -e
 [ "$status" -eq 78 ]
@@ -79,7 +79,7 @@ grep -Fq '"state": "CRITICAL"' "$WORK_DIR/doctor.json"
 grep -Fq 'PKI_INDEX_MISSING' "$WORK_DIR/doctor.json"
 
 set +e
-run_control repair --plan >"$WORK_DIR/plan.out" 2>"$WORK_DIR/plan.err"
+run_control repair plan >"$WORK_DIR/plan.out" 2>"$WORK_DIR/plan.err"
 status=$?
 set -e
 [ "$status" -eq 78 ]
@@ -103,7 +103,7 @@ docker run -d \
   start >/dev/null
 
 for _ in $(seq 1 30); do
-  status_output="$(docker exec "$container_name" ovpn status 2>/dev/null || true)"
+  status_output="$(docker exec "$container_name" ovpn runtime status 2>/dev/null || true)"
   if grep -Fq '"maintenance": true' <<<"$status_output"; then
     break
   fi
@@ -113,7 +113,7 @@ grep -Fq '"instance_state": "CRITICAL"' <<<"$status_output"
 grep -Fq '"daemon": "stopped"' <<<"$status_output"
 grep -Fq '"maintenance": true' <<<"$status_output"
 set +e
-docker exec "$container_name" ovpn healthcheck >"$WORK_DIR/health.out" 2>"$WORK_DIR/health.err"
+docker exec "$container_name" ovpn runtime health >"$WORK_DIR/health.out" 2>"$WORK_DIR/health.err"
 status=$?
 set -e
 [ "$status" -eq 1 ]

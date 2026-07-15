@@ -74,7 +74,7 @@ cat >"$OVPN_RUNTIME_STATE_FILE" <<'EOF'
 }
 EOF
 
-"$OVPN" config init
+"$OVPN" config apply
 mkdir -p "$OVPN_DATA_DIR/data" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/pki" "$(dirname "$OVPN_POOL_PERSIST_FILE")"
 printf '%s\n' \
   $'V\t30000101000000Z\t\t01\tunknown\t/CN=alpha' \
@@ -89,13 +89,13 @@ cp "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.cs
 printf '%s\n' '# client,state' 'alpha,active' 'bravo,active' >"$OVPN_DATA_DIR/meta/client-state.csv"
 : >"$OVPN_DATA_DIR/meta/audit.jsonl"
 printf '%s\n' 'bravo,10.88.0.200' >"$OVPN_POOL_PERSIST_FILE"
-"$OVPN" client-ip apply
+"$OVPN" client ip apply
 
-"$OVPN" network reconfigure --network 10.89.0.0/24 --dynamic-pool-size 100 --dry-run >"$TMP_DIR/dry.out"
+"$OVPN" network plan --network 10.89.0.0/24 --dynamic-pool-size 100 >"$TMP_DIR/dry.out"
 grep -Fq 'Network: 10.88.0.0/24 -> 10.89.0.0/24' "$TMP_DIR/dry.out"
 grep -Fqx 'OVPN_NETWORK=10.88.0.0/24' "$OVPN_DATA_DIR/config/project.env"
 
-"$OVPN" network reconfigure --network 10.89.0.0/24 --dynamic-pool-size 100 --yes >"$TMP_DIR/apply.out"
+"$OVPN" network apply --network 10.89.0.0/24 --dynamic-pool-size 100 --yes >"$TMP_DIR/apply.out"
 grep -Fqx 'OVPN_NETWORK=10.89.0.0/24' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'OVPN_DYNAMIC_POOL_SIZE=100' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'alpha,10.89.0.20' "$OVPN_DATA_DIR/data/client-ip.csv"
@@ -105,7 +105,7 @@ grep -q '^server 10.89.0.0 255.255.255.0 nopool$' "$OVPN_DATA_DIR/server/server.
 grep -Fq 'signal SIGHUP' "$OVPN_TEST_SOCAT_LOG"
 grep -Fq '"event":"network_migration","outcome":"applied"' "$OVPN_DATA_DIR/meta/audit.jsonl"
 
-if OVPN_NETWORK_MIGRATION_FAIL_HEALTH=true "$OVPN" network reconfigure --network 10.90.0.0/24 --yes >"$TMP_DIR/fail.out" 2>"$TMP_DIR/fail.err"; then
+if OVPN_NETWORK_MIGRATION_FAIL_HEALTH=true "$OVPN" network apply --network 10.90.0.0/24 --yes >"$TMP_DIR/fail.out" 2>"$TMP_DIR/fail.err"; then
   echo 'failed network migration unexpectedly succeeded' >&2
   exit 1
 fi
@@ -119,7 +119,7 @@ wait "$SOCKET_LISTENER_PID" 2>/dev/null || true
 SOCKET_LISTENER_PID=''
 rm -f "$OVPN_MANAGEMENT_SOCKET"
 before_config="$(sha256sum "$OVPN_DATA_DIR/config/project.env")"
-if "$OVPN" network reconfigure --network 10.90.0.0/24 --yes >"$TMP_DIR/offline.out" 2>"$TMP_DIR/offline.err"; then
+if "$OVPN" network apply --network 10.90.0.0/24 --yes >"$TMP_DIR/offline.out" 2>"$TMP_DIR/offline.err"; then
   echo 'offline network migration unexpectedly succeeded' >&2
   exit 1
 fi

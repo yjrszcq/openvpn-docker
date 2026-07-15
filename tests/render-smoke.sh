@@ -32,8 +32,8 @@ export OVPN_CLIENT_TO_CLIENT="true"
 export OVPN_ROUTES="192.168.50.0/24"
 export OVPN_DNS="1.1.1.1,8.8.8.8"
 
-"$OVPN" config init
-"$OVPN" config print >"$TMP_DIR/project.env.out"
+"$OVPN" config apply
+"$OVPN" config show >"$TMP_DIR/project.env.out"
 if ! grep -q '^OVPN_NETWORK=10.88.0.0/24$' "$TMP_DIR/project.env.out"; then
   echo 'project config did not preserve validation network' >&2
   exit 1
@@ -64,7 +64,7 @@ grep -q 'TEST CLIENT CERT' "$TMP_DIR/laptop.ovpn"
 grep -q 'TEST CLIENT KEY' "$TMP_DIR/laptop.ovpn"
 grep -q 'TEST TLS CRYPT KEY' "$TMP_DIR/laptop.ovpn"
 
-OVPN_DATA_DIR="$TMP_DIR/static" OVPN_DYNAMIC_POOL_SIZE=0 "$OVPN" config init
+OVPN_DATA_DIR="$TMP_DIR/static" OVPN_DYNAMIC_POOL_SIZE=0 "$OVPN" config apply
 OVPN_DATA_DIR="$TMP_DIR/static" "$OVPN" render server --stdout >"$TMP_DIR/static-server.conf"
 grep -q '^server 10.88.0.0 255.255.255.0 nopool$' "$TMP_DIR/static-server.conf"
 if grep -q '^ifconfig-pool ' "$TMP_DIR/static-server.conf"; then

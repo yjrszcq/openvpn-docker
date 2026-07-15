@@ -73,7 +73,7 @@ export OVPN_ENDPOINT=vpn.example.test
 
 grep -Fqx 'OVPN_ENDPOINT=vpn.example.test' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'OVPN_NETWORK=10.88.0.0/24' "$OVPN_DATA_DIR/config/project.env"
-OVPN_ENDPOINT=changed.example.test "$OVPN" config print >"$TMP_DIR/config.out"
+OVPN_ENDPOINT=changed.example.test "$OVPN" config show >"$TMP_DIR/config.out"
 grep -Fqx 'OVPN_ENDPOINT=vpn.example.test' "$TMP_DIR/config.out"
 
 export OVPN_DATA_DIR="$TMP_DIR/invalid-endpoint"
@@ -86,7 +86,7 @@ if [ "$status" -eq 0 ]; then
   exit 1
 fi
 grep -Fq 'OVPN_ENDPOINT must be a hostname or IP address' "$TMP_DIR/invalid.err"
-if [ "$("$OVPN" state)" != EMPTY ]; then
+if [ "$("$OVPN" state show)" != EMPTY ]; then
   echo 'invalid bootstrap input left non-empty data' >&2
   exit 1
 fi
@@ -101,7 +101,7 @@ if [ "$status" -eq 0 ]; then
   echo 'failed PKI initialization unexpectedly succeeded' >&2
   exit 1
 fi
-if [ "$("$OVPN" state)" != EMPTY ]; then
+if [ "$("$OVPN" state show)" != EMPTY ]; then
   echo 'failed PKI initialization left non-empty data' >&2
   exit 1
 fi
@@ -113,7 +113,7 @@ fi
 export OVPN_DATA_DIR="$TMP_DIR/interrupted-commit"
 mkdir -p "$OVPN_DATA_DIR"
 : >"$OVPN_DATA_DIR/.init-transaction"
-if [ "$("$OVPN" state)" != CRITICAL ]; then
+if [ "$("$OVPN" state show)" != CRITICAL ]; then
   echo 'interrupted initialization should be CRITICAL' >&2
   exit 1
 fi

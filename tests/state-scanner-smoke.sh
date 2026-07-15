@@ -11,7 +11,7 @@ export OVPN_COMPATIBILITY_DIR="$ROOT_DIR/compatibility"
 export OVPN_RUNTIME_DIR="$TMP_DIR/run"
 export OVPN_DATA_DIR="$TMP_DIR/missing"
 
-if [ "$("$OVPN" state)" != EMPTY ]; then
+if [ "$("$OVPN" state show)" != EMPTY ]; then
   echo 'missing data directory should be EMPTY' >&2
   exit 1
 fi
@@ -23,7 +23,7 @@ fi
 export OVPN_DATA_DIR="$TMP_DIR/ignored"
 mkdir -p "$OVPN_DATA_DIR"
 touch "$OVPN_DATA_DIR/lost+found" "$OVPN_DATA_DIR/.DS_Store"
-if [ "$("$OVPN" state)" != EMPTY ]; then
+if [ "$("$OVPN" state show)" != EMPTY ]; then
   echo 'whitelisted data directory entries should remain EMPTY' >&2
   exit 1
 fi
@@ -39,7 +39,7 @@ for artifact in config pki meta clients server.conf unknown.key .staging-init-te
       : >"$OVPN_DATA_DIR/$artifact"
       ;;
   esac
-  if [ "$("$OVPN" state)" = EMPTY ]; then
+  if [ "$("$OVPN" state show)" = EMPTY ]; then
     echo "artifact $artifact was incorrectly classified as EMPTY" >&2
     exit 1
   fi

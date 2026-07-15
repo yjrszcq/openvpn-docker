@@ -53,7 +53,7 @@ export OVPN_OPENVPN_BIN="$FAKE_BIN/openvpn"
 : >"$TMP_DIR/generated.conf"
 ovpn_compatibility_validate_config "$TMP_DIR/generated.conf"
 
-"$OVPN" capabilities >"$TMP_DIR/supported.json"
+"$OVPN" runtime capabilities >"$TMP_DIR/supported.json"
 grep -Fq '"openvpn_version": "2.7.5"' "$TMP_DIR/supported.json"
 grep -Fq '"supported_range": true' "$TMP_DIR/supported.json"
 grep -Fq '"adapter": "openvpn-2.7"' "$TMP_DIR/supported.json"
@@ -63,7 +63,7 @@ grep -Fq '"crl_verify": true' "$TMP_DIR/supported.json"
 grep -Fq '"topology_subnet": true' "$TMP_DIR/supported.json"
 
 set +e
-FAKE_OPENVPN_MISSING_FEATURE=tls-crypt "$OVPN" capabilities >"$TMP_DIR/missing-feature.json" 2>"$TMP_DIR/missing-feature.err"
+FAKE_OPENVPN_MISSING_FEATURE=tls-crypt "$OVPN" runtime capabilities >"$TMP_DIR/missing-feature.json" 2>"$TMP_DIR/missing-feature.err"
 status=$?
 set -e
 if [ "$status" -eq 0 ]; then
@@ -75,7 +75,7 @@ grep -Fq '"adapter": "openvpn-2.7"' "$TMP_DIR/missing-feature.json"
 grep -Fq '"tls_crypt": false' "$TMP_DIR/missing-feature.json"
 
 set +e
-FAKE_OPENVPN_VERSION=2.8.0 "$OVPN" capabilities >"$TMP_DIR/unsupported-runtime.json" 2>"$TMP_DIR/unsupported-runtime.err"
+FAKE_OPENVPN_VERSION=2.8.0 "$OVPN" runtime capabilities >"$TMP_DIR/unsupported-runtime.json" 2>"$TMP_DIR/unsupported-runtime.err"
 status=$?
 set -e
 if [ "$status" -eq 0 ]; then

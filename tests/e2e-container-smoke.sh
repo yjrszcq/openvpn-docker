@@ -280,8 +280,8 @@ for proto in udp tcp; do
 
   start_server "$data_dir" "$endpoint" "$server_name" "$network_name"
   wait_for_log "$server_name" 'Initialization Sequence Completed' "$WORK_DIR/server-$proto-active.log"
-  test "$(run_control "$data_dir" "$endpoint" ovpn state)" = HEALTHY
-  docker exec "$server_name" ovpn healthcheck
+  test "$(run_control "$data_dir" "$endpoint" ovpn state show)" = HEALTHY
+  docker exec "$server_name" ovpn runtime health
 
   data_grep "$data_dir" "^OVPN_NETWORK=$NETWORK$" config/project.env
   data_grep "$data_dir" "^OVPN_PROTO=$proto$" config/project.env
@@ -307,17 +307,17 @@ for proto in udp tcp; do
   fi
   assert_nat_policy "$server_name" "$POLICY_NAT"
 
-  run_control "$data_dir" "$endpoint" ovpn add-client "client-$proto"
-  run_control "$data_dir" "$endpoint" ovpn export-client "client-$proto" >"$profile_path"
+  run_control "$data_dir" "$endpoint" ovpn client create "client-$proto"
+  run_control "$data_dir" "$endpoint" ovpn client export "client-$proto" >"$profile_path"
   grep -q "^remote $endpoint $PORT$" "$profile_path"
   grep -q "^proto $proto$" "$profile_path"
-  grep -q "^client-$proto active$" <(run_control "$data_dir" "$endpoint" ovpn list-clients)
+  grep -q "^client-$proto active$" <(run_control "$data_dir" "$endpoint" ovpn client list)
 
   assert_client_connects "$network_name" "$profile_path" "$WORK_DIR/client-$proto-active.log"
 
   docker rm -f "$server_name" >/dev/null
-  run_control "$data_dir" "$endpoint" ovpn revoke-client "client-$proto"
-  grep -q "^client-$proto revoked$" <(run_control "$data_dir" "$endpoint" ovpn list-clients)
+  run_control "$data_dir" "$endpoint" ovpn client revoke "client-$proto"
+  grep -q "^client-$proto revoked$" <(run_control "$data_dir" "$endpoint" ovpn client list)
 
   start_server "$data_dir" "$endpoint" "$server_name" "$network_name"
   wait_for_log "$server_name" 'Initialization Sequence Completed' "$WORK_DIR/server-$proto-revoked-start.log"

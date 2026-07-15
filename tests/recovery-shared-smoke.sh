@@ -158,11 +158,11 @@ assert_critical_recovery() {
   local before after status
 
   export OVPN_DATA_DIR="$fixture"
-  [ "$("$OVPN" state)" = CRITICAL ]
+  [ "$("$OVPN" state show)" = CRITICAL ]
   before="$(snapshot_data_dir "$fixture")"
 
   set +e
-  "$OVPN" doctor --json >"$TMP_DIR/$label-doctor.out" 2>"$TMP_DIR/$label-doctor.err"
+  "$OVPN" state doctor --json >"$TMP_DIR/$label-doctor.out" 2>"$TMP_DIR/$label-doctor.err"
   status=$?
   set -e
   [ "$status" -eq 78 ]
@@ -171,7 +171,7 @@ assert_critical_recovery() {
   [ "$before" = "$after" ]
 
   set +e
-  "$OVPN" repair --plan >"$TMP_DIR/$label-plan.out" 2>"$TMP_DIR/$label-plan.err"
+  "$OVPN" repair plan >"$TMP_DIR/$label-plan.out" 2>"$TMP_DIR/$label-plan.err"
   status=$?
   set -e
   [ "$status" -eq 78 ]
@@ -195,12 +195,12 @@ export OVPN_DATA_DIR="$data_dir"
 ca_hash="$(sha256sum "$data_dir/pki/ca.crt")"
 tls_hash="$(sha256sum "$data_dir/secrets/tls-crypt.key")"
 rm "$data_dir/pki/ca.crt" "$data_dir/secrets/tls-crypt.key"
-[ "$("$OVPN" state)" = DEGRADED_RECOVERABLE ]
-"$OVPN" repair --plan >"$TMP_DIR/plan.out"
+[ "$("$OVPN" state show)" = DEGRADED_RECOVERABLE ]
+"$OVPN" repair plan >"$TMP_DIR/plan.out"
 grep -Fq '[RECOVER] RECOVER_CA_CERT' "$TMP_DIR/plan.out"
 grep -Fq '[RECOVER] RECOVER_TLS_CRYPT_KEY' "$TMP_DIR/plan.out"
-"$OVPN" repair >"$TMP_DIR/repair.out" 2>"$TMP_DIR/repair.err"
-[ "$("$OVPN" state)" = HEALTHY ]
+"$OVPN" repair apply >"$TMP_DIR/repair.out" 2>"$TMP_DIR/repair.err"
+[ "$("$OVPN" state show)" = HEALTHY ]
 [ "$(sha256sum "$data_dir/pki/ca.crt")" = "$ca_hash" ]
 [ "$(sha256sum "$data_dir/secrets/tls-crypt.key")" = "$tls_hash" ]
 [ "$(stat -c '%a' "$data_dir/pki/ca.crt")" = 644 ]
@@ -219,46 +219,46 @@ if ! "$OVPN" start >"$TMP_DIR/start.out" 2>"$TMP_DIR/start.err"; then
   cat "$TMP_DIR/start.err" >&2
   exit 1
 fi
-[ "$("$OVPN" state)" = HEALTHY ]
+[ "$("$OVPN" state show)" = HEALTHY ]
 [ "$(sha256sum "$data_dir/pki/ca.crt")" = "$ca_hash" ]
 [ "$(sha256sum "$data_dir/secrets/tls-crypt.key")" = "$tls_hash" ]
 client_certificate_hash="$(sha256sum "$data_dir/pki/issued/laptop.crt")"
 client_key_hash="$(sha256sum "$data_dir/pki/private/laptop.key")"
 rm "$data_dir/pki/issued/laptop.crt"
-client_state="$("$OVPN" state)"
+client_state="$("$OVPN" state show)"
 if [ "$client_state" != DEGRADED_RECOVERABLE ]; then
-  "$OVPN" doctor --json >&2 || true
+  "$OVPN" state doctor --json >&2 || true
   echo "expected DEGRADED_RECOVERABLE after client certificate loss, got $client_state" >&2
   exit 1
 fi
-"$OVPN" repair --plan >"$TMP_DIR/client-cert-plan.out"
+"$OVPN" repair plan >"$TMP_DIR/client-cert-plan.out"
 grep -Fq '[RECOVER] RECOVER_CLIENT_CERT' "$TMP_DIR/client-cert-plan.out"
-"$OVPN" repair >"$TMP_DIR/client-cert-repair.out" 2>"$TMP_DIR/client-cert-repair.err"
-[ "$("$OVPN" state)" = HEALTHY ]
+"$OVPN" repair apply >"$TMP_DIR/client-cert-repair.out" 2>"$TMP_DIR/client-cert-repair.err"
+[ "$("$OVPN" state show)" = HEALTHY ]
 [ "$(sha256sum "$data_dir/pki/issued/laptop.crt")" = "$client_certificate_hash" ]
 [ "$(stat -c '%a' "$data_dir/pki/issued/laptop.crt")" = 644 ]
 
 rm "$data_dir/pki/private/laptop.key"
-[ "$("$OVPN" state)" = DEGRADED_RECOVERABLE ]
-"$OVPN" repair --plan >"$TMP_DIR/client-key-plan.out"
+[ "$("$OVPN" state show)" = DEGRADED_RECOVERABLE ]
+"$OVPN" repair plan >"$TMP_DIR/client-key-plan.out"
 grep -Fq '[RECOVER] RECOVER_CLIENT_KEY' "$TMP_DIR/client-key-plan.out"
-"$OVPN" repair >"$TMP_DIR/client-key-repair.out" 2>"$TMP_DIR/client-key-repair.err"
-[ "$("$OVPN" state)" = HEALTHY ]
+"$OVPN" repair apply >"$TMP_DIR/client-key-repair.out" 2>"$TMP_DIR/client-key-repair.err"
+[ "$("$OVPN" state show)" = HEALTHY ]
 [ "$(sha256sum "$data_dir/pki/private/laptop.key")" = "$client_key_hash" ]
 [ "$(stat -c '%a' "$data_dir/pki/private/laptop.key")" = 600 ]
 
 rm "$data_dir/pki/issued/laptop.crt" "$data_dir/pki/private/laptop.key"
-[ "$("$OVPN" state)" = DEGRADED_RECOVERABLE ]
+[ "$("$OVPN" state show)" = DEGRADED_RECOVERABLE ]
 if ! "$OVPN" start >"$TMP_DIR/client-start.out" 2>"$TMP_DIR/client-start.err"; then
   cat "$TMP_DIR/client-start.err" >&2
   exit 1
 fi
-[ "$("$OVPN" state)" = HEALTHY ]
+[ "$("$OVPN" state show)" = HEALTHY ]
 [ "$(sha256sum "$data_dir/pki/issued/laptop.crt")" = "$client_certificate_hash" ]
 [ "$(sha256sum "$data_dir/pki/private/laptop.key")" = "$client_key_hash" ]
 
 rm "$data_dir/clients/active/laptop.ovpn" "$data_dir/clients/active/phone.ovpn" "$data_dir/pki/ca.crt"
-[ "$("$OVPN" state)" = CRITICAL ]
+[ "$("$OVPN" state show)" = CRITICAL ]
 set +e
 "$OVPN" start >"$TMP_DIR/no-source-start.out" 2>"$TMP_DIR/no-source-start.err"
 status=$?

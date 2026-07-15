@@ -34,7 +34,7 @@ docker run --rm \
   -e OVPN_PROTO=udp \
   --entrypoint /bin/bash \
   "$IMAGE" \
-  -ec 'ovpn capabilities >/tmp/capabilities.json
+  -ec 'ovpn runtime capabilities >/tmp/capabilities.json
        grep -Fq "\"supported_range\": true" /tmp/capabilities.json
        grep -Fq "\"adapter\": \"openvpn-2.7\"" /tmp/capabilities.json
        grep -Fq "\"tls_crypt\": true" /tmp/capabilities.json
@@ -42,8 +42,8 @@ docker run --rm \
        grep -Fq "\"crl_verify\": true" /tmp/capabilities.json
        grep -Fq "\"topology_subnet\": true" /tmp/capabilities.json
        ovpn init >/tmp/init.log 2>&1
-       ovpn add-client config-load >/tmp/add-client.log 2>&1
-       ovpn export-client config-load >/tmp/config-load.ovpn
+       ovpn client create config-load >/tmp/add-client.log 2>&1
+       ovpn client export config-load >/tmp/config-load.ovpn
        openvpn --config /etc/openvpn/server/server.conf --cipher AES-256-GCM --test-crypto >/tmp/server-config-load.log 2>&1
        openvpn --config /tmp/config-load.ovpn --cipher AES-256-GCM --test-crypto >/tmp/client-config-load.log 2>&1
        grep -Fq "crypto self-test mode SUCCEEDED" /tmp/server-config-load.log

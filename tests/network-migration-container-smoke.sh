@@ -38,7 +38,7 @@ wait_for_health() {
   local deadline=$((SECONDS + 30))
 
   while [ "$SECONDS" -lt "$deadline" ]; do
-    if docker exec "$CONTAINER_NAME" ovpn healthcheck >/dev/null 2>&1; then
+    if docker exec "$CONTAINER_NAME" ovpn runtime health >/dev/null 2>&1; then
       return 0
     fi
     if ! docker ps --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
@@ -88,10 +88,10 @@ docker run -d \
 wait_for_health
 docker exec "$CONTAINER_NAME" ovpn client create static-client >/dev/null
 docker exec "$CONTAINER_NAME" ovpn client create dynamic-client --dynamic >/dev/null
-docker exec "$CONTAINER_NAME" ovpn network reconfigure --network "$MIGRATED_NETWORK" --dynamic-pool-size 100 --yes >/tmp/ovpn-network-migration-apply.out
+docker exec "$CONTAINER_NAME" ovpn network apply --network "$MIGRATED_NETWORK" --dynamic-pool-size 100 --yes >/tmp/ovpn-network-migration-apply.out
 wait_for_health
-docker exec "$CONTAINER_NAME" ovpn healthcheck
-test "$(docker exec "$CONTAINER_NAME" ovpn state)" = HEALTHY
+docker exec "$CONTAINER_NAME" ovpn runtime health
+test "$(docker exec "$CONTAINER_NAME" ovpn state show)" = HEALTHY
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec '
   grep -Fqx "OVPN_NETWORK=$1" /etc/openvpn/config/project.env
   grep -Fqx "static-client,10.89.0.2" /etc/openvpn/data/client-ip.csv
@@ -99,14 +99,14 @@ docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec
   grep -Fq '"'"'"event":"network_migration","outcome":"applied"'"'"' /etc/openvpn/meta/audit.jsonl
 ' sh "$MIGRATED_NETWORK"
 
-if docker exec -e OVPN_NETWORK_MIGRATION_FAIL_HEALTH=true "$CONTAINER_NAME" ovpn network reconfigure --network "$FAILED_NETWORK" --yes >/tmp/ovpn-network-migration-fail.out 2>/tmp/ovpn-network-migration-fail.err; then
+if docker exec -e OVPN_NETWORK_MIGRATION_FAIL_HEALTH=true "$CONTAINER_NAME" ovpn network apply --network "$FAILED_NETWORK" --yes >/tmp/ovpn-network-migration-fail.out 2>/tmp/ovpn-network-migration-fail.err; then
   echo 'injected network migration health failure unexpectedly succeeded' >&2
   exit 1
 fi
 grep -Fq 'network migration health check failed; rollback completed' /tmp/ovpn-network-migration-fail.err
 wait_for_health
-docker exec "$CONTAINER_NAME" ovpn healthcheck
-test "$(docker exec "$CONTAINER_NAME" ovpn state)" = HEALTHY
+docker exec "$CONTAINER_NAME" ovpn runtime health
+test "$(docker exec "$CONTAINER_NAME" ovpn state show)" = HEALTHY
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec '
   grep -Fqx "OVPN_NETWORK=$1" /etc/openvpn/config/project.env
   grep -Fqx "static-client,10.89.0.2" /etc/openvpn/data/client-ip.csv

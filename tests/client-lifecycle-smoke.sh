@@ -148,9 +148,9 @@ export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
 env -u OVPN_EDITOR -u EDITOR \
   OVPN_TEST_EDITOR_LOG="$TMP_DIR/editor.log" \
   PATH="$FAKE_BIN:$PATH" \
-  "$OVPN" client-ip edit >"$TMP_DIR/client-ip-edit.out" 2>"$TMP_DIR/client-ip-edit.err"
+  "$OVPN" client ip edit >"$TMP_DIR/client-ip-edit.out" 2>"$TMP_DIR/client-ip-edit.err"
 grep -Fqx 'nano:client-ip.csv' "$TMP_DIR/editor.log"
-"$OVPN" add-client laptop >/tmp/ovpn-add-client.out 2>/tmp/ovpn-add-client.err
+"$OVPN" client create laptop >/tmp/ovpn-add-client.out 2>/tmp/ovpn-add-client.err
 
 repair_snapshot() {
   find "$OVPN_DATA_DIR" \
@@ -171,8 +171,8 @@ rm "$OVPN_DATA_DIR/config/schema-version" \
   "$OVPN_DATA_DIR/pki/crl.pem" \
   "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 rm -rf "$OVPN_RUNTIME_DIR"
-"$OVPN" repair >"$TMP_DIR/repair.out" 2>"$TMP_DIR/repair.err"
-if [ "$("$OVPN" state)" != HEALTHY ]; then
+"$OVPN" repair apply >"$TMP_DIR/repair.out" 2>"$TMP_DIR/repair.err"
+if [ "$("$OVPN" state show)" != HEALTHY ]; then
   echo 'safe repair did not restore HEALTHY state' >&2
   exit 1
 fi
@@ -202,7 +202,7 @@ export FAKE_OPENSSL_SLEEP_SECONDS=1
 export FAKE_EASYRSA_LOG="$TMP_DIR/repair-lock-easyrsa.log"
 : >"$FAKE_OPENSSL_LOG"
 : >"$FAKE_EASYRSA_LOG"
-"$OVPN" repair >"$TMP_DIR/locked-repair.out" 2>"$TMP_DIR/locked-repair.err" &
+"$OVPN" repair apply >"$TMP_DIR/locked-repair.out" 2>"$TMP_DIR/locked-repair.err" &
 repair_pid=$!
 deadline=$((SECONDS + 5))
 while ! grep -Fqx x509 "$FAKE_OPENSSL_LOG"; do
@@ -213,7 +213,7 @@ while ! grep -Fqx x509 "$FAKE_OPENSSL_LOG"; do
   fi
   sleep 0.1
 done
-"$OVPN" add-client tablet >"$TMP_DIR/locked-add-client.out" 2>"$TMP_DIR/locked-add-client.err" &
+"$OVPN" client create tablet >"$TMP_DIR/locked-add-client.out" 2>"$TMP_DIR/locked-add-client.err" &
 add_client_pid=$!
 sleep 0.1
 if grep -Fqx build-client-full "$FAKE_EASYRSA_LOG"; then
@@ -224,13 +224,13 @@ wait "$repair_pid"
 wait "$add_client_pid"
 grep -Fqx build-client-full "$FAKE_EASYRSA_LOG"
 unset FAKE_OPENSSL_LOG FAKE_OPENSSL_SLEEP_ON FAKE_OPENSSL_SLEEP_SECONDS FAKE_EASYRSA_LOG
-if [ "$("$OVPN" state)" != HEALTHY ]; then
+if [ "$("$OVPN" state show)" != HEALTHY ]; then
   echo 'shared-lock repair and client mutation did not leave HEALTHY state' >&2
   exit 1
 fi
 rm "$OVPN_DATA_DIR/server/server.conf" "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 before_failed_repair="$(repair_snapshot)"
-if OVPN_REPAIR_FAIL_AFTER_INSTALL=RENDER_SERVER_CONFIG "$OVPN" repair >"$TMP_DIR/failed-repair.out" 2>"$TMP_DIR/failed-repair.err"; then
+if OVPN_REPAIR_FAIL_AFTER_INSTALL=RENDER_SERVER_CONFIG "$OVPN" repair apply >"$TMP_DIR/failed-repair.out" 2>"$TMP_DIR/failed-repair.err"; then
   echo 'injected repair failure unexpectedly succeeded' >&2
   exit 1
 fi
@@ -254,29 +254,29 @@ if grep -Fq 'FAKE CLIENT KEY laptop' "$journal"; then
   echo 'repair journal contains private profile material' >&2
   exit 1
 fi
-"$OVPN" repair >"$TMP_DIR/retry-repair.out" 2>"$TMP_DIR/retry-repair.err"
-if [ "$("$OVPN" state)" != HEALTHY ]; then
+"$OVPN" repair apply >"$TMP_DIR/retry-repair.out" 2>"$TMP_DIR/retry-repair.err"
+if [ "$("$OVPN" state show)" != HEALTHY ]; then
   echo 'retry after failed repair did not restore HEALTHY state' >&2
   exit 1
 fi
 
 
-grep -q '^laptop active$' <("$OVPN" list-clients)
+grep -q '^laptop active$' <("$OVPN" client list)
 test -f "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 
 "$OVPN" client create phone --dynamic >"$TMP_DIR/phone-create.out" 2>"$TMP_DIR/phone-create.err"
 grep -Fqx 'phone,' "$OVPN_DATA_DIR/data/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/ccd/phone"
-"$OVPN" client set-static phone --ip 10.88.0.20 >"$TMP_DIR/phone-static.out" 2>"$TMP_DIR/phone-static.err"
+"$OVPN" client ip set-static phone --ip 10.88.0.20 >"$TMP_DIR/phone-static.out" 2>"$TMP_DIR/phone-static.err"
 grep -Fqx 'phone,10.88.0.20' "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.20 255.255.255.0' "$OVPN_DATA_DIR/ccd/phone"
-"$OVPN" client set-dynamic laptop >"$TMP_DIR/laptop-dynamic.out" 2>"$TMP_DIR/laptop-dynamic.err"
+"$OVPN" client ip set-dynamic laptop >"$TMP_DIR/laptop-dynamic.out" 2>"$TMP_DIR/laptop-dynamic.err"
 grep -Fqx 'laptop,' "$OVPN_DATA_DIR/data/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/ccd/laptop"
 env -u OVPN_EDITOR -u EDITOR \
   OVPN_TEST_EDITOR_LOG="$TMP_DIR/editor.log" \
   PATH="$FAKE_BIN:$PATH" \
-  "$OVPN" client set-static laptop phone >"$TMP_DIR/batch-static.out" 2>"$TMP_DIR/batch-static.err"
+  "$OVPN" client ip set-static laptop phone >"$TMP_DIR/batch-static.out" 2>"$TMP_DIR/batch-static.err"
 grep -Eq '^nano:\.client-static\.' "$TMP_DIR/editor.log"
 grep -Fqx 'laptop,10.88.0.2' "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/laptop"
@@ -316,13 +316,13 @@ if grep -Fq 'unrelated' "$TMP_DIR/client-list-ip.out"; then
   exit 1
 fi
 grep -Fqx 'laptop active' <("$OVPN" client list)
-grep -Fqx "$(format_client_list_row online active dynamic 10.88.0.200 connected online)" <("$OVPN" list-clients --ip)
+grep -Fqx "$(format_client_list_row online active dynamic 10.88.0.200 connected online)" <("$OVPN" client list --ip)
 rm -f "$OVPN_MANAGEMENT_SOCKET"
 "$OVPN" client list --ip >"$TMP_DIR/client-list-ip-unknown.out"
 grep -Fqx "$(format_client_list_row laptop active static 10.88.0.2 configured unknown)" "$TMP_DIR/client-list-ip-unknown.out"
 grep -Fqx "$(format_client_list_row online active dynamic 10.88.0.201 last-known unknown)" "$TMP_DIR/client-list-ip-unknown.out"
 
-"$OVPN" export-client laptop >"$TMP_DIR/laptop.ovpn" 2>"$TMP_DIR/export.err"
+"$OVPN" client export laptop >"$TMP_DIR/laptop.ovpn" 2>"$TMP_DIR/export.err"
 test ! -s "$TMP_DIR/export.err"
 grep -q '^remote vpn.example.test 1194$' "$TMP_DIR/laptop.ovpn"
 grep -q 'FAKE CLIENT CERT laptop' "$TMP_DIR/laptop.ovpn"
@@ -338,24 +338,24 @@ OVPN_ENDPOINT=changed.example.test \
   OVPN_CLIENT_TO_CLIENT=false \
   OVPN_DNS='' \
   OVPN_ROUTES='' \
-  "$OVPN" config init
-"$OVPN" export-client laptop >"$TMP_DIR/laptop-updated.ovpn" 2>"$TMP_DIR/export-updated.err"
+  "$OVPN" config apply
+"$OVPN" client export laptop >"$TMP_DIR/laptop-updated.ovpn" 2>"$TMP_DIR/export-updated.err"
 test ! -s "$TMP_DIR/export-updated.err"
 grep -q '^remote changed.example.test 443$' "$TMP_DIR/laptop-updated.ovpn"
 grep -q '^proto tcp$' "$TMP_DIR/laptop-updated.ovpn"
 cmp "$TMP_DIR/laptop-updated.ovpn" "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 
 rm "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
-if "$OVPN" export-client laptop >"$TMP_DIR/missing-profile-export.out" 2>"$TMP_DIR/missing-profile-export.err"; then
+if "$OVPN" client export laptop >"$TMP_DIR/missing-profile-export.out" 2>"$TMP_DIR/missing-profile-export.err"; then
   echo 'missing profile export unexpectedly succeeded' >&2
   exit 1
 fi
 grep -q 'DEGRADED_REPAIRABLE' "$TMP_DIR/missing-profile-export.err"
-"$OVPN" repair >"$TMP_DIR/missing-profile-repair.out" 2>"$TMP_DIR/missing-profile-repair.err"
+"$OVPN" repair apply >"$TMP_DIR/missing-profile-repair.out" 2>"$TMP_DIR/missing-profile-repair.err"
 grep -q '^remote changed.example.test 443$' "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 grep -q '^proto tcp$' "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 
-if "$OVPN" add-client laptop >"$TMP_DIR/duplicate.out" 2>"$TMP_DIR/duplicate.err"; then
+if "$OVPN" client create laptop >"$TMP_DIR/duplicate.out" 2>"$TMP_DIR/duplicate.err"; then
   echo 'duplicate add-client unexpectedly succeeded' >&2
   exit 1
 fi
@@ -404,8 +404,8 @@ if "$OVPN" client release-ip laptop >"$TMP_DIR/active-release-ip.out" 2>"$TMP_DI
 fi
 grep -Fq "is not revoked" "$TMP_DIR/active-release-ip.err"
 
-"$OVPN" revoke-client laptop >"$TMP_DIR/revoke.out" 2>"$TMP_DIR/revoke.err"
-grep -q "^laptop revoked$" <("$OVPN" list-clients)
+"$OVPN" client revoke laptop >"$TMP_DIR/revoke.out" 2>"$TMP_DIR/revoke.err"
+grep -q "^laptop revoked$" <("$OVPN" client list)
 grep -Fqx "laptop,10.88.0.2" "$OVPN_DATA_DIR/data/client-ip.csv"
 test -f "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
 test ! -e "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
@@ -423,7 +423,7 @@ if "$OVPN" client release-ip laptop >"$TMP_DIR/repeated-release-ip.out" 2>"$TMP_
 fi
 grep -Fq "does not have a static IP reservation" "$TMP_DIR/repeated-release-ip.err"
 
-if "$OVPN" export-client laptop >"$TMP_DIR/revoked-export.out" 2>"$TMP_DIR/revoked-export.err"; then
+if "$OVPN" client export laptop >"$TMP_DIR/revoked-export.out" 2>"$TMP_DIR/revoked-export.err"; then
   echo "revoked client export unexpectedly succeeded" >&2
   exit 1
 fi

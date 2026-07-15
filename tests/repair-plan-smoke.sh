@@ -37,7 +37,7 @@ repairable="$TMP_DIR/repairable"
 make_healthy "$repairable"
 rm "$repairable/config/schema-version" "$repairable/meta/instance.json" "$repairable/server/server.conf" "$repairable/pki/crl.pem"
 before="$(snapshot "$repairable")"
-OVPN_DATA_DIR="$repairable" "$OVPN" repair --plan --json >"$TMP_DIR/repairable.json" 2>"$TMP_DIR/repairable.err"
+OVPN_DATA_DIR="$repairable" "$OVPN" repair plan --json >"$TMP_DIR/repairable.json" 2>"$TMP_DIR/repairable.err"
 after="$(snapshot "$repairable")"
 [ "$before" = "$after" ] || {
   echo 'repair plan modified a repairable fixture' >&2
@@ -75,7 +75,7 @@ printf '{\n  "ca_fingerprint_sha256": "FAKE:CA:FINGERPRINT"\n}\n' >"$recoverable
 mkdir -p "$recoverable/clients/active"
 printf '%s\n' '<ca>' 'FAKE CA CERT' '</ca>' >"$recoverable/clients/active/laptop.ovpn"
 rm "$recoverable/pki/ca.crt"
-OVPN_DATA_DIR="$recoverable" "$OVPN" repair --plan --json >"$TMP_DIR/recoverable.json"
+OVPN_DATA_DIR="$recoverable" "$OVPN" repair plan --json >"$TMP_DIR/recoverable.json"
 grep -Fq '"id": "RECOVER_CA_CERT"' "$TMP_DIR/recoverable.json"
 grep -Fq '"kind": "recover"' "$TMP_DIR/recoverable.json"
 
@@ -83,12 +83,12 @@ reissuable="$TMP_DIR/reissuable"
 cp -a "$recoverable" "$reissuable"
 : >"$reissuable/pki/ca.crt"
 rm "$reissuable/pki/issued/$OVPN_SERVER_NAME.crt"
-OVPN_DATA_DIR="$reissuable" "$OVPN" repair --plan --json >"$TMP_DIR/reissuable.json"
+OVPN_DATA_DIR="$reissuable" "$OVPN" repair plan --json >"$TMP_DIR/reissuable.json"
 grep -Fq '"id": "SERVER_CERT_MISSING"' "$TMP_DIR/reissuable.json"
 grep -Fq '"severity": "reissuable"' "$TMP_DIR/reissuable.json"
 
 set +e
-OVPN_DATA_DIR="$critical" "$OVPN" repair --plan >"$TMP_DIR/critical.txt" 2>"$TMP_DIR/critical.err"
+OVPN_DATA_DIR="$critical" "$OVPN" repair plan >"$TMP_DIR/critical.txt" 2>"$TMP_DIR/critical.err"
 exit_code=$?
 set -e
 after="$(snapshot "$critical")"
@@ -102,7 +102,7 @@ fi
 }
 grep -Fq '[BLOCKED] PKI_INDEX_MISSING' "$TMP_DIR/critical.txt"
 set +e
-OVPN_DATA_DIR="$critical" "$OVPN" repair >"$TMP_DIR/critical-repair.out" 2>"$TMP_DIR/critical-repair.err"
+OVPN_DATA_DIR="$critical" "$OVPN" repair apply >"$TMP_DIR/critical-repair.out" 2>"$TMP_DIR/critical-repair.err"
 exit_code=$?
 set -e
 if [ "$exit_code" -ne 78 ]; then
@@ -115,13 +115,13 @@ fi
 }
 
 set +e
-OVPN_DATA_DIR="$repairable" "$OVPN" repair --unsupported >"$TMP_DIR/usage.out" 2>"$TMP_DIR/usage.err"
+OVPN_DATA_DIR="$repairable" "$OVPN" repair apply --unsupported >"$TMP_DIR/usage.out" 2>"$TMP_DIR/usage.err"
 exit_code=$?
 set -e
 if [ "$exit_code" -ne 64 ]; then
   echo "repair with an unsupported argument returned $exit_code instead of 64" >&2
   exit 1
 fi
-grep -Fq 'usage: ovpn repair --plan [--json]' "$TMP_DIR/usage.err"
+grep -Fq 'usage: ovpn repair apply' "$TMP_DIR/usage.err"
 
 printf 'repair plan smoke passed\n'

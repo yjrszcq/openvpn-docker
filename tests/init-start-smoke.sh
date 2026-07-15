@@ -89,13 +89,13 @@ export OVPN_EASYRSA_BIN="$FAKE_BIN/easyrsa"
 export OVPN_OPENVPN_BIN="$FAKE_BIN/openvpn"
 export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
 
-if [ "$("$OVPN" state)" != EMPTY ]; then
+if [ "$("$OVPN" state show)" != EMPTY ]; then
   echo 'fresh data dir should be EMPTY' >&2
   exit 1
 fi
 
 "$OVPN" start >"$TMP_DIR/empty-start.out" 2>"$TMP_DIR/empty-start.err"
-if [ "$("$OVPN" state)" != HEALTHY ]; then
+if [ "$("$OVPN" state show)" != HEALTHY ]; then
   echo 'auto-initialized data dir should be HEALTHY' >&2
   exit 1
 fi
@@ -106,7 +106,7 @@ grep -q 'vpn.example.test' "$OVPN_DATA_DIR/config/project.env"
 grep -q '^server 10.88.0.0 255.255.255.0 nopool$' "$OVPN_DATA_DIR/server/server.conf"
 rm "$OVPN_DATA_DIR/server/server.conf"
 "$OVPN" start >"$TMP_DIR/auto-repair-start.out" 2>"$TMP_DIR/auto-repair-start.err"
-if [ "$("$OVPN" state)" != HEALTHY ]; then
+if [ "$("$OVPN" state show)" != HEALTHY ]; then
   echo 'repairable start did not restore HEALTHY state' >&2
   exit 1
 fi
@@ -123,7 +123,7 @@ if [ "$status" -eq 0 ]; then
   exit 1
 fi
 grep -q 'OVPN_ENDPOINT must be a hostname or IP address' "$TMP_DIR/missing-endpoint.err"
-if [ "$("$OVPN" state)" != EMPTY ]; then
+if [ "$("$OVPN" state show)" != EMPTY ]; then
   echo 'missing endpoint left non-empty data' >&2
   exit 1
 fi
@@ -198,7 +198,7 @@ if [ "$build_ca_count" -ne 1 ]; then
   echo "concurrent starts created $build_ca_count certificate authorities" >&2
   exit 1
 fi
-if [ "$("$OVPN" state)" != HEALTHY ]; then
+if [ "$("$OVPN" state show)" != HEALTHY ]; then
   echo 'concurrent starts did not leave a HEALTHY data directory' >&2
   exit 1
 fi

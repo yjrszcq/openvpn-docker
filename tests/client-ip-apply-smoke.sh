@@ -17,7 +17,7 @@ export OVPN_POOL_PERSIST_FILE="$TMP_DIR/leases/pool-persist.txt"
 export OVPN_ENDPOINT="vpn.example.test"
 export OVPN_NETWORK="10.88.0.0/24"
 
-"$OVPN" config init
+"$OVPN" config apply
 mkdir -p "$OVPN_DATA_DIR/data" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/pki"
 printf '%s\n' \
   $'V\t30000101000000Z\t\t01\tunknown\t/CN=alpha' \
@@ -45,7 +45,7 @@ unrelated,10.88.0.202
 EOF
 
 before_validate="$(sha256sum "$OVPN_DATA_DIR/data/client-ip.csv")"
-"$OVPN" client-ip validate >"$TMP_DIR/validate.out"
+"$OVPN" client ip validate >"$TMP_DIR/validate.out"
 grep -Fqx 'client-ip registry draft is valid' "$TMP_DIR/validate.out"
 after_validate="$(sha256sum "$OVPN_DATA_DIR/data/client-ip.csv")"
 [ "$before_validate" = "$after_validate" ] || {
@@ -53,7 +53,7 @@ after_validate="$(sha256sum "$OVPN_DATA_DIR/data/client-ip.csv")"
   exit 1
 }
 
-"$OVPN" client-ip apply >"$TMP_DIR/apply.out"
+"$OVPN" client ip apply >"$TMP_DIR/apply.out"
 grep -Fqx 'client-ip registry applied' "$TMP_DIR/apply.out"
 cat >"$TMP_DIR/expected.csv" <<'EOF'
 # client,ip
@@ -74,7 +74,7 @@ alpha,10.88.0.3
 bravo,10.88.0.3
 zulu,
 EOF
-if "$OVPN" client-ip apply >"$TMP_DIR/rejected.out" 2>"$TMP_DIR/rejected.err"; then
+if "$OVPN" client ip apply >"$TMP_DIR/rejected.out" 2>"$TMP_DIR/rejected.err"; then
   echo 'duplicate-IP draft unexpectedly applied' >&2
   exit 1
 fi
@@ -93,7 +93,7 @@ zulu,
 alpha,10.88.0.4
 bravo,10.88.0.3
 EOF
-"$OVPN" client-ip sync >"$TMP_DIR/sync.out"
+"$OVPN" client ip apply >"$TMP_DIR/sync.out"
 cmp "$TMP_DIR/expected.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
 
 cat >"$OVPN_DATA_DIR/data/client-ip.csv" <<'EOF'
@@ -102,7 +102,7 @@ alpha,10.88.0.128
 bravo,10.88.0.2
 zulu,
 EOF
-"$OVPN" client-ip apply >"$TMP_DIR/boundary.out"
+"$OVPN" client ip apply >"$TMP_DIR/boundary.out"
 cat >"$TMP_DIR/boundary.csv" <<'EOF'
 # client,ip
 bravo,10.88.0.2
@@ -117,7 +117,7 @@ alpha,10.88.0.129
 bravo,10.88.0.2
 zulu,
 EOF
-if "$OVPN" client-ip apply >"$TMP_DIR/pool-overlap.out" 2>"$TMP_DIR/pool-overlap.err"; then
+if "$OVPN" client ip apply >"$TMP_DIR/pool-overlap.out" 2>"$TMP_DIR/pool-overlap.err"; then
   echo 'dynamic-pool IP draft unexpectedly applied' >&2
   exit 1
 fi
@@ -130,7 +130,7 @@ alpha,
 bravo,10.88.0.2
 zulu,
 EOF
-"$OVPN" client-ip apply >"$TMP_DIR/dynamic.out"
+"$OVPN" client ip apply >"$TMP_DIR/dynamic.out"
 cat >"$TMP_DIR/dynamic.csv" <<'EOF'
 # client,ip
 bravo,10.88.0.2
@@ -156,7 +156,7 @@ alpha,10.88.0.128
 bravo,
 zulu,
 EOF
-if OVPN_CLIENT_IP_APPLY_FAIL_AFTER=ccd "$OVPN" client-ip apply >"$TMP_DIR/derived-failure.out" 2>"$TMP_DIR/derived-failure.err"; then
+if OVPN_CLIENT_IP_APPLY_FAIL_AFTER=ccd "$OVPN" client ip apply >"$TMP_DIR/derived-failure.out" 2>"$TMP_DIR/derived-failure.err"; then
   echo 'injected derived-state failure unexpectedly applied' >&2
   exit 1
 fi

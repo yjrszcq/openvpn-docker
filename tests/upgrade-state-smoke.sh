@@ -61,7 +61,7 @@ docker run --rm \
   "$SOURCE_IMAGE" \
   ovpn init >"$WORK_DIR/source-init.out" 2>"$WORK_DIR/source-init.err"
 
-test "$(docker run --rm -v "$data_dir:/etc/openvpn" "$TARGET_IMAGE" ovpn state)" = HEALTHY
+test "$(docker run --rm -v "$data_dir:/etc/openvpn" "$TARGET_IMAGE" ovpn state show)" = HEALTHY
 
 auto_start_log="$WORK_DIR/target-start.log"
 set +e

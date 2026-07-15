@@ -520,7 +520,13 @@ ovpn_repair_command() {
   shift
   case "$operation" in
     plan) ovpn_repair_plan_command "$@" ;;
-    apply) [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn repair apply'; ovpn_with_data_lock repair ovpn_repair_apply_inner ;;
+    apply)
+      [ "$#" -eq 0 ] || {
+        ovpn_log 'usage: ovpn repair apply'
+        exit 64
+      }
+      ovpn_with_data_lock repair ovpn_repair_apply_inner
+      ;;
     *) ovpn_die 'usage: ovpn repair <plan|apply> [--json]' ;;
   esac
 }

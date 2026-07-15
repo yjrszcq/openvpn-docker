@@ -35,7 +35,7 @@ snapshot() {
 healthy="$TMP_DIR/healthy"
 make_healthy "$healthy"
 before="$(snapshot "$healthy")"
-OVPN_DATA_DIR="$healthy" "$OVPN" doctor --json >"$TMP_DIR/healthy.json" 2>"$TMP_DIR/healthy.err"
+OVPN_DATA_DIR="$healthy" "$OVPN" state doctor --json >"$TMP_DIR/healthy.json" 2>"$TMP_DIR/healthy.err"
 after="$(snapshot "$healthy")"
 [ "$before" = "$after" ] || {
   echo 'doctor modified a healthy fixture' >&2
@@ -47,7 +47,7 @@ after="$(snapshot "$healthy")"
 }
 grep -Fq '"state": "HEALTHY"' "$TMP_DIR/healthy.json"
 grep -Fq '"issues": [' "$TMP_DIR/healthy.json"
-OVPN_DATA_DIR="$healthy" "$OVPN" doctor >"$TMP_DIR/healthy.txt"
+OVPN_DATA_DIR="$healthy" "$OVPN" state doctor >"$TMP_DIR/healthy.txt"
 grep -Fxq 'State: HEALTHY' "$TMP_DIR/healthy.txt"
 grep -Fxq 'Issues: none' "$TMP_DIR/healthy.txt"
 
@@ -74,7 +74,7 @@ mkdir -p "$pending/clients/active"
 : >"$pending/clients/active/applied.ovpn"
 chmod 600 "$pending/data/client-ip.csv" "$pending/meta/client-ip.applied.csv" "$pending/meta/client-state.csv" "$pending/meta/audit.jsonl"
 before="$(snapshot "$pending")"
-OVPN_DATA_DIR="$pending" "$OVPN" doctor >"$TMP_DIR/pending.txt" 2>"$TMP_DIR/pending.err"
+OVPN_DATA_DIR="$pending" "$OVPN" state doctor >"$TMP_DIR/pending.txt" 2>"$TMP_DIR/pending.err"
 after="$(snapshot "$pending")"
 [ "$before" = "$after" ] || {
   echo 'doctor adopted a pending client-IP draft' >&2
@@ -83,14 +83,14 @@ after="$(snapshot "$pending")"
 [ ! -s "$TMP_DIR/pending.err" ]
 grep -Fxq 'State: HEALTHY' "$TMP_DIR/pending.txt"
 grep -Fq 'client-IP draft is waiting for explicit application' "$TMP_DIR/pending.txt"
-grep -Fq 'ovpn client-ip apply' "$TMP_DIR/pending.txt"
+grep -Fq 'ovpn client ip apply' "$TMP_DIR/pending.txt"
 
 critical="$TMP_DIR/critical"
 cp -a "$healthy" "$critical"
 rm "$critical/pki/index.txt"
 before="$(snapshot "$critical")"
 set +e
-OVPN_DATA_DIR="$critical" "$OVPN" doctor --json >"$TMP_DIR/critical.json" 2>"$TMP_DIR/critical.err"
+OVPN_DATA_DIR="$critical" "$OVPN" state doctor --json >"$TMP_DIR/critical.json" 2>"$TMP_DIR/critical.err"
 status=$?
 set -e
 after="$(snapshot "$critical")"
@@ -116,7 +116,7 @@ cp -a "$healthy" "$quoted"
 printf 'V\t9999\t\t/CN=bad"client\n' >"$quoted/pki/index.txt"
 : >"$quoted/pki/issued/bad\"client.crt"
 : >"$quoted/pki/private/bad\"client.key"
-OVPN_DATA_DIR="$quoted" "$OVPN" doctor --json >"$TMP_DIR/quoted.json"
+OVPN_DATA_DIR="$quoted" "$OVPN" state doctor --json >"$TMP_DIR/quoted.json"
 grep -Fq '"id": "CLIENT_PROFILE_MISSING_bad\"client"' "$TMP_DIR/quoted.json"
 
 printf 'doctor smoke passed\n'

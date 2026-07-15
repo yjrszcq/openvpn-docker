@@ -98,7 +98,7 @@ render_case() {
     OVPN_ROUTES="$routes" \
     OVPN_DNS="$dns" \
     OVPN_CLIENT_TO_CLIENT="$client_to_client" \
-    "$OVPN" config init
+    "$OVPN" config apply
   OVPN_DATA_DIR="$data_dir" "$OVPN" render server --stdout >"$server_config"
 
   assert_present "$data_dir/config/project.env" "OVPN_NAT=$nat"
@@ -146,7 +146,7 @@ assert_rejected() {
   local status
 
   set +e
-  env   OVPN_DATA_DIR="$data_dir" "$@" "$OVPN" config init >"$TMP_DIR/$name.out" 2>"$TMP_DIR/$name.err"
+  env   OVPN_DATA_DIR="$data_dir" "$@" "$OVPN" config apply >"$TMP_DIR/$name.out" 2>"$TMP_DIR/$name.err"
   status=$?
   set -e
   [ "$status" -eq 1 ]

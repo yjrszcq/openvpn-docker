@@ -46,7 +46,7 @@ if grep -Fq 'not found' <<<"$ldd_output"; then
   exit 1
 fi
 
-metadata="$(docker run --rm --entrypoint ovpn "$IMAGE" version)"
+metadata="$(docker run --rm --entrypoint ovpn "$IMAGE" runtime version)"
 grep -Fq '"runtime_strategy": "source-build"' <<<"$metadata"
 grep -Fq "\"openvpn_version\": \"$OPENVPN_VERSION\"" <<<"$metadata"
 grep -Fq "\"openvpn_source_version\": \"$OPENVPN_VERSION\"" <<<"$metadata"

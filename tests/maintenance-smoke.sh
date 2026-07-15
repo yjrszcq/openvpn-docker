@@ -45,9 +45,9 @@ OVPN_DATA_DIR="$critical" OVPN_RUNTIME_DIR="$runtime_dir" OVPN_CRITICAL_MODE=exi
 status=$?
 set -e
 [ "$status" -eq 78 ]
-grep -Fq 'recommended: docker compose run --rm openvpn-maintenance doctor' "$TMP_DIR/exit.err"
+grep -Fq 'recommended: docker compose run --rm openvpn-maintenance state doctor' "$TMP_DIR/exit.err"
 
-OVPN_DATA_DIR="$critical" OVPN_RUNTIME_DIR="$runtime_dir" "$OVPN" status >"$TMP_DIR/fallback-status.json"
+OVPN_DATA_DIR="$critical" OVPN_RUNTIME_DIR="$runtime_dir" "$OVPN" runtime status >"$TMP_DIR/fallback-status.json"
 grep -Fq '"instance_state": "CRITICAL"' "$TMP_DIR/fallback-status.json"
 grep -Fq '"daemon": "unknown"' "$TMP_DIR/fallback-status.json"
 
@@ -65,12 +65,12 @@ for _ in $(seq 1 30); do
   sleep 0.1
 done
 [ -f "$runtime_dir/state.json" ]
-OVPN_DATA_DIR="$critical" OVPN_RUNTIME_DIR="$runtime_dir" "$OVPN" status >"$TMP_DIR/maintenance-status.json"
+OVPN_DATA_DIR="$critical" OVPN_RUNTIME_DIR="$runtime_dir" "$OVPN" runtime status >"$TMP_DIR/maintenance-status.json"
 grep -Fq '"instance_state": "CRITICAL"' "$TMP_DIR/maintenance-status.json"
 grep -Fq '"daemon": "stopped"' "$TMP_DIR/maintenance-status.json"
 grep -Fq '"maintenance": true' "$TMP_DIR/maintenance-status.json"
 set +e
-OVPN_DATA_DIR="$critical" OVPN_RUNTIME_DIR="$runtime_dir" "$OVPN" healthcheck >"$TMP_DIR/health.out" 2>"$TMP_DIR/health.err"
+OVPN_DATA_DIR="$critical" OVPN_RUNTIME_DIR="$runtime_dir" "$OVPN" runtime health >"$TMP_DIR/health.out" 2>"$TMP_DIR/health.err"
 status=$?
 set -e
 [ "$status" -eq 1 ]
