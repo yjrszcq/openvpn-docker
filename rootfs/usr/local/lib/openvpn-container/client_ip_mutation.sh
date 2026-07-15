@@ -257,7 +257,7 @@ ovpn_client_set_dynamic_command() {
 
 ovpn_client_editor() {
   local file="$1"
-  local editor="${OVPN_EDITOR:-${EDITOR:-vi}}"
+  local editor="${OVPN_EDITOR:-${EDITOR:-nano}}"
 
   case "$editor" in
     *[[:space:]]*) ovpn_die 'OVPN_EDITOR must be a single executable path' ;;

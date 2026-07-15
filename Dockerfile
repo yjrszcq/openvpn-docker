@@ -67,11 +67,13 @@ RUN apt-get update \
         easy-rsa \
         iproute2 \
         iptables \
+        nano \
         openssl \
         procps \
         tini \
         socat \
         util-linux \
+        vim \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /out/ /

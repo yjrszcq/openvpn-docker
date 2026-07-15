@@ -278,7 +278,7 @@ ovpn_client_ip_edit_command() {
 
   draft="$(ovpn_registry_client_ip_file)"
   [ -e "$draft" ] || ovpn_die "registry draft does not exist: $draft"
-  editor="${OVPN_EDITOR:-${EDITOR:-vi}}"
+  editor="${OVPN_EDITOR:-${EDITOR:-nano}}"
   case "$editor" in
     *[[:space:]]*) ovpn_die 'OVPN_EDITOR must be a single executable path' ;;
   esac

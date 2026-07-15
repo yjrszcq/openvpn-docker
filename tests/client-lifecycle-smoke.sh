@@ -123,6 +123,13 @@ printf 'END\r\n'
 FAKE_SOCAT
 chmod +x "$FAKE_BIN/socat"
 
+cat >"$FAKE_BIN/nano" <<'FAKE_NANO'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'nano:%s\n' "${1##*/}" >>"${OVPN_TEST_EDITOR_LOG:?}"
+FAKE_NANO
+chmod +x "$FAKE_BIN/nano"
+
 export OVPN_LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
 export OVPN_TEMPLATE_ROOT="$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates"
 export OVPN_COMPATIBILITY_DIR="$ROOT_DIR/compatibility"
@@ -138,6 +145,11 @@ export OVPN_OPENVPN_BIN="$FAKE_BIN/openvpn"
 export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
 
 "$OVPN" init >/tmp/ovpn-client-init.out 2>/tmp/ovpn-client-init.err
+env -u OVPN_EDITOR -u EDITOR \
+  OVPN_TEST_EDITOR_LOG="$TMP_DIR/editor.log" \
+  PATH="$FAKE_BIN:$PATH" \
+  "$OVPN" client-ip edit >"$TMP_DIR/client-ip-edit.out" 2>"$TMP_DIR/client-ip-edit.err"
+grep -Fqx 'nano:client-ip.csv' "$TMP_DIR/editor.log"
 "$OVPN" add-client laptop >/tmp/ovpn-add-client.out 2>/tmp/ovpn-add-client.err
 
 repair_snapshot() {
@@ -261,7 +273,11 @@ grep -Fqx 'ifconfig-push 10.88.0.20 255.255.255.0' "$OVPN_DATA_DIR/ccd/phone"
 "$OVPN" client set-dynamic laptop >"$TMP_DIR/laptop-dynamic.out" 2>"$TMP_DIR/laptop-dynamic.err"
 grep -Fqx 'laptop,' "$OVPN_DATA_DIR/data/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/ccd/laptop"
-OVPN_EDITOR=true "$OVPN" client set-static laptop phone >"$TMP_DIR/batch-static.out" 2>"$TMP_DIR/batch-static.err"
+env -u OVPN_EDITOR -u EDITOR \
+  OVPN_TEST_EDITOR_LOG="$TMP_DIR/editor.log" \
+  PATH="$FAKE_BIN:$PATH" \
+  "$OVPN" client set-static laptop phone >"$TMP_DIR/batch-static.out" 2>"$TMP_DIR/batch-static.err"
+grep -Eq '^nano:\.client-static\.' "$TMP_DIR/editor.log"
 grep -Fqx 'laptop,10.88.0.2' "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/laptop"
 

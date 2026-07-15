@@ -254,10 +254,21 @@ docker compose exec openvpn ovpn client set-static phone --ip 10.42.0.20
 重复指定其已有地址是允许的。要明确修改已有静态地址时应指定 `--ip`；省略它表示自动
 分配，可能选择另一个空闲地址。
 
-传入多个名称，或使用 `client set-static --all` 时，会通过配置的 `OVPN_EDITOR`
-（或 `EDITOR`）打开临时 `client,ip` 清单。填入 `auto` 表示分配最小可用静态地址，
-填入具体值表示指定静态 IP。对指定名称的批量修改，留空表示保持动态；`--all` 不允许
-留下空 IP。
+传入多个名称，或使用 `client set-static --all` 时，`OVPN_EDITOR`（或 `EDITOR`；
+默认 `nano`）会打开临时 `client,ip` 清单。可在 OpenVPN 服务的 Docker Compose
+`environment` 中设置 `OVPN_EDITOR`（例如 `OVPN_EDITOR=vim`），使
+`docker compose exec` 命令始终使用该选择。编辑器中的每一行均为 `client,ip`：
+
+~~~text
+# client,ip
+phone,auto
+tablet,10.42.0.20
+laptop,
+~~~
+
+`auto` 表示分配最小可用静态地址；填入具体值表示指定静态 IP。对指定名称的批量修改，
+留空表示保持动态；`--all` 不允许留下空 IP。镜像已预装 `nano` 和 `vim`
+（也可使用 `vi`）供此编辑器选择使用。
 
 所有标准客户端分配命令都会在一个事务中立即应用变更，无需在其后再执行
 `client-ip apply`。静态变更成功后会立刻更新清单快照和 CCD；如果 OpenVPN 管理 socket
@@ -274,7 +285,7 @@ docker compose exec openvpn ovpn client-ip apply
 validate 只读。apply 会在共享锁内校验 client 身份、重复或越界地址、静态区与动态池隔离、
 容量和 PKI 状态。成功时按静态 IP 数值、动态 CN 字典序排序，重建 CCD，清理受影响动态
 租约，并通过本地 root-only 管理 socket 踢出受影响在线 client。被拒绝或事务中途失败时，
-草稿会从已应用快照精确恢复。client-ip sync 是 apply 的兼容别名；client-ip edit 只打开草稿。
+草稿会从已应用快照精确恢复。client-ip sync 是 apply 的兼容别名；client-ip edit 使用相同的编辑器选择打开草稿。
 
 存在未应用直接编辑时，启动和自动 repair 绝不会采用它；doctor 会报告等待显式应用。
 

@@ -308,11 +308,23 @@ When deliberately changing an existing static assignment, specify `--ip`;
 omitting it requests automatic allocation and may select a different free
 address.
 
-For multiple names, or `client set-static --all`, the configured
-`OVPN_EDITOR` (or `EDITOR`) opens a temporary `client,ip` list. Enter
-`auto` to allocate the lowest unused static address or an explicit static IP.
-An empty IP keeps a selected client dynamic when changing named clients;
-`--all` rejects empty IPs.
+For multiple names, or `client set-static --all`, `OVPN_EDITOR` (or
+`EDITOR`, defaulting to `nano`) opens a temporary `client,ip` list. Set
+`OVPN_EDITOR` in the OpenVPN service's Docker Compose `environment` (for
+example, `OVPN_EDITOR=vim`) to select it consistently for `docker compose exec`
+commands. The editor contains `client,ip` rows:
+
+~~~text
+# client,ip
+phone,auto
+tablet,10.42.0.20
+laptop,
+~~~
+
+`auto` allocates the lowest unused static address; an explicit value requests
+that static IP. An empty IP keeps a selected client dynamic when changing named
+clients; `--all` rejects empty IPs. The image includes both `nano` and `vim`
+(also available as `vi`) for this editor selection.
 
 All standard client-assignment commands apply their changes as one transaction;
 they do not need `client-ip apply` afterward. A successful static change
@@ -337,7 +349,7 @@ entries by client name, regenerates CCD, clears affected dynamic leases, and
 disconnects affected online clients through the local root-only management
 socket. On rejection or a later transaction failure it restores the draft
 exactly from the applied snapshot. client-ip sync remains an alias for apply;
-client-ip edit only opens the draft.
+client-ip edit only opens the draft with the same editor selection.
 
 A pending direct edit is never started or repaired automatically. doctor reports
 it as waiting for explicit application.
