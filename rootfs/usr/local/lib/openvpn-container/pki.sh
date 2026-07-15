@@ -70,10 +70,3 @@ ovpn_pki_issue_client() {
   chmod 600 "$OVPN_DATA_DIR/pki/private/$name.key"
 }
 
-ovpn_pki_revoke_client() {
-  local name="$1"
-  ovpn_run_easyrsa revoke "$name"
-  ovpn_pki_generate_crl
-  [ -s "$OVPN_DATA_DIR/pki/crl.pem" ] || ovpn_die "Easy-RSA did not refresh CRL"
-  chmod 644 "$OVPN_DATA_DIR/pki/crl.pem"
-}

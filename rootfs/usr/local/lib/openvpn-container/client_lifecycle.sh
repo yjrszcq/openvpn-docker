@@ -170,10 +170,6 @@ ovpn_client_list_command() {
   esac
 }
 
-ovpn_list_clients_command() {
-  ovpn_client_list_command "$@"
-}
-
 ovpn_pki_try_revoke_client() {
   local name="$1"
   local bin
@@ -190,6 +186,7 @@ ovpn_pki_try_issue_client() {
   local bin
 
   bin="$(ovpn_easyrsa_bin)" || return 1
+  rm -f "$OVPN_DATA_DIR/pki/reqs/$name.req" "$OVPN_DATA_DIR/pki/private/$name.key"
   EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" EASYRSA_REQ_CN="$name" "$bin" build-client-full "$name" nopass
   [ -r "$OVPN_DATA_DIR/pki/issued/$name.crt" ] || return 1
   [ -r "$OVPN_DATA_DIR/pki/private/$name.key" ] || return 1
@@ -215,6 +212,7 @@ ovpn_pki_reissue_supported() {
     fi
   fi
   if [ "$status" -eq 0 ]; then
+    rm -f "$probe/pki/reqs/$name.req" "$probe/pki/private/$name.key"
     EASYRSA_BATCH=1 EASYRSA_PKI="$probe/pki" EASYRSA_REQ_CN="$name" "$bin" build-client-full "$name" nopass >/dev/null 2>&1 || status=1
   fi
   [ -r "$probe/pki/issued/$name.crt" ] && [ -r "$probe/pki/private/$name.key" ] || status=1

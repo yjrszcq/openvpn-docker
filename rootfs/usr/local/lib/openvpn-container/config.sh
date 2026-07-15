@@ -253,6 +253,24 @@ EOF
 ovpn_config_write() {
   ovpn_config_normalize_bootstrap
   ovpn_config_write_loaded
+  ovpn_config_regenerate_derived
+}
+
+ovpn_config_regenerate_derived() {
+  local name status output_path client_ip_csv
+
+  [ -r "$OVPN_DATA_DIR/pki/index.txt" ] || return 0
+
+  ovpn_render_server --output "$OVPN_DATA_DIR/server/server.conf" || return 1
+
+  client_ip_csv="$OVPN_DATA_DIR/data/client-ip.csv"
+  ovpn_client_ip_collect_pki_clients || return 1
+  for name in $(tail -n +2 "$client_ip_csv" 2>/dev/null | cut -d, -f1); do
+    [ -n "$name" ] || continue
+    status="${OVPN_CLIENT_IP_PKI_STATES[$name]:-}"
+    [ "$status" = active ] || continue
+    ovpn_render_client "$name" --output "$OVPN_DATA_DIR/clients/active/$name.ovpn" || return 1
+  done
 }
 
 
