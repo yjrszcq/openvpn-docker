@@ -134,18 +134,6 @@ export OVPN_EASYRSA_BIN="$FAKE_BIN/easyrsa"
 export OVPN_OPENVPN_BIN="$FAKE_BIN/openvpn"
 export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
 
-mkdir -p "$OVPN_RUNTIME_DIR"
-nc -lU "$OVPN_MANAGEMENT_SOCKET" >/dev/null 2>&1 &
-SOCKET_LISTENER_PID=$!
-for attempt in {1..20}; do
-  [ -S "$OVPN_MANAGEMENT_SOCKET" ] && break
-  sleep 0.1
-done
-[ -S "$OVPN_MANAGEMENT_SOCKET" ] || {
-  echo 'failed to create a UNIX management socket fixture' >&2
-  exit 1
-}
-
 "$OVPN" init >/tmp/ovpn-client-init.out 2>/tmp/ovpn-client-init.err
 "$OVPN" add-client laptop >/tmp/ovpn-add-client.out 2>/tmp/ovpn-add-client.err
 
@@ -273,6 +261,18 @@ test ! -e "$OVPN_DATA_DIR/ccd/laptop"
 OVPN_EDITOR=true "$OVPN" client set-static laptop phone >"$TMP_DIR/batch-static.out" 2>"$TMP_DIR/batch-static.err"
 grep -Fqx 'laptop,10.88.0.2' "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/laptop"
+
+mkdir -p "$OVPN_RUNTIME_DIR"
+nc -lU "$OVPN_MANAGEMENT_SOCKET" >/dev/null 2>&1 &
+SOCKET_LISTENER_PID=$!
+for attempt in {1..20}; do
+  [ -S "$OVPN_MANAGEMENT_SOCKET" ] && break
+  sleep 0.1
+done
+[ -S "$OVPN_MANAGEMENT_SOCKET" ] || {
+  echo 'failed to create a UNIX management socket fixture' >&2
+  exit 1
+}
 
 "$OVPN" client create old --ip 10.88.0.30 >"$TMP_DIR/old-create.out" 2>"$TMP_DIR/old-create.err"
 "$OVPN" client revoke old >"$TMP_DIR/old-revoke.out" 2>"$TMP_DIR/old-revoke.err"
