@@ -149,22 +149,6 @@ laptop,                  # leave empty to keep dynamic
 Editor selection order: `OVPN_EDITOR` > `EDITOR` > `nano`. The image ships
 `nano` and `vim`.
 
-### Direct registry editing
-
-```bash
-# open draft registry in editor
-docker compose exec openvpn ovpn client ip edit
-
-# validate the draft
-docker compose exec openvpn ovpn client ip validate
-
-# apply the draft
-docker compose exec openvpn ovpn client ip apply
-```
-
-`validate` is read-only. `apply` validates and writes atomically in a
-transaction; it restores from the last applied snapshot on failure.
-
 ---
 
 ## Configuration changes

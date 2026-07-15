@@ -76,10 +76,6 @@ ovpn_client_ip_usage() {
 Usage: ovpn client ip <command> [args]
 
 Commands:
-  list              print the draft client-IP registry
-  validate          validate the draft registry without changing it
-  apply             validate and apply the draft registry
-  edit              open the draft registry in an editor
   release           release the retained static IP of a revoked client
   set               assign client IP addresses
 

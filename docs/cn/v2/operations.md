@@ -142,21 +142,6 @@ laptop,                  # 留空保留动态分配
 
 编辑器选择顺序为 `OVPN_EDITOR` > `EDITOR` > `nano`。镜像预装 `nano` 和 `vim`。
 
-### 直接编辑清单
-
-```bash
-# 用编辑器打开草稿清单
-docker compose exec openvpn ovpn client ip edit
-
-# 验证草稿
-docker compose exec openvpn ovpn client ip validate
-
-# 应用草稿
-docker compose exec openvpn ovpn client ip apply
-```
-
-`validate` 只读。`apply` 在事务中校验并原子写入，失败时从已应用快照回滚。
-
 ---
 
 ## 配置变更

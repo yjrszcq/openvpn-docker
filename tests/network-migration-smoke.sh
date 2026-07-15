@@ -89,7 +89,7 @@ cp "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.cs
 printf '%s\n' '# client,state' 'alpha,active' 'bravo,active' >"$OVPN_DATA_DIR/meta/client-state.csv"
 : >"$OVPN_DATA_DIR/meta/audit.jsonl"
 printf '%s\n' 'bravo,10.88.0.200' >"$OVPN_POOL_PERSIST_FILE"
-"$OVPN" client ip apply
+"$OVPN" client ip set alpha --ip 10.88.0.20
 
 "$OVPN" network plan --network 10.89.0.0/24 --dynamic-pool-size 100 >"$TMP_DIR/dry.out"
 grep -Fq 'Network: 10.88.0.0/24 -> 10.89.0.0/24' "$TMP_DIR/dry.out"

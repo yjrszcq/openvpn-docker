@@ -535,7 +535,7 @@ ovpn_doctor_command() {
       printf 'Issues:\n'
       for ((index = 0; index < ${#OVPN_STATE_ISSUE_IDS[@]}; index++)); do
         if [ "${OVPN_STATE_ISSUE_IDS[index]}" = CLIENT_IP_PENDING_EXPLICIT_APPLY ]; then
-          printf '  [manual] client-IP draft is waiting for explicit application (run: ovpn client ip apply)\n'
+          printf '  [manual] client-IP draft is out of sync with the applied registry; the next write operation will restore it automatically\n'
         else
           printf '  [%s] %s (action: %s)\n' \
             "${OVPN_STATE_ISSUE_SEVERITIES[index]}" \

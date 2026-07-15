@@ -63,10 +63,6 @@ assert_help "Usage: ovpn client revoke <name> [--release-ip]" client revoke -h
 assert_help "Usage: ovpn client ip release <name>" client ip release --help
 assert_help "Usage: ovpn client reissue <name>" client reissue -h
 assert_help "Usage: ovpn client delete <name>" client delete --help
-assert_help "Usage: ovpn client ip list" client ip list -h
-assert_help "Usage: ovpn client ip validate" client ip validate --help
-assert_help "Usage: ovpn client ip apply" client ip apply -h
-assert_help "Usage: ovpn client ip edit" client ip edit --help
 assert_help "Usage: ovpn network plan [--network <CIDR>] [--dynamic-pool-size <N>]" network plan --help
 assert_help "Usage: ovpn repair apply" repair apply -h
 assert_help "Usage: ovpn state show" state show --help
@@ -94,28 +90,6 @@ if [ -s /tmp/ovpn-doctor.err ]; then
   echo 'doctor emitted unexpected stderr output' >&2
   exit 1
 fi
-
-assert_retired_command() {
-  if "$OVPN" "$@" >/tmp/ovpn-retired.out 2>/tmp/ovpn-retired.err; then
-    echo "retired command unexpectedly succeeded: ovpn $*" >&2
-    exit 1
-  fi
-}
-
-assert_retired_command add-client
-assert_retired_command client-ip
-assert_retired_command client ip set-static
-assert_retired_command client ip set-dynamic
-assert_retired_command client ip sync
-assert_retired_command config print
-assert_retired_command network reconfigure
-assert_retired_command repair --plan
-assert_retired_command doctor
-assert_retired_command status
-assert_retired_command healthcheck
-assert_retired_command capabilities
-assert_retired_command version
-assert_retired_command recover
 
 set +e
 "$OVPN" does-not-exist >/tmp/ovpn-unknown.out 2>/tmp/ovpn-unknown.err

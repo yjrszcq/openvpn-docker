@@ -29,10 +29,6 @@ ovpn
 │   ├── reissue         为已有客户端签发新证书。
 │   ├── delete          删除客户端及其本地凭据。
 │   └── ip
-│       ├── list        打印草稿客户端 IP 清单。
-│       ├── validate    验证草稿清单而不修改。
-│       ├── apply       验证并应用草稿清单。
-│       ├── edit        在编辑器中打开草稿清单。
 │       ├── release     释放已吊销客户端的保留静态 IP。
 │       └── set         分配客户端 IP 地址。
 ├── network
@@ -184,46 +180,6 @@ ovpn client delete <name>
 ## 客户端 IP 管理
 
 草稿清单为 `data/client-ip.csv`；最近一次已接受的清单为 `meta/client-ip.applied.csv`。两者均使用 `client,ip` 行格式。非空 IP 为静态分配；空 IP 为动态分配。可选的第一个整行内容恰好为 `# client,ip`。名称和静态地址必须唯一，静态地址必须落在静态区域内，且清单必须包含每一个逻辑 PKI 客户端。
-
-### `ovpn client ip list`
-
-语法：
-
-```text
-ovpn client ip list
-```
-
-只读。按原样打印草稿清单。它不验证或应用待处理的编辑。
-
-### `ovpn client ip validate`
-
-语法：
-
-```text
-ovpn client ip validate
-```
-
-只读。根据当前持久化网络配置和 PKI 验证草稿清单：CSV 结构、客户端名称、重复名称或静态地址、地址范围、静态容量以及与逻辑客户端的一一对应关系。成功时打印 `client-ip registry draft is valid`。
-
-### `ovpn client ip apply`
-
-语法：
-
-```text
-ovpn client ip apply
-```
-
-在数据锁下验证并应用草稿。成功时将标准排序写入草稿和已应用快照，重新生成派生的 CCD 状态，清除受影响的动态租约，并断开受影响的在线客户端。如果验证或事务后续步骤失败，会从最近一次已应用快照恢复两份清单文件。
-
-### `ovpn client ip edit`
-
-语法：
-
-```text
-ovpn client ip edit
-```
-
-以 `OVPN_EDITOR`，其次 `EDITOR`，最后 `nano` 的顺序打开编辑器编辑草稿清单。编辑器值必须是镜像中可用的单个可执行文件路径。此命令仅打开文件；编辑后请运行 `validate` 和 `apply`。
 
 ### `ovpn client ip release`
 
@@ -402,10 +358,6 @@ ovpn runtime version
 # 创建并导出一个静态客户端 profile。
 docker compose exec openvpn ovpn client create laptop
 docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
-
-# 验证并应用编辑后的清单。
-docker compose exec openvpn ovpn client ip validate
-docker compose exec openvpn ovpn client ip apply
 
 # 预览网络变更而不修改持久化数据。
 docker compose exec openvpn ovpn network plan --network 10.43.0.0/24 --dynamic-pool-size 96

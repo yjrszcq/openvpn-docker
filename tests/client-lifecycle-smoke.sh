@@ -145,11 +145,6 @@ export OVPN_OPENVPN_BIN="$FAKE_BIN/openvpn"
 export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
 
 "$OVPN" init >/tmp/ovpn-client-init.out 2>/tmp/ovpn-client-init.err
-env -u OVPN_EDITOR -u EDITOR \
-  OVPN_TEST_EDITOR_LOG="$TMP_DIR/editor.log" \
-  PATH="$FAKE_BIN:$PATH" \
-  "$OVPN" client ip edit >"$TMP_DIR/client-ip-edit.out" 2>"$TMP_DIR/client-ip-edit.err"
-grep -Fqx 'nano:client-ip.csv' "$TMP_DIR/editor.log"
 "$OVPN" client create laptop >/tmp/ovpn-add-client.out 2>/tmp/ovpn-add-client.err
 
 repair_snapshot() {

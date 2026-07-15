@@ -456,7 +456,7 @@ ovpn_client_command() {
         ovpn_client_ip_usage
         return 0
       fi
-      [ -n "$ip_subcommand" ] || ovpn_die "usage: ovpn client ip <list|validate|apply|edit|release|set> ..."
+      [ -n "$ip_subcommand" ] || ovpn_die "usage: ovpn client ip <release|set> ..."
       shift
       case "$ip_subcommand" in
         set)
@@ -466,34 +466,6 @@ ovpn_client_command() {
             ovpn_client_set_command "$@"
           fi
           ;;
-        list)
-          if ovpn_help_requested "$@"; then
-            ovpn_command_usage "ovpn client ip list" "Print the draft client-IP registry."
-          else
-            ovpn_client_ip_command "$ip_subcommand" "$@"
-          fi
-          ;;
-        validate)
-          if ovpn_help_requested "$@"; then
-            ovpn_command_usage "ovpn client ip validate" "Validate the draft client-IP registry without changing it."
-          else
-            ovpn_client_ip_command "$ip_subcommand" "$@"
-          fi
-          ;;
-        apply)
-          if ovpn_help_requested "$@"; then
-            ovpn_command_usage "ovpn client ip apply" "Validate and apply the draft client-IP registry."
-          else
-            ovpn_client_ip_command "$ip_subcommand" "$@"
-          fi
-          ;;
-        edit)
-          if ovpn_help_requested "$@"; then
-            ovpn_command_usage "ovpn client ip edit" "Open the draft client-IP registry in an editor."
-          else
-            ovpn_client_ip_command "$ip_subcommand" "$@"
-          fi
-          ;;
         release)
           if ovpn_help_requested "$@"; then
             ovpn_command_usage "ovpn client ip release <name>" "Release the retained static IP of a revoked client."
@@ -501,7 +473,7 @@ ovpn_client_command() {
             ovpn_client_release_ip_command "$@"
           fi
           ;;
-        *) ovpn_client_ip_command "$ip_subcommand" "$@" ;;
+        *) ovpn_die "usage: ovpn client ip <release|set> ..." ;;
       esac
       ;;
     revoke)

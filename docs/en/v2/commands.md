@@ -35,10 +35,6 @@ ovpn
 │   ├── reissue         Issue a new certificate for an existing client.
 │   ├── delete          Remove a client and its local credentials.
 │   └── ip
-│       ├── list        Print the draft client-IP registry.
-│       ├── validate    Validate the draft registry without changing it.
-│       ├── apply       Validate and apply the draft registry.
-│       ├── edit        Open the draft registry in an editor.
 │       ├── release     Release the retained static IP of a revoked client.
 │       └── set         Assign client IP addresses.
 ├── network
@@ -241,56 +237,6 @@ static assignment; an empty IP is dynamic. The optional first line is exactly
 `# client,ip`. Names and static addresses must be unique, static addresses must
 fall in the static region, and the registry must contain every logical PKI
 client.
-
-### `ovpn client ip list`
-
-Syntax:
-
-```text
-ovpn client ip list
-```
-
-Read-only. Prints the draft registry exactly as stored. It does not validate or
-apply pending edits.
-
-### `ovpn client ip validate`
-
-Syntax:
-
-```text
-ovpn client ip validate
-```
-
-Read-only. Validates the draft registry against the current persistent network
-configuration and PKI: CSV structure, client names, duplicate names or static
-addresses, address range, static capacity, and one-to-one correspondence with
-logical clients. On success it prints `client-ip registry draft is valid`.
-
-### `ovpn client ip apply`
-
-Syntax:
-
-```text
-ovpn client ip apply
-```
-
-Validates and applies the draft under the data lock. On success it writes a
-canonical ordering to the draft and applied snapshot, regenerates derived CCD
-state, clears affected dynamic leases, and disconnects affected online clients.
-If validation or a later transaction step fails, it restores both registry files
-from the previous applied snapshot.
-
-### `ovpn client ip edit`
-
-Syntax:
-
-```text
-ovpn client ip edit
-```
-
-Opens the draft registry in `OVPN_EDITOR`, then `EDITOR`, then `nano`. The
-editor value must be a single executable path available in the image. This
-command only opens the file; run `validate` and `apply` after editing.
 
 ### `ovpn client ip release`
 
@@ -509,10 +455,6 @@ fields.
 # Create and export a static client profile.
 docker compose exec openvpn ovpn client create laptop
 docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
-
-# Validate and apply a deliberate registry edit.
-docker compose exec openvpn ovpn client ip validate
-docker compose exec openvpn ovpn client ip apply
 
 # Preview a network change without changing persistent state.
 docker compose exec openvpn ovpn network plan --network 10.43.0.0/24 --dynamic-pool-size 96

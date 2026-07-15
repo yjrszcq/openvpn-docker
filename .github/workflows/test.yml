@@ -57,7 +57,7 @@ jobs:
             tests/render-smoke.sh \
             tests/ipam-layout-smoke.sh \
             tests/registry-migration-smoke.sh \
-            tests/client-ip-apply-smoke.sh \
+            tests/client-ip-set-smoke.sh \
             tests/init-start-smoke.sh \
             tests/bootstrap-init-smoke.sh \
             tests/state-scanner-smoke.sh \

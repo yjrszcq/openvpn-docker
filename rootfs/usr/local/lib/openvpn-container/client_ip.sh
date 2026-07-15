@@ -257,59 +257,5 @@ ovpn_client_ip_apply_inner() (
   printf 'client-ip registry applied\n'
 )
 
-ovpn_client_ip_validate_command() {
-  local draft
 
-  draft="$(ovpn_registry_client_ip_file)"
-  ovpn_client_ip_validate_file "$draft"
-  printf 'client-ip registry draft is valid\n'
-}
 
-ovpn_client_ip_list_command() {
-  local draft
-
-  draft="$(ovpn_registry_client_ip_file)"
-  [ -r "$draft" ] || ovpn_die "cannot read registry draft: $draft"
-  cat "$draft"
-}
-
-ovpn_client_ip_edit_command() {
-  local draft editor
-
-  draft="$(ovpn_registry_client_ip_file)"
-  [ -e "$draft" ] || ovpn_die "registry draft does not exist: $draft"
-  editor="${OVPN_EDITOR:-${EDITOR:-nano}}"
-  case "$editor" in
-    *[[:space:]]*) ovpn_die 'OVPN_EDITOR must be a single executable path' ;;
-  esac
-  command -v "$editor" >/dev/null 2>&1 || ovpn_die "editor is not available: $editor"
-  "$editor" "$draft"
-}
-
-ovpn_client_ip_command() {
-  local subcommand="${1:-}"
-
-  [ -n "$subcommand" ] || ovpn_die 'usage: ovpn client ip <list|validate|apply|edit>'
-  shift
-  case "$subcommand" in
-    list)
-      [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn client ip list'
-      ovpn_client_ip_list_command
-      ;;
-    validate)
-      [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn client ip validate'
-      ovpn_client_ip_validate_command
-      ;;
-    apply)
-      [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn client ip apply'
-      ovpn_with_data_lock client ovpn_client_ip_apply_inner
-      ;;
-    edit)
-      [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn client ip edit'
-      ovpn_client_ip_edit_command
-      ;;
-    *)
-      ovpn_die 'usage: ovpn client ip <list|validate|apply|edit>'
-      ;;
-  esac
-}

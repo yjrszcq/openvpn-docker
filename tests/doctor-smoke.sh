@@ -82,8 +82,7 @@ after="$(snapshot "$pending")"
 }
 [ ! -s "$TMP_DIR/pending.err" ]
 grep -Fxq 'State: HEALTHY' "$TMP_DIR/pending.txt"
-grep -Fq 'client-IP draft is waiting for explicit application' "$TMP_DIR/pending.txt"
-grep -Fq 'ovpn client ip apply' "$TMP_DIR/pending.txt"
+grep -Fq 'client-IP draft is out of sync with the applied registry; the next write operation will restore it automatically' "$TMP_DIR/pending.txt"
 
 critical="$TMP_DIR/critical"
 cp -a "$healthy" "$critical"

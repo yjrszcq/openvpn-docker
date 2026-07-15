@@ -8,7 +8,10 @@ ovpn_client_ip_require_applied_draft() {
   draft="$(ovpn_registry_client_ip_file)"
   applied="$(ovpn_registry_applied_file)"
   [ -r "$draft" ] && [ -r "$applied" ] || ovpn_die 'client-IP registry is unavailable; restore the V2 registry first'
-  cmp -s "$draft" "$applied" || ovpn_die 'client-IP draft is waiting for explicit application; run: ovpn client ip apply'
+  if ! cmp -s "$draft" "$applied"; then
+    ovpn_log 'client-IP draft was out of sync; restoring from the applied snapshot'
+    cp "$applied" "$draft"
+  fi
 }
 
 ovpn_client_ip_prepare_mutation() {
