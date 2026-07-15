@@ -91,7 +91,7 @@ The first start initializes only an empty `./openvpn-data` directory and
 persists its bootstrap configuration in `config/project.env`. Later changes to
 bootstrap environment variables do not rewrite an existing instance.
 
-## Environment Variables
+## Configuration
 
 | Variable | Runtime default / Compose fallback | Quick-start value | Purpose |
 | --- | --- | --- | --- |
@@ -139,8 +139,8 @@ Choose the routing model deliberately:
 This README intentionally does not duplicate the command manual. Select the
 reference that matches the image version you operate:
 
-- [v1 command reference](docs/commands-v1.md) — release commit `6619921e5257e604f5df2c63d2fa10505b680d84`.
-- [v2 command reference](docs/commands-v2.md) — the current CLI.
+- [v1 command reference](docs/en/commands-v1.md) — release commit `6619921e5257e604f5df2c63d2fa10505b680d84`.
+- [v2 command reference](docs/en/commands-v2.md) — the current CLI.
 
 ## License
 

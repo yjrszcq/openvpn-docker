@@ -83,7 +83,7 @@ docker compose logs -f openvpn
 首次启动只会初始化空的 `./openvpn-data` 目录，并将 bootstrap 配置写入
 `config/project.env`。之后修改 bootstrap 环境变量不会重写已有实例。
 
-## 环境变量
+## 配置项
 
 | 变量 | 运行时默认值 / Compose 回退值 | 快速开始值 | 说明 |
 | --- | --- | --- | --- |
@@ -125,8 +125,8 @@ docker compose logs -f openvpn
 
 本 README 不再重复命令手册。请按所使用的镜像版本选择对应参考：
 
-- [v1 命令参考](docs/commands-v1.md)：发布提交 `6619921e5257e604f5df2c63d2fa10505b680d84`。
-- [v2 命令参考](docs/commands-v2.md)：当前 CLI。
+- [v1 命令参考](docs/cn/commands-v1.md)：发布提交 `6619921e5257e604f5df2c63d2fa10505b680d84`。
+- [v2 命令参考](docs/cn/commands-v2.md)：当前 CLI。
 
 ## 许可证
 
