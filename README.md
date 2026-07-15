@@ -260,7 +260,7 @@ recovering the old private key requires a secure backup. `add-client`,
 standard counterparts.
 
 `client list` retains its compact, compatibility-oriented `name state` output.
-Use `client list --ip` for tab-separated `CLIENT`, `STATE`, `MODE`, `IP`,
+Use `client list --ip` for fixed-width `CLIENT`, `STATE`, `MODE`, `IP`,
 `IP STATE`, and `CONNECTION` columns. `CONNECTION=online` means the local OpenVPN
 management socket reports a current route for the client; `offline` means the
 query succeeded but has no route, and `unknown` means the socket is unavailable

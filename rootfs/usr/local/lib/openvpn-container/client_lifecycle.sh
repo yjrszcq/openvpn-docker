@@ -61,6 +61,7 @@ ovpn_client_list_load_connected_clients() {
   OVPN_CLIENT_LIST_CONNECTED_IPS=()
   OVPN_CLIENT_LIST_MANAGEMENT_AVAILABLE=false
   response="$(ovpn_management_socket_request "$OVPN_MANAGEMENT_SOCKET" "status 3")" || return 0
+  response="${response//$'\r'/}"
   case $'\n'"$response"$'\n' in
     *$'\nEND\n'*) OVPN_CLIENT_LIST_MANAGEMENT_AVAILABLE=true ;;
     *) return 0 ;;
@@ -68,6 +69,9 @@ ovpn_client_list_load_connected_clients() {
   while IFS= read -r line || [ -n "$line" ]; do
     line="${line%$'\r'}"
     case "$line" in
+      ROUTING_TABLE$'\t'*)
+        IFS=$'\t' read -r ignored address name ignored <<<"$line"
+        ;;
       ROUTING_TABLE,*)
         IFS=, read -r ignored address name ignored <<<"$line"
         ;;
@@ -98,7 +102,7 @@ ovpn_client_list_with_ip_command() {
   ovpn_client_list_prepare_applied_registry
   ovpn_client_list_load_persisted_dynamic_ips
   ovpn_client_list_load_connected_clients
-  printf 'CLIENT\tSTATE\tMODE\tIP\tIP STATE\tCONNECTION\n'
+  printf '%-24s %-10s %-8s %-15s %-14s %s\n' CLIENT STATE MODE IP 'IP STATE' CONNECTION
   for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
     name="${OVPN_CLIENT_IP_NAMES[index]}"
     state="${OVPN_CLIENT_IP_PKI_STATES[$name]}"
@@ -111,7 +115,7 @@ ovpn_client_list_with_ip_command() {
     if [ -n "$assignment" ]; then
       ip_state=configured
       [ "$state" != revoked ] || ip_state=retained
-      printf '%s\t%s\tstatic\t%s\t%s\t%s\n' "$name" "$state" "$assignment" "$ip_state" "$connection"
+      printf '%-24s %-10s %-8s %-15s %-14s %s\n' "$name" "$state" static "$assignment" "$ip_state" "$connection"
       continue
     fi
     address='-'
@@ -123,7 +127,7 @@ ovpn_client_list_with_ip_command() {
       address="${OVPN_CLIENT_LIST_PERSISTED_IPS[$name]}"
       ip_state='last-known'
     fi
-    printf '%s\t%s\tdynamic\t%s\t%s\t%s\n' "$name" "$state" "$address" "$ip_state" "$connection"
+    printf '%-24s %-10s %-8s %-15s %-14s %s\n' "$name" "$state" dynamic "$address" "$ip_state" "$connection"
   done | LC_ALL=C sort
 }
 
