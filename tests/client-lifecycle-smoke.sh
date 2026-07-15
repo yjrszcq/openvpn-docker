@@ -15,7 +15,7 @@ cleanup() {
 }
 
 format_client_list_row() {
-  printf '%-24s %-10s %-8s %-15s %-14s %s\n' "$@"
+  printf '%-7s  %-7s  %-7s  %-11s  %-11s  %s\n' "$@"
 }
 
 on_error() {

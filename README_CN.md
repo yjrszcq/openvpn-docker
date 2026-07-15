@@ -216,7 +216,7 @@ docker compose exec openvpn ovpn client delete laptop
 `revoke-client` 仍作为对应标准命令的兼容别名保留。
 
 `client list` 保持兼容的紧凑 `名称 状态` 输出。使用 `client list --ip` 可获得
-固定宽度对齐的 `CLIENT`、`STATE`、`MODE`、`IP`、`IP STATE` 和 `CONNECTION` 列。
+自动调整列宽并对齐的 `CLIENT`、`STATE`、`MODE`、`IP`、`IP STATE` 和 `CONNECTION` 列。
 `CONNECTION=online` 表示本机 OpenVPN 管理 socket 报告该客户端有当前路由；`offline`
 表示查询成功但没有该路由；`unknown` 表示 socket 不可用或查询失败。活动静态地址为
 `configured`；已吊销但仍占用保留地址的静态客户端为 `retained`。动态地址只有在该路由

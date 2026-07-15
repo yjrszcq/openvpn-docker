@@ -95,14 +95,14 @@ ovpn_client_list_load_connected_clients() {
 }
 
 ovpn_client_list_with_ip_command() {
-  local index name state assignment address ip_state
-  local connection
+  local index name state assignment address ip_state connection mode row
+  local client_width=6 state_width=5 mode_width=4 ip_width=2 ip_state_width=8
+  local -a rows=()
 
   ovpn_require_healthy_state
   ovpn_client_list_prepare_applied_registry
   ovpn_client_list_load_persisted_dynamic_ips
   ovpn_client_list_load_connected_clients
-  printf '%-24s %-10s %-8s %-15s %-14s %s\n' CLIENT STATE MODE IP 'IP STATE' CONNECTION
   for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
     name="${OVPN_CLIENT_IP_NAMES[index]}"
     state="${OVPN_CLIENT_IP_PKI_STATES[$name]}"
@@ -113,22 +113,45 @@ ovpn_client_list_with_ip_command() {
       [ -z "${OVPN_CLIENT_LIST_CONNECTED_IPS[$name]+present}" ] || connection=online
     fi
     if [ -n "$assignment" ]; then
+      mode=static
+      address="$assignment"
       ip_state=configured
       [ "$state" != revoked ] || ip_state=retained
-      printf '%-24s %-10s %-8s %-15s %-14s %s\n' "$name" "$state" static "$assignment" "$ip_state" "$connection"
-      continue
+    else
+      mode=dynamic
+      address='-'
+      ip_state='unavailable'
+      if [ -n "${OVPN_CLIENT_LIST_CONNECTED_IPS[$name]+present}" ] && ovpn_ipam_ip_in_dynamic_pool "${OVPN_CLIENT_LIST_CONNECTED_IPS[$name]}"; then
+        address="${OVPN_CLIENT_LIST_CONNECTED_IPS[$name]}"
+        ip_state='connected'
+      elif [ -n "${OVPN_CLIENT_LIST_PERSISTED_IPS[$name]+present}" ]; then
+        address="${OVPN_CLIENT_LIST_PERSISTED_IPS[$name]}"
+        ip_state='last-known'
+      fi
     fi
-    address='-'
-    ip_state='unavailable'
-    if [ -n "${OVPN_CLIENT_LIST_CONNECTED_IPS[$name]+present}" ] && ovpn_ipam_ip_in_dynamic_pool "${OVPN_CLIENT_LIST_CONNECTED_IPS[$name]}"; then
-      address="${OVPN_CLIENT_LIST_CONNECTED_IPS[$name]}"
-      ip_state='connected'
-    elif [ -n "${OVPN_CLIENT_LIST_PERSISTED_IPS[$name]+present}" ]; then
-      address="${OVPN_CLIENT_LIST_PERSISTED_IPS[$name]}"
-      ip_state='last-known'
-    fi
-    printf '%-24s %-10s %-8s %-15s %-14s %s\n' "$name" "$state" dynamic "$address" "$ip_state" "$connection"
-  done | LC_ALL=C sort
+    rows+=("$name"$'\t'"$state"$'\t'"$mode"$'\t'"$address"$'\t'"$ip_state"$'\t'"$connection")
+  done
+
+  if ((${#rows[@]})); then
+    mapfile -t rows < <(printf '%s\n' "${rows[@]}" | LC_ALL=C sort)
+  fi
+  for row in "${rows[@]}"; do
+    IFS=$'\t' read -r name state mode address ip_state connection <<<"$row"
+    if ((${#name} > client_width)); then client_width=${#name}; fi
+    if ((${#state} > state_width)); then state_width=${#state}; fi
+    if ((${#mode} > mode_width)); then mode_width=${#mode}; fi
+    if ((${#address} > ip_width)); then ip_width=${#address}; fi
+    if ((${#ip_state} > ip_state_width)); then ip_state_width=${#ip_state}; fi
+  done
+  printf '%-*s  %-*s  %-*s  %-*s  %-*s  %s\n' \
+    "$client_width" CLIENT "$state_width" STATE "$mode_width" MODE "$ip_width" IP \
+    "$ip_state_width" 'IP STATE' CONNECTION
+  for row in "${rows[@]}"; do
+    IFS=$'\t' read -r name state mode address ip_state connection <<<"$row"
+    printf '%-*s  %-*s  %-*s  %-*s  %-*s  %s\n' \
+      "$client_width" "$name" "$state_width" "$state" "$mode_width" "$mode" "$ip_width" "$address" \
+      "$ip_state_width" "$ip_state" "$connection"
+  done
 }
 
 ovpn_client_list_command() {
