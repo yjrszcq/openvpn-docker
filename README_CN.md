@@ -127,6 +127,24 @@ docker compose logs -f openvpn
 
 - [v1 命令参考](docs/cn/commands-v1.md)：发布提交 `6619921e5257e604f5df2c63d2fa10505b680d84`。
 - [v2 命令参考](docs/cn/commands-v2.md)：当前 CLI。
+- [v2 操作手册](docs/cn/operations.md)：按工作流组织的命令组合用法。
+
+## 安全说明
+
+- 默认设计将 CA 保持在持久化数据卷内，便于日常运维；数据卷被攻破可能导致 CA 泄露。
+- 私钥和导出的 `.ovpn` profile 都是敏感凭据，应以严格权限保存并经信任渠道交付。
+- 稳定版本发布前会校验源码校验和、runtime 版本、配置加载及所需能力。
+
+## 开发
+
+版本与发布输入集中在 `versions.env`。修改代码前运行：
+
+```bash
+tests/check.sh          # Shell 语法与风格检查
+tests/cli-smoke.sh      # CLI 结构验证
+```
+
+测试使用 `OVPN_NETWORK=10.88.0.0/24`。部分检查需要 Docker 和 `/dev/net/tun`。
 
 ## 许可证
 

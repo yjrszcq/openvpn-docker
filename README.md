@@ -141,6 +141,29 @@ reference that matches the image version you operate:
 
 - [v1 command reference](docs/en/commands-v1.md) — release commit `6619921e5257e604f5df2c63d2fa10505b680d84`.
 - [v2 command reference](docs/en/commands-v2.md) — the current CLI.
+- [v2 operations guide](docs/en/operations.md) — workflow-oriented command combinations.
+
+## Security Notes
+
+- The default design keeps the CA inside the persistent data volume for
+  day-to-day convenience. Compromise of the volume can expose the CA.
+- Private keys and exported `.ovpn` profiles are sensitive credentials. Store
+  them with strict permissions and deliver them through trusted channels.
+- Source checksums, runtime version, configuration loading, and required
+  capabilities are verified before a stable release is published.
+
+## Development
+
+Version and release inputs are centralized in `versions.env`. Before changing
+code, run:
+
+```bash
+tests/check.sh          # shell syntax and style
+tests/cli-smoke.sh      # CLI structure verification
+```
+
+Tests use `OVPN_NETWORK=10.88.0.0/24`. Some checks require Docker and
+`/dev/net/tun`.
 
 ## License
 
