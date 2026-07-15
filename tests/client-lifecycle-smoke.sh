@@ -5,7 +5,14 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OVPN="$ROOT_DIR/rootfs/usr/local/bin/ovpn"
 TMP_DIR="$(mktemp -d)"
 FAKE_BIN="$TMP_DIR/bin"
+SOCKET_LISTENER_PID=''
 mkdir -p "$FAKE_BIN"
+
+cleanup() {
+  [ -z "$SOCKET_LISTENER_PID" ] || kill "$SOCKET_LISTENER_PID" >/dev/null 2>&1 || true
+  [ -z "$SOCKET_LISTENER_PID" ] || wait "$SOCKET_LISTENER_PID" 2>/dev/null || true
+  rm -rf "$TMP_DIR"
+}
 
 on_error() {
   local status=$?
@@ -13,6 +20,7 @@ on_error() {
   exit "$status"
 }
 trap 'on_error "$LINENO"' ERR
+trap cleanup EXIT
 
 cat >"$FAKE_BIN/easyrsa" <<'FAKE_EASYRSA'
 #!/usr/bin/env bash
@@ -100,16 +108,42 @@ esac
 FAKE_OPENVPN
 chmod +x "$FAKE_BIN/openvpn"
 
+cat >"$FAKE_BIN/socat" <<'FAKE_SOCAT'
+#!/usr/bin/env bash
+set -euo pipefail
+cat >/dev/null
+printf '%s\n' \
+  'HEADER,ROUTING_TABLE,Virtual Address,Common Name,Real Address,Last Ref' \
+  'ROUTING_TABLE,10.88.0.200,online,198.51.100.10:1194,Wed Jul 15 00:00:00 2026' \
+  'END'
+FAKE_SOCAT
+chmod +x "$FAKE_BIN/socat"
+
 export OVPN_LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
 export OVPN_TEMPLATE_ROOT="$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates"
 export OVPN_COMPATIBILITY_DIR="$ROOT_DIR/compatibility"
 export OVPN_DATA_DIR="$TMP_DIR/openvpn"
 export OVPN_RUNTIME_DIR="$TMP_DIR/run"
+export OVPN_MANAGEMENT_SOCKET="$OVPN_RUNTIME_DIR/management.sock"
+export OVPN_POOL_PERSIST_FILE="$TMP_DIR/runtime/pool-persist.txt"
+export OVPN_SOCAT_BIN="$FAKE_BIN/socat"
 export OVPN_ENDPOINT="vpn.example.test"
 export OVPN_NETWORK="10.88.0.0/24"
 export OVPN_EASYRSA_BIN="$FAKE_BIN/easyrsa"
 export OVPN_OPENVPN_BIN="$FAKE_BIN/openvpn"
 export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
+
+mkdir -p "$OVPN_RUNTIME_DIR"
+nc -lU "$OVPN_MANAGEMENT_SOCKET" >/dev/null 2>&1 &
+SOCKET_LISTENER_PID=$!
+for attempt in {1..20}; do
+  [ -S "$OVPN_MANAGEMENT_SOCKET" ] && break
+  sleep 0.1
+done
+[ -S "$OVPN_MANAGEMENT_SOCKET" ] || {
+  echo 'failed to create a UNIX management socket fixture' >&2
+  exit 1
+}
 
 "$OVPN" init >/tmp/ovpn-client-init.out 2>/tmp/ovpn-client-init.err
 "$OVPN" add-client laptop >/tmp/ovpn-add-client.out 2>/tmp/ovpn-add-client.err
@@ -238,6 +272,27 @@ test ! -e "$OVPN_DATA_DIR/ccd/laptop"
 OVPN_EDITOR=true "$OVPN" client set-static laptop phone >"$TMP_DIR/batch-static.out" 2>"$TMP_DIR/batch-static.err"
 grep -Fqx 'laptop,10.88.0.2' "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/laptop"
+
+"$OVPN" client create online --dynamic >"$TMP_DIR/online-create.out" 2>"$TMP_DIR/online-create.err"
+"$OVPN" client create known --dynamic >"$TMP_DIR/known-create.out" 2>"$TMP_DIR/known-create.err"
+"$OVPN" client create missing --dynamic >"$TMP_DIR/missing-create.out" 2>"$TMP_DIR/missing-create.err"
+mkdir -p "$(dirname "$OVPN_POOL_PERSIST_FILE")"
+printf '%s\n' \
+  'online,10.88.0.201' \
+  'known,10.88.0.202' \
+  'unrelated,10.88.0.203' >"$OVPN_POOL_PERSIST_FILE"
+"$OVPN" client list --ip >"$TMP_DIR/client-list-ip.out"
+grep -Fqx $'CLIENT\tSTATE\tASSIGNMENT\tIP\tSOURCE' "$TMP_DIR/client-list-ip.out"
+grep -Fqx $'laptop\tactive\tstatic\t10.88.0.2\tconfigured' "$TMP_DIR/client-list-ip.out"
+grep -Fqx $'online\tactive\tdynamic\t10.88.0.200\tconnected' "$TMP_DIR/client-list-ip.out"
+grep -Fqx $'known\tactive\tdynamic\t10.88.0.202\tlast-known' "$TMP_DIR/client-list-ip.out"
+grep -Fqx $'missing\tactive\tdynamic\t-\tunavailable' "$TMP_DIR/client-list-ip.out"
+if grep -Fq 'unrelated' "$TMP_DIR/client-list-ip.out"; then
+  echo 'client IP list included a lease for an unknown client' >&2
+  exit 1
+fi
+grep -Fqx 'laptop active' <("$OVPN" client list)
+grep -Fqx $'online\tactive\tdynamic\t10.88.0.200\tconnected' <("$OVPN" list-clients --ip)
 
 "$OVPN" export-client laptop >"$TMP_DIR/laptop.ovpn" 2>"$TMP_DIR/export.err"
 test ! -s "$TMP_DIR/export.err"

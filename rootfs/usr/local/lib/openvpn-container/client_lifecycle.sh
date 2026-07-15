@@ -9,6 +9,121 @@ ovpn_client_records() {
   done | LC_ALL=C sort
 }
 
+declare -A OVPN_CLIENT_LIST_CONNECTED_IPS=()
+declare -A OVPN_CLIENT_LIST_PERSISTED_IPS=()
+
+ovpn_client_list_prepare_applied_registry() {
+  local applied
+
+  applied="$(ovpn_registry_applied_file)"
+  [ -r "$applied" ] || ovpn_die "cannot read applied client-IP registry: $applied"
+  ovpn_client_ip_validate_file "$applied" || ovpn_die 'applied client-IP registry is invalid; restore it before listing IPs'
+}
+
+ovpn_client_list_dynamic_ip_is_valid() {
+  local name="$1"
+  local address="$2"
+
+  ovpn_registry_client_name_valid "$name" || return 1
+  [ "${OVPN_CLIENT_IP_PKI_STATES[$name]:-}" = active ] || return 1
+  ovpn_ipam_ip_in_dynamic_pool "$address"
+}
+
+ovpn_client_list_load_persisted_dynamic_ips() {
+  local pool_file="$OVPN_POOL_PERSIST_FILE"
+  local name address ignored
+
+  OVPN_CLIENT_LIST_PERSISTED_IPS=()
+  [ -r "$pool_file" ] || return 0
+  while IFS=, read -r name address ignored || [ -n "$name" ]; do
+    [ -z "$ignored" ] || continue
+    address="${address%$'\r'}"
+    ovpn_client_list_dynamic_ip_is_valid "$name" "$address" || continue
+    [ -n "${OVPN_CLIENT_LIST_PERSISTED_IPS[$name]+present}" ] && continue
+    OVPN_CLIENT_LIST_PERSISTED_IPS["$name"]="$address"
+  done <"$pool_file"
+}
+
+ovpn_client_list_load_connected_dynamic_ips() {
+  local response line address name ignored
+  local in_routing_table=false
+
+  OVPN_CLIENT_LIST_CONNECTED_IPS=()
+  response="$(ovpn_management_socket_request "$OVPN_MANAGEMENT_SOCKET" "status 3")" || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    case "$line" in
+      ROUTING_TABLE,*)
+        IFS=, read -r ignored address name ignored <<<"$line"
+        ;;
+      'ROUTING TABLE')
+        in_routing_table=true
+        continue
+        ;;
+      'GLOBAL STATS'|END)
+        in_routing_table=false
+        continue
+        ;;
+      *)
+        [ "$in_routing_table" = true ] || continue
+        IFS=, read -r address name ignored <<<"$line"
+        ;;
+    esac
+    ovpn_client_list_dynamic_ip_is_valid "$name" "$address" || continue
+    [ -n "${OVPN_CLIENT_LIST_CONNECTED_IPS[$name]+present}" ] && continue
+    OVPN_CLIENT_LIST_CONNECTED_IPS["$name"]="$address"
+  done <<<"$response"
+}
+
+ovpn_client_list_with_ip_command() {
+  local index name state assignment address source
+
+  ovpn_require_healthy_state
+  ovpn_client_list_prepare_applied_registry
+  ovpn_client_list_load_persisted_dynamic_ips
+  ovpn_client_list_load_connected_dynamic_ips
+  printf 'CLIENT\tSTATE\tASSIGNMENT\tIP\tSOURCE\n'
+  for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
+    name="${OVPN_CLIENT_IP_NAMES[index]}"
+    state="${OVPN_CLIENT_IP_PKI_STATES[$name]}"
+    assignment="${OVPN_CLIENT_IP_VALUES[index]}"
+    if [ -n "$assignment" ]; then
+      printf '%s\t%s\tstatic\t%s\tconfigured\n' "$name" "$state" "$assignment"
+      continue
+    fi
+    address='-'
+    source='unavailable'
+    if [ -n "${OVPN_CLIENT_LIST_CONNECTED_IPS[$name]+present}" ]; then
+      address="${OVPN_CLIENT_LIST_CONNECTED_IPS[$name]}"
+      source='connected'
+    elif [ -n "${OVPN_CLIENT_LIST_PERSISTED_IPS[$name]+present}" ]; then
+      address="${OVPN_CLIENT_LIST_PERSISTED_IPS[$name]}"
+      source='last-known'
+    fi
+    printf '%s\t%s\tdynamic\t%s\t%s\n' "$name" "$state" "$address" "$source"
+  done | LC_ALL=C sort
+}
+
+ovpn_client_list_command() {
+  case "$#" in
+    0)
+      ovpn_require_healthy_state
+      ovpn_client_records
+      ;;
+    1)
+      [ "$1" = --ip ] || ovpn_die 'usage: ovpn client list [--ip]'
+      ovpn_client_list_with_ip_command
+      ;;
+    *)
+      ovpn_die 'usage: ovpn client list [--ip]'
+      ;;
+  esac
+}
+
+ovpn_list_clients_command() {
+  ovpn_client_list_command "$@"
+}
+
 ovpn_pki_try_revoke_client() {
   local name="$1"
   local bin
@@ -272,7 +387,7 @@ ovpn_client_command() {
     release-ip) ovpn_client_release_ip_command "$@" ;;
     reissue) ovpn_client_reissue_command "$@" ;;
     delete) ovpn_client_delete_command "$@" ;;
-    list) [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn client list'; ovpn_list_clients_command ;;
+    list) ovpn_client_list_command "$@" ;;
     *) ovpn_die 'usage: ovpn client <create|set-static|set-dynamic|revoke|release-ip|reissue|delete|list> ...' ;;
   esac
 }

@@ -193,6 +193,7 @@ docker compose exec -T openvpn ovpn export-client laptop > laptop.ovpn
 
 ```bash
 docker compose exec openvpn ovpn client list
+docker compose exec openvpn ovpn client list --ip
 docker compose exec openvpn ovpn client revoke laptop
 docker compose exec openvpn ovpn client release-ip laptop
 docker compose exec openvpn ovpn client revoke laptop --release-ip
@@ -213,6 +214,14 @@ docker compose exec openvpn ovpn client delete laptop
 `client delete` 会在必要时吊销活动客户端，然后删除其清单记录、生成的 profile 与私钥。
 这应视为不可逆操作：若要恢复旧私钥，只能依赖安全备份。`add-client`、`list-clients` 和
 `revoke-client` 仍作为对应标准命令的兼容别名保留。
+
+`client list` 保持兼容的紧凑 `名称 状态` 输出。使用 `client list --ip` 可获得以制表符
+分隔的 `CLIENT`、`STATE`、`ASSIGNMENT`、`IP` 和 `SOURCE` 列。静态地址的来源为
+`configured`；动态地址只有在本机 OpenVPN 管理 socket 报告当前路由时才标记为
+`connected`，否则从 `pool-persist.txt` 读取的记录标为 `last-known`，无当前或已保存
+租约时显示 `-` 和 `unavailable`。动态 IP 仅为状态信息，绝不是地址保留。该视图读取
+最后已应用清单，直接编辑 CSV 后须待 `client-ip apply` 成功才会反映；兼容别名
+`list-clients --ip` 也接受此选项。
 
 ## 客户端 IP 管理
 

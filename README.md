@@ -230,6 +230,7 @@ not mix it with status output. The lifecycle commands are:
 
 ```bash
 docker compose exec openvpn ovpn client list
+docker compose exec openvpn ovpn client list --ip
 docker compose exec openvpn ovpn client revoke laptop
 docker compose exec openvpn ovpn client release-ip laptop
 docker compose exec openvpn ovpn client revoke laptop --release-ip
@@ -257,6 +258,16 @@ registry record, generated profile, and private key. Treat it as irreversible:
 recovering the old private key requires a secure backup. `add-client`,
 `list-clients`, and `revoke-client` remain compatibility aliases for their
 standard counterparts.
+
+`client list` retains its compact, compatibility-oriented `name state` output.
+Use `client list --ip` for tab-separated `CLIENT`, `STATE`, `ASSIGNMENT`, `IP`,
+and `SOURCE` columns. Static addresses are `configured`. Dynamic addresses are
+`connected` only when the local OpenVPN management socket reports a current
+route; otherwise `last-known` is read from `pool-persist.txt`, and `-`
+`unavailable` means no current or persisted lease is available. A dynamic IP is
+informational, never a reservation. This view reads the last applied registry,
+so direct CSV edits do not appear until `client-ip apply` succeeds. The
+`list-clients --ip` compatibility alias accepts the same option.
 
 ## Client IP Management
 
