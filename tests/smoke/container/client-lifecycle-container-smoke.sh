@@ -66,21 +66,25 @@ assignment_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint
 key_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /usr/bin/sha256sum "$IMAGE" "/etc/openvpn/pki/private/$client.key")"
 index_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /usr/bin/sha256sum "$IMAGE" /etc/openvpn/pki/index.txt)"
 
-if run_control client reissue "$client" >/tmp/ovpn-lifecycle-reissue.out 2>/tmp/ovpn-lifecycle-reissue.err; then
-  echo 'same-CN reissue unexpectedly succeeded in the shipped Easy-RSA runtime' >&2
+if ! run_control client reissue "$client" >/tmp/ovpn-lifecycle-reissue.out 2>/tmp/ovpn-lifecycle-reissue.err; then
+  echo 'same-CN reissue unexpectedly failed in the shipped Easy-RSA runtime' >&2
+  sed 's/^/  | /' /tmp/ovpn-lifecycle-reissue.err >&2
   exit 1
 fi
-grep -Fq 'does not support same-CN reissue' /tmp/ovpn-lifecycle-reissue.err
 grep -Fqx "$client active" <(run_control client list)
 assignment_after="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, -v client="$client" '$1 == client { print; exit }' /etc/openvpn/data/client-ip.csv)"
 [ "$assignment_after" = "$assignment_before" ] || {
-  printf 'rejected reissue changed the IP assignment: %s\n' "$assignment_after" >&2
+  printf 'reissue changed the IP assignment: %s\n' "$assignment_after" >&2
   exit 1
 }
 key_after="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /usr/bin/sha256sum "$IMAGE" "/etc/openvpn/pki/private/$client.key")"
 index_after="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /usr/bin/sha256sum "$IMAGE" /etc/openvpn/pki/index.txt)"
-[ "$key_after" = "$key_before" ] && [ "$index_after" = "$index_before" ] || {
-  echo 'rejected same-CN reissue modified PKI state' >&2
+[ "$key_after" != "$key_before" ] || {
+  echo 'same-CN reissue did not generate a new key' >&2
+  exit 1
+}
+[ "$index_after" != "$index_before" ] || {
+  echo 'same-CN reissue did not update the PKI index' >&2
   exit 1
 }
 
