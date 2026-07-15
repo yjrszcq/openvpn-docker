@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+IMAGE="${OVPN_RUNTIME_IMAGE:-szcq/openvpn-server:runtime-smoke}"
+REQUIRED="${OVPN_RUNTIME_REQUIRED:-0}"
+SKIP_BUILD="${OVPN_RUNTIME_SKIP_BUILD:-0}"
+
+set -a
+# shellcheck source=../versions.env
+. "$ROOT_DIR/versions.env"
+set +a
+
+skip_or_fail() {
+  local reason="$1"
+  if [ "$REQUIRED" = 1 ]; then
+    echo "runtime image smoke failed: $reason" >&2
+    exit 1
+  fi
+  echo "runtime image smoke skipped: $reason"
+  exit 0
+}
+
+if ! command -v docker >/dev/null 2>&1; then
+  skip_or_fail 'missing command: docker'
+fi
+if ! docker info >/dev/null 2>&1; then
+  skip_or_fail 'Docker daemon is not accessible'
+fi
+
+if [ "$SKIP_BUILD" != 1 ]; then
+  "$ROOT_DIR/scripts/docker-build.sh" -t "$IMAGE" "$ROOT_DIR"
+fi
+
+version_output="$(docker run --rm --entrypoint openvpn "$IMAGE" --version)"
+if ! grep -Fq "OpenVPN $OPENVPN_VERSION" <<<"$version_output"; then
+  printf '%s\n' "$version_output" >&2
+  echo 'runtime binary version does not match versions.env' >&2
+  exit 1
+fi
+
+ldd_output="$(docker run --rm --entrypoint ldd "$IMAGE" /usr/local/sbin/openvpn)"
+if grep -Fq 'not found' <<<"$ldd_output"; then
+  printf '%s\n' "$ldd_output" >&2
+  echo 'runtime OpenVPN binary has unresolved libraries' >&2
+  exit 1
+fi
+
+metadata="$(docker run --rm --entrypoint ovpn "$IMAGE" runtime version)"
+grep -Fq '"runtime_strategy": "source-build"' <<<"$metadata"
+grep -Fq "\"openvpn_version\": \"$OPENVPN_VERSION\"" <<<"$metadata"
+grep -Fq "\"openvpn_source_version\": \"$OPENVPN_VERSION\"" <<<"$metadata"
+
+docker run --rm --entrypoint sh "$IMAGE" -ec '
+  test -s /usr/local/share/licenses/openvpn-container/LICENSE
+  test -s /usr/local/share/licenses/openvpn-container/NOTICE
+  test -s /usr/local/share/licenses/openvpn/COPYING
+  grep -Fq "GNU GENERAL PUBLIC LICENSE" /usr/local/share/licenses/openvpn-container/LICENSE
+  grep -Fq "GPL-2.0-only" /usr/local/share/licenses/openvpn-container/NOTICE
+  grep -Fq "OpenVPN" /usr/local/share/licenses/openvpn/COPYING
+'
+printf 'runtime image smoke passed (openvpn=%s)\n' "$OPENVPN_VERSION"
