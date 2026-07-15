@@ -427,25 +427,27 @@ ovpn_client_delete_command() {
 
 ovpn_client_command() {
   local subcommand="${1:-}"
-  [ -n "$subcommand" ] || ovpn_die 'usage: ovpn client <create|set-static|set-dynamic|revoke|release-ip|reissue|delete|list> ...'
+
+  [ -n "$subcommand" ] || ovpn_die 'usage: ovpn client <create|export|list|revoke|release-ip|reissue|delete|ip> ...'
   shift
   case "$subcommand" in
     create) ovpn_client_create_command "$@" ;;
-    set-static) ovpn_client_set_static_command "$@" ;;
-    set-dynamic) ovpn_client_set_dynamic_command "$@" ;;
+    export) ovpn_client_export_command "$@" ;;
+    ip)
+      local ip_subcommand="${1:-}"
+      [ -n "$ip_subcommand" ] || ovpn_die 'usage: ovpn client ip <list|validate|apply|edit|set-static|set-dynamic> ...'
+      shift
+      case "$ip_subcommand" in
+        set-static) ovpn_client_set_static_command "$@" ;;
+        set-dynamic) ovpn_client_set_dynamic_command "$@" ;;
+        *) ovpn_client_ip_command "$ip_subcommand" "$@" ;;
+      esac
+      ;;
     revoke) ovpn_client_revoke_command "$@" ;;
     release-ip) ovpn_client_release_ip_command "$@" ;;
     reissue) ovpn_client_reissue_command "$@" ;;
     delete) ovpn_client_delete_command "$@" ;;
     list) ovpn_client_list_command "$@" ;;
-    *) ovpn_die 'usage: ovpn client <create|set-static|set-dynamic|revoke|release-ip|reissue|delete|list> ...' ;;
+    *) ovpn_die 'usage: ovpn client <create|export|list|revoke|release-ip|reissue|delete|ip> ...' ;;
   esac
-}
-
-ovpn_revoke_client_inner() {
-  ovpn_client_revoke_inner "$1" false
-}
-
-ovpn_revoke_client_command() {
-  ovpn_client_revoke_command "$@"
 }

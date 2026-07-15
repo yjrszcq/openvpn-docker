@@ -36,22 +36,13 @@ Usage: ovpn <command> [args]
 Commands:
   start             scan policy and start OpenVPN
   init              initialize an empty data directory
-  doctor            inspect state without modifying it
-  state             print the detected state
-  repair            plan or run SAFE/equivalent recovery actions
-  recover           run explicit high-risk recovery actions
-  config            inspect or update persistent project config
-  render            render derived configuration
-  client-ip         inspect, validate, or apply the client IP registry
-  client            manage client assignments
-  add-client        create a client certificate
-  export-client     write a client profile to stdout
-  list-clients      list known clients
-  revoke-client     revoke a client certificate
-  status            print runtime status
-  healthcheck       return container health
-  capabilities      print runtime capability information
-  version           print build information
+  config            show or apply persistent project configuration
+  client            manage client certificates and IP assignments
+  network           plan or apply a tunnel-network migration
+  repair            plan or apply safe recovery actions
+  state             show instance state or run diagnostics
+  render            render derived server or client configuration
+  runtime           inspect runtime status, health, capabilities, or version
   help              show this help
 USAGE
 }
@@ -72,8 +63,16 @@ JSON
   fi
 }
 
-ovpn_not_implemented() {
-  local command="$1"
-  ovpn_log "command '$command' is not implemented in this phase"
-  exit 2
+ovpn_runtime_command() {
+  local subcommand="${1:-}"
+
+  [ -n "$subcommand" ] || ovpn_die 'usage: ovpn runtime <status|health|capabilities|version>'
+  shift
+  case "$subcommand" in
+    status) ovpn_status_command "$@" ;;
+    health) ovpn_healthcheck_command "$@" ;;
+    capabilities) [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn runtime capabilities'; ovpn_capabilities_command ;;
+    version) [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn runtime version'; ovpn_version ;;
+    *) ovpn_die 'usage: ovpn runtime <status|health|capabilities|version>' ;;
+  esac
 }

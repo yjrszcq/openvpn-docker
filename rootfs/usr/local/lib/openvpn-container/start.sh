@@ -19,7 +19,7 @@ ovpn_start_command() {
   state="$(ovpn_state_detect)"
   if [ "$state" = DEGRADED_REPAIRABLE ] || [ "$state" = DEGRADED_RECOVERABLE ]; then
     ovpn_log "instance state is $state; applying automatic repairs"
-    ovpn_repair_command
+    ovpn_repair_command apply
     state="$(ovpn_state_detect)"
   fi
   if [ "$state" != HEALTHY ]; then
@@ -28,8 +28,8 @@ ovpn_start_command() {
         if [ "$critical_mode" = maintenance ]; then
           ovpn_maintenance_enter "$state"
         fi
-        ovpn_log 'recommended: docker compose run --rm openvpn-maintenance doctor'
-        ovpn_log 'recommended: docker compose run --rm openvpn-maintenance repair --plan'
+        ovpn_log 'recommended: docker compose run --rm openvpn-maintenance state doctor'
+        ovpn_log 'recommended: docker compose run --rm openvpn-maintenance repair plan'
         ;;
     esac
     ovpn_log "instance state is $state; refusing to start"

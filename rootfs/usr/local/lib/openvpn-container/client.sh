@@ -66,7 +66,7 @@ ovpn_client_refuse_duplicate() {
 
 ovpn_add_client_inner() {
   local name="${1:-}"
-  [ -n "$name" ] || ovpn_die "usage: ovpn add-client <name>"
+  [ -n "$name" ] || ovpn_die "usage: ovpn client create <name>"
   ovpn_client_name_or_die "$name"
   ovpn_require_healthy_state
   ovpn_client_refuse_duplicate "$name"
@@ -76,7 +76,7 @@ ovpn_add_client_inner() {
   ovpn_log "added client '$name'"
 }
 
-ovpn_export_client_inner() {
+ovpn_client_export_inner() {
   local name="$1"
   local profile
 
@@ -87,11 +87,11 @@ ovpn_export_client_inner() {
   ovpn_write_or_print - "$profile"
 }
 
-ovpn_export_client_command() {
+ovpn_client_export_command() {
   local name="${1:-}"
-  [ -n "$name" ] || ovpn_die "usage: ovpn export-client <name>"
+  [ -n "$name" ] || ovpn_die "usage: ovpn client export <name>"
   ovpn_client_name_or_die "$name"
-  ovpn_with_data_lock client ovpn_export_client_inner "$name"
+  ovpn_with_data_lock client ovpn_client_export_inner "$name"
 }
 
 ovpn_list_clients_command() {
@@ -101,7 +101,7 @@ ovpn_list_clients_command() {
 
 ovpn_revoke_client_inner() {
   local name="${1:-}"
-  [ -n "$name" ] || ovpn_die "usage: ovpn revoke-client <name>"
+  [ -n "$name" ] || ovpn_die "usage: ovpn client revoke <name>"
   ovpn_client_name_or_die "$name"
   ovpn_require_healthy_state
   ovpn_client_require_active "$name"
@@ -116,14 +116,14 @@ ovpn_revoke_client_inner() {
 
 ovpn_add_client_command() {
   local name="${1:-}"
-  [ -n "$name" ] || ovpn_die "usage: ovpn add-client <name>"
+  [ -n "$name" ] || ovpn_die "usage: ovpn client create <name>"
   ovpn_client_name_or_die "$name"
   ovpn_with_data_lock client ovpn_add_client_inner "$name"
 }
 
 ovpn_revoke_client_command() {
   local name="${1:-}"
-  [ -n "$name" ] || ovpn_die "usage: ovpn revoke-client <name>"
+  [ -n "$name" ] || ovpn_die "usage: ovpn client revoke <name>"
   ovpn_client_name_or_die "$name"
   ovpn_with_data_lock client ovpn_revoke_client_inner "$name"
 }

@@ -171,24 +171,12 @@ ovpn_repair_plan_command() {
   local output_format=plain
 
   case "$#" in
-    1)
-      [ "$1" = --plan ] || {
-        ovpn_log 'usage: ovpn repair --plan [--json]'
-        exit 64
-      }
-      ;;
-    2)
-      if [ "$1" = --plan ] && [ "$2" = --json ]; then
-        output_format=json
-      else
-        ovpn_log 'usage: ovpn repair --plan [--json]'
-        exit 64
-      fi
-      ;;
-    *)
-      ovpn_log 'usage: ovpn repair --plan [--json]'
+    0) ;;
+    1) [ "$1" = --json ] && output_format=json || {
+      ovpn_log 'usage: ovpn repair plan [--json]'
       exit 64
-      ;;
+    } ;;
+    *) ovpn_log 'usage: ovpn repair plan [--json]'; exit 64 ;;
   esac
 
   ovpn_repair_plan_build
@@ -526,9 +514,13 @@ ovpn_repair_apply_inner() {
 }
 
 ovpn_repair_command() {
-  if [ "$#" -gt 0 ]; then
-    ovpn_repair_plan_command "$@"
-    return 0
-  fi
-  ovpn_with_data_lock repair ovpn_repair_apply_inner
+  local operation="${1:-}"
+
+  [ -n "$operation" ] || ovpn_die 'usage: ovpn repair <plan|apply> [--json]'
+  shift
+  case "$operation" in
+    plan) ovpn_repair_plan_command "$@" ;;
+    apply) [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn repair apply'; ovpn_with_data_lock repair ovpn_repair_apply_inner ;;
+    *) ovpn_die 'usage: ovpn repair <plan|apply> [--json]' ;;
+  esac
 }

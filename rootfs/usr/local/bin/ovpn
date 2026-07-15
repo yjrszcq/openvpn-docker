@@ -37,8 +37,11 @@ case "$command" in
   help|-h|--help)
     ovpn_usage
     ;;
-  version|--version)
-    ovpn_version
+  init)
+    ovpn_init_command "$@"
+    ;;
+  start)
+    ovpn_start_command "$@"
     ;;
   config)
     ovpn_config_command "$@"
@@ -46,55 +49,20 @@ case "$command" in
   client)
     ovpn_client_command "$@"
     ;;
-  client-ip)
-    ovpn_client_ip_command "$@"
-    ;;
   network)
-    [ "${1:-}" = reconfigure ] || ovpn_die 'usage: ovpn network reconfigure ...'
-    shift
-    ovpn_network_reconfigure_command "$@"
-    ;;
-  render)
-    ovpn_render_command "$@"
-    ;;
-  state)
-    ovpn_state_command "$@"
-    ;;
-  init)
-    ovpn_init_command "$@"
-    ;;
-  start)
-    ovpn_start_command "$@"
-    ;;
-  add-client)
-    ovpn_add_client_command "$@"
-    ;;
-  export-client)
-    ovpn_export_client_command "$@"
-    ;;
-  list-clients)
-    ovpn_list_clients_command "$@"
-    ;;
-  revoke-client)
-    ovpn_revoke_client_command "$@"
-    ;;
-  doctor)
-    ovpn_doctor_command "$@"
+    ovpn_network_command "$@"
     ;;
   repair)
     ovpn_repair_command "$@"
     ;;
-  status)
-    ovpn_status_command "$@"
+  state)
+    ovpn_state_command "$@"
     ;;
-  healthcheck)
-    ovpn_healthcheck_command "$@"
+  render)
+    ovpn_render_command "$@"
     ;;
-  recover)
-    ovpn_not_implemented "$command"
-    ;;
-  capabilities)
-    ovpn_capabilities_command "$@"
+  runtime)
+    ovpn_runtime_command "$@"
     ;;
   *)
     ovpn_log "unknown command '$command'"

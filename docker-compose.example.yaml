@@ -43,6 +43,7 @@ services:
       - maintenance
 
     command:
+      - state
       - doctor
     entrypoint:
       - /usr/local/bin/ovpn

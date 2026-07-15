@@ -287,29 +287,29 @@ ovpn_client_ip_edit_command() {
 }
 
 ovpn_client_ip_command() {
-  local subcommand="${1:-list}"
-  if [ "$#" -gt 0 ]; then
-    shift
-  fi
+  local subcommand="${1:-}"
+
+  [ -n "$subcommand" ] || ovpn_die 'usage: ovpn client ip <list|validate|apply|edit>'
+  shift
   case "$subcommand" in
     list)
-      [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn client-ip list'
+      [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn client ip list'
       ovpn_client_ip_list_command
       ;;
     validate)
-      [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn client-ip validate'
+      [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn client ip validate'
       ovpn_client_ip_validate_command
       ;;
-    apply|sync)
-      [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn client-ip apply'
+    apply)
+      [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn client ip apply'
       ovpn_with_data_lock client ovpn_client_ip_apply_inner
       ;;
     edit)
-      [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn client-ip edit'
+      [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn client ip edit'
       ovpn_client_ip_edit_command
       ;;
     *)
-      ovpn_die 'usage: ovpn client-ip <list|validate|apply|sync|edit>'
+      ovpn_die 'usage: ovpn client ip <list|validate|apply|edit>'
       ;;
   esac
 }

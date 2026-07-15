@@ -239,16 +239,27 @@ ovpn_network_migration_apply_inner() (
   ovpn_log 'network migration applied'
 )
 
-ovpn_network_reconfigure_command() {
+ovpn_network_command() {
+  local operation="${1:-}"
   local target_network='' target_pool='' dry_run=false yes=false
+
+  [ -n "$operation" ] || ovpn_die 'usage: ovpn network <plan|apply> [--network CIDR] [--dynamic-pool-size N] [--yes]'
+  shift
+  case "$operation" in
+    plan) dry_run=true ;;
+    apply) ;;
+    *) ovpn_die 'usage: ovpn network <plan|apply> [--network CIDR] [--dynamic-pool-size N] [--yes]' ;;
+  esac
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --network) shift; [ "$#" -gt 0 ] || ovpn_die '--network requires CIDR'; target_network="$1" ;;
       --dynamic-pool-size) shift; [ "$#" -gt 0 ] || ovpn_die '--dynamic-pool-size requires N'; target_pool="$1" ;;
-      --dry-run) dry_run=true ;;
-      --yes) yes=true ;;
-      *) ovpn_die 'usage: ovpn network reconfigure [--network CIDR] [--dynamic-pool-size N] [--dry-run] [--yes]' ;;
+      --yes)
+        [ "$operation" = apply ] || ovpn_die 'usage: ovpn network plan [--network CIDR] [--dynamic-pool-size N]'
+        yes=true
+        ;;
+      *) ovpn_die 'usage: ovpn network <plan|apply> [--network CIDR] [--dynamic-pool-size N] [--yes]' ;;
     esac
     shift
   done

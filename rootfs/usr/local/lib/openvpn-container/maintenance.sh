@@ -35,7 +35,7 @@ ovpn_status_command() {
   local state
 
   [ "$#" -eq 0 ] || {
-    ovpn_log 'usage: ovpn status'
+    ovpn_log 'usage: ovpn runtime status'
     exit 64
   }
   if [ -r "$OVPN_RUNTIME_STATE_FILE" ]; then
@@ -49,7 +49,7 @@ ovpn_status_command() {
 
 ovpn_healthcheck_command() {
   [ "$#" -eq 0 ] || {
-    ovpn_log 'usage: ovpn healthcheck'
+    ovpn_log 'usage: ovpn runtime health'
     return 64
   }
   if [ ! -r "$OVPN_RUNTIME_STATE_FILE" ]; then
@@ -78,8 +78,8 @@ ovpn_maintenance_enter() {
 
   ovpn_runtime_write_state "$state" stopped true
   ovpn_log "instance state is $state; entering maintenance mode"
-  ovpn_log 'recommended: docker compose run --rm openvpn-maintenance doctor'
-  ovpn_log 'recommended: docker compose run --rm openvpn-maintenance repair --plan'
+  ovpn_log 'recommended: docker compose run --rm openvpn-maintenance state doctor'
+  ovpn_log 'recommended: docker compose run --rm openvpn-maintenance repair plan'
   trap 'ovpn_log "maintenance mode stopping"; exit 0' INT TERM
   while :; do
     sleep 3600 &

@@ -104,6 +104,6 @@ RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/docker-entrypoint \
        /usr/local/bin/generate-build-info /usr/local/share/openvpn-container/build-info.json \
     && rm /usr/local/bin/generate-build-info
 
-HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=1 CMD ["/usr/local/bin/ovpn", "healthcheck"]
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=1 CMD ["/usr/local/bin/ovpn", "runtime", "health"]
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint"]
 CMD ["ovpn", "start"]

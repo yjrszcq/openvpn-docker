@@ -256,21 +256,20 @@ ovpn_config_write() {
 }
 
 ovpn_config_command() {
-  local subcommand="${1:-print}"
-  if [ "$#" -gt 0 ]; then
-    shift
-  fi
+  local subcommand="${1:-}"
 
+  [ -n "$subcommand" ] || ovpn_die 'usage: ovpn config <show|apply>'
+  shift
   case "$subcommand" in
-    print)
+    show)
       ovpn_config_print "$@"
       ;;
-    init)
+    apply)
       ovpn_config_write "$@"
       ;;
     *)
       ovpn_log "unknown config subcommand '$subcommand'"
-      ovpn_log "usage: ovpn config [print|init]"
+      ovpn_log 'usage: ovpn config <show|apply>'
       exit 64
       ;;
   esac

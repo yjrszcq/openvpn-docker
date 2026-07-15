@@ -425,7 +425,15 @@ ovpn_state_detect() {
 }
 
 ovpn_state_command() {
-  ovpn_state_detect
+  local subcommand="${1:-}"
+
+  [ -n "$subcommand" ] || ovpn_die 'usage: ovpn state <show|doctor>'
+  shift
+  case "$subcommand" in
+    show) [ "$#" -eq 0 ] || ovpn_die 'usage: ovpn state show'; ovpn_state_detect ;;
+    doctor) ovpn_doctor_command "$@" ;;
+    *) ovpn_die 'usage: ovpn state <show|doctor>' ;;
+  esac
 }
 
 ovpn_require_healthy_state() {
@@ -488,12 +496,12 @@ ovpn_doctor_command() {
       if [ "$1" = --json ]; then
         output_format=json
       else
-        ovpn_log "usage: ovpn doctor [--json]"
+        ovpn_log "usage: ovpn state doctor [--json]"
         exit 64
       fi
       ;;
     *)
-      ovpn_log "usage: ovpn doctor [--json]"
+      ovpn_log "usage: ovpn state doctor [--json]"
       exit 64
       ;;
   esac
@@ -509,7 +517,7 @@ ovpn_doctor_command() {
       printf 'Issues:\n'
       for ((index = 0; index < ${#OVPN_STATE_ISSUE_IDS[@]}; index++)); do
         if [ "${OVPN_STATE_ISSUE_IDS[index]}" = CLIENT_IP_PENDING_EXPLICIT_APPLY ]; then
-          printf '  [manual] client-IP draft is waiting for explicit application (run: ovpn client-ip apply)\n'
+          printf '  [manual] client-IP draft is waiting for explicit application (run: ovpn client ip apply)\n'
         else
           printf '  [%s] %s (action: %s)\n' \
             "${OVPN_STATE_ISSUE_SEVERITIES[index]}" \
