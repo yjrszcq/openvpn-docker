@@ -88,7 +88,7 @@ run_control client ip set-static "$client" --ip 10.88.0.2 >/tmp/ovpn-lifecycle-s
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/grep "$IMAGE" -Fqx "$client,10.88.0.2" /etc/openvpn/data/client-ip.csv
 run_control client revoke "$client" >/tmp/ovpn-lifecycle-revoke.out 2>/tmp/ovpn-lifecycle-revoke.err
 grep -Fqx "$client revoked" <(run_control client list)
-run_control client release-ip "$client" >/tmp/ovpn-lifecycle-release-ip.out 2>/tmp/ovpn-lifecycle-release-ip.err
+run_control client ip release "$client" >/tmp/ovpn-lifecycle-release-ip.out 2>/tmp/ovpn-lifecycle-release-ip.err
 grep -Fqx "$client revoked" <(run_control client list)
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/grep "$IMAGE" -Fqx "$client," /etc/openvpn/data/client-ip.csv
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/test "$IMAGE" -f "/etc/openvpn/clients/revoked/$client.ovpn"

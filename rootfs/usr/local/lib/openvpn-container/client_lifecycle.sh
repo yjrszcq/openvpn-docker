@@ -161,11 +161,11 @@ ovpn_client_list_command() {
       ovpn_client_records
       ;;
     1)
-      [ "$1" = --ip ] || ovpn_die 'usage: ovpn client list [--ip]'
+      [ "$1" = --detail ] || ovpn_die 'usage: ovpn client list [--detail]'
       ovpn_client_list_with_ip_command
       ;;
     *)
-      ovpn_die 'usage: ovpn client list [--ip]'
+      ovpn_die 'usage: ovpn client list [--detail]'
       ;;
   esac
 }
@@ -319,8 +319,8 @@ ovpn_client_release_ip_inner() {
 ovpn_client_release_ip_command() {
   local name="${1:-}"
 
-  [ -n "$name" ] || ovpn_die "usage: ovpn client release-ip <name>"
-  [ "$#" -eq 1 ] || ovpn_die "usage: ovpn client release-ip <name>"
+  [ -n "$name" ] || ovpn_die "usage: ovpn client ip release <name>"
+  [ "$#" -eq 1 ] || ovpn_die "usage: ovpn client ip release <name>"
   ovpn_with_data_lock client ovpn_client_release_ip_inner "$name"
 }
 
@@ -433,7 +433,7 @@ ovpn_client_command() {
     ovpn_client_usage
     return 0
   fi
-  [ -n "$subcommand" ] || ovpn_die "usage: ovpn client <create|export|list|revoke|release-ip|reissue|delete|ip> ..."
+  [ -n "$subcommand" ] || ovpn_die "usage: ovpn client <create|export|list|revoke|reissue|delete|ip> ..."
   shift
   case "$subcommand" in
     create)
@@ -456,7 +456,7 @@ ovpn_client_command() {
         ovpn_client_ip_usage
         return 0
       fi
-      [ -n "$ip_subcommand" ] || ovpn_die "usage: ovpn client ip <list|validate|apply|edit|set-static|set-dynamic> ..."
+      [ -n "$ip_subcommand" ] || ovpn_die "usage: ovpn client ip <list|validate|apply|edit|release|set-static|set-dynamic> ..."
       shift
       case "$ip_subcommand" in
         set-static)
@@ -501,6 +501,13 @@ ovpn_client_command() {
             ovpn_client_ip_command "$ip_subcommand" "$@"
           fi
           ;;
+        release)
+          if ovpn_help_requested "$@"; then
+            ovpn_command_usage "ovpn client ip release <name>" "Release the retained static IP of a revoked client."
+          else
+            ovpn_client_release_ip_command "$@"
+          fi
+          ;;
         *) ovpn_client_ip_command "$ip_subcommand" "$@" ;;
       esac
       ;;
@@ -509,13 +516,6 @@ ovpn_client_command() {
         ovpn_command_usage "ovpn client revoke <name> [--release-ip]" "Revoke a client certificate and optionally release its static IP."
       else
         ovpn_client_revoke_command "$@"
-      fi
-      ;;
-    release-ip)
-      if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client release-ip <name>" "Release the retained static IP of a revoked client."
-      else
-        ovpn_client_release_ip_command "$@"
       fi
       ;;
     reissue)
@@ -534,11 +534,11 @@ ovpn_client_command() {
       ;;
     list)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client list [--ip]" "List client certificate state and optional IP assignment details."
+        ovpn_command_usage "ovpn client list [--detail]" "List client certificate state and optional detailed IP assignment."
       else
         ovpn_client_list_command "$@"
       fi
       ;;
-    *) ovpn_die "usage: ovpn client <create|export|list|revoke|release-ip|reissue|delete|ip> ..." ;;
+    *) ovpn_die "usage: ovpn client <create|export|list|revoke|reissue|delete|ip> ..." ;;
   esac
 }

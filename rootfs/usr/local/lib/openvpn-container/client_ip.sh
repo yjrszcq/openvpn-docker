@@ -289,7 +289,7 @@ ovpn_client_ip_edit_command() {
 ovpn_client_ip_command() {
   local subcommand="${1:-}"
 
-  [ -n "$subcommand" ] || ovpn_die 'usage: ovpn client ip <list|validate|apply|edit>'
+  [ -n "$subcommand" ] || ovpn_die 'usage: ovpn client ip <list|validate|apply|edit|release>'
   shift
   case "$subcommand" in
     list)
@@ -309,7 +309,7 @@ ovpn_client_ip_command() {
       ovpn_client_ip_edit_command
       ;;
     *)
-      ovpn_die 'usage: ovpn client ip <list|validate|apply|edit>'
+      ovpn_die 'usage: ovpn client ip <list|validate|apply|edit|release>'
       ;;
   esac
 }

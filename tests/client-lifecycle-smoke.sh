@@ -303,7 +303,7 @@ printf '%s\n' \
   'online,10.88.0.201' \
   'known,10.88.0.202' \
   'unrelated,10.88.0.203' >"$OVPN_POOL_PERSIST_FILE"
-"$OVPN" client list --ip >"$TMP_DIR/client-list-ip.out"
+"$OVPN" client list --detail >"$TMP_DIR/client-list-ip.out"
 grep -Fqx "$(format_client_list_row CLIENT STATE MODE IP 'IP STATE' CONNECTION)" "$TMP_DIR/client-list-ip.out"
 grep -Fqx "$(format_client_list_row laptop active static 10.88.0.2 configured online)" "$TMP_DIR/client-list-ip.out"
 grep -Fqx "$(format_client_list_row phone active static 10.88.0.20 configured offline)" "$TMP_DIR/client-list-ip.out"
@@ -316,9 +316,9 @@ if grep -Fq 'unrelated' "$TMP_DIR/client-list-ip.out"; then
   exit 1
 fi
 grep -Fqx 'laptop active' <("$OVPN" client list)
-grep -Fqx "$(format_client_list_row online active dynamic 10.88.0.200 connected online)" <("$OVPN" client list --ip)
+grep -Fqx "$(format_client_list_row online active dynamic 10.88.0.200 connected online)" <("$OVPN" client list --detail)
 rm -f "$OVPN_MANAGEMENT_SOCKET"
-"$OVPN" client list --ip >"$TMP_DIR/client-list-ip-unknown.out"
+"$OVPN" client list --detail >"$TMP_DIR/client-list-ip-unknown.out"
 grep -Fqx "$(format_client_list_row laptop active static 10.88.0.2 configured unknown)" "$TMP_DIR/client-list-ip-unknown.out"
 grep -Fqx "$(format_client_list_row online active dynamic 10.88.0.201 last-known unknown)" "$TMP_DIR/client-list-ip-unknown.out"
 
@@ -398,7 +398,7 @@ tablet_index_after="$(sha256sum "$OVPN_DATA_DIR/pki/index.txt")"
   exit 1
 }
 
-if "$OVPN" client release-ip laptop >"$TMP_DIR/active-release-ip.out" 2>"$TMP_DIR/active-release-ip.err"; then
+if "$OVPN" client ip release laptop >"$TMP_DIR/active-release-ip.out" 2>"$TMP_DIR/active-release-ip.err"; then
   echo "active client IP release unexpectedly succeeded" >&2
   exit 1
 fi
@@ -410,14 +410,14 @@ grep -Fqx "laptop,10.88.0.2" "$OVPN_DATA_DIR/data/client-ip.csv"
 test -f "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
 test ! -e "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 
-"$OVPN" client release-ip laptop >"$TMP_DIR/release-ip.out" 2>"$TMP_DIR/release-ip.err"
+"$OVPN" client ip release laptop >"$TMP_DIR/release-ip.out" 2>"$TMP_DIR/release-ip.err"
 grep -Fqx "laptop," "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -q "^laptop revoked$" <("$OVPN" client list)
 test ! -e "$OVPN_DATA_DIR/ccd/laptop"
 test -f "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
 test -f "$OVPN_DATA_DIR/pki/private/laptop.key"
 grep -Fq release_ip "$OVPN_DATA_DIR/meta/audit.jsonl"
-if "$OVPN" client release-ip laptop >"$TMP_DIR/repeated-release-ip.out" 2>"$TMP_DIR/repeated-release-ip.err"; then
+if "$OVPN" client ip release laptop >"$TMP_DIR/repeated-release-ip.out" 2>"$TMP_DIR/repeated-release-ip.err"; then
   echo "repeated client IP release unexpectedly succeeded" >&2
   exit 1
 fi

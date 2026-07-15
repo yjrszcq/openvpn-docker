@@ -24,9 +24,8 @@ ovpn
 ├── client
 │   ├── create          创建客户端证书、profile 和 IP 分配。
 │   ├── export          将活跃客户端 profile 写入标准输出。
-│   ├── list            列出客户端证书状态和 IP 分配详情。
+│   ├── list            列出客户端证书状态和可选的详细 IP 分配信息。
 │   ├── revoke          吊销客户端证书，可选释放静态 IP。
-│   ├── release-ip      释放已吊销客户端的保留静态 IP。
 │   ├── reissue         为已有客户端签发新证书。
 │   ├── delete          删除客户端及其本地凭据。
 │   └── ip
@@ -34,6 +33,7 @@ ovpn
 │       ├── validate    验证草稿清单而不修改。
 │       ├── apply       验证并应用草稿清单。
 │       ├── edit        在编辑器中打开草稿清单。
+│       ├── release     释放已吊销客户端的保留静态 IP。
 │       ├── set-static  将选中客户端设为静态 IP 分配。
 │       └── set-dynamic 将选中客户端设为动态 IP 分配。
 ├── network
@@ -145,10 +145,10 @@ ovpn client export <name>
 语法：
 
 ```text
-ovpn client list [--ip]
+ovpn client list [--detail]
 ```
 
-不带 `--ip` 时，打印活跃和已撤销客户端的精简 `name state` 记录。带 `--ip` 时，打印对齐的列：`CLIENT`、`STATE`、`MODE`、`IP`、`IP STATE` 和 `CONNECTION`。
+不带 `--detail` 时，打印活跃和已撤销客户端的精简 `name state` 记录。带 `--detail` 时，打印对齐的列：`CLIENT`、`STATE`、`MODE`、`IP`、`IP STATE` 和 `CONNECTION`。
 
 在 IP 视图下，静态分配为 `configured`，或撤销后为 `retained`。动态地址在有当前租约时显示为 `connected`，在 `pool-persist.txt` 中有记录时显示为 `last-known`，否则为 `unavailable`。`CONNECTION` 根据管理套接字可用性和当前路由显示为 `online`、`offline` 或 `unknown`。该视图读取的是已应用的清单，而非未应用的草稿。
 
@@ -161,16 +161,6 @@ ovpn client revoke <name> [--release-ip]
 ```
 
 撤销活跃证书，重新生成 CRL，将其活跃 profile 移至 `clients/revoked/`，记录该客户端为已撤销状态，并在管理套接字可用时断开其连接。默认情况下，静态分配会保持保留。`--release-ip` 作为同一操作的一部分释放该静态保留。释放静态保留要求动态池容量非零。
-
-### `ovpn client release-ip`
-
-语法：
-
-```text
-ovpn client release-ip <name>
-```
-
-释放已撤销客户端的保留静态分配。客户端必须已撤销且仍持有静态保留，动态池容量必须非零。已撤销的 profile、私钥、证书历史和审计历史均会保留。
 
 ### `ovpn client reissue`
 
@@ -236,6 +226,16 @@ ovpn client ip edit
 
 以 `OVPN_EDITOR`，其次 `EDITOR`，最后 `nano` 的顺序打开编辑器编辑草稿清单。编辑器值必须是镜像中可用的单个可执行文件路径。此命令仅打开文件；编辑后请运行 `validate` 和 `apply`。
 
+### `ovpn client ip release`
+
+语法：
+
+```text
+ovpn client ip release <name>
+```
+
+释放已撤销客户端的保留静态分配。客户端必须已撤销且仍持有静态保留，动态池容量必须非零。已撤销的 profile、私钥、证书历史和审计历史均会保留。
+
 ### `ovpn client ip set-static`
 
 语法：
@@ -246,7 +246,19 @@ ovpn client ip set-static <client...|--all> [--ip <IPv4>]
 
 将活跃客户端设为静态分配并立即应用事务。单个客户端且不带 `--ip` 时，自动分配最低可用静态地址。`--ip` 仅允许用于恰好一个客户端，且必须指定有效的未使用静态地址。
 
-用于多个名称或 `--all` 时，该命令打开编辑器显示选取的 `client,ip` 行。输入 `auto` 以分配最低可用静态地址，或输入显式的静态地址。命名多客户端编辑可以将 IP 留空以保留该客户端的动态分配；`--all` 要求每个活跃客户端均为静态分配。
+用于多个名称或 `--all` 时，该命令打开编辑器显示选取的 `client,ip` 行，支持三种赋值：
+
+- 输入 `auto` 分配最低可用静态地址
+- 输入显式 IPv4 指定静态地址
+- IP 留空保留动态分配（仅限命名多客户端编辑）
+
+```text
+laptop,auto               # 自动分配
+phone,10.88.0.20          # 显式指定
+desktop,                  # 保留动态
+```
+
+编辑器选择顺序为 `OVPN_EDITOR`，其次 `EDITOR`，最后 `nano`（镜像预装 `nano` 和 `vim`）。
 
 ### `ovpn client ip set-dynamic`
 

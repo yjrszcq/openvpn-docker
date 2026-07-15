@@ -58,9 +58,9 @@ assert_help "Usage: ovpn runtime version" runtime version -h
 
 assert_help "Usage: ovpn config show" config show --help
 assert_help "Usage: ovpn client export <name>" client export -h
-assert_help "Usage: ovpn client list [--ip]" client list --help
+assert_help "Usage: ovpn client list [--detail]" client list --help
 assert_help "Usage: ovpn client revoke <name> [--release-ip]" client revoke -h
-assert_help "Usage: ovpn client release-ip <name>" client release-ip --help
+assert_help "Usage: ovpn client ip release <name>" client ip release --help
 assert_help "Usage: ovpn client reissue <name>" client reissue -h
 assert_help "Usage: ovpn client delete <name>" client delete --help
 assert_help "Usage: ovpn client ip list" client ip list -h

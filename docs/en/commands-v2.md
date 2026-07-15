@@ -30,9 +30,8 @@ ovpn
 ├── client
 │   ├── create          Create a client certificate, profile, and IP assignment.
 │   ├── export          Write an active client profile to stdout.
-│   ├── list            List client certificate state and IP assignment details.
+│   ├── list            List client certificate state and optional detailed IP assignment.
 │   ├── revoke          Revoke a client certificate, optionally release its static IP.
-│   ├── release-ip      Release the retained static IP of a revoked client.
 │   ├── reissue         Issue a new certificate for an existing client.
 │   ├── delete          Remove a client and its local credentials.
 │   └── ip
@@ -40,6 +39,7 @@ ovpn
 │       ├── validate    Validate the draft registry without changing it.
 │       ├── apply       Validate and apply the draft registry.
 │       ├── edit        Open the draft registry in an editor.
+│       ├── release     Release the retained static IP of a revoked client.
 │       ├── set-static  Assign selected clients static IP addresses.
 │       └── set-dynamic Assign selected clients dynamic IP addresses.
 ├── network
@@ -177,11 +177,11 @@ standard output. Redirect standard output to save the client profile.
 Syntax:
 
 ```text
-ovpn client list [--ip]
+ovpn client list [--detail]
 ```
 
-Without `--ip`, prints compact `name state` records for active and revoked
-clients. With `--ip`, prints the aligned columns `CLIENT`, `STATE`, `MODE`,
+Without `--detail`, prints compact `name state` records for active and revoked
+clients. With `--detail`, prints the aligned columns `CLIENT`, `STATE`, `MODE`,
 `IP`, `IP STATE`, and `CONNECTION`.
 
 For the IP view, static assignments are `configured` or `retained` after
@@ -205,19 +205,6 @@ management socket is available. By default, a static assignment remains
 reserved. `--release-ip` releases that static reservation as part of the same
 operation. Releasing a static reservation requires nonzero dynamic-pool
 capacity.
-
-### `ovpn client release-ip`
-
-Syntax:
-
-```text
-ovpn client release-ip <name>
-```
-
-Releases the retained static assignment of a revoked client. The client must be
-revoked, must still have a static reservation, and the dynamic pool must have
-nonzero capacity. The revoked profile, private key, certificate history, and
-audit history remain.
 
 ### `ovpn client reissue`
 
@@ -306,6 +293,19 @@ Opens the draft registry in `OVPN_EDITOR`, then `EDITOR`, then `nano`. The
 editor value must be a single executable path available in the image. This
 command only opens the file; run `validate` and `apply` after editing.
 
+### `ovpn client ip release`
+
+Syntax:
+
+```text
+ovpn client ip release <name>
+```
+
+Releases the retained static assignment of a revoked client. The client must be
+revoked, must still have a static reservation, and the dynamic pool must have
+nonzero capacity. The revoked profile, private key, certificate history, and
+audit history remain.
+
 ### `ovpn client ip set-static`
 
 Syntax:
@@ -320,9 +320,20 @@ static address. `--ip` is allowed only for exactly one client and must name a
 valid unused static address.
 
 With multiple names or `--all`, the command opens an editor containing selected
-`client,ip` rows. Enter `auto` to allocate the lowest available static address
-or an explicit static address. Named multi-client edits may leave an IP empty
-to keep that client dynamic; `--all` requires every active client to be static.
+`client,ip` rows with three assignment modes:
+
+- Enter `auto` to allocate the lowest available static address
+- Enter an explicit IPv4 address to assign a specific static IP
+- Leave the IP empty to keep the client dynamic (named multi-client edits only)
+
+```text
+laptop,auto               # auto-allocate
+phone,10.88.0.20          # explicit assignment
+desktop,                  # keep dynamic
+```
+
+The editor is chosen from `OVPN_EDITOR`, then `EDITOR`, then `nano` (image ships
+`nano` and `vim`).
 
 ### `ovpn client ip set-dynamic`
 

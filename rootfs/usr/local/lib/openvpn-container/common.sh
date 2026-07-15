@@ -63,7 +63,6 @@ Commands:
   export            write a client profile to stdout
   list              list client certificates and assignments
   revoke            revoke a client certificate
-  release-ip        release a revoked client static IP reservation
   reissue           issue a new certificate for an existing client
   delete            remove a client and its local credentials
   ip                manage client IP assignments
@@ -81,6 +80,7 @@ Commands:
   validate          validate the draft registry without changing it
   apply             validate and apply the draft registry
   edit              open the draft registry in an editor
+  release           release the retained static IP of a revoked client
   set-static        assign selected clients static IP addresses
   set-dynamic       assign selected clients dynamic IP addresses
 
