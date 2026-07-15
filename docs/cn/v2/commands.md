@@ -34,8 +34,7 @@ ovpn
 │       ├── apply       验证并应用草稿清单。
 │       ├── edit        在编辑器中打开草稿清单。
 │       ├── release     释放已吊销客户端的保留静态 IP。
-│       ├── set-static  将选中客户端设为静态 IP 分配。
-│       └── set-dynamic 将选中客户端设为动态 IP 分配。
+│       └── set         分配客户端 IP 地址。
 ├── network
 │   ├── plan            预览隧道网络迁移计划。
 │   └── apply           应用隧道网络迁移。
@@ -236,21 +235,26 @@ ovpn client ip release <name>
 
 释放已撤销客户端的保留静态分配。客户端必须已撤销且仍持有静态保留，动态池容量必须非零。已撤销的 profile、私钥、证书历史和审计历史均会保留。
 
-### `ovpn client ip set-static`
+### `ovpn client ip set`
 
 语法：
 
 ```text
-ovpn client ip set-static <client...|--all> [--ip <IPv4>]
+ovpn client ip set <client...|--all> [--dynamic|--ip <IPv4>]
 ```
 
-将活跃客户端设为静态分配并立即应用事务。单个客户端且不带 `--ip` 时，自动分配最低可用静态地址。`--ip` 仅允许用于恰好一个客户端，且必须指定有效的未使用静态地址。
+将活跃客户端设为指定 IP 分配并立即应用事务。
 
-用于多个名称或 `--all` 时，该命令打开编辑器显示选取的 `client,ip` 行，支持三种赋值：
+单个客户端模式：
+- 不带标志 → 自动分配最低可用静态地址
+- `--ip <IPv4>` → 显式指定静态地址
+- `--dynamic` → 设为动态分配
+
+多个客户端或 `--all` → 打开编辑器显示 `client,ip` 行，支持三种赋值：
 
 - 输入 `auto` 分配最低可用静态地址
 - 输入显式 IPv4 指定静态地址
-- IP 留空保留动态分配（仅限命名多客户端编辑）
+- IP 留空保留动态分配
 
 ```text
 laptop,auto               # 自动分配
@@ -259,16 +263,6 @@ desktop,                  # 保留动态
 ```
 
 编辑器选择顺序为 `OVPN_EDITOR`，其次 `EDITOR`，最后 `nano`（镜像预装 `nano` 和 `vim`）。
-
-### `ovpn client ip set-dynamic`
-
-语法：
-
-```text
-ovpn client ip set-dynamic <client...|--all>
-```
-
-将选取的活跃客户端（或 `--all` 时的每一个活跃客户端）设为动态分配并立即应用事务。要求动态池容量非零。
 
 ## 隧道网络迁移
 

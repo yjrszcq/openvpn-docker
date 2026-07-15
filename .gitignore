@@ -1,3 +1,4 @@
 goal/
 .env
 .checkpoint-karpathy/private/
+temp/

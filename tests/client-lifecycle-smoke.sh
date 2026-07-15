@@ -267,17 +267,17 @@ test -f "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 "$OVPN" client create phone --dynamic >"$TMP_DIR/phone-create.out" 2>"$TMP_DIR/phone-create.err"
 grep -Fqx 'phone,' "$OVPN_DATA_DIR/data/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/ccd/phone"
-"$OVPN" client ip set-static phone --ip 10.88.0.20 >"$TMP_DIR/phone-static.out" 2>"$TMP_DIR/phone-static.err"
+"$OVPN" client ip set phone --ip 10.88.0.20 >"$TMP_DIR/phone-static.out" 2>"$TMP_DIR/phone-static.err"
 grep -Fqx 'phone,10.88.0.20' "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.20 255.255.255.0' "$OVPN_DATA_DIR/ccd/phone"
-"$OVPN" client ip set-dynamic laptop >"$TMP_DIR/laptop-dynamic.out" 2>"$TMP_DIR/laptop-dynamic.err"
+"$OVPN" client ip set laptop --dynamic >"$TMP_DIR/laptop-dynamic.out" 2>"$TMP_DIR/laptop-dynamic.err"
 grep -Fqx 'laptop,' "$OVPN_DATA_DIR/data/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/ccd/laptop"
 env -u OVPN_EDITOR -u EDITOR \
   OVPN_TEST_EDITOR_LOG="$TMP_DIR/editor.log" \
   PATH="$FAKE_BIN:$PATH" \
-  "$OVPN" client ip set-static laptop phone >"$TMP_DIR/batch-static.out" 2>"$TMP_DIR/batch-static.err"
-grep -Eq '^nano:\.client-static\.' "$TMP_DIR/editor.log"
+  "$OVPN" client ip set laptop phone >"$TMP_DIR/batch-static.out" 2>"$TMP_DIR/batch-static.err"
+grep -Eq '^nano:\.client-ip-set\.' "$TMP_DIR/editor.log"
 grep -Fqx 'laptop,10.88.0.2' "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/laptop"
 

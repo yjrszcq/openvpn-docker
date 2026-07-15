@@ -226,35 +226,6 @@ ovpn_client_collect_named_targets() {
   done
 }
 
-ovpn_client_set_dynamic_inner() {
-  local use_all="$1"
-  shift
-  local name
-
-  ovpn_client_ip_prepare_mutation
-  [ "$OVPN_IPAM_DYNAMIC_POOL_SIZE" -gt 0 ] || ovpn_die 'cannot set a client to dynamic: dynamic pool capacity is 0; enlarge the dynamic pool first'
-  if [ "$use_all" = true ]; then
-    ovpn_client_collect_active_targets
-  else
-    ovpn_client_collect_named_targets "$@"
-  fi
-  for name in "${OVPN_CLIENT_MUTATION_TARGETS[@]}"; do
-    ovpn_client_ip_set_current_assignment "$name" ''
-  done
-  ovpn_client_ip_apply_current_mutation
-  ovpn_log 'set selected clients to dynamic assignments'
-}
-
-ovpn_client_set_dynamic_command() {
-  [ "$#" -gt 0 ] || ovpn_die 'usage: ovpn client ip set-dynamic <client...|--all>'
-  if [ "$1" = --all ]; then
-    [ "$#" -eq 1 ] || ovpn_die 'usage: ovpn client ip set-dynamic <client...|--all>'
-    ovpn_with_data_lock client ovpn_client_set_dynamic_inner true
-  else
-    ovpn_with_data_lock client ovpn_client_set_dynamic_inner false "$@"
-  fi
-}
-
 ovpn_client_editor() {
   local file="$1"
   local editor="${OVPN_EDITOR:-${EDITOR:-nano}}"
@@ -266,14 +237,13 @@ ovpn_client_editor() {
   "$editor" "$file"
 }
 
-ovpn_client_set_static_from_editor() {
-  local require_all_static="$1"
+ovpn_client_set_from_editor() {
   local temporary line name value normalized index address
   local -A targets=()
   local -A requests=()
   local -A seen=()
 
-  temporary="$(mktemp "$OVPN_DATA_DIR/data/.client-static.XXXXXX")"
+  temporary="$(mktemp "$OVPN_DATA_DIR/data/.client-ip-set.XXXXXX")"
   umask 077
   {
     printf '%s\n' '# client,ip'
@@ -310,9 +280,6 @@ ovpn_client_set_static_from_editor() {
   rm -f "$temporary"
   for name in "${OVPN_CLIENT_MUTATION_TARGETS[@]}"; do
     [ -n "${seen[$name]+present}" ] || ovpn_die "temporary client assignment editor is missing client '$name'"
-    if [ "$require_all_static" = true ] && [ -z "${requests[$name]}" ]; then
-      ovpn_die 'client ip set-static --all cannot leave a client dynamic'
-    fi
     ovpn_client_ip_set_current_assignment "$name" ''
   done
   for name in "${OVPN_CLIENT_MUTATION_TARGETS[@]}"; do
@@ -333,62 +300,93 @@ ovpn_client_set_static_from_editor() {
   done
 }
 
-ovpn_client_set_static_inner() {
-  local use_all="$1"
+ovpn_client_set_single_inner() {
+  local mode="$1"
   local requested_ip="$2"
-  shift 2
-  local name address
+  local name="$3"
+  local address
 
   ovpn_client_ip_prepare_mutation
-  [ "$OVPN_IPAM_STATIC_CAPACITY" -gt 0 ] || ovpn_die 'cannot allocate a static IP: static capacity is 0; shrink the dynamic pool or expand the VPN network'
+  ovpn_client_collect_named_targets "$name"
+  name="${OVPN_CLIENT_MUTATION_TARGETS[0]}"
+
+  case "$mode" in
+    dynamic)
+      [ "$OVPN_IPAM_DYNAMIC_POOL_SIZE" -gt 0 ] || ovpn_die 'cannot set a client to dynamic: dynamic pool capacity is 0; enlarge the dynamic pool first'
+      ovpn_client_ip_set_current_assignment "$name" ''
+      ovpn_client_ip_apply_current_mutation
+      ovpn_log "set client '$name' to dynamic assignment"
+      ;;
+    static)
+      [ "$OVPN_IPAM_STATIC_CAPACITY" -gt 0 ] || ovpn_die 'cannot allocate a static IP: static capacity is 0; shrink the dynamic pool or expand the VPN network'
+      ovpn_client_ip_set_current_assignment "$name" ''
+      if [ -n "$requested_ip" ]; then
+        ovpn_client_ip_require_static_address "$requested_ip" "$name"
+        address="$requested_ip"
+      else
+        address="$(ovpn_client_ip_allocate_static)"
+      fi
+      ovpn_client_ip_set_current_assignment "$name" "$address"
+      ovpn_client_ip_apply_current_mutation
+      ovpn_log "set client '$name' to static assignment"
+      ;;
+    *) ovpn_die "unsupported client assignment mode: $mode" ;;
+  esac
+}
+
+ovpn_client_set_from_editor_inner() {
+  local use_all="$1"
+  shift
+
+  ovpn_client_ip_prepare_mutation
   if [ "$use_all" = true ]; then
     ovpn_client_collect_active_targets
   else
     ovpn_client_collect_named_targets "$@"
   fi
-  if [ "$use_all" = true ] || [ "${#OVPN_CLIENT_MUTATION_TARGETS[@]}" -gt 1 ]; then
-    ovpn_client_set_static_from_editor "$use_all"
-  else
-    name="${OVPN_CLIENT_MUTATION_TARGETS[0]}"
-    ovpn_client_ip_set_current_assignment "$name" ''
-    if [ -n "$requested_ip" ]; then
-      ovpn_client_ip_require_static_address "$requested_ip" "$name"
-      address="$requested_ip"
-    else
-      address="$(ovpn_client_ip_allocate_static)"
-    fi
-    ovpn_client_ip_set_current_assignment "$name" "$address"
-  fi
+  ovpn_client_set_from_editor
   ovpn_client_ip_apply_current_mutation
-  ovpn_log 'set selected clients to static assignments'
+  ovpn_log 'applied client IP assignments from editor'
 }
 
-ovpn_client_set_static_command() {
-  local requested_ip=''
+ovpn_client_set_command() {
+  local mode=static requested_ip='' use_all=false
   local -a names=()
 
-  [ "$#" -gt 0 ] || ovpn_die 'usage: ovpn client ip set-static <client...|--all> [--ip <IPv4>]'
-  if [ "$1" = --all ]; then
-    [ "$#" -eq 1 ] || ovpn_die 'usage: ovpn client ip set-static <client...|--all> [--ip <IPv4>]'
-    ovpn_with_data_lock client ovpn_client_set_static_inner true ''
-    return 0
-  fi
+  [ "$#" -gt 0 ] || ovpn_die 'usage: ovpn client ip set <client...|--all> [--dynamic|--ip <IPv4>]'
+
   while [ "$#" -gt 0 ]; do
     case "$1" in
+      --all)
+        $use_all && ovpn_die '--all may only be specified once'
+        use_all=true
+        ;;
+      --dynamic)
+        [ "$mode" = static ] && [ -z "$requested_ip" ] || ovpn_die '--dynamic cannot be combined with --ip'
+        mode=dynamic
+        ;;
       --ip)
         shift
         [ "$#" -gt 0 ] || ovpn_die '--ip requires an IPv4 address'
-        [ -z "$requested_ip" ] || ovpn_die '--ip may only be specified once'
+        [ "$mode" = static ] && [ -z "$requested_ip" ] || ovpn_die '--ip cannot be combined with --dynamic or repeated'
         requested_ip="$1"
         ;;
-      --*) ovpn_die 'usage: ovpn client ip set-static <client...|--all> [--ip <IPv4>]' ;;
+      --*) ovpn_die 'usage: ovpn client ip set <client...|--all> [--dynamic|--ip <IPv4>]' ;;
       *) names+=("$1") ;;
     esac
     shift
   done
-  [ "${#names[@]}" -gt 0 ] || ovpn_die 'usage: ovpn client ip set-static <client...|--all> [--ip <IPv4>]'
-  if [ -n "$requested_ip" ] && [ "${#names[@]}" -ne 1 ]; then
-    ovpn_die '--ip requires exactly one client'
+
+  if $use_all; then
+    [ "${#names[@]}" -eq 0 ] || ovpn_die '--all cannot be combined with client names'
+    [ "$mode" = static ] && [ -z "$requested_ip" ] || ovpn_die '--dynamic and --ip cannot be combined with --all'
+    ovpn_with_data_lock client ovpn_client_set_from_editor_inner true
+  elif [ "${#names[@]}" -gt 1 ]; then
+    [ "$mode" = static ] && [ -z "$requested_ip" ] || ovpn_die '--dynamic and --ip cannot be combined with multiple client names'
+    ovpn_with_data_lock client ovpn_client_set_from_editor_inner false "${names[@]}"
+  elif [ "${#names[@]}" -eq 1 ]; then
+    ovpn_with_data_lock client ovpn_client_set_single_inner "$mode" "$requested_ip" "${names[0]}"
+  else
+    ovpn_die 'usage: ovpn client ip set <client...|--all> [--dynamic|--ip <IPv4>]'
   fi
-  ovpn_with_data_lock client ovpn_client_set_static_inner false "$requested_ip" "${names[@]}"
 }

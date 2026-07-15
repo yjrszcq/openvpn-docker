@@ -456,21 +456,14 @@ ovpn_client_command() {
         ovpn_client_ip_usage
         return 0
       fi
-      [ -n "$ip_subcommand" ] || ovpn_die "usage: ovpn client ip <list|validate|apply|edit|release|set-static|set-dynamic> ..."
+      [ -n "$ip_subcommand" ] || ovpn_die "usage: ovpn client ip <list|validate|apply|edit|release|set> ..."
       shift
       case "$ip_subcommand" in
-        set-static)
+        set)
           if ovpn_help_requested "$@"; then
-            ovpn_command_usage "ovpn client ip set-static <client...|--all> [--ip <IPv4>]" "Assign selected active clients static IP addresses."
+            ovpn_command_usage "ovpn client ip set <client...|--all> [--dynamic|--ip <IPv4>]" "Assign client IP addresses."
           else
-            ovpn_client_set_static_command "$@"
-          fi
-          ;;
-        set-dynamic)
-          if ovpn_help_requested "$@"; then
-            ovpn_command_usage "ovpn client ip set-dynamic <client...|--all>" "Assign selected active clients dynamic IP addresses."
-          else
-            ovpn_client_set_dynamic_command "$@"
+            ovpn_client_set_command "$@"
           fi
           ;;
         list)

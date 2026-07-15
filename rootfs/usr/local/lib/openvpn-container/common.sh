@@ -81,8 +81,7 @@ Commands:
   apply             validate and apply the draft registry
   edit              open the draft registry in an editor
   release           release the retained static IP of a revoked client
-  set-static        assign selected clients static IP addresses
-  set-dynamic       assign selected clients dynamic IP addresses
+  set               assign client IP addresses
 
 Run ovpn client ip <command> --help for command details.
 EOF

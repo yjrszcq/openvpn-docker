@@ -44,7 +44,7 @@ assert_help "Usage: ovpn config apply" config apply -h
 assert_help "Usage: ovpn client <command> [args]" client -h
 assert_help "Usage: ovpn client create <name> [--dynamic|--ip <IPv4>]" client create --help
 assert_help "Usage: ovpn client ip <command> [args]" client ip -h
-assert_help "Usage: ovpn client ip set-static <client...|--all> [--ip <IPv4>]" client ip set-static --help
+assert_help "Usage: ovpn client ip set <client...|--all> [--dynamic|--ip <IPv4>]" client ip set --help
 assert_help "Usage: ovpn network <command> [options]" network --help
 assert_help "Usage: ovpn network apply [--network <CIDR>] [--dynamic-pool-size <N>] [--yes]" network apply -h
 assert_help "Usage: ovpn repair <command>" repair --help
@@ -67,7 +67,6 @@ assert_help "Usage: ovpn client ip list" client ip list -h
 assert_help "Usage: ovpn client ip validate" client ip validate --help
 assert_help "Usage: ovpn client ip apply" client ip apply -h
 assert_help "Usage: ovpn client ip edit" client ip edit --help
-assert_help "Usage: ovpn client ip set-dynamic <client...|--all>" client ip set-dynamic -h
 assert_help "Usage: ovpn network plan [--network <CIDR>] [--dynamic-pool-size <N>]" network plan --help
 assert_help "Usage: ovpn repair apply" repair apply -h
 assert_help "Usage: ovpn state show" state show --help
@@ -105,7 +104,8 @@ assert_retired_command() {
 
 assert_retired_command add-client
 assert_retired_command client-ip
-assert_retired_command client set-static
+assert_retired_command client ip set-static
+assert_retired_command client ip set-dynamic
 assert_retired_command client ip sync
 assert_retired_command config print
 assert_retired_command network reconfigure

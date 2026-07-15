@@ -40,8 +40,7 @@ ovpn
 │       ├── apply       Validate and apply the draft registry.
 │       ├── edit        Open the draft registry in an editor.
 │       ├── release     Release the retained static IP of a revoked client.
-│       ├── set-static  Assign selected clients static IP addresses.
-│       └── set-dynamic Assign selected clients dynamic IP addresses.
+│       └── set         Assign client IP addresses.
 ├── network
 │   ├── plan            Preview a tunnel-network migration.
 │   └── apply           Apply a tunnel-network migration.
@@ -306,25 +305,28 @@ revoked, must still have a static reservation, and the dynamic pool must have
 nonzero capacity. The revoked profile, private key, certificate history, and
 audit history remain.
 
-### `ovpn client ip set-static`
+### `ovpn client ip set`
 
 Syntax:
 
 ```text
-ovpn client ip set-static <client...|--all> [--ip <IPv4>]
+ovpn client ip set <client...|--all> [--dynamic|--ip <IPv4>]
 ```
 
-Sets active clients to static assignments and applies the transaction
-immediately. With one client and no `--ip`, it allocates the lowest available
-static address. `--ip` is allowed only for exactly one client and must name a
-valid unused static address.
+Sets active clients to the specified IP assignment and applies the transaction
+immediately.
 
-With multiple names or `--all`, the command opens an editor containing selected
-`client,ip` rows with three assignment modes:
+Single-client mode:
+- No flag → auto-allocate the lowest available static address
+- `--ip <IPv4>` → assign an explicit static address
+- `--dynamic` → assign a dynamic address
+
+Multiple clients or `--all` → opens an editor containing `client,ip` rows with
+three assignment modes:
 
 - Enter `auto` to allocate the lowest available static address
 - Enter an explicit IPv4 address to assign a specific static IP
-- Leave the IP empty to keep the client dynamic (named multi-client edits only)
+- Leave the IP empty to keep the client dynamic
 
 ```text
 laptop,auto               # auto-allocate
@@ -334,18 +336,6 @@ desktop,                  # keep dynamic
 
 The editor is chosen from `OVPN_EDITOR`, then `EDITOR`, then `nano` (image ships
 `nano` and `vim`).
-
-### `ovpn client ip set-dynamic`
-
-Syntax:
-
-```text
-ovpn client ip set-dynamic <client...|--all>
-```
-
-Sets selected active clients, or every active client with `--all`, to dynamic
-assignments and applies the transaction immediately. It requires a nonzero
-dynamic-pool capacity.
 
 ## Tunnel-network migration
 

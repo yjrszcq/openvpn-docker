@@ -116,13 +116,13 @@ profile, and private key are removed.
 
 ```bash
 # assign static (auto-allocate lowest free address)
-docker compose exec openvpn ovpn client ip set-static phone
+docker compose exec openvpn ovpn client ip set phone
 
 # assign static (specific address)
-docker compose exec openvpn ovpn client ip set-static phone --ip 10.42.0.20
+docker compose exec openvpn ovpn client ip set phone --ip 10.42.0.20
 
 # assign dynamic
-docker compose exec openvpn ovpn client ip set-dynamic phone
+docker compose exec openvpn ovpn client ip set phone --dynamic
 ```
 
 ### Batch operations
@@ -132,10 +132,10 @@ manifest:
 
 ```bash
 # named multi-client edit
-docker compose exec openvpn ovpn client ip set-static phone tablet laptop
+docker compose exec openvpn ovpn client ip set phone tablet laptop
 
 # all active clients
-docker compose exec openvpn ovpn client ip set-dynamic --all
+docker compose exec openvpn ovpn client ip set --all
 ```
 
 Each editor line is `client,ip` with three assignment modes:
@@ -143,7 +143,7 @@ Each editor line is `client,ip` with three assignment modes:
 ```text
 phone,auto               # auto-allocate lowest free static address
 tablet,10.42.0.20        # explicit static address
-laptop,                  # leave empty to keep dynamic (not allowed with --all)
+laptop,                  # leave empty to keep dynamic
 ```
 
 Editor selection order: `OVPN_EDITOR` > `EDITOR` > `nano`. The image ships

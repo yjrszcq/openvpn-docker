@@ -111,13 +111,13 @@ docker compose exec openvpn ovpn client delete laptop
 
 ```bash
 # 设为静态（自动分配最低可用地址）
-docker compose exec openvpn ovpn client ip set-static phone
+docker compose exec openvpn ovpn client ip set phone
 
 # 设为静态（指定地址）
-docker compose exec openvpn ovpn client ip set-static phone --ip 10.42.0.20
+docker compose exec openvpn ovpn client ip set phone --ip 10.42.0.20
 
 # 设为动态
-docker compose exec openvpn ovpn client ip set-dynamic phone
+docker compose exec openvpn ovpn client ip set phone --dynamic
 ```
 
 ### 批量操作
@@ -126,10 +126,10 @@ docker compose exec openvpn ovpn client ip set-dynamic phone
 
 ```bash
 # 指定客户端批量编辑
-docker compose exec openvpn ovpn client ip set-static phone tablet laptop
+docker compose exec openvpn ovpn client ip set phone tablet laptop
 
 # 全部活跃客户端
-docker compose exec openvpn ovpn client ip set-dynamic --all
+docker compose exec openvpn ovpn client ip set --all
 ```
 
 编辑器每行格式为 `client,ip`，支持三种赋值：
@@ -137,7 +137,7 @@ docker compose exec openvpn ovpn client ip set-dynamic --all
 ```text
 phone,auto               # 自动分配最低可用静态地址
 tablet,10.42.0.20        # 显式指定静态地址
-laptop,                  # 留空保留动态分配（--all 不允许留空）
+laptop,                  # 留空保留动态分配
 ```
 
 编辑器选择顺序为 `OVPN_EDITOR` > `EDITOR` > `nano`。镜像预装 `nano` 和 `vim`。
