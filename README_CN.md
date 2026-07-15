@@ -111,7 +111,8 @@ docker compose logs -f openvpn
 服务端地址（`网络地址 + 1`）和广播地址均被保留。例如，`10.42.0.0/24` 可提供
 253 个客户端地址（`10.42.0.2` 至 `10.42.0.254`），动态池可设为 `0` 至 `253`，
 未设置时默认取 `floor(253 / 2) = 126`。动态池始终占用可用地址区间末尾的一段
-连续地址，前面的剩余部分就是静态区。
+连续地址，前面的剩余部分就是静态区。最小可用网段为 `/30`，恰好提供一个
+客户端地址（`.2`）。
 
 应明确选择路由方式：
 
@@ -125,26 +126,65 @@ docker compose logs -f openvpn
 
 本 README 不再重复命令手册。请按所使用的镜像版本选择对应参考：
 
-- [v1 命令参考](docs/cn/commands-v1.md)：发布提交 `6619921e5257e604f5df2c63d2fa10505b680d84`。
-- [v2 命令参考](docs/cn/commands-v2.md)：当前 CLI。
-- [v2 操作手册](docs/cn/operations.md)：按工作流组织的命令组合用法。
+- [v1 命令参考](docs/cn/v1/commands.md)：发布提交 `6619921e5257e604f5df2c63d2fa10505b680d84`。
+  - [v1 操作手册](docs/cn/v1/operations.md)：按工作流组织的命令组合用法。
+- [v2 命令参考](docs/cn/v2/commands.md)：当前 CLI。
+  - [v2 操作手册](docs/cn/v2/operations.md)：按工作流组织的命令组合用法。
 
 ## 安全说明
 
 - 默认设计将 CA 保持在持久化数据卷内，便于日常运维；数据卷被攻破可能导致 CA 泄露。
 - 私钥和导出的 `.ovpn` profile 都是敏感凭据，应以严格权限保存并经信任渠道交付。
 - 稳定版本发布前会校验源码校验和、runtime 版本、配置加载及所需能力。
+- 网络规则的作用域取决于所选网络模式。快速开始使用 host 网络模式，共享主机网络
+  命名空间；启用 NAT、路由推送或全隧道路由时会修改主机的 IPv4 转发和 iptables
+  规则。隔离容器网络模式下，此类修改才留在容器网络命名空间内。主机防火墙、云
+  安全组与端口转发仍由运维人员负责。
 
 ## 开发
 
 版本与发布输入集中在 `versions.env`。修改代码前运行：
 
 ```bash
-tests/check.sh          # Shell 语法与风格检查
-tests/cli-smoke.sh      # CLI 结构验证
+tests/check.sh           # Shell 语法与风格检查
+tests/cli-smoke.sh       # CLI 结构验证
+tests/workflow-smoke.sh  # 工作流逻辑验证
 ```
 
-测试使用 `OVPN_NETWORK=10.88.0.0/24`。部分检查需要 Docker 和 `/dev/net/tun`。
+CI 会校验 OpenVPN 版本、源码校验和、支持矩阵和项目镜像版本。测试使用
+`OVPN_NETWORK=10.88.0.0/24`。部分检查需要 Docker 和 `/dev/net/tun`。
+
+## 镜像、构建与发布
+
+Docker Hub 稳定镜像仅使用 OpenVPN runtime 版本作为 tag：
+
+```text
+szcq/openvpn:<OPENVPN_VERSION>
+```
+
+生产环境请固定明确 tag，不要依赖会变化的 tag。GitHub Container Registry 还会
+接收用于项目发布管理的镜像版本 tag。
+
+本地构建当前源码树：
+
+```bash
+scripts/docker-build.sh -t szcq/openvpn-server:dev .
+OVPN_IMAGE=szcq/openvpn-server:dev docker compose up -d
+```
+
+GitHub Actions 会执行兼容性、容器、E2E、升级状态和多架构门禁。默认分支的
+Candidate 会发布 GHCR 候选镜像；Candidate 成功后会自动触发 Release，创建稳定
+GHCR tag 并发布 Docker Hub 的 OpenVPN 版本 tag。
+
+每周运行（也可手动运行）的 Upstream Check 会检查官方 OpenVPN 是否有新版本。
+发现新版时，它会推送 `automation/openvpn-<版本>` 分支，并创建指向 `dev` 的 PR。
+审阅并合并该 PR 到 `dev` 后会运行 PR 检查，但 Candidate 不会从 `dev` 发布；将
+已审阅的变更从 `dev` 提升到 `main` 才会触发 Candidate 和随后 Release。手动启动
+Candidate 时也应选择 `main`。
+
+维护者注意：若 `DOCKER_TOKEN` 过期，在 `Settings → Secrets and variables →
+Actions` 更新它，然后手动启动一个默认分支的 Candidate。Candidate 成功会排队一个
+新的 Release。更新仓库 secret 后，不要依赖重跑旧的 Release。
 
 ## 许可证
 
@@ -153,4 +193,9 @@ Copyright (C) 2026 yjrszcq。
 本仓库中的原创源代码和构建配置采用 [GPL-2.0-only](LICENSE)；
 [NOTICE](NOTICE) 说明其适用范围并列出第三方组件边界。容器镜像包含 OpenVPN
 Community Edition 及其他第三方组件，它们继续适用各自的许可证，不会因本项目
-而被重新许可。
+而被重新许可。镜像在 `/usr/local/share/licenses/` 中提供本项目许可文件和
+OpenVPN 的 `COPYING` 文件。
+
+发布镜像由本源码树和 [versions.env](versions.env) 中声明并校验和固定的 OpenVPN
+源码构建；获取逻辑见
+[scripts/fetch-openvpn-source.sh](scripts/fetch-openvpn-source.sh)。

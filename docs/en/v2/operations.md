@@ -1,7 +1,7 @@
 # OpenVPN Operations Guide
 
 A workflow-oriented guide for operators. For complete command syntax and options,
-see the [v2 command reference](commands-v2.md).
+see the [v2 command reference](commands.md).
 
 ## Runtime conventions
 
@@ -17,6 +17,30 @@ docker compose exec openvpn ovpn <command>
 # maintenance container (one-shot)
 docker compose run --rm openvpn-maintenance <command>
 ```
+
+`ovpn` is the maintenance container's entrypoint, so `<command>` is the part that follows
+`ovpn` — for example, `state doctor` runs `ovpn state doctor`.
+
+If your compose file does not include the maintenance service, add it under
+`services:`:
+
+```yaml
+  openvpn-maintenance:
+    image: szcq/openvpn:2.7.5
+    restart: "no"
+    volumes:
+      - ./openvpn-data:/etc/openvpn
+      - ./openvpn-runtime:/var/lib/openvpn
+    profiles:
+      - maintenance
+    command:
+      - doctor
+    entrypoint:
+      - /usr/local/bin/ovpn
+```
+
+It mounts the same persistent data but does not request TUN, `NET_ADMIN`, or
+exposed ports.
 
 ---
 
@@ -165,10 +189,12 @@ Example: switch from UDP to TCP.
    docker compose up -d openvpn
    ```
 
-3. Re-export and distribute profiles for all active clients:
+3. Re-export and distribute profiles for all active clients. Use a temp file to
+   avoid overwriting the local copy on export failure:
 
    ```bash
-   docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
+   docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn.tmp &&
+   mv laptop.ovpn.tmp laptop.ovpn
    ```
 
 > **Note**: `config apply` only rewrites persistent configuration. It does not

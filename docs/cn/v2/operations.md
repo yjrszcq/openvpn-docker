@@ -1,7 +1,7 @@
 # OpenVPN 操作手册
 
 本文是面向运维人员的操作指南，按工作流组织命令组合用法。单个命令的完整语法和选项
-请参阅 [v2 命令参考](commands-v2.md)。
+请参阅 [v2 命令参考](commands.md)。
 
 ## 运行环境约定
 
@@ -17,6 +17,28 @@ docker compose exec openvpn ovpn <command>
 # maintenance 容器（一次性运行）
 docker compose run --rm openvpn-maintenance <command>
 ```
+
+`ovpn` 是 maintenance 容器的入口点，`<command>` 即 `ovpn` 之后的命令部分。例如
+`state doctor` 相当于执行 `ovpn state doctor`。
+
+如果 compose 文件中还没有 maintenance 服务，在 `services:` 下追加：
+
+```yaml
+  openvpn-maintenance:
+    image: szcq/openvpn:2.7.5
+    restart: "no"
+    volumes:
+      - ./openvpn-data:/etc/openvpn
+      - ./openvpn-runtime:/var/lib/openvpn
+    profiles:
+      - maintenance
+    command:
+      - doctor
+    entrypoint:
+      - /usr/local/bin/ovpn
+```
+
+它挂载同一份持久化数据，但不申请 TUN、`NET_ADMIN` 或公开端口。
 
 ---
 
@@ -159,10 +181,12 @@ docker compose exec openvpn ovpn client ip apply
    docker compose up -d openvpn
    ```
 
-3. 重新导出并分发所有活动客户端的 profile：
+3. 重新导出并分发所有活动客户端的 profile。使用临时文件可避免导出失败时覆盖
+   本地已有 profile：
 
    ```bash
-   docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
+   docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn.tmp &&
+   mv laptop.ovpn.tmp laptop.ovpn
    ```
 
 > **注意**：`config apply` 只重写持久化配置，不会修改客户端证书、私钥或 IP 分配。

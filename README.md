@@ -122,7 +122,8 @@ broadcast address are reserved. For example, `10.42.0.0/24` provides 253 client
 addresses (`10.42.0.2` through `10.42.0.254`), so the dynamic pool may be `0`
 through `253`; its unset default is `floor(253 / 2) = 126`. The dynamic pool is
 a contiguous tail of this range, and the preceding addresses are the static
-region.
+region. The smallest usable network is `/30`, which provides exactly one
+client address (`.2`).
 
 Choose the routing model deliberately:
 
@@ -139,9 +140,10 @@ Choose the routing model deliberately:
 This README intentionally does not duplicate the command manual. Select the
 reference that matches the image version you operate:
 
-- [v1 command reference](docs/en/commands-v1.md) — release commit `6619921e5257e604f5df2c63d2fa10505b680d84`.
-- [v2 command reference](docs/en/commands-v2.md) — the current CLI.
-- [v2 operations guide](docs/en/operations.md) — workflow-oriented command combinations.
+- [v1 command reference](docs/en/v1/commands.md) — release commit `6619921e5257e604f5df2c63d2fa10505b680d84`.
+  - [v1 operations guide](docs/en/v1/operations.md) — workflow-oriented command combinations.
+- [v2 command reference](docs/en/v2/commands.md) — the current CLI.
+  - [v2 operations guide](docs/en/v2/operations.md) — workflow-oriented command combinations.
 
 ## Security Notes
 
@@ -151,6 +153,12 @@ reference that matches the image version you operate:
   them with strict permissions and deliver them through trusted channels.
 - Source checksums, runtime version, configuration loading, and required
   capabilities are verified before a stable release is published.
+- Network-rule scope depends on the selected network mode. The quick-start
+  example uses host networking, which shares the host network namespace;
+  enabling NAT, route push, or full-tunnel routing modifies the host's IPv4
+  forwarding and iptables rules. In an isolated container network mode those
+  changes stay within the container network namespace. Host firewall, cloud
+  security groups, and port forwarding remain the operator's responsibility.
 
 ## Development
 
@@ -158,12 +166,50 @@ Version and release inputs are centralized in `versions.env`. Before changing
 code, run:
 
 ```bash
-tests/check.sh          # shell syntax and style
-tests/cli-smoke.sh      # CLI structure verification
+tests/check.sh           # shell syntax and style
+tests/cli-smoke.sh       # CLI structure verification
+tests/workflow-smoke.sh  # workflow logic verification
 ```
 
-Tests use `OVPN_NETWORK=10.88.0.0/24`. Some checks require Docker and
-`/dev/net/tun`.
+CI validates the OpenVPN version, source checksum, support matrix, and project
+image version. Tests use `OVPN_NETWORK=10.88.0.0/24`. Some checks require Docker
+and `/dev/net/tun`.
+
+## Build & Release
+
+Docker Hub stable images use the OpenVPN runtime version as the sole tag:
+
+```text
+szcq/openvpn:<OPENVPN_VERSION>
+```
+
+Pin an explicit tag in production; do not rely on a moving tag. GitHub
+Container Registry also receives image-version tags for project release
+management.
+
+Build the current source tree locally:
+
+```bash
+scripts/docker-build.sh -t szcq/openvpn-server:dev .
+OVPN_IMAGE=szcq/openvpn-server:dev docker compose up -d
+```
+
+GitHub Actions runs compatibility, container, E2E, upgrade-state, and
+multi-architecture gates. A default-branch Candidate publishes a GHCR
+candidate image; on success it automatically triggers a Release that creates a
+stable GHCR tag and publishes the OpenVPN-version tag to Docker Hub.
+
+A weekly (or manually triggered) Upstream Check watches for new official
+OpenVPN releases. When one is found it pushes an `automation/openvpn-<version>`
+branch and opens a PR targeting `dev`. Review and merge that PR into `dev` to
+run PR checks; Candidate is never published from `dev`. Promote reviewed
+changes from `dev` to `main` to trigger Candidate and the subsequent Release.
+When triggering Candidate manually, select `main`.
+
+Maintainer note: if `DOCKER_TOKEN` expires, update it in
+`Settings → Secrets and variables → Actions`, then manually trigger a
+default-branch Candidate. A successful Candidate queues a new Release. After
+updating the repository secret, do not rely on re-running an old Release.
 
 ## License
 
@@ -173,4 +219,9 @@ The original source code and build configuration in this repository are
 licensed under [GPL-2.0-only](LICENSE). [NOTICE](NOTICE) defines that scope and
 identifies third-party components. Container images include OpenVPN Community
 Edition and other third-party components under their own licenses; they are not
-relicensed by this project.
+relicensed by this project. The image provides this project's license file and
+OpenVPN's `COPYING` file under `/usr/local/share/licenses/`.
+
+Published images are built from this source tree and the checksum-pinned
+OpenVPN source declared in [versions.env](versions.env); fetch logic is in
+[scripts/fetch-openvpn-source.sh](scripts/fetch-openvpn-source.sh).
