@@ -52,7 +52,6 @@ services:
       - /dev/net/tun:/dev/net/tun
     volumes:
       - ./openvpn-data:/etc/openvpn
-      - ./openvpn-runtime:/var/lib/openvpn
     environment:
       OVPN_ENDPOINT: vpn.example.com
       OVPN_PROTO: udp

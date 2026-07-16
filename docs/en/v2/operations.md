@@ -30,7 +30,6 @@ If your compose file does not include the maintenance service, add it under
     restart: "no"
     volumes:
       - ./openvpn-data:/etc/openvpn
-      - ./openvpn-runtime:/var/lib/openvpn
     profiles:
       - maintenance
     command:

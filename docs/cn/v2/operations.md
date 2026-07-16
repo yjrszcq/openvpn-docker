@@ -29,7 +29,6 @@ docker compose run --rm openvpn-maintenance <command>
     restart: "no"
     volumes:
       - ./openvpn-data:/etc/openvpn
-      - ./openvpn-runtime:/var/lib/openvpn
     profiles:
       - maintenance
     command:

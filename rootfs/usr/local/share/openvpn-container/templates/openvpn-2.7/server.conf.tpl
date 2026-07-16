@@ -6,7 +6,10 @@ topology subnet
 server {{OVPN_NETWORK_ADDRESS}} {{OVPN_NETWORK_NETMASK}} nopool
 {{OVPN_DYNAMIC_POOL_DIRECTIVE}}
 client-config-dir {{OVPN_CCD_DIR}}
-ifconfig-pool-persist {{OVPN_POOL_PERSIST_FILE}}
+ifconfig-pool-persist {{OVPN_POOL_PERSIST_FILE}} 0
+script-security 2
+client-connect /usr/local/lib/openvpn-container/pool-persist-hook.sh {{OVPN_POOL_PERSIST_FILE}}
+client-disconnect /usr/local/lib/openvpn-container/pool-persist-hook.sh {{OVPN_POOL_PERSIST_FILE}}
 management {{OVPN_MANAGEMENT_SOCKET}} unix
 management-client-user root
 

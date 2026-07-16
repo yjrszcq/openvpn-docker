@@ -1,7 +1,6 @@
 x-openvpn-data: &openvpn-data
   volumes:
     - ./openvpn-data:/etc/openvpn
-    - ./openvpn-runtime:/var/lib/openvpn
 
 services:
   openvpn:
