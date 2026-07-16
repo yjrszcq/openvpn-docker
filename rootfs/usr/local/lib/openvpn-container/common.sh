@@ -181,7 +181,7 @@ ovpn_version() {
   local easyrsa_ver
   easyrsa_ver="$(ovpn_easyrsa_version)"
   if [ -r "$OVPN_BUILD_INFO" ]; then
-    sed 's/\("easy_rsa_version": *"\)[^"]*"/\1'"${easyrsa_ver}"'"/' "$OVPN_BUILD_INFO"
+    awk -v ver="$easyrsa_ver" 'BEGIN { OFS = "" } /"easy_rsa_version"/ { sub(/: *"[^"]*"/, ": \"" ver "\"") } 1' "$OVPN_BUILD_INFO"
   else
     cat <<JSON
 {

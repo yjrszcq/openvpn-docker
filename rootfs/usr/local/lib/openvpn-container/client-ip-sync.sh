@@ -146,7 +146,7 @@ ovpn_client_ip_apply_begin() {
   if [ -d "$OVPN_LEASE_DIR" ]; then
     OVPN_CLIENT_IP_SYNC_LEASE_BACKUP="$(mktemp -d "$OVPN_DATA_DIR/meta/.leases.backup.XXXXXX")"
     if [ -n "$(ls -A "$OVPN_LEASE_DIR" 2>/dev/null)" ]; then
-      cp -a "$OVPN_LEASE_DIR"/* "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP"/ 2>/dev/null || true
+      cp -a "$OVPN_LEASE_DIR"/* "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP"/ || ovpn_die "failed to back up leases"
     fi
     OVPN_CLIENT_IP_SYNC_LEASE_EXISTED=true
   fi
@@ -183,7 +183,9 @@ ovpn_client_ip_apply_rollback() {
   fi
   if [ "$OVPN_CLIENT_IP_SYNC_LEASE_SWAPPED" = true ] && [ "$OVPN_CLIENT_IP_SYNC_LEASE_EXISTED" = true ]; then
     find "$OVPN_LEASE_DIR" -maxdepth 1 -type f -delete 2>/dev/null || true
-    cp -a "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP"/* "$OVPN_LEASE_DIR"/ 2>/dev/null || true
+    if [ -n "$(ls -A "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP" 2>/dev/null)" ]; then
+      cp -a "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP"/* "$OVPN_LEASE_DIR"/ || ovpn_die "failed to restore lease backup"
+    fi
   fi
   [ -z "$OVPN_CLIENT_IP_SYNC_CCD_STAGE" ] || rm -rf "$OVPN_CLIENT_IP_SYNC_CCD_STAGE"
   [ -z "$OVPN_CLIENT_IP_SYNC_CCD_PREVIOUS" ] || rm -rf "$OVPN_CLIENT_IP_SYNC_CCD_PREVIOUS"

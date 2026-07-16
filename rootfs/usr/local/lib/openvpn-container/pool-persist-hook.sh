@@ -28,7 +28,7 @@ pool_hook_upsert() {
   # the stale lease file so list --detail won't show a zombie last-known.
   for f in "$lease_dir"/*; do
     [ -f "$f" ] || continue
-    [ "$(cat "$f")" = "$address" ] && rm -f "$f"
+    [ "$(cat "$f" 2>/dev/null || true)" = "$address" ] && rm -f "$f"
   done
 
   printf '%s\n' "$address" >"$lease_dir/$name"

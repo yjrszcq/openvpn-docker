@@ -48,7 +48,7 @@ ovpn_client_list_load_persisted_dynamic_ips() {
   for f in "$lease_dir"/*; do
     [ -f "$f" ] || continue
     name="$(basename "$f")"
-    address="$(cat "$f")"
+    address="$(cat "$f" 2>/dev/null || true)"
     ovpn_client_list_dynamic_ip_is_valid "$name" "$address" || continue
     [ -n "${OVPN_CLIENT_LIST_PERSISTED_IPS[$name]+present}" ] && continue
     OVPN_CLIENT_LIST_PERSISTED_IPS["$name"]="$address"

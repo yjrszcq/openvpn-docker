@@ -34,6 +34,7 @@ ovpn_prepare_ipam_render_context() {
   if [ "$OVPN_IPAM_DYNAMIC_POOL_SIZE" -gt 0 ]; then
     dynamic_start="$(ovpn_ipam_int_to_ipv4 "$OVPN_IPAM_DYNAMIC_START_INT")"
     dynamic_end="$(ovpn_ipam_int_to_ipv4 "$OVPN_IPAM_DYNAMIC_END_INT")"
+    [ -n "$dynamic_start" ] && [ -n "$dynamic_end" ] || ovpn_die "failed to compute dynamic pool range"
     OVPN_DYNAMIC_POOL_DIRECTIVE="ifconfig-pool $dynamic_start $dynamic_end"
   fi
 }

@@ -33,10 +33,10 @@ ovpn_start_command() {
         ;;
     esac
     ovpn_log "instance state is $state; refusing to start"
-    ovpn_missing_required_files | while IFS= read -r file; do
+    while IFS= read -r file; do
       [ -n "$file" ] || continue
       ovpn_log "missing required file: $file"
-    done
+    done < <(ovpn_missing_required_files)
     ovpn_exit_for_state "$state"
   fi
   ovpn_registry_upgrade_v1

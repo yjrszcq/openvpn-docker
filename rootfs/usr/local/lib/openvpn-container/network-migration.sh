@@ -217,21 +217,21 @@ ovpn_network_migration_apply_inner() (
   }
   trap cleanup EXIT
 
-  cp "$OVPN_PROJECT_ENV" "$config_backup"
-  cp "$OVPN_SCHEMA_VERSION_FILE" "$schema_backup"
-  cp "$draft" "$backup/draft"
-  cp "$applied" "$backup/applied"
-  cp "$audit" "$backup/audit"
+  cp "$OVPN_PROJECT_ENV" "$config_backup" || ovpn_die "migration backup failed"
+  cp "$OVPN_SCHEMA_VERSION_FILE" "$schema_backup" || ovpn_die "migration backup failed"
+  cp "$draft" "$backup/draft" || ovpn_die "migration backup failed"
+  cp "$applied" "$backup/applied" || ovpn_die "migration backup failed"
+  cp "$audit" "$backup/audit" || ovpn_die "migration backup failed"
   if [ -e "$OVPN_DATA_DIR/ccd" ]; then
-    cp -a "$OVPN_DATA_DIR/ccd" "$backup/ccd"
+    cp -a "$OVPN_DATA_DIR/ccd" "$backup/ccd" || ovpn_die "migration backup failed"
     ccd_existed=true
   fi
   if [ -e "$server" ]; then
-    cp "$server" "$backup/server"
+    cp "$server" "$backup/server" || ovpn_die "migration backup failed"
     server_existed=true
   fi
   if [ -d "$lease_dir" ]; then
-    cp -a "$lease_dir" "$backup/leases"
+    cp -a "$lease_dir" "$backup/leases" || ovpn_die "migration backup failed"
     lease_dir_existed=true
   fi
   rollback_ready=true

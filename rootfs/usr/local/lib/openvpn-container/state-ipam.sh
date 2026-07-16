@@ -188,11 +188,14 @@ ovpn_state_scan_ipam_consistency() {
     fi
   done
   if [ -d "$ccd_dir" ]; then
+    local _nullglob
+    _nullglob="$(shopt -p nullglob 2>/dev/null || true)"
     shopt -s nullglob
     for lease_line in "$ccd_dir"/*; do
       name="${lease_line##*/}"
       [ -n "${applied_clients[$name]+present}" ] && [ -n "$(awk -F, -v client="$name" '$1 == client && $2 != "" { print; exit }' "$applied")" ] || ccd_out_of_sync=true
     done
+    eval "$_nullglob"
   fi
   if [ "$ccd_out_of_sync" = true ]; then
     ovpn_state_add_repairable_issue CLIENT_IP_CCD_OUT_OF_SYNC SYNCHRONIZE_CLIENT_IP_CCD

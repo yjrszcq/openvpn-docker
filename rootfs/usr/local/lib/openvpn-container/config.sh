@@ -276,12 +276,13 @@ ovpn_config_regenerate_derived() {
 
   client_ip_csv="$OVPN_DATA_DIR/data/client-ip.csv"
   ovpn_client_ip_collect_pki_clients || return 1
-  for name in $(tail -n +2 "$client_ip_csv" 2>/dev/null | cut -d, -f1); do
+  while IFS=, read -r name _; do
     [ -n "$name" ] || continue
+    [ "$name" = "${name##\#*}" ] || continue
     status="${OVPN_CLIENT_IP_PKI_STATES[$name]:-}"
     [ "$status" = active ] || continue
     ovpn_render_client "$name" --output "$OVPN_DATA_DIR/clients/active/$name.ovpn" || return 1
-  done
+  done < <(tail -n +2 "$client_ip_csv" 2>/dev/null)
 }
 
 

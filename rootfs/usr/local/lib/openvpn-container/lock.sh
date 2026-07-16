@@ -19,7 +19,7 @@ ovpn_with_data_lock() {
   )
   chmod 600 "$lock_file"
   (
-    flock -x 9
+    flock -x 9 || ovpn_die "failed to acquire data lock"
     "$@"
   ) 9<>"$lock_file"
 }
