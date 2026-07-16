@@ -65,6 +65,25 @@ ovpn --help
 
 打印顶层命令树。此命令不会检查或修改实例数据。
 
+### `ovpn -v` / `ovpn --version`
+
+语法：
+
+```text
+ovpn -v
+ovpn --version
+```
+
+`-v` 仅打印镜像版本号（如 `2.0.0`）。`--version` 打印三行摘要，包含镜像、OpenVPN 和 Easy-RSA 版本：
+
+```text
+image:     2.0.0
+openvpn:   2.7.5
+easy-rsa:  3.2.2
+```
+
+完整的构建信息 JSON 可通过 `ovpn runtime version` 获取。
+
 ### `ovpn init`
 
 语法：
@@ -143,7 +162,7 @@ ovpn client export <name>
 ovpn client list [--detail]
 ```
 
-不带 `--detail` 时，打印活跃和已撤销客户端的精简 `name state` 记录。带 `--detail` 时，打印对齐的列：`CLIENT`、`STATE`、`MODE`、`IP`、`IP STATE` 和 `CONNECTION`。
+不带 `--detail` 时，打印带 `CLIENT` 和 `STATE` 表头的两列表格，列宽按最长名称自适应。带 `--detail` 时，打印对齐的列：`CLIENT`、`STATE`、`MODE`、`IP`、`IP STATE` 和 `CONNECTION`。
 
 在 IP 视图下，静态分配为 `configured`，或撤销后为 `retained`。动态地址在有当前租约时显示为 `connected`，在 `pool-persist.txt` 中有记录时显示为 `last-known`，否则为 `unavailable`。`CONNECTION` 根据管理套接字可用性和当前路由显示为 `online`、`offline` 或 `unknown`。该视图读取的是已应用的清单，而非未应用的草稿。
 
@@ -350,7 +369,7 @@ ovpn runtime capabilities
 ovpn runtime version
 ```
 
-打印 `/usr/local/share/openvpn-container/build-info.json` 中的构建信息 JSON。如果该文件缺失，则对于 image、runtime、Easy-RSA 和 support-range 字段打印 `unknown` 值。
+打印 `/usr/local/share/openvpn-container/build-info.json` 中的构建信息 JSON，其中 Easy-RSA 版本为运行时检测的实际版本。如果该文件缺失，则从运行时获取 Easy-RSA 版本，其余字段打印 `unknown`。
 
 ## 示例
 

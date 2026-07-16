@@ -37,6 +37,12 @@ case "$command" in
   help|-h|--help)
     ovpn_usage
     ;;
+  -v)
+    ovpn_version_short
+    ;;
+  --version)
+    ovpn_version_summary
+    ;;
 
   init)
     if ovpn_help_requested "$@"; then

@@ -71,6 +71,26 @@ ovpn --help
 
 Prints the top-level command tree. It does not inspect or modify instance data.
 
+### `ovpn -v` / `ovpn --version`
+
+Syntax:
+
+```text
+ovpn -v
+ovpn --version
+```
+
+`-v` prints only the image version (e.g. `2.0.0`). `--version` prints a
+three-line summary with image, OpenVPN, and Easy-RSA versions:
+
+```text
+image:     2.0.0
+openvpn:   2.7.5
+easy-rsa:  3.2.2
+```
+
+Use `ovpn runtime version` for the complete build-information JSON.
+
 ### `ovpn init`
 
 Syntax:
@@ -175,9 +195,9 @@ Syntax:
 ovpn client list [--detail]
 ```
 
-Without `--detail`, prints compact `name state` records for active and revoked
-clients. With `--detail`, prints the aligned columns `CLIENT`, `STATE`, `MODE`,
-`IP`, `IP STATE`, and `CONNECTION`.
+Without `--detail`, prints a two-column table with `CLIENT` and `STATE` headers,
+auto-sized to the widest name. With `--detail`, prints the aligned columns
+`CLIENT`, `STATE`, `MODE`, `IP`, `IP STATE`, and `CONNECTION`.
 
 For the IP view, static assignments are `configured` or `retained` after
 revocation. Dynamic addresses are `connected` when the management socket has a
@@ -445,9 +465,9 @@ ovpn runtime version
 ```
 
 Prints build-information JSON from
-`/usr/local/share/openvpn-container/build-info.json`. If that file is missing,
-it prints `unknown` values for image, runtime, Easy-RSA, and support-range
-fields.
+`/usr/local/share/openvpn-container/build-info.json`, with the Easy-RSA version
+detected at runtime. If that file is missing, it detects the Easy-RSA version
+and prints `unknown` for the remaining fields.
 
 ## Examples
 

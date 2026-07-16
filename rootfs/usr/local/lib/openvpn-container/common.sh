@@ -164,20 +164,63 @@ Commands:
 USAGE
 }
 
+ovpn_easyrsa_version() {
+  local easyrsa_bin ver
+  easyrsa_bin="$(ovpn_easyrsa_bin 2>/dev/null)" || true
+  if [ -n "$easyrsa_bin" ] && [ -x "$easyrsa_bin" ]; then
+    ver="$("$easyrsa_bin" --version 2>/dev/null | grep -oE 'Version:[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/Version:[[:space:]]*//')"
+    if [ -n "$ver" ]; then
+      printf '%s\n' "$ver"
+      return 0
+    fi
+  fi
+  printf 'unknown\n'
+}
+
 ovpn_version() {
+  local easyrsa_ver
+  easyrsa_ver="$(ovpn_easyrsa_version)"
   if [ -r "$OVPN_BUILD_INFO" ]; then
-    cat "$OVPN_BUILD_INFO"
+    sed 's/\("easy_rsa_version": *"\)[^"]*"/\1'"${easyrsa_ver}"'"/' "$OVPN_BUILD_INFO"
   else
-    cat <<'JSON'
+    cat <<JSON
 {
   "image_version": "unknown",
   "runtime_strategy": "unknown",
   "openvpn_version": "unknown",
-  "easy_rsa_version": "unknown",
+  "easy_rsa_version": "$easyrsa_ver",
   "supported_openvpn_range": "unknown"
 }
 JSON
   fi
+}
+
+ovpn_version_short() {
+  local info="${OVPN_BUILD_INFO:-/usr/local/share/openvpn-container/build-info.json}"
+  if [ -r "$info" ]; then
+    grep -o '"image_version": *"[^"]*"' "$info" | head -1 | sed 's/.*: *"//;s/"//'
+  else
+    printf 'unknown\n'
+  fi
+}
+
+ovpn_version_summary() {
+  local info="${OVPN_BUILD_INFO:-/usr/local/share/openvpn-container/build-info.json}"
+  local image_ver='unknown' ovpn_ver='unknown' easyrsa_ver='unknown'
+  local label_width=9
+
+  if [ -r "$info" ]; then
+    image_ver="$(grep -o '"image_version": *"[^"]*"' "$info" | head -1 | sed 's/.*: *"//;s/"//')"
+    [ -n "$image_ver" ] || image_ver=unknown
+    ovpn_ver="$(grep -o '"openvpn_version": *"[^"]*"' "$info" | head -1 | sed 's/.*: *"//;s/"//')"
+    [ -n "$ovpn_ver" ] || ovpn_ver=unknown
+  fi
+
+  easyrsa_ver="$(ovpn_easyrsa_version)"
+
+  printf '%-*s  %s\n' "$label_width" 'image:' "$image_ver"
+  printf '%-*s  %s\n' "$label_width" 'openvpn:' "$ovpn_ver"
+  printf '%-*s  %s\n' "$label_width" 'easy-rsa:' "$easyrsa_ver"
 }
 
 
