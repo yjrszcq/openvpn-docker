@@ -122,14 +122,36 @@ ovpn_network_migration_plan() {
 }
 
 ovpn_network_migration_print_plan() {
-  local index old
+  local index old new_val
+  local label_width=13 val_width=2
+  local -a client_rows=()
 
-  printf 'Network: %s -> %s\n' "$OVPN_NETWORK_MIGRATION_OLD_NETWORK" "$OVPN_NETWORK_MIGRATION_TARGET_NETWORK"
-  printf 'Dynamic pool: %s -> %s\n' "$OVPN_NETWORK_MIGRATION_OLD_POOL" "$OVPN_NETWORK_MIGRATION_TARGET_POOL"
   for ((index = 0; index < ${#OVPN_NETWORK_MIGRATION_NAMES[@]}; index++)); do
-    old="${OVPN_CLIENT_IP_VALUES[index]}"
-    printf '%s: %s -> %s\n' "${OVPN_NETWORK_MIGRATION_NAMES[index]}" "${old:-dynamic}" "${OVPN_NETWORK_MIGRATION_VALUES[index]:-dynamic}"
+    old="${OVPN_CLIENT_IP_VALUES[index]:-dynamic}"
+    new_val="${OVPN_NETWORK_MIGRATION_VALUES[index]:-dynamic}"
+    client_rows+=("${OVPN_NETWORK_MIGRATION_NAMES[index]}"$'\t'"$old"$'\t'"$new_val")
+    if ((${#OVPN_NETWORK_MIGRATION_NAMES[index]} + 1 > label_width)); then
+      label_width=$((${#OVPN_NETWORK_MIGRATION_NAMES[index]} + 1))
+    fi
+    if ((${#old} > val_width)); then val_width=${#old}; fi
+    if ((${#new_val} > val_width)); then val_width=${#new_val}; fi
   done
+
+  for v in "$OVPN_NETWORK_MIGRATION_OLD_NETWORK" "$OVPN_NETWORK_MIGRATION_TARGET_NETWORK" \
+           "$OVPN_NETWORK_MIGRATION_OLD_POOL" "$OVPN_NETWORK_MIGRATION_TARGET_POOL"; do
+    if ((${#v} > val_width)); then val_width=${#v}; fi
+  done
+
+  printf '%-*s  %-*s  ->  %s\n' "$label_width" 'Network:' "$val_width" "$OVPN_NETWORK_MIGRATION_OLD_NETWORK" "$OVPN_NETWORK_MIGRATION_TARGET_NETWORK"
+  printf '%-*s  %-*s  ->  %s\n' "$label_width" 'Dynamic pool:' "$val_width" "$OVPN_NETWORK_MIGRATION_OLD_POOL" "$OVPN_NETWORK_MIGRATION_TARGET_POOL"
+
+  if ((${#client_rows[@]})); then
+    printf '\nClient IP migrations (%d):\n' "${#client_rows[@]}"
+    for row in "${client_rows[@]}"; do
+      IFS=$'\t' read -r name old new_val <<<"$row"
+      printf '%-*s  %-*s  ->  %s\n' "$label_width" "${name}:" "$val_width" "$old" "$new_val"
+    done
+  fi
 }
 
 ovpn_network_migration_apply_inner() (

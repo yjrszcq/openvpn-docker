@@ -92,7 +92,7 @@ printf '%s\n' 'bravo,10.88.0.200' >"$OVPN_POOL_PERSIST_FILE"
 "$OVPN" client ip set alpha --ip 10.88.0.20
 
 "$OVPN" network plan --network 10.89.0.0/24 --dynamic-pool-size 100 >"$TMP_DIR/dry.out"
-grep -Fq 'Network: 10.88.0.0/24 -> 10.89.0.0/24' "$TMP_DIR/dry.out"
+grep -Eq 'Network:[[:space:]]+10\.88\.0\.0/24[[:space:]]+->[[:space:]]+10\.89\.0\.0/24' "$TMP_DIR/dry.out"
 grep -Fqx 'OVPN_NETWORK=10.88.0.0/24' "$OVPN_DATA_DIR/config/project.env"
 
 "$OVPN" network apply --network 10.89.0.0/24 --dynamic-pool-size 100 --yes >"$TMP_DIR/apply.out"
