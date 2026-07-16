@@ -70,7 +70,7 @@ services:
 
 Replace `vpn.example.com` with the public hostname or IP address clients use,
 and choose an unused network for the deployment. The repository
-`docker-compose.example.yaml` also includes an optional low-privilege
+`docker-compose.yaml` also includes an optional low-privilege
 maintenance service.
 
 The example uses host networking, so OpenVPN listens directly on the host and
@@ -112,7 +112,7 @@ bootstrap environment variables do not rewrite an existing instance.
 
 Runtime defaults apply only when the environment omits a value. The quick-start
 values are the deliberately opinionated values in
-`docker-compose.example.yaml` and `.env.example`; they are not an additional
+`docker-compose.yaml` and `.env.example`; they are not an additional
 set of runtime defaults.
 
 For a canonical network with prefix length `p`, usable client capacity is

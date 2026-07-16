@@ -125,7 +125,7 @@ grep -Fq 'injected client-ip apply failure after ccd' "$TMP_DIR/derived-failure.
 cmp "$TMP_DIR/before-failure.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
 cmp "$TMP_DIR/before-failure.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 [ "$ccd_before" = "$(sha256sum "$OVPN_DATA_DIR/ccd/bravo")" ]
-[ "$lease_before" = "$(sha256sum "$OVPN_LEASE_DIR")" ]
+[ "$lease_before" = "$(find "$OVPN_LEASE_DIR" -type f -exec sha256sum {} + | sort -k2 | sha256sum)" ]
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/bravo"
 
 printf 'client-ip set smoke passed\n'

@@ -64,7 +64,7 @@ services:
 ```
 
 将 `vpn.example.com` 替换为客户端实际连接的公网域名或 IP，并按部署环境选择
-未使用的网段。仓库中的 `docker-compose.example.yaml` 还包含一个可选的低权限
+未使用的网段。仓库中的 `docker-compose.yaml` 还包含一个可选的低权限
 maintenance 服务。
 
 示例使用 host 网络模式，OpenVPN 直接监听宿主机，因此没有 Docker 的
@@ -103,7 +103,7 @@ docker compose logs -f openvpn
 | `OVPN_EDITOR` | `EDITOR`，否则 `nano` | 未设置 | 交互式 client-IP 操作使用的编辑器。 |
 
 运行时默认值只在环境未提供相应值时生效。快速开始值是
-`docker-compose.example.yaml` 与 `.env.example` 中有意选择的值，并不是另一套
+`docker-compose.yaml` 与 `.env.example` 中有意选择的值，并不是另一套
 运行时默认值。
 
 对于前缀长度为 `p` 的规范 CIDR，可用客户端地址数为 `2^(32-p)-3`：网络地址、
