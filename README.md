@@ -12,16 +12,17 @@ layer.
 - Builds a checksum-pinned OpenVPN runtime for `linux/amd64` and `linux/arm64`.
 - Initializes an empty persistent volume with PKI, server identity, CRL,
   tls-crypt material, and the rendered server configuration.
-- Supports UDP or TCP, IPv4 NAT, route push, full-tunnel routing, DNS push,
-  and client-to-client traffic.
+- Supports UDP or TCP over public IPv4 or IPv6 transport, IPv4 NAT, route
+  push, full-tunnel routing, DNS push, and client-to-client traffic.
 - Uses a persistent client-IP registry with separate static and dynamic pools.
 - Detects inconsistent persistent state before startup and fails closed for
   critical states.
 
-The image supports IPv4 TUN deployments with mutual certificate authentication,
-Easy-RSA, tls-crypt, and CRL enforcement. It does not provide a web UI, TAP
-mode, IPv6, external or offline CA workflows, LDAP/RADIUS/OIDC, or Kubernetes
-integration.
+The image supports IPv4 TUN deployments over public IPv4 or IPv6 transport,
+with mutual certificate authentication, Easy-RSA, tls-crypt, and CRL
+enforcement. It does not provide a web UI, TAP mode, IPv6 tunnel addressing or
+a dual-stack data plane, external or offline CA workflows, LDAP/RADIUS/OIDC,
+or Kubernetes integration.
 
 ## Quick Start
 
@@ -55,6 +56,7 @@ services:
     environment:
       OVPN_ENDPOINT: vpn.example.com
       OVPN_PROTO: udp
+      OVPN_TRANSPORT_FAMILY: auto
       OVPN_PORT: "1194"
       OVPN_NETWORK: 10.42.0.0/24
       OVPN_TOPOLOGY: subnet
@@ -97,6 +99,7 @@ bootstrap environment variables do not rewrite an existing instance.
 | `OVPN_IMAGE` | `szcq/openvpn:2.7.5` | `szcq/openvpn:2.7.5` | Image used by Compose. Pin a released OpenVPN-version tag. |
 | `OVPN_ENDPOINT` | required | `vpn.example.com` | Public hostname or IP embedded in client profiles during initialization. |
 | `OVPN_PROTO` | `udp` | `udp` | Transport protocol: `udp` or `tcp`. |
+| `OVPN_TRANSPORT_FAMILY` | `auto` | `auto` | Public transport address family: `auto`, `ipv4`, or `ipv6`; IPv6-only endpoints must select `ipv6`. |
 | `OVPN_PORT` | `1194` | `1194` | OpenVPN listen port. |
 | `OVPN_NETWORK` | `10.8.0.0/24` | `10.42.0.0/24` | IPv4 tunnel network. Select a non-overlapping canonical CIDR. |
 | `OVPN_TOPOLOGY` | `subnet` | `subnet` | Required IPv4 topology; no other topology is accepted. |
@@ -114,6 +117,12 @@ Runtime defaults apply only when the environment omits a value. The quick-start
 values are the deliberately opinionated values in
 `docker-compose.yaml` and `.env.example`; they are not an additional
 set of runtime defaults.
+
+For a server with only public IPv6, publish an AAAA record and set
+`OVPN_TRANSPORT_FAMILY=ipv6`. This changes only the outer OpenVPN connection;
+tunnel addresses, pushed routes, and DNS configuration remain IPv4. If the
+server has no IPv4 egress, VPN clients cannot reach the public IPv4 Internet
+through the existing IPv4 NAT, and this image does not provide NAT64.
 
 For a canonical network with prefix length `p`, usable client capacity is
 `2^(32 - p) - 3`: the network address, server address (`network + 1`), and

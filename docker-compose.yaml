@@ -20,6 +20,7 @@ services:
     environment:
       OVPN_ENDPOINT: ${OVPN_ENDPOINT:-vpn.example.com}
       OVPN_PROTO: ${OVPN_PROTO:-udp}
+      OVPN_TRANSPORT_FAMILY: ${OVPN_TRANSPORT_FAMILY:-auto}
       OVPN_PORT: ${OVPN_PORT:-1194}
       OVPN_NETWORK: ${OVPN_NETWORK:-10.8.0.0/24}
       OVPN_TOPOLOGY: ${OVPN_TOPOLOGY:-subnet}

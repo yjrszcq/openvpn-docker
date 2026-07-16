@@ -1,5 +1,5 @@
 port {{OVPN_PORT}}
-proto {{OVPN_PROTO}}
+proto {{OVPN_SERVER_PROTO}}
 dev tun
 
 topology subnet

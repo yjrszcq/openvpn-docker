@@ -27,7 +27,8 @@ ovpn_cidr_netmask() {
 ovpn_template_apply() {
   local template="$1"
   template="${template//\{\{OVPN_PORT\}\}/$OVPN_PORT}"
-  template="${template//\{\{OVPN_PROTO\}\}/$OVPN_PROTO}"
+  template="${template//\{\{OVPN_SERVER_PROTO\}\}/$OVPN_SERVER_PROTO}"
+  template="${template//\{\{OVPN_CLIENT_PROTO\}\}/$OVPN_CLIENT_PROTO}"
   template="${template//\{\{OVPN_ENDPOINT\}\}/$OVPN_ENDPOINT}"
   template="${template//\{\{OVPN_DATA_DIR\}\}/$OVPN_RENDER_DATA_DIR}"
   template="${template//\{\{OVPN_NETWORK_ADDRESS\}\}/$OVPN_NETWORK_ADDRESS}"
@@ -78,6 +79,28 @@ ovpn_join_pushes() {
 
 ovpn_prepare_render_context() {
   ovpn_config_load
+  case "$OVPN_TRANSPORT_FAMILY:$OVPN_PROTO" in
+    auto:*)
+      OVPN_SERVER_PROTO="$OVPN_PROTO"
+      OVPN_CLIENT_PROTO="$OVPN_PROTO"
+      ;;
+    ipv4:udp)
+      OVPN_SERVER_PROTO=udp4
+      OVPN_CLIENT_PROTO=udp4
+      ;;
+    ipv4:tcp)
+      OVPN_SERVER_PROTO=tcp4-server
+      OVPN_CLIENT_PROTO=tcp4-client
+      ;;
+    ipv6:udp)
+      OVPN_SERVER_PROTO=udp6
+      OVPN_CLIENT_PROTO=udp6
+      ;;
+    ipv6:tcp)
+      OVPN_SERVER_PROTO=tcp6-server
+      OVPN_CLIENT_PROTO=tcp6-client
+      ;;
+  esac
   OVPN_NETWORK_ADDRESS="$(ovpn_cidr_ip "$OVPN_NETWORK")"
   OVPN_NETWORK_NETMASK="$(ovpn_cidr_netmask "$OVPN_NETWORK")"
   ovpn_prepare_ipam_render_context

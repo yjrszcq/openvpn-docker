@@ -1,6 +1,6 @@
 client
 dev tun
-proto {{OVPN_PROTO}}
+proto {{OVPN_CLIENT_PROTO}}
 remote {{OVPN_ENDPOINT}} {{OVPN_PORT}}
 
 resolv-retry infinite

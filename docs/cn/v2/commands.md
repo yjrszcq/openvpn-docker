@@ -118,7 +118,7 @@ ovpn start
 ovpn config show
 ```
 
-只读。加载持久化配置，对所有配置项打印一行 `KEY=VALUE`：schema 版本、端点、传输协议、端口、网络、拓扑、动态池大小、NAT 设置、网关重定向、客户端互访设置、DNS 服务器以及推送路由。
+只读。加载持久化配置，对所有配置项打印一行 `KEY=VALUE`：schema 版本、端点、传输协议、公网传输地址族、端口、网络、拓扑、动态池大小、NAT 设置、网关重定向、客户端互访设置、DNS 服务器以及推送路由。
 
 ### `ovpn config apply`
 
@@ -130,7 +130,7 @@ ovpn config apply
 
 验证当前 `OVPN_*` 环境变量，并以 mode `0600` 原子替换 `config/project.env` 和 `config/schema-version`。它会写入配置 schema 版本 `2`，且不会签发、撤销、删除或重新签发客户端证书。
 
-`OVPN_ENDPOINT` 必须为有效的主机名或 IP 字符串；`OVPN_PROTO` 为 `udp` 或 `tcp`；`OVPN_TOPOLOGY` 为 `subnet`；布尔类型字段为 `true` 或 `false`；`OVPN_DNS` 和 `OVPN_ROUTES` 为逗号分隔的 IPv4 值；网络与动态池大小必须构成合法的 IPAM 布局。apply 会写入当前环境中所有的配置值。
+`OVPN_ENDPOINT` 必须为有效的主机名或 IP 字符串；`OVPN_PROTO` 为 `udp` 或 `tcp`；`OVPN_TRANSPORT_FAMILY` 为 `auto`、`ipv4` 或 `ipv6`；`OVPN_TOPOLOGY` 为 `subnet`；布尔类型字段为 `true` 或 `false`；`OVPN_DNS` 和 `OVPN_ROUTES` 为逗号分隔的 IPv4 值；网络与动态池大小必须构成合法的 IPAM 布局。apply 会写入当前环境中所有的配置值。
 
 ## 客户端生命周期
 
@@ -317,7 +317,7 @@ ovpn state doctor [--json]
 ovpn render server [--stdout|--output <path>]
 ```
 
-根据持久化配置、IPAM 布局、PKI 路径和兼容的模板族渲染服务端配置。无输出选项时，原子更新 `server/server.conf`；`--stdout` 将结果写入标准输出；`--output <path>` 在指定路径写入 mode-`0600` 文件。
+根据持久化配置、传输地址族、IPAM 布局、PKI 路径和兼容的模板族渲染服务端配置。`auto` 保持 `udp`/`tcp`，`ipv4` 和 `ipv6` 分别渲染显式的 OpenVPN 4/6 协议。无输出选项时，原子更新 `server/server.conf`；`--stdout` 将结果写入标准输出；`--output <path>` 在指定路径写入 mode-`0600` 文件。
 
 ### `ovpn render client`
 

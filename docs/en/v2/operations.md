@@ -191,6 +191,24 @@ Example: switch from UDP to TCP.
 docker compose exec openvpn ovpn config show
 ```
 
+### Use an IPv6-only public endpoint
+
+Publish an AAAA record for the server hostname and set the Compose environment:
+
+```yaml
+environment:
+  OVPN_ENDPOINT: vpn6.example.com
+  OVPN_PROTO: udp
+  OVPN_TRANSPORT_FAMILY: ipv6
+```
+
+Follow the configuration-change workflow above to run `ovpn config apply`,
+restart the service, and re-export client profiles. This forces only the outer
+OpenVPN connection to IPv6; the VPN data plane remains the IPv4 TUN defined by
+`OVPN_NETWORK`. Without IPv4 egress on the server, the existing IPv4 NAT cannot
+provide public IPv4 access, and this image does not provide NAT64. Client
+networks must also have public IPv6 connectivity.
+
 ---
 
 ## Network migration

@@ -38,6 +38,7 @@ if ! grep -q '^OVPN_NETWORK=10.88.0.0/24$' "$TMP_DIR/project.env.out"; then
   echo 'project config did not preserve validation network' >&2
   exit 1
 fi
+grep -Fqx 'OVPN_TRANSPORT_FAMILY=auto' "$TMP_DIR/project.env.out"
 
 "$OVPN" render server --stdout >"$TMP_DIR/server.conf"
 grep -q '^server 10.88.0.0 255.255.255.0 nopool$' "$TMP_DIR/server.conf"
@@ -61,10 +62,46 @@ printf '%s\n' 'TEST TLS CRYPT KEY' >"$OVPN_DATA_DIR/secrets/tls-crypt.key"
 
 "$OVPN" render client laptop --stdout >"$TMP_DIR/laptop.ovpn"
 grep -q '^remote vpn.example.test 1194$' "$TMP_DIR/laptop.ovpn"
+grep -q '^proto udp$' "$TMP_DIR/laptop.ovpn"
 grep -q 'TEST CA CERT' "$TMP_DIR/laptop.ovpn"
 grep -q 'TEST CLIENT CERT' "$TMP_DIR/laptop.ovpn"
 grep -q 'TEST CLIENT KEY' "$TMP_DIR/laptop.ovpn"
 grep -q 'TEST TLS CRYPT KEY' "$TMP_DIR/laptop.ovpn"
+
+assert_transport_render() {
+  local family="$1"
+  local proto="$2"
+  local endpoint="$3"
+  local server_proto="$4"
+  local client_proto="$5"
+
+  OVPN_TRANSPORT_FAMILY="$family" OVPN_PROTO="$proto" OVPN_ENDPOINT="$endpoint" "$OVPN" config apply
+  "$OVPN" render server --stdout >"$TMP_DIR/server-$family-$proto.conf"
+  "$OVPN" render client laptop --stdout >"$TMP_DIR/client-$family-$proto.ovpn"
+  grep -Fqx "proto $server_proto" "$TMP_DIR/server-$family-$proto.conf"
+  grep -Fqx "proto $client_proto" "$TMP_DIR/client-$family-$proto.ovpn"
+  grep -Fqx "remote $endpoint 1194" "$TMP_DIR/client-$family-$proto.ovpn"
+}
+
+assert_transport_render auto udp vpn.example.test udp udp
+assert_transport_render auto tcp vpn.example.test tcp tcp
+assert_transport_render ipv4 udp vpn.example.test udp4 udp4
+assert_transport_render ipv4 tcp vpn.example.test tcp4-server tcp4-client
+assert_transport_render ipv6 udp 2001:db8::10 udp6 udp6
+assert_transport_render ipv6 tcp vpn6.example.test tcp6-server tcp6-client
+
+config_before="$(sha256sum "$OVPN_DATA_DIR/config/project.env")"
+if OVPN_TRANSPORT_FAMILY=invalid "$OVPN" config apply >"$TMP_DIR/invalid-family.out" 2>"$TMP_DIR/invalid-family.err"; then
+  echo 'invalid transport family unexpectedly applied' >&2
+  exit 1
+fi
+grep -Fq 'OVPN_TRANSPORT_FAMILY must be auto, ipv4, or ipv6' "$TMP_DIR/invalid-family.err"
+[ "$config_before" = "$(sha256sum "$OVPN_DATA_DIR/config/project.env")" ]
+
+grep -v '^OVPN_TRANSPORT_FAMILY=' "$OVPN_DATA_DIR/config/project.env" >"$OVPN_DATA_DIR/config/project.env.legacy"
+mv "$OVPN_DATA_DIR/config/project.env.legacy" "$OVPN_DATA_DIR/config/project.env"
+"$OVPN" config show >"$TMP_DIR/legacy-project.env.out"
+grep -Fqx 'OVPN_TRANSPORT_FAMILY=auto' "$TMP_DIR/legacy-project.env.out"
 
 OVPN_DATA_DIR="$TMP_DIR/static" OVPN_DYNAMIC_POOL_SIZE=0 "$OVPN" config apply
 OVPN_DATA_DIR="$TMP_DIR/static" "$OVPN" render server --stdout >"$TMP_DIR/static-server.conf"

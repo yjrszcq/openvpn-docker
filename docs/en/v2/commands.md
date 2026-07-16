@@ -135,9 +135,10 @@ ovpn config show
 ```
 
 Read-only. Loads persistent configuration and prints one `KEY=VALUE` line for
-all configuration facts: schema version, endpoint, transport, port, network,
-topology, dynamic-pool size, NAT settings, gateway redirection,
-client-to-client setting, DNS servers, and pushed routes.
+all configuration facts: schema version, endpoint, transport protocol, public
+transport address family, port, network, topology, dynamic-pool size, NAT
+settings, gateway redirection, client-to-client setting, DNS servers, and
+pushed routes.
 
 ### `ovpn config apply`
 
@@ -153,7 +154,8 @@ configuration schema version `2` and does not issue, revoke, delete, or reissue
 client certificates.
 
 `OVPN_ENDPOINT` must be a valid hostname or IP string; `OVPN_PROTO` is `udp` or
-`tcp`; `OVPN_TOPOLOGY` is `subnet`; boolean fields are `true` or `false`;
+`tcp`; `OVPN_TRANSPORT_FAMILY` is `auto`, `ipv4`, or `ipv6`;
+`OVPN_TOPOLOGY` is `subnet`; boolean fields are `true` or `false`;
 `OVPN_DNS` and `OVPN_ROUTES` are comma-separated IPv4 values; and the network
 and dynamic-pool size must form a valid IPAM layout. Apply writes every
 configuration value from the current environment.
@@ -404,8 +406,10 @@ Syntax:
 ovpn render server [--stdout|--output <path>]
 ```
 
-Renders the server configuration from persistent configuration, IPAM layout,
-PKI paths, and the compatible template family. With no output option it
+Renders the server configuration from persistent configuration, transport
+address family, IPAM layout, PKI paths, and the compatible template family.
+`auto` preserves `udp`/`tcp`; `ipv4` and `ipv6` render explicit OpenVPN 4/6
+protocols. With no output option it
 atomically updates `server/server.conf`; `--stdout` writes the result to
 standard output; `--output <path>` writes a mode-`0600` file at that path.
 

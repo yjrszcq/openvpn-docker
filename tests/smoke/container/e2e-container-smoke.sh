@@ -17,6 +17,7 @@ POLICY_REDIRECT_GATEWAY=false
 POLICY_CLIENT_TO_CLIENT=false
 POLICY_DNS=''
 POLICY_ROUTES=''
+transport_family=auto
 
 containers=()
 networks=()
@@ -76,6 +77,7 @@ run_control() {
     -e "OVPN_NETWORK=$NETWORK" \
     -e "OVPN_PORT=$PORT" \
     -e "OVPN_PROTO=$proto" \
+    -e "OVPN_TRANSPORT_FAMILY=$transport_family" \
     -e "OVPN_NAT=$POLICY_NAT" \
     -e "OVPN_NAT_INTERFACE=$POLICY_NAT_INTERFACE" \
     -e "OVPN_REDIRECT_GATEWAY=$POLICY_REDIRECT_GATEWAY" \
@@ -152,6 +154,7 @@ start_server() {
     -e "OVPN_NETWORK=$NETWORK" \
     -e "OVPN_PORT=$PORT" \
     -e "OVPN_PROTO=$proto" \
+    -e "OVPN_TRANSPORT_FAMILY=$transport_family" \
     -e "OVPN_NAT=$POLICY_NAT" \
     -e "OVPN_NAT_INTERFACE=$POLICY_NAT_INTERFACE" \
     -e "OVPN_REDIRECT_GATEWAY=$POLICY_REDIRECT_GATEWAY" \
@@ -252,6 +255,7 @@ assert_client_rejected() {
 }
 
 for proto in udp tcp; do
+  transport_family=auto
   data_dir="$WORK_DIR/$proto-data"
   profile_path="$WORK_DIR/client-$proto.ovpn"
   network_name="$RUN_ID-$proto-net"
@@ -285,6 +289,7 @@ for proto in udp tcp; do
 
   data_grep "$data_dir" "^OVPN_NETWORK=$NETWORK$" config/project.env
   data_grep "$data_dir" "^OVPN_PROTO=$proto$" config/project.env
+  data_grep "$data_dir" '^OVPN_TRANSPORT_FAMILY=auto$' config/project.env
   data_grep "$data_dir" '^server 10.88.0.0 255.255.255.0 nopool$' server/server.conf
   data_grep "$data_dir" "^proto $proto$" server/server.conf
   data_grep "$data_dir" "^OVPN_NAT=$POLICY_NAT$" config/project.env
@@ -325,4 +330,54 @@ for proto in udp tcp; do
 
 done
 
-printf 'e2e container smoke passed (udp,tcp network=%s)\n' "$NETWORK"
+family_index=0
+for proto in udp tcp; do
+  family_index=$((family_index + 1))
+  transport_family=ipv6
+  data_dir="$WORK_DIR/$proto-ipv6-data"
+  profile_path="$WORK_DIR/client-$proto-ipv6.ovpn"
+  network_name="$RUN_ID-$proto-ipv6-net"
+  server_name="$RUN_ID-$proto-ipv6-server"
+  endpoint="$server_name"
+  POLICY_NAT=false
+  POLICY_NAT_INTERFACE=auto
+  POLICY_REDIRECT_GATEWAY=false
+  POLICY_CLIENT_TO_CLIENT=true
+  POLICY_DNS=''
+  POLICY_ROUTES=''
+  mkdir -p "$data_dir"
+
+  docker network create --ipv6 --subnet "fd42:88:$family_index::/64" "$network_name" >/dev/null
+  networks+=("$network_name")
+  containers+=("$server_name")
+
+  start_server "$data_dir" "$endpoint" "$server_name" "$network_name"
+  wait_for_log "$server_name" 'Initialization Sequence Completed' "$WORK_DIR/server-$proto-ipv6.log"
+  docker exec "$server_name" ovpn runtime health
+
+  if [ "$proto" = udp ]; then
+    server_proto=udp6
+    client_proto=udp6
+  else
+    server_proto=tcp6-server
+    client_proto=tcp6-client
+  fi
+  data_grep "$data_dir" '^OVPN_TRANSPORT_FAMILY=ipv6$' config/project.env
+  data_grep "$data_dir" "^proto $server_proto$" server/server.conf
+  data_grep "$data_dir" '^server 10.88.0.0 255.255.255.0 nopool$' server/server.conf
+  data_absent "$data_dir" 'ifconfig-ipv6\|route-ipv6' server/server.conf
+
+  run_control "$data_dir" "$endpoint" ovpn client create "client-$proto-ipv6"
+  run_control "$data_dir" "$endpoint" ovpn client export "client-$proto-ipv6" >"$profile_path"
+  grep -Fqx "proto $client_proto" "$profile_path"
+  grep -Fqx "remote $endpoint $PORT" "$profile_path"
+  if grep -Eq 'ifconfig-ipv6|route-ipv6' "$profile_path"; then
+    echo 'IPv6 transport profile unexpectedly configured an IPv6 tunnel' >&2
+    exit 1
+  fi
+
+  assert_client_connects "$network_name" "$profile_path" "$WORK_DIR/client-$proto-ipv6.log"
+  grep -Eq 'UDPv6|TCPv6' "$WORK_DIR/client-$proto-ipv6.log"
+done
+
+printf 'e2e container smoke passed (IPv4 and IPv6 transport; udp,tcp network=%s)\n' "$NETWORK"
