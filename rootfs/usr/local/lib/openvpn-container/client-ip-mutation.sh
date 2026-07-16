@@ -165,7 +165,6 @@ ovpn_client_create_inner() {
     *) ovpn_die "unsupported client assignment mode: $mode" ;;
   esac
 
-  ovpn_pki_issue_client "$name"
   OVPN_CLIENT_IP_NAMES+=("$name")
   OVPN_CLIENT_IP_VALUES+=("$assignment")
   if [ -n "$assignment" ]; then
@@ -175,6 +174,7 @@ ovpn_client_create_inner() {
   fi
   ovpn_client_registry_set_state "$name" active
   ovpn_client_ip_apply_current_mutation
+  ovpn_pki_issue_client "$name"
   ovpn_render_client "$name" --output "$OVPN_DATA_DIR/clients/active/$name.ovpn"
   ovpn_log "added client '$name'"
 }

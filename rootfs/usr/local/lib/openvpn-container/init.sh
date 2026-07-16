@@ -50,6 +50,13 @@ ovpn_init_inner() {
   cleanup_stage() {
     local status=$?
     if [ "$status" -ne 0 ]; then
+      if [ "$commit_started" = true ]; then
+        for entry in ccd clients config data meta pki repair secrets server; do
+          [ -e "$final_data_dir/$entry" ] || continue
+          [ -e "$stage_dir/$entry" ] && continue
+          mv "$final_data_dir/$entry" "$stage_dir/$entry" 2>/dev/null || true
+        done
+      fi
       rm -rf "$stage_dir"
       if [ "$commit_started" = false ]; then
         rm -f "$transaction_file" "$transaction_tmp"

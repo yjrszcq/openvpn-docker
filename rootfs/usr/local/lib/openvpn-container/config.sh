@@ -118,7 +118,7 @@ ovpn_validate_cidr() {
   prefix="${cidr#*/}"
   IFS=. read -r o1 o2 o3 o4 <<<"$ip"
   for octet in "$o1" "$o2" "$o3" "$o4"; do
-    if [ "$octet" -gt 255 ]; then
+    if [ "$((10#$octet))" -gt 255 ]; then
       ovpn_die "invalid IPv4 CIDR: $cidr"
     fi
   done
@@ -138,7 +138,7 @@ ovpn_validate_ipv4() {
 
   IFS=. read -r o1 o2 o3 o4 <<<"$address"
   for octet in "$o1" "$o2" "$o3" "$o4"; do
-    if [ "$octet" -gt 255 ]; then
+    if [ "$((10#$octet))" -gt 255 ]; then
       ovpn_die "invalid IPv4 address: $address"
     fi
   done
@@ -272,16 +272,17 @@ ovpn_config_regenerate_derived() {
 
   [ -r "$OVPN_DATA_DIR/pki/index.txt" ] || return 0
 
-  ovpn_render_server --output "$OVPN_DATA_DIR/server/server.conf" || return 1
+  ovpn_render_server --output "$OVPN_DATA_DIR/server/server.conf" || ovpn_die "failed to regenerate server config"
 
   client_ip_csv="$OVPN_DATA_DIR/data/client-ip.csv"
-  ovpn_client_ip_collect_pki_clients || return 1
+  ovpn_client_ip_collect_pki_clients || ovpn_die "failed to collect PKI client state"
+  [ -r "$client_ip_csv" ] || return 0
   while IFS=, read -r name _; do
     [ -n "$name" ] || continue
     [ "$name" = "${name##\#*}" ] || continue
     status="${OVPN_CLIENT_IP_PKI_STATES[$name]:-}"
     [ "$status" = active ] || continue
-    ovpn_render_client "$name" --output "$OVPN_DATA_DIR/clients/active/$name.ovpn" || return 1
+    ovpn_render_client "$name" --output "$OVPN_DATA_DIR/clients/active/$name.ovpn" || ovpn_die "failed to regenerate profile for client $name"
   done < <(tail -n +2 "$client_ip_csv" 2>/dev/null)
 }
 

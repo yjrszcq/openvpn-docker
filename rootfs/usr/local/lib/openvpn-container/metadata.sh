@@ -9,14 +9,28 @@ ovpn_json_escape() {
 }
 
 ovpn_instance_id() {
-  local openssl_bin
+  local id_file openssl_bin id
+
+  if [ -n "${OVPN_DATA_DIR:-}" ]; then
+    id_file="$OVPN_DATA_DIR/meta/instance-id"
+    if [ -r "$id_file" ]; then
+      cat "$id_file"
+      return 0
+    fi
+  fi
 
   if [ -r /proc/sys/kernel/random/uuid ]; then
-    cat /proc/sys/kernel/random/uuid
-    return 0
+    id="$(cat /proc/sys/kernel/random/uuid)"
+  else
+    openssl_bin="$(ovpn_openssl_bin)" || return 1
+    id="$("$openssl_bin" rand -hex 16)"
   fi
-  openssl_bin="$(ovpn_openssl_bin)" || return 1
-  "$openssl_bin" rand -hex 16
+
+  if [ -n "${id_file:-}" ] && [ -d "$(dirname "$id_file")" ]; then
+    printf '%s\n' "$id" >"$id_file"
+    chmod 600 "$id_file"
+  fi
+  printf '%s\n' "$id"
 }
 
 ovpn_ca_fingerprint() {

@@ -158,10 +158,10 @@ ovpn_render_client_content() {
     ovpn_die "OVPN_ENDPOINT is required to render client profiles"
   fi
 
-  CA_CERT="$(ovpn_read_required_file "$OVPN_DATA_DIR/pki/ca.crt")"
-  CLIENT_CERT="$(ovpn_read_required_file "$OVPN_DATA_DIR/pki/issued/$client_name.crt")"
-  CLIENT_KEY="$(ovpn_read_required_file "$OVPN_DATA_DIR/pki/private/$client_name.key")"
-  TLS_CRYPT_KEY="$(ovpn_read_required_file "$OVPN_DATA_DIR/secrets/tls-crypt.key")"
+  CA_CERT="$(ovpn_read_required_file "$OVPN_DATA_DIR/pki/ca.crt")" || exit 1
+  CLIENT_CERT="$(ovpn_read_required_file "$OVPN_DATA_DIR/pki/issued/$client_name.crt")" || exit 1
+  CLIENT_KEY="$(ovpn_read_required_file "$OVPN_DATA_DIR/pki/private/$client_name.key")" || exit 1
+  TLS_CRYPT_KEY="$(ovpn_read_required_file "$OVPN_DATA_DIR/secrets/tls-crypt.key")" || exit 1
   ovpn_template_apply "$(cat "$template_path")"
 }
 
