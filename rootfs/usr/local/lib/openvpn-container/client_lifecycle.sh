@@ -154,11 +154,30 @@ ovpn_client_list_with_ip_command() {
   done
 }
 
+ovpn_client_list_plain_command() {
+  local name state
+  local name_width=6
+  local -a entries=()
+
+  ovpn_require_healthy_state
+  while IFS=' ' read -r name state; do
+    entries+=("$name"$'\t'"$state")
+    if ((${#name} > name_width)); then name_width=${#name}; fi
+  done < <(ovpn_client_records)
+
+  if ((${#entries[@]})); then
+    printf '%-*s  %s\n' "$name_width" CLIENT STATE
+    for entry in "${entries[@]}"; do
+      IFS=$'\t' read -r name state <<<"$entry"
+      printf '%-*s  %s\n' "$name_width" "$name" "$state"
+    done
+  fi
+}
+
 ovpn_client_list_command() {
   case "$#" in
     0)
-      ovpn_require_healthy_state
-      ovpn_client_records
+      ovpn_client_list_plain_command
       ;;
     1)
       [ "$1" = --detail ] || ovpn_die 'usage: ovpn client list [--detail]'

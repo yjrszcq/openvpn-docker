@@ -311,13 +311,13 @@ for proto in udp tcp; do
   run_control "$data_dir" "$endpoint" ovpn client export "client-$proto" >"$profile_path"
   grep -q "^remote $endpoint $PORT$" "$profile_path"
   grep -q "^proto $proto$" "$profile_path"
-  grep -q "^client-$proto active$" <(run_control "$data_dir" "$endpoint" ovpn client list)
+  grep -E "^client-$proto[[:space:]]+active$" <(run_control "$data_dir" "$endpoint" ovpn client list)
 
   assert_client_connects "$network_name" "$profile_path" "$WORK_DIR/client-$proto-active.log"
 
   docker rm -f "$server_name" >/dev/null
   run_control "$data_dir" "$endpoint" ovpn client revoke "client-$proto"
-  grep -q "^client-$proto revoked$" <(run_control "$data_dir" "$endpoint" ovpn client list)
+  grep -E "^client-$proto[[:space:]]+revoked$" <(run_control "$data_dir" "$endpoint" ovpn client list)
 
   start_server "$data_dir" "$endpoint" "$server_name" "$network_name"
   wait_for_log "$server_name" 'Initialization Sequence Completed' "$WORK_DIR/server-$proto-revoked-start.log"

@@ -256,7 +256,7 @@ if [ "$("$OVPN" state show)" != HEALTHY ]; then
 fi
 
 
-grep -q '^laptop active$' <("$OVPN" client list)
+grep -E '^laptop[[:space:]]+active$' <("$OVPN" client list)
 test -f "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 
 "$OVPN" client create phone --dynamic >"$TMP_DIR/phone-create.out" 2>"$TMP_DIR/phone-create.err"
@@ -310,7 +310,7 @@ if grep -Fq 'unrelated' "$TMP_DIR/client-list-ip.out"; then
   echo 'client IP list included a lease for an unknown client' >&2
   exit 1
 fi
-grep -Fqx 'laptop active' <("$OVPN" client list)
+grep -E '^laptop[[:space:]]+active$' <("$OVPN" client list)
 grep -Fqx "$(format_client_list_row online active dynamic 10.88.0.200 connected online)" <("$OVPN" client list --detail)
 rm -f "$OVPN_MANAGEMENT_SOCKET"
 "$OVPN" client list --detail >"$TMP_DIR/client-list-ip-unknown.out"
@@ -358,7 +358,7 @@ fi
 grep -q 'already exists' "$TMP_DIR/duplicate.err"
 
 "$OVPN" client revoke phone --release-ip >"$TMP_DIR/phone-revoke.out" 2>"$TMP_DIR/phone-revoke.err"
-grep -q '^phone revoked$' <("$OVPN" client list)
+grep -E '^phone[[:space:]]+revoked$' <("$OVPN" client list)
 grep -Fqx 'phone,' "$OVPN_DATA_DIR/data/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/ccd/phone"
 test -f "$OVPN_DATA_DIR/clients/revoked/phone.ovpn"
@@ -369,7 +369,7 @@ phone_key_after="$(sha256sum "$OVPN_DATA_DIR/pki/private/phone.key")"
   echo 'reissue did not generate a new private key' >&2
   exit 1
 }
-grep -q '^phone active$' <("$OVPN" client list)
+grep -E '^phone[[:space:]]+active$' <("$OVPN" client list)
 grep -Fqx 'phone,' "$OVPN_DATA_DIR/data/client-ip.csv"
 test -f "$OVPN_DATA_DIR/clients/active/phone.ovpn"
 "$OVPN" client delete phone >"$TMP_DIR/phone-delete.out" 2>"$TMP_DIR/phone-delete.err"
@@ -400,14 +400,14 @@ fi
 grep -Fq "is not revoked" "$TMP_DIR/active-release-ip.err"
 
 "$OVPN" client revoke laptop >"$TMP_DIR/revoke.out" 2>"$TMP_DIR/revoke.err"
-grep -q "^laptop revoked$" <("$OVPN" client list)
+grep -E "^laptop[[:space:]]+revoked$" <("$OVPN" client list)
 grep -Fqx "laptop,10.88.0.2" "$OVPN_DATA_DIR/data/client-ip.csv"
 test -f "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
 test ! -e "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 
 "$OVPN" client ip release laptop >"$TMP_DIR/release-ip.out" 2>"$TMP_DIR/release-ip.err"
 grep -Fqx "laptop," "$OVPN_DATA_DIR/data/client-ip.csv"
-grep -q "^laptop revoked$" <("$OVPN" client list)
+grep -E "^laptop[[:space:]]+revoked$" <("$OVPN" client list)
 test ! -e "$OVPN_DATA_DIR/ccd/laptop"
 test -f "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
 test -f "$OVPN_DATA_DIR/pki/private/laptop.key"
