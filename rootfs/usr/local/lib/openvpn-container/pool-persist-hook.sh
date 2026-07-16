@@ -13,10 +13,15 @@ lease_dir="${OVPN_LEASE_DIR:-/etc/openvpn/data/leases}"
 pool_hook_upsert() {
   local name="$1"
   local address="$2"
-  local f
+  local f ccd_dir
 
   [ -n "$name" ] || return 0
   [ -n "$address" ] || return 0
+
+  # Static clients have a CCD file with ifconfig-push — skip lease tracking.
+  ccd_dir="$(dirname "$(dirname "$lease_dir")")/ccd"
+  [ -f "$ccd_dir/$name" ] && return 0
+
   mkdir -p "$lease_dir"
 
   # If OpenVPN just reassigned this IP from another client to us, remove
