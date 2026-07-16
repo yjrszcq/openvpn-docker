@@ -93,48 +93,24 @@ ovpn_client_ip_sync_swap_ccd() {
 }
 
 ovpn_client_ip_sync_stage_leases() {
-  local pool_file="$OVPN_POOL_PERSIST_FILE"
-  local line name
-  local -A release_names=()
+  local lease_dir="$OVPN_LEASE_DIR"
 
   [ "${#OVPN_CLIENT_IP_SYNC_LEASE_CLIENTS[@]}" -gt 0 ] || return 0
-  [ -e "$pool_file" ] || return 0
-  mkdir -p "$(dirname "$pool_file")"
-  OVPN_CLIENT_IP_SYNC_LEASE_STAGE="$(mktemp "$(dirname "$pool_file")/.pool-persist.XXXXXX")"
-  umask 077
-  for name in "${OVPN_CLIENT_IP_SYNC_LEASE_CLIENTS[@]}"; do
-    release_names["$name"]=1
-  done
-  while IFS= read -r line || [ -n "$line" ]; do
-    name="${line%%,*}"
-    [ -n "${release_names[$name]+present}" ] && continue
-    printf '%s\n' "$line"
-  done <"$pool_file" >"$OVPN_CLIENT_IP_SYNC_LEASE_STAGE"
-  chmod 600 "$OVPN_CLIENT_IP_SYNC_LEASE_STAGE"
+  mkdir -p "$lease_dir"
 }
 
 ovpn_client_ip_sync_swap_leases() {
-  [ -n "$OVPN_CLIENT_IP_SYNC_LEASE_STAGE" ] || return 0
-  mv "$OVPN_CLIENT_IP_SYNC_LEASE_STAGE" "$OVPN_POOL_PERSIST_FILE"
-  OVPN_CLIENT_IP_SYNC_LEASE_STAGE=''
+  local name
+
+  [ "${#OVPN_CLIENT_IP_SYNC_LEASE_CLIENTS[@]}" -gt 0 ] || return 0
+  for name in "${OVPN_CLIENT_IP_SYNC_LEASE_CLIENTS[@]}"; do
+    rm -f "$OVPN_LEASE_DIR/$name"
+  done
   OVPN_CLIENT_IP_SYNC_LEASE_SWAPPED=true
 }
 
 ovpn_client_ip_clear_dynamic_lease() {
-  local client_name="$1"
-  local pool_file="$OVPN_POOL_PERSIST_FILE"
-  local temporary line name
-
-  [ -e "$pool_file" ] || return 0
-  temporary="$(mktemp "$(dirname "$pool_file")/.pool-persist.XXXXXX")"
-  umask 077
-  while IFS= read -r line || [ -n "$line" ]; do
-    name="${line%%,*}"
-    [ "$name" = "$client_name" ] && continue
-    printf '%s\n' "$line"
-  done <"$pool_file" >"$temporary"
-  chmod 600 "$temporary"
-  mv "$temporary" "$pool_file"
+  rm -f "$OVPN_LEASE_DIR/$1"
 }
 
 ovpn_client_ip_kick_changed_clients() {
@@ -167,10 +143,11 @@ ovpn_client_ip_sync_maybe_fail() {
 
 ovpn_client_ip_apply_begin() {
   ovpn_client_ip_sync_reset
-  if [ -e "$OVPN_POOL_PERSIST_FILE" ]; then
-    OVPN_CLIENT_IP_SYNC_LEASE_BACKUP="$(mktemp "$OVPN_DATA_DIR/meta/.pool-persist.backup.XXXXXX")"
-    cp "$OVPN_POOL_PERSIST_FILE" "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP"
-    chmod 600 "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP"
+  if [ -d "$OVPN_LEASE_DIR" ]; then
+    OVPN_CLIENT_IP_SYNC_LEASE_BACKUP="$(mktemp -d "$OVPN_DATA_DIR/meta/.leases.backup.XXXXXX")"
+    if [ -n "$(ls -A "$OVPN_LEASE_DIR" 2>/dev/null)" ]; then
+      cp -a "$OVPN_LEASE_DIR"/* "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP"/ 2>/dev/null || true
+    fi
     OVPN_CLIENT_IP_SYNC_LEASE_EXISTED=true
   fi
 }
@@ -193,8 +170,8 @@ ovpn_client_ip_apply_derived() {
 ovpn_client_ip_apply_finalize() {
   [ -z "$OVPN_CLIENT_IP_SYNC_CCD_PREVIOUS" ] || rm -rf "$OVPN_CLIENT_IP_SYNC_CCD_PREVIOUS"
   [ -z "$OVPN_CLIENT_IP_SYNC_CCD_STAGE" ] || rm -rf "$OVPN_CLIENT_IP_SYNC_CCD_STAGE"
-  [ -z "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP" ] || rm -f "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP"
-  [ -z "$OVPN_CLIENT_IP_SYNC_LEASE_STAGE" ] || rm -f "$OVPN_CLIENT_IP_SYNC_LEASE_STAGE"
+  [ -z "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP" ] || rm -rf "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP"
+  [ -z "$OVPN_CLIENT_IP_SYNC_LEASE_STAGE" ] || rm -rf "$OVPN_CLIENT_IP_SYNC_LEASE_STAGE"
 }
 
 ovpn_client_ip_apply_rollback() {
@@ -205,12 +182,11 @@ ovpn_client_ip_apply_rollback() {
     fi
   fi
   if [ "$OVPN_CLIENT_IP_SYNC_LEASE_SWAPPED" = true ] && [ "$OVPN_CLIENT_IP_SYNC_LEASE_EXISTED" = true ]; then
-    cp "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP" "$OVPN_POOL_PERSIST_FILE.tmp"
-    mv "$OVPN_POOL_PERSIST_FILE.tmp" "$OVPN_POOL_PERSIST_FILE"
-    chmod 600 "$OVPN_POOL_PERSIST_FILE"
+    find "$OVPN_LEASE_DIR" -maxdepth 1 -type f -delete 2>/dev/null || true
+    cp -a "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP"/* "$OVPN_LEASE_DIR"/ 2>/dev/null || true
   fi
   [ -z "$OVPN_CLIENT_IP_SYNC_CCD_STAGE" ] || rm -rf "$OVPN_CLIENT_IP_SYNC_CCD_STAGE"
   [ -z "$OVPN_CLIENT_IP_SYNC_CCD_PREVIOUS" ] || rm -rf "$OVPN_CLIENT_IP_SYNC_CCD_PREVIOUS"
-  [ -z "$OVPN_CLIENT_IP_SYNC_LEASE_STAGE" ] || rm -f "$OVPN_CLIENT_IP_SYNC_LEASE_STAGE"
-  [ -z "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP" ] || rm -f "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP"
+  [ -z "$OVPN_CLIENT_IP_SYNC_LEASE_STAGE" ] || rm -rf "$OVPN_CLIENT_IP_SYNC_LEASE_STAGE"
+  [ -z "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP" ] || rm -rf "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP"
 }

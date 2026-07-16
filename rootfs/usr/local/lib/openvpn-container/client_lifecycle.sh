@@ -40,18 +40,19 @@ ovpn_client_list_connected_client_is_valid() {
 }
 
 ovpn_client_list_load_persisted_dynamic_ips() {
-  local pool_file="$OVPN_POOL_PERSIST_FILE"
-  local name address ignored
+  local lease_dir="$OVPN_LEASE_DIR"
+  local name address f
 
   OVPN_CLIENT_LIST_PERSISTED_IPS=()
-  [ -r "$pool_file" ] || return 0
-  while IFS=, read -r name address ignored || [ -n "$name" ]; do
-    [ -z "$ignored" ] || continue
-    address="${address%$'\r'}"
+  [ -d "$lease_dir" ] || return 0
+  for f in "$lease_dir"/*; do
+    [ -f "$f" ] || continue
+    name="$(basename "$f")"
+    address="$(cat "$f")"
     ovpn_client_list_dynamic_ip_is_valid "$name" "$address" || continue
     [ -n "${OVPN_CLIENT_LIST_PERSISTED_IPS[$name]+present}" ] && continue
     OVPN_CLIENT_LIST_PERSISTED_IPS["$name"]="$address"
-  done <"$pool_file"
+  done
 }
 
 ovpn_client_list_load_connected_clients() {

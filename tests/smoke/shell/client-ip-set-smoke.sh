@@ -13,7 +13,7 @@ trap cleanup EXIT
 export OVPN_LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
 export OVPN_DATA_DIR="$TMP_DIR/openvpn"
 export OVPN_RUNTIME_DIR="$TMP_DIR/run"
-export OVPN_POOL_PERSIST_FILE="$TMP_DIR/leases/pool-persist.txt"
+export OVPN_LEASE_DIR="$TMP_DIR/leases"
 export OVPN_ENDPOINT="vpn.example.test"
 export OVPN_NETWORK="10.88.0.0/24"
 
@@ -33,12 +33,10 @@ EOF
 cp "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 printf '%s\n' '# client,state' 'alpha,active' 'bravo,active' 'zulu,active' >"$OVPN_DATA_DIR/meta/client-state.csv"
 : >"$OVPN_DATA_DIR/meta/audit.jsonl"
-mkdir -p "$(dirname "$OVPN_POOL_PERSIST_FILE")"
-cat >"$OVPN_POOL_PERSIST_FILE" <<'EOF'
-alpha,10.88.0.200
-zulu,10.88.0.201
-unrelated,10.88.0.202
-EOF
+mkdir -p "$OVPN_LEASE_DIR"
+printf '10.88.0.200\n' >"$OVPN_LEASE_DIR/alpha"
+printf '10.88.0.201\n' >"$OVPN_LEASE_DIR/zulu"
+printf '10.88.0.202\n' >"$OVPN_LEASE_DIR/unrelated"
 
 canonical="$(mktemp "$TMP_DIR/canonical.XXXXXX")"
 cat >"$canonical" <<'EOF'
@@ -108,9 +106,9 @@ cmp "$TMP_DIR/dynamic.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/bravo"
 test ! -e "$OVPN_DATA_DIR/ccd/alpha"
 test ! -e "$OVPN_DATA_DIR/ccd/zulu"
-grep -Fqx 'zulu,10.88.0.201' "$OVPN_POOL_PERSIST_FILE"
-grep -Fqx 'unrelated,10.88.0.202' "$OVPN_POOL_PERSIST_FILE"
-if grep -Fq 'alpha,10.88.0.200' "$OVPN_POOL_PERSIST_FILE"; then
+grep -Fqx '10.88.0.201' "$OVPN_LEASE_DIR/zulu"
+grep -Fqx '10.88.0.202' "$OVPN_LEASE_DIR/unrelated"
+if [ -f "$OVPN_LEASE_DIR/alpha" ]; then
   echo 'dynamic lease was not cleared for a converted client' >&2
   exit 1
 fi
@@ -118,7 +116,7 @@ fi
 # Test: transaction rollback on derived-state failure
 cp "$OVPN_DATA_DIR/meta/client-ip.applied.csv" "$TMP_DIR/before-failure.csv"
 ccd_before="$(sha256sum "$OVPN_DATA_DIR/ccd/bravo")"
-lease_before="$(sha256sum "$OVPN_POOL_PERSIST_FILE")"
+lease_before="$(find "$OVPN_LEASE_DIR" -type f -exec sha256sum {} + | sort -k2 | sha256sum)"
 if OVPN_CLIENT_IP_APPLY_FAIL_AFTER=ccd "$OVPN" client ip set zulu --ip 10.88.0.4 >"$TMP_DIR/derived-failure.out" 2>&1; then
   echo 'injected derived-state failure unexpectedly succeeded' >&2
   exit 1
@@ -127,7 +125,7 @@ grep -Fq 'injected client-ip apply failure after ccd' "$TMP_DIR/derived-failure.
 cmp "$TMP_DIR/before-failure.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
 cmp "$TMP_DIR/before-failure.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 [ "$ccd_before" = "$(sha256sum "$OVPN_DATA_DIR/ccd/bravo")" ]
-[ "$lease_before" = "$(sha256sum "$OVPN_POOL_PERSIST_FILE")" ]
+[ "$lease_before" = "$(sha256sum "$OVPN_LEASE_DIR")" ]
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/bravo"
 
 printf 'client-ip set smoke passed\n'

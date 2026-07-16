@@ -155,8 +155,8 @@ ovpn_network_migration_print_plan() {
 }
 
 ovpn_network_migration_apply_inner() (
-  local backup config_backup schema_backup draft applied audit server pool index
-  local server_existed=false pool_existed=false ccd_existed=false
+  local backup config_backup schema_backup draft applied audit server lease_dir index
+  local server_existed=false lease_dir_existed=false ccd_existed=false
   local transaction_success=false rollback_ready=false runtime_reload_attempted=false
 
   ovpn_network_migration_runtime_preflight || ovpn_die 'network migration requires a healthy running OpenVPN process and management socket'
@@ -168,7 +168,7 @@ ovpn_network_migration_apply_inner() (
   applied="$(ovpn_registry_applied_file)"
   audit="$(ovpn_registry_audit_file)"
   server="$OVPN_DATA_DIR/server/server.conf"
-  pool="$OVPN_POOL_PERSIST_FILE"
+  lease_dir="$OVPN_LEASE_DIR"
 
   rollback() {
     cp "$config_backup" "$OVPN_PROJECT_ENV"
@@ -185,11 +185,12 @@ ovpn_network_migration_apply_inner() (
     else
       rm -f "$server"
     fi
-    mkdir -p "$(dirname "$pool")"
-    if [ "$pool_existed" = true ]; then
-      cp "$backup/pool" "$pool"
+    mkdir -p "$lease_dir"
+    if [ "$lease_dir_existed" = true ]; then
+      find "$lease_dir" -maxdepth 1 -type f -delete 2>/dev/null || true
+      cp -a "$backup/leases"/* "$lease_dir"/ 2>/dev/null || true
     else
-      rm -f "$pool"
+      find "$lease_dir" -maxdepth 1 -type f -delete 2>/dev/null || true
     fi
   }
 
@@ -229,9 +230,9 @@ ovpn_network_migration_apply_inner() (
     cp "$server" "$backup/server"
     server_existed=true
   fi
-  if [ -e "$pool" ]; then
-    cp "$pool" "$backup/pool"
-    pool_existed=true
+  if [ -d "$lease_dir" ]; then
+    cp -a "$lease_dir" "$backup/leases"
+    lease_dir_existed=true
   fi
   rollback_ready=true
 
@@ -247,9 +248,8 @@ ovpn_network_migration_apply_inner() (
     if [ -n "${OVPN_CLIENT_IP_VALUES[index]}" ]; then OVPN_CLIENT_IP_INTS+=("$(ovpn_ipam_ipv4_to_int "${OVPN_CLIENT_IP_VALUES[index]}")"); else OVPN_CLIENT_IP_INTS+=(''); fi
   done
   ovpn_client_ip_apply_current_mutation
-  mkdir -p "$(dirname "$pool")"
-  : >"$pool"
-  chmod 600 "$pool"
+  mkdir -p "$lease_dir"
+  find "$lease_dir" -maxdepth 1 -type f -delete 2>/dev/null || true
   ovpn_render_server --output "$server"
   runtime_reload_attempted=true
   ovpn_network_migration_reload_and_check false || ovpn_die 'network migration health check failed'

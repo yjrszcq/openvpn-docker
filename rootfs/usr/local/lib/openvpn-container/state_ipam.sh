@@ -110,7 +110,7 @@ ovpn_state_ipam_stage_canonical_registry() {
 }
 
 ovpn_state_scan_ipam_consistency() {
-  local draft applied state_file audit_file ccd_dir pool_file protected
+  local draft applied state_file audit_file ccd_dir lease_dir protected
   local index name ip expected actual lease_line lease_name state expected_state
   local ccd_out_of_sync=false
   local -A applied_clients=()
@@ -120,7 +120,7 @@ ovpn_state_scan_ipam_consistency() {
   state_file="$(ovpn_registry_client_state_file)"
   audit_file="$(ovpn_registry_audit_file)"
   ccd_dir="$OVPN_DATA_DIR/ccd"
-  pool_file="$OVPN_POOL_PERSIST_FILE"
+  lease_dir="$OVPN_LEASE_DIR"
   if [ ! -e "$draft" ] && [ ! -e "$applied" ] && [ ! -e "$state_file" ] && [ ! -e "$audit_file" ]; then
     return 0
   fi
@@ -197,13 +197,14 @@ ovpn_state_scan_ipam_consistency() {
   if [ "$ccd_out_of_sync" = true ]; then
     ovpn_state_add_repairable_issue CLIENT_IP_CCD_OUT_OF_SYNC SYNCHRONIZE_CLIENT_IP_CCD
   fi
-  if [ -r "$pool_file" ]; then
-    while IFS= read -r lease_line || [ -n "$lease_line" ]; do
-      lease_name="${lease_line%%,*}"
+  if [ -d "$lease_dir" ]; then
+    for lease_file in "$lease_dir"/*; do
+      [ -f "$lease_file" ] || continue
+      lease_name="$(basename "$lease_file")"
       [ -n "${applied_clients[$lease_name]+present}" ] || continue
       ip="$(awk -F, -v client="$lease_name" '$1 == client { print $2; exit }' "$applied")"
       [ -z "$ip" ] || ovpn_state_add_issue "STATIC_CLIENT_LEASE_$lease_name" manual RUN_CLIENT_IP_APPLY
-    done <"$pool_file"
+    done
   fi
   if cmp -s "$draft" "$applied" && ! ovpn_state_ipam_applied_is_canonical "$applied"; then
     ovpn_state_add_repairable_issue CLIENT_IP_REGISTRY_NOT_CANONICAL NORMALIZE_CLIENT_IP_REGISTRY

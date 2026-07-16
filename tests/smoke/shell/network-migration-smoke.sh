@@ -49,7 +49,7 @@ export OVPN_MANAGEMENT_SOCKET="$OVPN_RUNTIME_DIR/management.sock"
 export OVPN_RUNTIME_STATE_FILE="$OVPN_RUNTIME_DIR/state.json"
 export OVPN_SOCAT_BIN="$FAKE_BIN/socat"
 export OVPN_TEST_SOCAT_LOG="$TMP_DIR/socat.log"
-export OVPN_POOL_PERSIST_FILE="$TMP_DIR/leases/pool-persist.txt"
+export OVPN_LEASE_DIR="$TMP_DIR/leases"
 export OVPN_ENDPOINT="vpn.example.test"
 export OVPN_NETWORK="10.88.0.0/24"
 export PATH="$FAKE_BIN:$PATH"
@@ -75,7 +75,7 @@ cat >"$OVPN_RUNTIME_STATE_FILE" <<'EOF'
 EOF
 
 "$OVPN" config apply
-mkdir -p "$OVPN_DATA_DIR/data" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/pki" "$(dirname "$OVPN_POOL_PERSIST_FILE")"
+mkdir -p "$OVPN_DATA_DIR/data" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/pki" "$OVPN_LEASE_DIR"
 printf '%s\n' \
   $'V\t30000101000000Z\t\t01\tunknown\t/CN=alpha' \
   $'V\t30000101000000Z\t\t02\tunknown\t/CN=bravo' \
@@ -88,7 +88,7 @@ EOF
 cp "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 printf '%s\n' '# client,state' 'alpha,active' 'bravo,active' >"$OVPN_DATA_DIR/meta/client-state.csv"
 : >"$OVPN_DATA_DIR/meta/audit.jsonl"
-printf '%s\n' 'bravo,10.88.0.200' >"$OVPN_POOL_PERSIST_FILE"
+printf '10.88.0.200\n' >"$OVPN_LEASE_DIR/bravo"
 "$OVPN" client ip set alpha --ip 10.88.0.20
 
 "$OVPN" network plan --network 10.89.0.0/24 --dynamic-pool-size 100 >"$TMP_DIR/dry.out"
@@ -100,7 +100,7 @@ grep -Fqx 'OVPN_NETWORK=10.89.0.0/24' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'OVPN_DYNAMIC_POOL_SIZE=100' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'alpha,10.89.0.20' "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.89.0.20 255.255.255.0' "$OVPN_DATA_DIR/ccd/alpha"
-test ! -s "$OVPN_POOL_PERSIST_FILE"
+test -z "$(ls -A "$OVPN_LEASE_DIR" 2>/dev/null)"
 grep -q '^server 10.89.0.0 255.255.255.0 nopool$' "$OVPN_DATA_DIR/server/server.conf"
 grep -Fq 'signal SIGHUP' "$OVPN_TEST_SOCAT_LOG"
 grep -Fq '"event":"network_migration","outcome":"applied"' "$OVPN_DATA_DIR/meta/audit.jsonl"
