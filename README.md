@@ -165,9 +165,9 @@ Version and release inputs are centralized in `versions.env`. Before changing
 code, run:
 
 ```bash
-tests/check.sh           # shell syntax and style
-tests/cli-smoke.sh       # CLI structure verification
-tests/workflow-smoke.sh  # workflow logic verification
+tests/smoke/shell/check.sh           # shell syntax and style
+tests/smoke/shell/cli-smoke.sh       # CLI structure verification
+tests/smoke/shell/workflow-smoke.sh  # workflow logic verification
 ```
 
 CI validates the OpenVPN version, source checksum, support matrix, and project

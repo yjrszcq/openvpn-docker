@@ -145,9 +145,9 @@ docker compose logs -f openvpn
 版本与发布输入集中在 `versions.env`。修改代码前运行：
 
 ```bash
-tests/check.sh           # Shell 语法与风格检查
-tests/cli-smoke.sh       # CLI 结构验证
-tests/workflow-smoke.sh  # 工作流逻辑验证
+tests/smoke/shell/check.sh           # Shell 语法与风格检查
+tests/smoke/shell/cli-smoke.sh       # CLI 结构验证
+tests/smoke/shell/workflow-smoke.sh  # 工作流逻辑验证
 ```
 
 CI 会校验 OpenVPN 版本、源码校验和、支持矩阵和项目镜像版本。测试使用
