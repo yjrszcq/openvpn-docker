@@ -261,7 +261,7 @@ ovpn network apply [--network <CIDR>] [--dynamic-pool-size <N>] [--yes]
 
 构建并打印同一计划，然后在交互式终端上请求确认，除非传入了 `--yes`。它会快照配置、清单、CCD、租约、渲染后的服务端配置和审计状态；更新配置和清单；重载 OpenVPN；并检查管理套接字和容器健康状态。重载或健康检查失败时，恢复快照并重载旧配置。
 
-请在实时 OpenVPN 服务上运行此命令，因为执行需要其本地管理套接字。
+请在实时 OpenVPN 服务上运行此命令，因为执行需要其本地管理套接字。迁移成功后，请同步更新 `docker-compose.yaml` 中的 `OVPN_NETWORK`（以及 `OVPN_DYNAMIC_POOL_SIZE`，如有变更）——持久化的 `project.env` 虽然持有新值，但 `ovpn config apply` 读取的是环境变量，旧值会导致网络被静默回退。
 
 ## 状态与修复
 

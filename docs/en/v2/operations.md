@@ -213,6 +213,12 @@ reload OpenVPN → verify management socket and container health. On failure it
 automatically restores snapshots and reloads the old config. Affected clients
 must reconnect.
 
+> **Important:** After a successful migration, update `OVPN_NETWORK` (and
+> `OVPN_DYNAMIC_POOL_SIZE` if changed) in your `docker-compose.yaml` or `.env`
+> to match. The persisted `project.env` holds the new values and controls
+> restarts, but a future `ovpn config apply` reads the environment variables —
+> stale values there would silently revert the network.
+
 ---
 
 ## Diagnostics and repair

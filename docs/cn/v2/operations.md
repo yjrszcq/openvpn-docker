@@ -201,6 +201,11 @@ docker compose exec openvpn ovpn network apply \
 迁移流程：快照当前状态 → 更新配置和清单 → SIGHUP 重载 OpenVPN → 验证管理 socket
 和容器健康。失败时自动回滚并重载旧配置。受影响客户端需重新连接。
 
+> **重要：** 迁移成功后，请同步更新 `docker-compose.yaml` 或 `.env` 中的
+> `OVPN_NETWORK`（以及 `OVPN_DYNAMIC_POOL_SIZE`，如有变更）。持久化的
+> `project.env` 持有新值并决定重启后的行为，但后续 `ovpn config apply` 会读取
+> 环境变量——旧值会导致网络被静默回退。
+
 ---
 
 ## 诊断与修复

@@ -334,7 +334,10 @@ and container health. A failed reload or health check restores the snapshot and
 reloads the old configuration.
 
 Run this against the live OpenVPN service because applying requires its local
-management socket.
+management socket. After a successful migration, update `OVPN_NETWORK` (and
+`OVPN_DYNAMIC_POOL_SIZE` if changed) in `docker-compose.yaml` — the persisted
+`project.env` holds the new value, but `ovpn config apply` reads environment
+variables and would revert to the stale compose-file value.
 
 ## State and repair
 
