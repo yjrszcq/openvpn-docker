@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # OpenVPN client-connect / client-disconnect hook for dynamic-client lease tracking.
 # Called by OpenVPN with environment variables: $common_name, $ifconfig_pool_remote_ip, $trusted_ip.
-# First argument is the lease directory path.
+# Also expects $OVPN_LEASE_DIR to be set in OpenVPN's environment.
 #
 # Each client gets its own file named by common name, containing the IP address.
 # This eliminates read-modify-write races with sync code and other hook instances.
 
 set -euo pipefail
 
-lease_dir="${1:-$OVPN_DATA_DIR/data/leases}"
+lease_dir="${OVPN_LEASE_DIR:-/etc/openvpn/data/leases}"
 
 pool_hook_upsert() {
   local name="$1"

@@ -201,7 +201,7 @@ auto-sized to the widest name. With `--detail`, prints the aligned columns
 
 For the IP view, static assignments are `configured` or `retained` after
 revocation. Dynamic addresses are `connected` when the management socket has a
-current lease, `last-known` when found in `pool-persist.txt`, or `unavailable`.
+current lease, `last-known` when a persisted lease record exists, or `unavailable`.
 `CONNECTION` is `online`, `offline`, or `unknown` according to management-socket
 availability and the current route. The view reads the applied registry, not an
 unapplied draft.

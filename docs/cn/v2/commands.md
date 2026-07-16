@@ -164,7 +164,7 @@ ovpn client list [--detail]
 
 不带 `--detail` 时，打印带 `CLIENT` 和 `STATE` 表头的两列表格，列宽按最长名称自适应。带 `--detail` 时，打印对齐的列：`CLIENT`、`STATE`、`MODE`、`IP`、`IP STATE` 和 `CONNECTION`。
 
-在 IP 视图下，静态分配为 `configured`，或撤销后为 `retained`。动态地址在有当前租约时显示为 `connected`，在 `pool-persist.txt` 中有记录时显示为 `last-known`，否则为 `unavailable`。`CONNECTION` 根据管理套接字可用性和当前路由显示为 `online`、`offline` 或 `unknown`。该视图读取的是已应用的清单，而非未应用的草稿。
+在 IP 视图下，静态分配为 `configured`，或撤销后为 `retained`。动态地址在有当前租约时显示为 `connected`，在有持久化租约记录时显示为 `last-known`，否则为 `unavailable`。`CONNECTION` 根据管理套接字可用性和当前路由显示为 `online`、`offline` 或 `unknown`。该视图读取的是已应用的清单，而非未应用的草稿。
 
 ### `ovpn client revoke`
 
