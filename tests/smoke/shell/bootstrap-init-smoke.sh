@@ -76,6 +76,25 @@ grep -Fqx 'OVPN_NETWORK=10.88.0.0/24' "$OVPN_DATA_DIR/config/project.env"
 OVPN_ENDPOINT=changed.example.test "$OVPN" config show >"$TMP_DIR/config.out"
 grep -Fqx 'OVPN_ENDPOINT=vpn.example.test' "$TMP_DIR/config.out"
 
+valid_ipv6_endpoints=('::' '::1' '::ffff:192.0.2.1')
+for index in "${!valid_ipv6_endpoints[@]}"; do
+  endpoint="${valid_ipv6_endpoints[index]}"
+  data_dir="$TMP_DIR/valid-ipv6-endpoint-$index"
+  OVPN_DATA_DIR="$data_dir" OVPN_ENDPOINT="$endpoint" "$OVPN" config apply
+  grep -Fqx "OVPN_ENDPOINT=$endpoint" "$data_dir/config/project.env"
+done
+
+invalid_ipv6_endpoints=(':1' '[::1]' '[2001:db8::1]')
+for index in "${!invalid_ipv6_endpoints[@]}"; do
+  endpoint="${invalid_ipv6_endpoints[index]}"
+  data_dir="$TMP_DIR/invalid-ipv6-endpoint-$index"
+  if OVPN_DATA_DIR="$data_dir" OVPN_ENDPOINT="$endpoint" "$OVPN" config apply >"$TMP_DIR/invalid-ipv6-$index.out" 2>"$TMP_DIR/invalid-ipv6-$index.err"; then
+    echo "invalid IPv6 endpoint unexpectedly applied: $endpoint" >&2
+    exit 1
+  fi
+  grep -Fq 'OVPN_ENDPOINT must be a hostname or IP address' "$TMP_DIR/invalid-ipv6-$index.err"
+done
+
 export OVPN_DATA_DIR="$TMP_DIR/invalid-endpoint"
 set +e
 OVPN_ENDPOINT='bad endpoint' "$OVPN" init >"$TMP_DIR/invalid.out" 2>"$TMP_DIR/invalid.err"

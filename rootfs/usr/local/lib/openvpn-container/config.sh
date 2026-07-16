@@ -31,7 +31,7 @@ ovpn_validate_single_line() {
 }
 
 ovpn_validate_bootstrap_endpoint() {
-  if ! [[ "$OVPN_ENDPOINT" =~ ^[A-Za-z0-9][A-Za-z0-9._:-]*$ ]]; then
+  if ! [[ "$OVPN_ENDPOINT" =~ ^[A-Za-z0-9][A-Za-z0-9._:-]*$ || "$OVPN_ENDPOINT" =~ ^::[A-Fa-f0-9:.]*$ ]]; then
     ovpn_die "OVPN_ENDPOINT must be a hostname or IP address"
   fi
 }
