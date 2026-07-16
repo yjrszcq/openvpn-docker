@@ -248,13 +248,13 @@ docker compose exec openvpn ovpn runtime version      # 构建信息
 
 ### 备份
 
-`./openvpn-data` 保存 CA 私钥、服务端与客户端私钥、profile、tls-crypt 密钥和
-实例元数据。`./openvpn-runtime` 保存动态租约等运行时状态。必须整体备份两个目录：
+`./openvpn-data` 保存 CA 私钥、服务端与客户端私钥、profile、tls-crypt 密钥、
+实例元数据以及动态租约状态。备份此目录：
 
 ```bash
 docker compose stop openvpn
 tar --numeric-owner -C . -czf openvpn-backup-YYYYMMDD.tar.gz \
-  openvpn-data openvpn-runtime
+  openvpn-data
 docker compose up -d openvpn
 ```
 
@@ -262,7 +262,7 @@ docker compose up -d openvpn
 
 ### 恢复
 
-将两个目录还原到原来的挂载路径，然后检查状态再启动：
+将数据目录还原到原来的挂载路径，然后检查状态再启动：
 
 ```bash
 docker compose run --rm openvpn-maintenance state doctor

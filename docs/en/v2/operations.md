@@ -263,13 +263,12 @@ docker compose exec openvpn ovpn runtime version      # build information
 ### Backup
 
 `./openvpn-data` stores CA, server, and client private keys, profiles, tls-crypt
-material, and instance metadata. `./openvpn-runtime` holds runtime state such as
-dynamic leases. Always back up both directories together:
+material, instance metadata, and dynamic lease state. Back it up:
 
 ```bash
 docker compose stop openvpn
 tar --numeric-owner -C . -czf openvpn-backup-YYYYMMDD.tar.gz \
-  openvpn-data openvpn-runtime
+  openvpn-data
 docker compose up -d openvpn
 ```
 
@@ -278,7 +277,7 @@ tickets, logs, or temporary recovery notes.
 
 ### Restore
 
-Place both directories at their original mount paths, then inspect state before
+Place the data directory at its original mount path, then inspect state before
 starting:
 
 ```bash
