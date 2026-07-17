@@ -279,9 +279,6 @@ ovpn_client_revoke_inner() {
   ovpn_client_require_registry_active "$name"
   index="$(ovpn_client_ip_assignment_index "$name")" || ovpn_die "client '$name' is missing from the in-memory registry"
   assignment="${OVPN_CLIENT_IP_VALUES[index]}"
-  if [ "$release_ip" = true ] && [ -n "$assignment" ] && [ "$OVPN_IPAM_DYNAMIC_POOL_SIZE" -eq 0 ]; then
-    ovpn_die 'cannot release a static IP: dynamic pool capacity is 0; enlarge the dynamic pool first'
-  fi
   if ! ovpn_pki_try_revoke_client "$name"; then
     ovpn_client_lifecycle_audit revoke failed || true
     ovpn_die 'failed to revoke client certificate; no assignment changes were applied'
@@ -325,7 +322,6 @@ ovpn_client_release_ip_inner() {
   index="$(ovpn_client_ip_assignment_index "$name")" || ovpn_die "client '$name' is missing from the in-memory registry"
   assignment="${OVPN_CLIENT_IP_VALUES[index]}"
   [ -n "$assignment" ] || ovpn_die "client $name does not have a static IP reservation"
-  [ "$OVPN_IPAM_DYNAMIC_POOL_SIZE" -gt 0 ] || ovpn_die "cannot release a static IP: dynamic pool capacity is 0; enlarge the dynamic pool first"
   ovpn_client_ip_set_current_assignment "$name" ""
   if ! ovpn_client_ip_apply_current_mutation; then
     ovpn_client_lifecycle_audit release_ip failed || true
@@ -345,17 +341,39 @@ ovpn_client_release_ip_command() {
 
 ovpn_client_reissue_inner() {
   local name="$1"
-  local status
+  local mode="$2"
+  local requested_ip="$3"
+  local status index assignment allocated_ip=''
 
   ovpn_client_name_or_die "$name"
   ovpn_require_healthy_state
   ovpn_client_ip_prepare_mutation
   status="${OVPN_CLIENT_IP_PKI_STATES[$name]:-}"
   [ -n "$status" ] || ovpn_die "client '$name' does not exist"
+
+  index="$(ovpn_client_ip_assignment_index "$name")" || ovpn_die "client '$name' is missing from the in-memory registry"
+  assignment="${OVPN_CLIENT_IP_VALUES[index]}"
+
+  case "$mode" in
+    dynamic)
+      [ "$OVPN_IPAM_DYNAMIC_POOL_SIZE" -gt 0 ] || ovpn_die 'cannot set a client to dynamic: dynamic pool capacity is 0; enlarge the dynamic pool first'
+      ;;
+    static)
+      ovpn_client_ip_require_static_address "$requested_ip" "$name"
+      ;;
+    '')
+      if [ -z "$assignment" ]; then
+        allocated_ip="$(ovpn_client_ip_allocate_static)"
+      fi
+      ;;
+    *) ovpn_die "unsupported reissue mode: $mode" ;;
+  esac
+
   if ! ovpn_pki_reissue_supported "$name" "$status"; then
     ovpn_client_lifecycle_audit reissue rejected || true
     ovpn_die 'the current Easy-RSA runtime does not support same-CN reissue; no PKI index changes were made'
   fi
+
   if [ "$status" = active ]; then
     if ! ovpn_pki_try_revoke_client "$name"; then
       ovpn_client_lifecycle_audit reissue failed || true
@@ -369,6 +387,24 @@ ovpn_client_reissue_inner() {
     ovpn_client_lifecycle_audit reissue failed || true
     ovpn_die 'client reissue failed; the previous certificate remains revoked and the IP assignment was retained'
   fi
+
+  case "$mode" in
+    dynamic)
+      ovpn_client_ip_set_current_assignment "$name" ''
+      ovpn_client_ip_apply_current_mutation
+      ;;
+    static)
+      ovpn_client_ip_set_current_assignment "$name" "$requested_ip"
+      ovpn_client_ip_apply_current_mutation
+      ;;
+    '')
+      if [ -n "$allocated_ip" ]; then
+        ovpn_client_ip_set_current_assignment "$name" "$allocated_ip"
+        ovpn_client_ip_apply_current_mutation
+      fi
+      ;;
+  esac
+
   ovpn_client_registry_set_state "$name" active
   ovpn_render_client "$name" --output "$OVPN_DATA_DIR/clients/active/$name.ovpn"
   ovpn_client_lifecycle_kick "$name"
@@ -378,10 +414,28 @@ ovpn_client_reissue_inner() {
 
 ovpn_client_reissue_command() {
   local name="${1:-}"
+  local mode='' requested_ip=''
 
-  [ -n "$name" ] || ovpn_die 'usage: ovpn client reissue <name>'
-  [ "$#" -eq 1 ] || ovpn_die 'usage: ovpn client reissue <name>'
-  ovpn_with_data_lock client ovpn_client_reissue_inner "$name"
+  [ -n "$name" ] || ovpn_die 'usage: ovpn client reissue <name> [--dynamic|--ip <IPv4>]'
+  shift
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --dynamic)
+        [ -z "$mode" ] || ovpn_die '--dynamic cannot be combined with --ip'
+        mode=dynamic
+        ;;
+      --ip)
+        shift
+        [ "$#" -gt 0 ] || ovpn_die '--ip requires an IPv4 address'
+        [ -z "$mode" ] || ovpn_die '--ip cannot be combined with --dynamic'
+        mode=static
+        requested_ip="$1"
+        ;;
+      *) ovpn_die 'usage: ovpn client reissue <name> [--dynamic|--ip <IPv4>]' ;;
+    esac
+    shift
+  done
+  ovpn_with_data_lock client ovpn_client_reissue_inner "$name" "$mode" "$requested_ip"
 }
 
 ovpn_client_delete_current_assignment() {
@@ -507,7 +561,7 @@ ovpn_client_command() {
       ;;
     reissue)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client reissue <name>" "Issue a new certificate for an existing client name."
+        ovpn_command_usage "ovpn client reissue <name> [--dynamic|--ip <IPv4>]" "Issue a new certificate for an existing client, optionally changing IP assignment."
       else
         ovpn_client_reissue_command "$@"
       fi

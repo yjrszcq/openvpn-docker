@@ -108,7 +108,14 @@ ovpn_network_migration_plan() {
       used["$candidate"]=1
       break
     done
-    [ -n "${planned[$name]+present}" ] || ovpn_die 'target static address region cannot accommodate existing static clients'
+    if [ -n "${planned[$name]+present}" ]; then
+      OVPN_NETWORK_MIGRATION_VALUES[index]="${planned[$name]}"
+      continue
+    fi
+    if [ "${OVPN_CLIENT_IP_PKI_STATES[$name]:-}" = active ]; then
+      ovpn_die 'target static address region cannot accommodate existing active static clients'
+    fi
+    OVPN_NETWORK_MIGRATION_VALUES[index]=''
   done
   for ((index = 0; index < ${#OVPN_NETWORK_MIGRATION_NAMES[@]}; index++)); do
     name="${OVPN_NETWORK_MIGRATION_NAMES[index]}"

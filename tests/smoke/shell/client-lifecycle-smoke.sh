@@ -369,7 +369,10 @@ phone_key_after="$(sha256sum "$OVPN_DATA_DIR/pki/private/phone.key")"
   exit 1
 }
 grep -E '^phone[[:space:]]+active$' <("$OVPN" client list)
-grep -Fqx 'phone,' "$OVPN_DATA_DIR/data/client-ip.csv"
+grep -q '^phone,10\.88\.0\.' "$OVPN_DATA_DIR/data/client-ip.csv" || {
+  echo 'reissue did not auto-allocate a static IP for a client with no IP' >&2
+  exit 1
+}
 test -f "$OVPN_DATA_DIR/clients/active/phone.ovpn"
 "$OVPN" client delete phone >"$TMP_DIR/phone-delete.out" 2>"$TMP_DIR/phone-delete.err"
 if grep -q '^phone,' "$OVPN_DATA_DIR/data/client-ip.csv"; then
