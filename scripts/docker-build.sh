@@ -25,19 +25,8 @@ vcs_ref="${VCS_REF:-$(git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || printf un
 build_date="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 build_network="${OVPN_BUILD_NETWORK:-default}"
 
-ovpn_proxy_is_loopback() {
-  case "$1" in
-    http://127.*|https://127.*|http://localhost|http://localhost:*|https://localhost|https://localhost:*|http://[[]::1[]]*|https://[[]::1[]]*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
 ovpn_standard_build_proxy() {
   local proxy="${1:-}"
-
-  if [ "$build_network" != host ] && ovpn_proxy_is_loopback "$proxy"; then
-    return 0
-  fi
   printf '%s\n' "$proxy"
 }
 
