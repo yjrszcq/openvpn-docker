@@ -118,7 +118,10 @@ values are the deliberately opinionated values in
 `docker-compose.yaml` and `.env.example`; they are not an additional
 set of runtime defaults.
 
-For a server with only public IPv6 that uses a hostname, publish an AAAA record and set
+With `OVPN_TRANSPORT_FAMILY=auto`, an IPv4 literal such as `198.51.100.10`
+selects IPv4 transport and an IPv6 literal such as `2001:db8::10` selects IPv6
+transport. Hostnames are not resolved for family detection. For a server with
+only public IPv6 that uses a hostname, publish an AAAA record and explicitly set
 `OVPN_TRANSPORT_FAMILY=ipv6`. This changes only the outer OpenVPN connection;
 tunnel addresses, pushed routes, and DNS configuration remain IPv4. If the
 server has no IPv4 egress, VPN clients cannot reach the public IPv4 Internet

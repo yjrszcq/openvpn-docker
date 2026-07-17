@@ -154,7 +154,9 @@ configuration schema version `2` and does not issue, revoke, delete, or reissue
 client certificates.
 
 `OVPN_ENDPOINT` must be a valid hostname or IP string; `OVPN_PROTO` is `udp` or
-`tcp`; `OVPN_TRANSPORT_FAMILY` is `auto`, `ipv4`, or `ipv6`;
+`tcp`; `OVPN_TRANSPORT_FAMILY` is `auto`, `ipv4`, or `ipv6`. The persisted
+`auto` value is retained: rendering detects IPv4 and IPv6 literals, while a
+hostname remains family-neutral because `config apply` does not resolve DNS.
 `OVPN_TOPOLOGY` is `subnet`; boolean fields are `true` or `false`;
 `OVPN_DNS` and `OVPN_ROUTES` are comma-separated IPv4 values; and the network
 and dynamic-pool size must form a valid IPAM layout. Apply writes every

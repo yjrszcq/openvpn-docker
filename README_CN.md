@@ -109,8 +109,10 @@ docker compose logs -f openvpn
 `docker-compose.yaml` 与 `.env.example` 中有意选择的值，并不是另一套
 运行时默认值。
 
-仅有公网 IPv6 的服务器使用域名时，可配置 AAAA 记录，并设置
-`OVPN_TRANSPORT_FAMILY=ipv6`。这只让 OpenVPN 外层连接通过 IPv6；隧道地址、
+使用 `OVPN_TRANSPORT_FAMILY=auto` 时，IPv4 字面量（如 `198.51.100.10`）会选择
+IPv4 传输，IPv6 字面量（如 `2001:db8::10`）会选择 IPv6 传输；域名不会通过
+DNS 解析来推断地址族。仅有公网 IPv6 的服务器使用域名时，可配置 AAAA 记录，
+并显式设置 `OVPN_TRANSPORT_FAMILY=ipv6`。这只让 OpenVPN 外层连接通过 IPv6；隧道地址、
 推送路由和 DNS 配置仍为 IPv4。若服务器本身没有 IPv4 出口，VPN 客户端也不能
 通过现有 IPv4 NAT 访问公网 IPv4；本镜像不提供 NAT64。
 

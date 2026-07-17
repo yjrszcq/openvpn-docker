@@ -184,7 +184,17 @@ docker compose exec openvpn ovpn config show
 
 ### 使用仅 IPv6 可达的公网端点
 
-为服务端域名发布 AAAA 记录，并在 Compose 环境中设置：
+使用 IPv6 字面量时，`auto` 会在渲染阶段选择 IPv6 传输：
+
+```yaml
+environment:
+  OVPN_ENDPOINT: 2001:db8::10
+  OVPN_PROTO: udp
+  OVPN_TRANSPORT_FAMILY: auto
+```
+
+使用域名时，地址族检测不会进行 DNS 解析。应为服务端域名发布 AAAA 记录，
+并在 Compose 环境中显式选择 IPv6：
 
 ```yaml
 environment:

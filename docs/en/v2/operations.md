@@ -193,7 +193,17 @@ docker compose exec openvpn ovpn config show
 
 ### Use an IPv6-only public endpoint
 
-Publish an AAAA record for the server hostname and set the Compose environment:
+For an IPv6 literal, `auto` selects IPv6 transport during rendering:
+
+```yaml
+environment:
+  OVPN_ENDPOINT: 2001:db8::10
+  OVPN_PROTO: udp
+  OVPN_TRANSPORT_FAMILY: auto
+```
+
+For a hostname, family detection does not perform DNS resolution. Publish an
+AAAA record and explicitly select IPv6 in the Compose environment:
 
 ```yaml
 environment:
