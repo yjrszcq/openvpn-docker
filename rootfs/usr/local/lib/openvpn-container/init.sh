@@ -35,7 +35,7 @@ ovpn_init_inner() {
   local final_data_dir="$OVPN_DATA_DIR"
   local transaction_id stage_dir transaction_file transaction_tmp state entry commit_started=false
 
-  transaction_id="$(ovpn_instance_id)"
+  transaction_id="$(ovpn_instance_id)" || ovpn_die "failed to generate instance id"
   stage_dir="$final_data_dir/.staging-init-$transaction_id"
   transaction_file="$final_data_dir/.init-transaction"
   transaction_tmp="${transaction_file}.tmp"

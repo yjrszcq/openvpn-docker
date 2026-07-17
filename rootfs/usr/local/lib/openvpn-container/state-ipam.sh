@@ -73,7 +73,7 @@ ovpn_state_ipam_applied_is_canonical() {
   local applied="$1"
   local canonical
 
-  canonical="$(mktemp "${TMPDIR:-/tmp}/ovpn-client-ip-canonical.XXXXXX")"
+  canonical="$(mktemp "${TMPDIR:-/tmp}/ovpn-client-ip-canonical.XXXXXX")" || return 1
   if ! ovpn_client_ip_write_canonical_file "$canonical" || ! cmp -s "$applied" "$canonical"; then
     rm -f "$canonical"
     return 1

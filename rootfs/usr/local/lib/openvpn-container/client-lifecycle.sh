@@ -423,8 +423,11 @@ ovpn_client_delete_inner() {
   ovpn_client_registry_set_state "$name" deleted
   ovpn_client_delete_current_assignment "$name"
   if ! ovpn_client_ip_apply_current_mutation; then
-    cp "$state_backup" "$state_file"
-    rm -f "$state_backup"
+    if cp "$state_backup" "$state_file"; then
+      rm -f "$state_backup"
+    else
+      ovpn_log "CRITICAL: failed to restore client state file; backup preserved at $state_backup"
+    fi
     ovpn_client_lifecycle_audit delete failed || true
     ovpn_die 'failed to remove the client assignment; the registry was restored'
   fi

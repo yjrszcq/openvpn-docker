@@ -366,16 +366,14 @@ ovpn_repair_validate_stage() {
     cp -a "$source" "$validation_dir/$target"
   done
 
-  OVPN_DATA_DIR="$validation_dir"
-  OVPN_CONFIG_DIR="$validation_dir/config"
-  OVPN_PROJECT_ENV="$OVPN_CONFIG_DIR/project.env"
-  OVPN_SCHEMA_VERSION_FILE="$OVPN_CONFIG_DIR/schema-version"
-  ovpn_state_scan
-  validation_state="$OVPN_STATE"
-  OVPN_DATA_DIR="$saved_data_dir"
-  OVPN_CONFIG_DIR="$saved_config_dir"
-  OVPN_PROJECT_ENV="$saved_project_env"
-  OVPN_SCHEMA_VERSION_FILE="$saved_schema_version_file"
+  validation_state="$(
+    OVPN_DATA_DIR="$validation_dir"
+    OVPN_CONFIG_DIR="$validation_dir/config"
+    OVPN_PROJECT_ENV="$OVPN_CONFIG_DIR/project.env"
+    OVPN_SCHEMA_VERSION_FILE="$OVPN_CONFIG_DIR/schema-version"
+    ovpn_state_scan
+    printf '%s' "$OVPN_STATE"
+  )" || ovpn_die "failed to validate staged repair actions"
 
   [ "$validation_state" = HEALTHY ] || ovpn_die "staged automatic repair is not healthy: $validation_state"
 }
