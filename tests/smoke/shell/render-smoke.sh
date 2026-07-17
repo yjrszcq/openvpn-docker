@@ -74,6 +74,7 @@ assert_transport_render() {
   local endpoint="$3"
   local server_proto="$4"
   local client_proto="$5"
+  local ipv6_only="$6"
 
   OVPN_TRANSPORT_FAMILY="$family" OVPN_PROTO="$proto" OVPN_ENDPOINT="$endpoint" "$OVPN" config apply
   "$OVPN" render server --stdout >"$TMP_DIR/server-$family-$proto.conf"
@@ -81,19 +82,25 @@ assert_transport_render() {
   grep -Fqx "proto $server_proto" "$TMP_DIR/server-$family-$proto.conf"
   grep -Fqx "proto $client_proto" "$TMP_DIR/client-$family-$proto.ovpn"
   grep -Fqx "remote $endpoint 1194" "$TMP_DIR/client-$family-$proto.ovpn"
+  if [ "$ipv6_only" = true ]; then
+    grep -Fqx 'bind ipv6only' "$TMP_DIR/server-$family-$proto.conf"
+  elif grep -Fqx 'bind ipv6only' "$TMP_DIR/server-$family-$proto.conf"; then
+    echo "unexpected IPv6-only bind for $family $proto $endpoint" >&2
+    exit 1
+  fi
 }
 
-assert_transport_render auto udp vpn.example.test udp udp
-assert_transport_render auto tcp vpn.example.test tcp tcp
-assert_transport_render auto udp 198.51.100.10 udp4 udp4
-assert_transport_render auto tcp 198.51.100.10 tcp4-server tcp4-client
-assert_transport_render auto udp ::1 udp6 udp6
-assert_transport_render auto tcp ::ffff:192.0.2.1 tcp6-server tcp6-client
+assert_transport_render auto udp vpn.example.test udp6 udp false
+assert_transport_render auto tcp vpn.example.test tcp6-server tcp false
+assert_transport_render auto udp 198.51.100.10 udp4 udp4 false
+assert_transport_render auto tcp 198.51.100.10 tcp4-server tcp4-client false
+assert_transport_render auto udp ::1 udp6 udp6 true
+assert_transport_render auto tcp ::ffff:192.0.2.1 tcp6-server tcp6-client true
 grep -Fqx 'OVPN_TRANSPORT_FAMILY=auto' "$OVPN_DATA_DIR/config/project.env"
-assert_transport_render ipv4 udp vpn.example.test udp4 udp4
-assert_transport_render ipv4 tcp vpn.example.test tcp4-server tcp4-client
-assert_transport_render ipv6 udp 2001:db8::10 udp6 udp6
-assert_transport_render ipv6 tcp vpn6.example.test tcp6-server tcp6-client
+assert_transport_render ipv4 udp vpn.example.test udp4 udp4 false
+assert_transport_render ipv4 tcp vpn.example.test tcp4-server tcp4-client false
+assert_transport_render ipv6 udp 2001:db8::10 udp6 udp6 true
+assert_transport_render ipv6 tcp vpn6.example.test tcp6-server tcp6-client true
 
 config_before="$(sha256sum "$OVPN_DATA_DIR/config/project.env")"
 if OVPN_TRANSPORT_FAMILY=invalid "$OVPN" config apply >"$TMP_DIR/invalid-family.out" 2>"$TMP_DIR/invalid-family.err"; then

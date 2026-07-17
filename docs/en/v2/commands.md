@@ -156,7 +156,8 @@ client certificates.
 `OVPN_ENDPOINT` must be a valid hostname or IP string; `OVPN_PROTO` is `udp` or
 `tcp`; `OVPN_TRANSPORT_FAMILY` is `auto`, `ipv4`, or `ipv6`. The persisted
 `auto` value is retained: rendering detects IPv4 and IPv6 literals, while a
-hostname remains family-neutral because `config apply` does not resolve DNS.
+hostname selects a dual-stack server transport and a family-neutral client
+transport. `config apply` does not resolve DNS.
 `OVPN_TOPOLOGY` is `subnet`; boolean fields are `true` or `false`;
 `OVPN_DNS` and `OVPN_ROUTES` are comma-separated IPv4 values; and the network
 and dynamic-pool size must form a valid IPAM layout. Apply writes every
@@ -410,8 +411,10 @@ ovpn render server [--stdout|--output <path>]
 
 Renders the server configuration from persistent configuration, transport
 address family, IPAM layout, PKI paths, and the compatible template family.
-`auto` infers `ipv4` or `ipv6` from IP literals without resolving hostnames;
-hostnames preserve `udp`/`tcp`. Explicit `ipv4` and `ipv6` values render the
+`auto` infers `ipv4` or `ipv6` from IP literals. For hostnames it renders an
+IPv6 dual-stack server socket (`udp6` or `tcp6-server` without `bind
+ipv6only`); client profiles preserve family-neutral `udp`/`tcp` and resolve
+A/AAAA records when connecting. Explicit `ipv4` and `ipv6` values render the
 corresponding OpenVPN 4/6 protocols. With no output option it
 atomically updates `server/server.conf`; `--stdout` writes the result to
 standard output; `--output <path>` writes a mode-`0600` file at that path.

@@ -130,7 +130,7 @@ ovpn config apply
 
 验证当前 `OVPN_*` 环境变量，并以 mode `0600` 原子替换 `config/project.env` 和 `config/schema-version`。它会写入配置 schema 版本 `2`，且不会签发、撤销、删除或重新签发客户端证书。
 
-`OVPN_ENDPOINT` 必须为有效的主机名或 IP 字符串；`OVPN_PROTO` 为 `udp` 或 `tcp`；`OVPN_TRANSPORT_FAMILY` 为 `auto`、`ipv4` 或 `ipv6`。持久化的 `auto` 值保持不变：渲染时会识别 IPv4 和 IPv6 字面量；域名保持地址族中立，因为 `config apply` 不进行 DNS 解析。`OVPN_TOPOLOGY` 为 `subnet`；布尔类型字段为 `true` 或 `false`；`OVPN_DNS` 和 `OVPN_ROUTES` 为逗号分隔的 IPv4 值；网络与动态池大小必须构成合法的 IPAM 布局。apply 会写入当前环境中所有的配置值。
+`OVPN_ENDPOINT` 必须为有效的主机名或 IP 字符串；`OVPN_PROTO` 为 `udp` 或 `tcp`；`OVPN_TRANSPORT_FAMILY` 为 `auto`、`ipv4` 或 `ipv6`。持久化的 `auto` 值保持不变：渲染时会识别 IPv4 和 IPv6 字面量；域名则选择双栈服务端传输和地址族中立的客户端传输。`config apply` 不进行 DNS 解析。`OVPN_TOPOLOGY` 为 `subnet`；布尔类型字段为 `true` 或 `false`；`OVPN_DNS` 和 `OVPN_ROUTES` 为逗号分隔的 IPv4 值；网络与动态池大小必须构成合法的 IPAM 布局。apply 会写入当前环境中所有的配置值。
 
 ## 客户端生命周期
 
@@ -317,7 +317,7 @@ ovpn state doctor [--json]
 ovpn render server [--stdout|--output <path>]
 ```
 
-根据持久化配置、传输地址族、IPAM 布局、PKI 路径和兼容的模板族渲染服务端配置。`auto` 会从 IP 字面量推断 `ipv4` 或 `ipv6`，但不会解析域名；域名保持 `udp`/`tcp`。显式的 `ipv4` 和 `ipv6` 分别渲染 OpenVPN 4/6 协议。无输出选项时，原子更新 `server/server.conf`；`--stdout` 将结果写入标准输出；`--output <path>` 在指定路径写入 mode-`0600` 文件。
+根据持久化配置、传输地址族、IPAM 布局、PKI 路径和兼容的模板族渲染服务端配置。`auto` 会从 IP 字面量推断 `ipv4` 或 `ipv6`。对于域名，服务端渲染 IPv6 双栈 socket（`udp6` 或 `tcp6-server`，不设置 `bind ipv6only`），客户端 profile 保持地址族中立的 `udp`/`tcp`，并在连接时解析 A/AAAA 记录。显式的 `ipv4` 和 `ipv6` 分别渲染 OpenVPN 4/6 协议。无输出选项时，原子更新 `server/server.conf`；`--stdout` 将结果写入标准输出；`--output <path>` 在指定路径写入 mode-`0600` 文件。
 
 ### `ovpn render client`
 

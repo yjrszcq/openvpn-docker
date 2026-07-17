@@ -202,19 +202,21 @@ environment:
   OVPN_TRANSPORT_FAMILY: auto
 ```
 
-For a hostname, family detection does not perform DNS resolution. Publish an
-AAAA record and explicitly select IPv6 in the Compose environment:
+For a hostname, publish the required A and/or AAAA records and keep `auto`:
 
 ```yaml
 environment:
   OVPN_ENDPOINT: vpn6.example.com
   OVPN_PROTO: udp
-  OVPN_TRANSPORT_FAMILY: ipv6
+  OVPN_TRANSPORT_FAMILY: auto
 ```
 
 Follow the configuration-change workflow above to run `ovpn config apply`,
-restart the service, and re-export client profiles. This forces only the outer
-OpenVPN connection to IPv6; the VPN data plane remains the IPv4 TUN defined by
+restart the service, and re-export client profiles. The server uses a dual-stack
+transport socket, while clients resolve and try A/AAAA records when connecting;
+`config apply` does not resolve DNS. Set `ipv6` instead only when IPv4 transport
+must be rejected. This affects only the outer OpenVPN connection; the VPN data
+plane remains the IPv4 TUN defined by
 `OVPN_NETWORK`. Without IPv4 egress on the server, the existing IPv4 NAT cannot
 provide public IPv4 access, and this image does not provide NAT64. Client
 networks must also have public IPv6 connectivity.

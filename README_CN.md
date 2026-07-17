@@ -91,7 +91,7 @@ docker compose logs -f openvpn
 | `OVPN_IMAGE` | `szcq/openvpn:2.7.5` | `szcq/openvpn:2.7.5` | Compose 使用的镜像。生产环境请固定到已发布的 OpenVPN 版本 tag。 |
 | `OVPN_ENDPOINT` | 必填 | `vpn.example.com` | 首次初始化时写入客户端 profile 的公网域名或 IP。 |
 | `OVPN_PROTO` | `udp` | `udp` | 传输协议：`udp` 或 `tcp`。 |
-| `OVPN_TRANSPORT_FAMILY` | `auto` | `auto` | 公网传输地址族：`auto` 会识别 IPv4/IPv6 字面量，域名不做 DNS 推断；也可显式设为 `ipv4` 或 `ipv6`。 |
+| `OVPN_TRANSPORT_FAMILY` | `auto` | `auto` | 公网传输地址族：`auto` 会识别 IP 字面量，并为域名使用双栈传输；也可显式设为 `ipv4` 或 `ipv6`。 |
 | `OVPN_PORT` | `1194` | `1194` | OpenVPN 监听端口。 |
 | `OVPN_NETWORK` | `10.8.0.0/24` | `10.42.0.0/24` | IPv4 隧道网段，必须选择无重叠且规范的 CIDR。 |
 | `OVPN_TOPOLOGY` | `subnet` | `subnet` | 必须使用的 IPv4 拓扑；不接受其他拓扑。 |
@@ -110,9 +110,10 @@ docker compose logs -f openvpn
 运行时默认值。
 
 使用 `OVPN_TRANSPORT_FAMILY=auto` 时，IPv4 字面量（如 `198.51.100.10`）会选择
-IPv4 传输，IPv6 字面量（如 `2001:db8::10`）会选择 IPv6 传输；域名不会通过
-DNS 解析来推断地址族。仅有公网 IPv6 的服务器使用域名时，可配置 AAAA 记录，
-并显式设置 `OVPN_TRANSPORT_FAMILY=ipv6`。这只让 OpenVPN 外层连接通过 IPv6；隧道地址、
+IPv4 传输，IPv6 字面量（如 `2001:db8::10`）会选择 IPv6 传输。使用域名时，
+服务端开启双栈传输 socket，客户端在连接时解析并尝试 A/AAAA 记录；`config apply`
+不会解析 DNS。因此仅有公网 IPv6 的服务器可配置 AAAA 记录并继续使用 `auto`；
+只有需要拒绝 IPv4 传输时才显式设置 `ipv6`。这只改变 OpenVPN 外层连接；隧道地址、
 推送路由和 DNS 配置仍为 IPv4。若服务器本身没有 IPv4 出口，VPN 客户端也不能
 通过现有 IPv4 NAT 访问公网 IPv4；本镜像不提供 NAT64。
 

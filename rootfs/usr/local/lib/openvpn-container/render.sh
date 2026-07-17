@@ -28,6 +28,7 @@ ovpn_template_apply() {
   local template="$1"
   template="${template//\{\{OVPN_PORT\}\}/$OVPN_PORT}"
   template="${template//\{\{OVPN_SERVER_PROTO\}\}/$OVPN_SERVER_PROTO}"
+  template="${template//\{\{OVPN_BIND_DIRECTIVE\}\}/$OVPN_BIND_DIRECTIVE}"
   template="${template//\{\{OVPN_CLIENT_PROTO\}\}/$OVPN_CLIENT_PROTO}"
   template="${template//\{\{OVPN_ENDPOINT\}\}/$OVPN_ENDPOINT}"
   template="${template//\{\{OVPN_DATA_DIR\}\}/$OVPN_RENDER_DATA_DIR}"
@@ -90,9 +91,13 @@ ovpn_prepare_render_context() {
     fi
   fi
   case "$transport_family:$OVPN_PROTO" in
-    auto:*)
-      OVPN_SERVER_PROTO="$OVPN_PROTO"
-      OVPN_CLIENT_PROTO="$OVPN_PROTO"
+    auto:udp)
+      OVPN_SERVER_PROTO=udp6
+      OVPN_CLIENT_PROTO=udp
+      ;;
+    auto:tcp)
+      OVPN_SERVER_PROTO=tcp6-server
+      OVPN_CLIENT_PROTO=tcp
       ;;
     ipv4:udp)
       OVPN_SERVER_PROTO=udp4
@@ -111,6 +116,11 @@ ovpn_prepare_render_context() {
       OVPN_CLIENT_PROTO=tcp6-client
       ;;
   esac
+  OVPN_BIND_DIRECTIVE=""
+  if [ "$transport_family" = ipv6 ]; then
+    OVPN_BIND_DIRECTIVE="bind ipv6only"
+  fi
+
   OVPN_NETWORK_ADDRESS="$(ovpn_cidr_ip "$OVPN_NETWORK")"
   OVPN_NETWORK_NETMASK="$(ovpn_cidr_netmask "$OVPN_NETWORK")"
   ovpn_prepare_ipam_render_context

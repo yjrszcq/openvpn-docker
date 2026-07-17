@@ -193,18 +193,19 @@ environment:
   OVPN_TRANSPORT_FAMILY: auto
 ```
 
-使用域名时，地址族检测不会进行 DNS 解析。应为服务端域名发布 AAAA 记录，
-并在 Compose 环境中显式选择 IPv6：
+使用域名时，发布所需的 A 和/或 AAAA 记录，并保持 `auto`：
 
 ```yaml
 environment:
   OVPN_ENDPOINT: vpn6.example.com
   OVPN_PROTO: udp
-  OVPN_TRANSPORT_FAMILY: ipv6
+  OVPN_TRANSPORT_FAMILY: auto
 ```
 
 按上一节的配置变更流程执行 `ovpn config apply`、重启服务并重新导出客户端
-profile。该设置只将 OpenVPN 外层连接强制为 IPv6，VPN 内网仍使用 `OVPN_NETWORK`
+profile。服务端使用双栈传输 socket，客户端在连接时解析并尝试 A/AAAA 记录；
+`config apply` 不解析 DNS。只有需要拒绝 IPv4 传输时才改用 `ipv6`。该设置只影响
+OpenVPN 外层连接，VPN 内网仍使用 `OVPN_NETWORK`
 定义的 IPv4 TUN。若服务器没有 IPv4 出口，现有 IPv4 NAT 无法让客户端访问公网
 IPv4；本镜像不提供 NAT64。客户端所在网络也必须能够访问公网 IPv6。
 

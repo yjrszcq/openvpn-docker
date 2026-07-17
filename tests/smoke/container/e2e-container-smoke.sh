@@ -291,7 +291,13 @@ for proto in udp tcp; do
   data_grep "$data_dir" "^OVPN_PROTO=$proto$" config/project.env
   data_grep "$data_dir" '^OVPN_TRANSPORT_FAMILY=auto$' config/project.env
   data_grep "$data_dir" '^server 10.88.0.0 255.255.255.0 nopool$' server/server.conf
-  data_grep "$data_dir" "^proto $proto$" server/server.conf
+  if [ "$proto" = udp ]; then
+    server_proto=udp6
+  else
+    server_proto=tcp6-server
+  fi
+  data_grep "$data_dir" "^proto $server_proto$" server/server.conf
+  data_absent "$data_dir" "^bind ipv6only$" server/server.conf
   data_grep "$data_dir" "^OVPN_NAT=$POLICY_NAT$" config/project.env
   data_grep "$data_dir" "^OVPN_NAT_INTERFACE=$POLICY_NAT_INTERFACE$" config/project.env
   data_grep "$data_dir" "^OVPN_REDIRECT_GATEWAY=$POLICY_REDIRECT_GATEWAY$" config/project.env
@@ -333,7 +339,7 @@ done
 family_index=0
 for proto in udp tcp; do
   family_index=$((family_index + 1))
-  transport_family=ipv6
+  transport_family=auto
   data_dir="$WORK_DIR/$proto-ipv6-data"
   profile_path="$WORK_DIR/client-$proto-ipv6.ovpn"
   network_name="$RUN_ID-$proto-ipv6-net"
@@ -347,7 +353,7 @@ for proto in udp tcp; do
   POLICY_ROUTES=''
   mkdir -p "$data_dir"
 
-  docker network create --ipv6 --subnet "fd42:88:$family_index::/64" "$network_name" >/dev/null
+  docker network create --ipv4=false --ipv6 --subnet "fd42:88:$family_index::/64" "$network_name" >/dev/null
   networks+=("$network_name")
   containers+=("$server_name")
 
@@ -357,13 +363,14 @@ for proto in udp tcp; do
 
   if [ "$proto" = udp ]; then
     server_proto=udp6
-    client_proto=udp6
+    client_proto=udp
   else
     server_proto=tcp6-server
-    client_proto=tcp6-client
+    client_proto=tcp
   fi
-  data_grep "$data_dir" '^OVPN_TRANSPORT_FAMILY=ipv6$' config/project.env
+  data_grep "$data_dir" '^OVPN_TRANSPORT_FAMILY=auto$' config/project.env
   data_grep "$data_dir" "^proto $server_proto$" server/server.conf
+  data_absent "$data_dir" "^bind ipv6only$" server/server.conf
   data_grep "$data_dir" '^server 10.88.0.0 255.255.255.0 nopool$' server/server.conf
   data_absent "$data_dir" 'ifconfig-ipv6\|route-ipv6' server/server.conf
 
@@ -380,4 +387,4 @@ for proto in udp tcp; do
   grep -Eq 'UDPv6|TCPv6' "$WORK_DIR/client-$proto-ipv6.log"
 done
 
-printf 'e2e container smoke passed (IPv4 and IPv6 transport; udp,tcp network=%s)\n' "$NETWORK"
+printf 'e2e container smoke passed (auto hostname over IPv4 and IPv6; udp,tcp tunnel=%s)\n' "$NETWORK"
