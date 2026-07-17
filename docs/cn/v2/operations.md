@@ -88,11 +88,22 @@ IP 回到可用池，但已吊销的 profile、私钥和审计历史均保留。
 ### 重签发证书
 
 ```bash
+# 保留原 IP 重签
 docker compose exec openvpn ovpn client reissue laptop
+
+# 重签并转为动态分配
+docker compose exec openvpn ovpn client reissue phone --dynamic
+
+# 重签并指定新静态 IP
+docker compose exec openvpn ovpn client reissue tablet --ip 10.42.0.30
+
+# 导出新 profile
 docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
 ```
 
-重签发生成新私钥和证书，保留原有 IP 分配。完成后须重新导出并分发 profile。
+已有静态 IP 的客户端重签时保留原 IP；无 IP 的客户端重签时自动分配最低可用
+静态地址。使用 `--dynamic` 可转为动态分配，`--ip <addr>` 可指定静态地址。
+完成后须重新导出并分发 profile。
 
 ### 删除客户端
 

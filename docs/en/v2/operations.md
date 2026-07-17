@@ -91,11 +91,22 @@ history are kept.
 ### Reissue certificates
 
 ```bash
+# reissue, keep the existing IP
 docker compose exec openvpn ovpn client reissue laptop
+
+# reissue and switch to dynamic
+docker compose exec openvpn ovpn client reissue phone --dynamic
+
+# reissue with a specific static IP
+docker compose exec openvpn ovpn client reissue tablet --ip 10.42.0.30
+
+# export the new profile
 docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
 ```
 
-Generates a new key and certificate while preserving the IP assignment.
+Clients that already have a static IP keep it. Clients without an IP auto-allocate
+the lowest available static address. Use `--dynamic` to switch to a dynamic
+assignment or `--ip <addr>` to pick a specific static address.
 Re-export and distribute the profile afterward.
 
 ### Delete a client

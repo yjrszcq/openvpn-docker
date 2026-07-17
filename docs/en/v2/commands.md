@@ -32,7 +32,7 @@ ovpn
 │   ├── export          Write an active client profile to stdout.
 │   ├── list            List client certificate state and optional detailed IP assignment.
 │   ├── revoke          Revoke a client certificate, optionally release its static IP.
-│   ├── reissue         Issue a new certificate for an existing client.
+│   ├── reissue         Issue a new certificate for an existing client, optionally adjusting IP assignment.
 │   ├── delete          Remove a client and its local credentials.
 │   └── ip
 │       ├── release     Release the retained static IP of a revoked client.
@@ -80,11 +80,11 @@ ovpn -v
 ovpn --version
 ```
 
-`-v` prints only the image version (e.g. `2.1.0`). `--version` prints a
+`-v` prints only the image version (e.g. `2.1.1`). `--version` prints a
 three-line summary with image, OpenVPN, and Easy-RSA versions:
 
 ```text
-image:     2.1.0
+image:     2.1.1
 openvpn:   2.7.5
 easy-rsa:  3.2.2
 ```
@@ -223,23 +223,29 @@ Revokes an active certificate, regenerates the CRL, moves its active profile to
 `clients/revoked/`, records the client as revoked, and disconnects it when the
 management socket is available. By default, a static assignment remains
 reserved. `--release-ip` releases that static reservation as part of the same
-operation. Releasing a static reservation requires nonzero dynamic-pool
-capacity.
+operation.
 
 ### `ovpn client reissue`
 
 Syntax:
 
 ```text
-ovpn client reissue <name>
+ovpn client reissue <name> [--dynamic|--ip <IPv4>]
 ```
 
-Issues a new key and certificate for an existing client name while retaining its
-IP assignment. For an active client, it first revokes the old certificate and
-moves its profile to the revoked set. It probes the shipped Easy-RSA runtime for
-same-CN reissue support before changing the live PKI. On success it writes a new
-active profile and disconnects the client; on a failed issuance the old
-certificate remains revoked and the IP assignment is retained.
+Issues a new key and certificate for an existing client name. For an active
+client, it first revokes the old certificate and moves its profile to the
+revoked set. It probes the shipped Easy-RSA runtime for same-CN reissue support
+before changing the live PKI, so a failing validation causes no changes.
+
+Clients that already have a static IP keep their assignment by default. Clients
+without an IP (released or originally dynamic) auto-allocate the lowest available
+static IP; reissue is refused when the static region is full. Options:
+
+- `--dynamic` → use a dynamic assignment after reissue; requires nonzero
+  dynamic-pool capacity.
+- `--ip <IPv4>` → use the specified static address, which must lie inside the
+  static region and be unoccupied.
 
 ### `ovpn client delete`
 

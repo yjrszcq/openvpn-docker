@@ -26,7 +26,7 @@ ovpn
 │   ├── export          将活跃客户端 profile 写入标准输出。
 │   ├── list            列出客户端证书状态和可选的详细 IP 分配信息。
 │   ├── revoke          吊销客户端证书，可选释放静态 IP。
-│   ├── reissue         为已有客户端签发新证书。
+│   ├── reissue         为已有客户端签发新证书，可选调整 IP 分配。
 │   ├── delete          删除客户端及其本地凭据。
 │   └── ip
 │       ├── release     释放已吊销客户端的保留静态 IP。
@@ -74,10 +74,10 @@ ovpn -v
 ovpn --version
 ```
 
-`-v` 仅打印镜像版本号（如 `2.1.0`）。`--version` 打印三行摘要，包含镜像、OpenVPN 和 Easy-RSA 版本：
+`-v` 仅打印镜像版本号（如 `2.1.1`）。`--version` 打印三行摘要，包含镜像、OpenVPN 和 Easy-RSA 版本：
 
 ```text
-image:     2.1.0
+image:     2.1.1
 openvpn:   2.7.5
 easy-rsa:  3.2.2
 ```
@@ -174,17 +174,22 @@ ovpn client list [--detail]
 ovpn client revoke <name> [--release-ip]
 ```
 
-撤销活跃证书，重新生成 CRL，将其活跃 profile 移至 `clients/revoked/`，记录该客户端为已撤销状态，并在管理套接字可用时断开其连接。默认情况下，静态分配会保持保留。`--release-ip` 作为同一操作的一部分释放该静态保留。释放静态保留要求动态池容量非零。
+撤销活跃证书，重新生成 CRL，将其活跃 profile 移至 `clients/revoked/`，记录该客户端为已撤销状态，并在管理套接字可用时断开其连接。默认情况下，静态分配会保持保留。`--release-ip` 作为同一操作的一部分释放该静态保留。
 
 ### `ovpn client reissue`
 
 语法：
 
 ```text
-ovpn client reissue <name>
+ovpn client reissue <name> [--dynamic|--ip <IPv4>]
 ```
 
-为已有的客户端名称签发新密钥和新证书，同时保留其 IP 分配。对于活跃客户端，它首先撤销旧证书并将其 profile 移至已撤销集合。在修改线上 PKI 之前，会探测所搭载的 Easy-RSA 运行时是否支持同一 CN 重新签发。成功时写入新的活跃 profile 并断开客户端连接；签发失败时，旧证书保持已撤销状态且 IP 分配被保留。
+为已有的客户端名称签发新密钥和新证书。对于活跃客户端，它首先撤销旧证书并将其 profile 移至已撤销集合。在修改线上 PKI 之前，会探测所搭载的 Easy-RSA 运行时是否支持同一 CN 重新签发，因此校验失败的请求不会造成任何变更。
+
+已有静态 IP 的客户端在重签时默认保留原有分配。无 IP 的客户端（曾释放或原本动态）在重签时默认分配最低可用静态地址；静态区满则拒绝。选项：
+
+- `--dynamic` → 重签后使用动态分配，要求动态池容量非零。
+- `--ip <IPv4>` → 重签后使用指定的静态地址，必须在静态区域内且未被占用。
 
 ### `ovpn client delete`
 
@@ -208,7 +213,7 @@ ovpn client delete <name>
 ovpn client ip release <name>
 ```
 
-释放已撤销客户端的保留静态分配。客户端必须已撤销且仍持有静态保留，动态池容量必须非零。已撤销的 profile、私钥、证书历史和审计历史均会保留。
+释放已撤销客户端的保留静态分配。客户端必须已撤销且仍持有静态保留。已撤销的 profile、私钥、证书历史和审计历史均会保留。
 
 ### `ovpn client ip set`
 
