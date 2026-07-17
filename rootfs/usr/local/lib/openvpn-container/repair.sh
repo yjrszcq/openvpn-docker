@@ -496,8 +496,8 @@ ovpn_repair_apply_inner() {
   OVPN_REPAIR_BEFORE_STATE="$OVPN_STATE"
   OVPN_REPAIR_TRANSACTION_SUCCESS=false
   OVPN_REPAIR_RUNTIME_WAS_PRESENT=false
-  ovpn_repair_transaction_start
   trap ovpn_repair_transaction_cleanup EXIT
+  ovpn_repair_transaction_start
   ovpn_repair_snapshot_actions
   ovpn_repair_stage_actions
   ovpn_repair_validate_stage

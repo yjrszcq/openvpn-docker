@@ -220,7 +220,7 @@ ovpn_pki_reissue_supported() {
   local bin probe status=0
 
   bin="$(ovpn_easyrsa_bin)" || return 1
-  probe="$(mktemp -d "$OVPN_DATA_DIR/.reissue-probe.XXXXXX")"
+  probe="$(mktemp -d "$OVPN_DATA_DIR/.reissue-probe.XXXXXX")" || return 1
   if ! cp -a "$OVPN_DATA_DIR/pki" "$probe/pki"; then
     rm -rf "$probe"
     return 1
@@ -276,7 +276,7 @@ ovpn_client_revoke_inner() {
   ovpn_require_healthy_state
   ovpn_client_ip_prepare_mutation
   ovpn_client_require_registry_active "$name"
-  index="$(ovpn_client_ip_assignment_index "$name")"
+  index="$(ovpn_client_ip_assignment_index "$name")" || ovpn_die "client '$name' is missing from the in-memory registry"
   assignment="${OVPN_CLIENT_IP_VALUES[index]}"
   if [ "$release_ip" = true ] && [ -n "$assignment" ] && [ "$OVPN_IPAM_DYNAMIC_POOL_SIZE" -eq 0 ]; then
     ovpn_die 'cannot release a static IP: dynamic pool capacity is 0; enlarge the dynamic pool first'
@@ -321,7 +321,7 @@ ovpn_client_release_ip_inner() {
   ovpn_client_ip_prepare_mutation
   status="${OVPN_CLIENT_IP_PKI_STATES[$name]:-}"
   [ "$status" = revoked ] || ovpn_die "client $name is not revoked"
-  index="$(ovpn_client_ip_assignment_index "$name")"
+  index="$(ovpn_client_ip_assignment_index "$name")" || ovpn_die "client '$name' is missing from the in-memory registry"
   assignment="${OVPN_CLIENT_IP_VALUES[index]}"
   [ -n "$assignment" ] || ovpn_die "client $name does not have a static IP reservation"
   [ "$OVPN_IPAM_DYNAMIC_POOL_SIZE" -gt 0 ] || ovpn_die "cannot release a static IP: dynamic pool capacity is 0; enlarge the dynamic pool first"
@@ -418,7 +418,7 @@ ovpn_client_delete_inner() {
     ovpn_client_lifecycle_move_profile_to_revoked "$name"
   fi
   state_file="$(ovpn_registry_client_state_file)"
-  state_backup="$(mktemp "$OVPN_DATA_DIR/meta/.client-state.delete.XXXXXX")"
+  state_backup="$(mktemp "$OVPN_DATA_DIR/meta/.client-state.delete.XXXXXX")" || ovpn_die "failed to create backup temp file"
   cp "$state_file" "$state_backup" || ovpn_die "failed to backup client state file"
   ovpn_client_registry_set_state "$name" deleted
   ovpn_client_delete_current_assignment "$name"

@@ -188,9 +188,7 @@ ovpn_client_ip_atomic_install() {
   local source="$1"
   local destination="$2"
 
-  cp "$source" "$destination.tmp"
-  mv "$destination.tmp" "$destination"
-  chmod 600 "$destination"
+  cp "$source" "$destination.tmp" && mv "$destination.tmp" "$destination" && chmod 600 "$destination"
 }
 
 ovpn_client_ip_audit_event() {

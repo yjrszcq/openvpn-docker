@@ -161,7 +161,7 @@ ovpn_network_migration_apply_inner() (
 
   ovpn_network_migration_runtime_preflight || ovpn_die 'network migration requires a healthy running OpenVPN process and management socket'
 
-  backup="$(mktemp -d "$OVPN_DATA_DIR/.network-migration.XXXXXX")"
+  backup="$(mktemp -d "$OVPN_DATA_DIR/.network-migration.XXXXXX")" || ovpn_die "failed to create migration backup directory"
   config_backup="$backup/project.env"
   schema_backup="$backup/schema-version"
   draft="$(ovpn_registry_client_ip_file)"

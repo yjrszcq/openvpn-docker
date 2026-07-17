@@ -87,8 +87,6 @@ ovpn_init_inner() {
   for entry in ccd clients config data meta pki repair secrets server; do
     mv "$stage_dir/$entry" "$final_data_dir/$entry"
   done
-  rmdir "$stage_dir"
-
   OVPN_DATA_DIR="$final_data_dir"
   OVPN_CONFIG_DIR="$OVPN_DATA_DIR/config"
   OVPN_PROJECT_ENV="$OVPN_CONFIG_DIR/project.env"
@@ -98,6 +96,7 @@ ovpn_init_inner() {
   ovpn_require_healthy_state
   commit_started=false
   trap - EXIT
+  rmdir "$stage_dir"
   ovpn_log "initialized OpenVPN data directory at $OVPN_DATA_DIR"
 }
 
