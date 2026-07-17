@@ -171,11 +171,11 @@ ovpn_network_migration_apply_inner() (
   lease_dir="$OVPN_LEASE_DIR"
 
   rollback() {
-    cp "$config_backup" "$OVPN_PROJECT_ENV"
-    cp "$schema_backup" "$OVPN_SCHEMA_VERSION_FILE"
-    cp "$backup/draft" "$draft"
-    cp "$backup/applied" "$applied"
-    cp "$backup/audit" "$audit"
+    cp "$config_backup" "$OVPN_PROJECT_ENV" || ovpn_log "rollback: failed to restore project env"
+    cp "$schema_backup" "$OVPN_SCHEMA_VERSION_FILE" || ovpn_log "rollback: failed to restore schema version"
+    cp "$backup/draft" "$draft" || ovpn_log "rollback: failed to restore draft registry"
+    cp "$backup/applied" "$applied" || ovpn_log "rollback: failed to restore applied registry"
+    cp "$backup/audit" "$audit" || ovpn_log "rollback: failed to restore audit log"
     rm -rf "$OVPN_DATA_DIR/ccd"
     if [ "$ccd_existed" = true ]; then
       cp -a "$backup/ccd" "$OVPN_DATA_DIR/ccd"

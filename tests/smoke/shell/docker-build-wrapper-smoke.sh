@@ -45,7 +45,7 @@ HTTP_PROXY=http://127.0.0.1:7890 \
 HTTPS_PROXY=http://127.0.0.1:7890 \
 NO_PROXY=localhost,127.0.0.1 \
 "$ROOT_DIR/scripts/docker-build.sh" -t test/openvpn:wrapper "$ROOT_DIR"
-assert_proxy_args '' '' localhost,127.0.0.1
+assert_proxy_args http://127.0.0.1:7890 http://127.0.0.1:7890 localhost,127.0.0.1
 
 PATH="$FAKE_BIN:$PATH" \
 OVPN_TEST_DOCKER_ARGS="$ARGS_FILE" \

@@ -144,11 +144,10 @@ ovpn_client_ip_validate_file() {
   local file="$1"
   local static_count=0 index
 
-  if ! (ovpn_config_load); then
+  ovpn_config_load || {
     ovpn_client_ip_error 'persistent network configuration is invalid'
     return 1
-  fi
-  ovpn_config_load
+  }
   ovpn_client_ip_parse_file "$file" || return 1
   ovpn_client_ip_validate_logical_clients || return 1
   for ((index = 0; index < ${#OVPN_CLIENT_IP_VALUES[@]}; index++)); do
@@ -224,7 +223,7 @@ ovpn_client_ip_apply_inner() (
   snapshot="$(ovpn_registry_applied_file)"
   [ -r "$draft" ] || ovpn_die "cannot read registry draft: $draft"
   [ -r "$snapshot" ] || ovpn_die "cannot read applied registry snapshot: $snapshot"
-  backup="$(mktemp "$OVPN_DATA_DIR/meta/.client-ip.apply.XXXXXX")"
+  backup="$(mktemp "$OVPN_DATA_DIR/meta/.client-ip.apply.XXXXXX")" || ovpn_die "failed to create client-ip apply backup file"
   candidate="${draft}.candidate.$$"
   cp "$snapshot" "$backup" || ovpn_die "failed to backup applied client-IP registry"
   trap '

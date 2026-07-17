@@ -85,7 +85,7 @@ ovpn_init_inner() {
   ovpn_init_write_transaction_marker "$transaction_file" "$transaction_id"
   commit_started=true
   for entry in ccd clients config data meta pki repair secrets server; do
-    mv "$stage_dir/$entry" "$final_data_dir/$entry"
+    mv "$stage_dir/$entry" "$final_data_dir/$entry" || ovpn_die "failed to move $entry into place"
   done
   OVPN_DATA_DIR="$final_data_dir"
   OVPN_CONFIG_DIR="$OVPN_DATA_DIR/config"

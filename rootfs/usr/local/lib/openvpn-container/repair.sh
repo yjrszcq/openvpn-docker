@@ -252,8 +252,8 @@ ovpn_repair_snapshot_actions() {
     source="$OVPN_DATA_DIR/$target"
     if [ -e "$source" ]; then
       snapshot_path="$OVPN_REPAIR_SNAPSHOT_DIR/$target"
-      mkdir -p "$(dirname "$snapshot_path")"
-      cp -a "$source" "$snapshot_path"
+      mkdir -p "$(dirname "$snapshot_path")" || ovpn_die "failed to create snapshot directory for $target"
+      cp -a "$source" "$snapshot_path" || ovpn_die "failed to snapshot $target"
       printf 'present\t%s\n' "$target" >>"$manifest"
     else
       printf 'missing\t%s\n' "$target" >>"$manifest"
@@ -392,7 +392,7 @@ ovpn_repair_install_staged_actions() {
       destination="$OVPN_DATA_DIR/$target"
       mkdir -p "$(dirname "$destination")"
       rm -rf "$destination"
-      mv "$source" "$destination"
+      mv "$source" "$destination" || ovpn_die "failed to install repaired file: $target"
     fi
     if [ "${OVPN_REPAIR_FAIL_AFTER_INSTALL:-}" = "$id" ]; then
       ovpn_die "injected repair failure after $id"

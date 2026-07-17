@@ -68,7 +68,7 @@ ovpn_client_ip_sync_collect_changes() {
 ovpn_client_ip_sync_stage_ccd() {
   local index name ip
 
-  OVPN_CLIENT_IP_SYNC_CCD_STAGE="$(mktemp -d "$OVPN_DATA_DIR/.ccd-ipam.stage.XXXXXX")"
+  OVPN_CLIENT_IP_SYNC_CCD_STAGE="$(mktemp -d "$OVPN_DATA_DIR/.ccd-ipam.stage.XXXXXX")" || ovpn_die "failed to create CCD stage directory"
   chmod 700 "$OVPN_CLIENT_IP_SYNC_CCD_STAGE"
   for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
     name="${OVPN_CLIENT_IP_NAMES[index]}"
@@ -81,7 +81,7 @@ ovpn_client_ip_sync_stage_ccd() {
 }
 
 ovpn_client_ip_sync_swap_ccd() {
-  OVPN_CLIENT_IP_SYNC_CCD_PREVIOUS="$(mktemp -d "$OVPN_DATA_DIR/.ccd-ipam.previous.XXXXXX")"
+  OVPN_CLIENT_IP_SYNC_CCD_PREVIOUS="$(mktemp -d "$OVPN_DATA_DIR/.ccd-ipam.previous.XXXXXX")" || ovpn_die "failed to create CCD previous directory"
   rmdir "$OVPN_CLIENT_IP_SYNC_CCD_PREVIOUS"
   if [ -e "$OVPN_CLIENT_IP_SYNC_CCD_DIR" ]; then
     mv "$OVPN_CLIENT_IP_SYNC_CCD_DIR" "$OVPN_CLIENT_IP_SYNC_CCD_PREVIOUS"
@@ -144,7 +144,7 @@ ovpn_client_ip_sync_maybe_fail() {
 ovpn_client_ip_apply_begin() {
   ovpn_client_ip_sync_reset
   if [ -d "$OVPN_LEASE_DIR" ]; then
-    OVPN_CLIENT_IP_SYNC_LEASE_BACKUP="$(mktemp -d "$OVPN_DATA_DIR/meta/.leases.backup.XXXXXX")"
+    OVPN_CLIENT_IP_SYNC_LEASE_BACKUP="$(mktemp -d "$OVPN_DATA_DIR/meta/.leases.backup.XXXXXX")" || ovpn_die "failed to create lease backup directory"
     if [ -n "$(ls -A "$OVPN_LEASE_DIR" 2>/dev/null)" ]; then
       cp -a "$OVPN_LEASE_DIR"/* "$OVPN_CLIENT_IP_SYNC_LEASE_BACKUP"/ || ovpn_die "failed to back up leases"
     fi

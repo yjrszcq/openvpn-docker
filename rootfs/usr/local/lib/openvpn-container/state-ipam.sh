@@ -143,10 +143,6 @@ ovpn_state_scan_ipam_consistency() {
     ovpn_state_add_critical_issue CLIENT_IP_AUDIT_INVALID RESTORE_AUDIT_LOG
     return 0
   fi
-  if ! (ovpn_client_ip_validate_file "$applied") >/dev/null 2>&1; then
-    ovpn_state_add_critical_issue CLIENT_IP_APPLIED_INVALID RESTORE_CLIENT_IP_REGISTRY
-    return 0
-  fi
   ovpn_client_ip_validate_file "$applied" || {
     ovpn_state_add_critical_issue CLIENT_IP_APPLIED_INVALID RESTORE_CLIENT_IP_REGISTRY
     return 0

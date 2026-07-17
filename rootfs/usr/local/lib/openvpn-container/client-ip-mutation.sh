@@ -143,7 +143,7 @@ ovpn_client_create_inner() {
   local name="$1"
   local mode="$2"
   local requested_ip="$3"
-  local assignment
+  local assignment int_val
 
   ovpn_client_name_or_die "$name"
   ovpn_require_healthy_state
@@ -250,7 +250,7 @@ ovpn_client_set_from_editor() {
   local -A requests=()
   local -A seen=()
 
-  temporary="$(mktemp "$OVPN_DATA_DIR/data/.client-ip-set.XXXXXX")"
+  temporary="$(mktemp "$OVPN_DATA_DIR/data/.client-ip-set.XXXXXX")" || ovpn_die "failed to create client-ip editor temporary file"
   umask 077
   {
     printf '%s\n' '# client,ip'
