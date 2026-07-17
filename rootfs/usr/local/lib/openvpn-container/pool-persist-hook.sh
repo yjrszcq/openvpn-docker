@@ -31,7 +31,8 @@ pool_hook_upsert() {
     [ "$(cat "$f" 2>/dev/null || true)" = "$address" ] && rm -f "$f"
   done
 
-  printf '%s\n' "$address" >"$lease_dir/$name"
+  printf '%s\n' "$address" >"$lease_dir/.$name.tmp"
+  mv "$lease_dir/.$name.tmp" "$lease_dir/$name"
   chmod 600 "$lease_dir/$name"
 }
 

@@ -94,7 +94,8 @@ ovpn_state_ipam_stage_ccd() {
     name="${OVPN_CLIENT_IP_NAMES[index]}"
     ip="${OVPN_CLIENT_IP_VALUES[index]}"
     [ -n "$ip" ] || continue
-    printf 'ifconfig-push %s %s\n' "$ip" "$OVPN_IPAM_NETMASK" >"$destination/$name"
+    printf 'ifconfig-push %s %s\n' "$ip" "$OVPN_IPAM_NETMASK" >"$destination/.$name.tmp"
+    mv "$destination/.$name.tmp" "$destination/$name"
     chmod 600 "$destination/$name"
   done
 }

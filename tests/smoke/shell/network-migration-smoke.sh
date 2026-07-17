@@ -109,7 +109,7 @@ if OVPN_NETWORK_MIGRATION_FAIL_HEALTH=true "$OVPN" network apply --network 10.90
   echo 'failed network migration unexpectedly succeeded' >&2
   exit 1
 fi
-grep -Fq 'network migration health check failed; rollback completed' "$TMP_DIR/fail.err"
+grep -Fq 'network migration rollback completed; OpenVPN is healthy' "$TMP_DIR/fail.err"
 grep -Fqx 'OVPN_NETWORK=10.89.0.0/24' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'alpha,10.89.0.20' "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fq '"event":"network_migration","outcome":"rejected"' "$OVPN_DATA_DIR/meta/audit.jsonl"

@@ -203,7 +203,7 @@ ovpn_network_migration_apply_inner() (
       rollback
       if [ "$runtime_reload_attempted" = true ]; then
         if ovpn_network_migration_reload_and_check true; then
-          ovpn_log 'network migration health check failed; rollback completed'
+          ovpn_log 'network migration rollback completed; OpenVPN is healthy'
         else
           ovpn_log 'network migration rollback restored persisted state but could not confirm OpenVPN health'
         fi

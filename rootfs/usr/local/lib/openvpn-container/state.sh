@@ -68,12 +68,12 @@ EOF
 
 ovpn_missing_required_files() {
   local file
-  ovpn_required_files | while IFS= read -r file; do
+  while IFS= read -r file; do
     [ -n "$file" ] || continue
     if [ ! -e "$file" ]; then
       printf '%s\n' "$file"
     fi
-  done
+  done < <(ovpn_required_files)
 }
 
 ovpn_state_reset() {

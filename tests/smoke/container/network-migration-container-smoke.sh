@@ -103,7 +103,7 @@ if docker exec -e OVPN_NETWORK_MIGRATION_FAIL_HEALTH=true "$CONTAINER_NAME" ovpn
   echo 'injected network migration health failure unexpectedly succeeded' >&2
   exit 1
 fi
-grep -Fq 'network migration health check failed; rollback completed' /tmp/ovpn-network-migration-fail.err
+grep -Fq 'network migration rollback completed; OpenVPN is healthy' /tmp/ovpn-network-migration-fail.err
 wait_for_health
 docker exec "$CONTAINER_NAME" ovpn runtime health
 test "$(docker exec "$CONTAINER_NAME" ovpn state show)" = HEALTHY
