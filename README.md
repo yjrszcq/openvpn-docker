@@ -99,7 +99,7 @@ bootstrap environment variables do not rewrite an existing instance.
 | `OVPN_IMAGE` | `szcq/openvpn:2.7.5` | `szcq/openvpn:2.7.5` | Image used by Compose. Pin a released OpenVPN-version tag. |
 | `OVPN_ENDPOINT` | required | `vpn.example.com` | Public hostname or IP embedded in client profiles during initialization. |
 | `OVPN_PROTO` | `udp` | `udp` | Transport protocol: `udp` or `tcp`. |
-| `OVPN_TRANSPORT_FAMILY` | `auto` | `auto` | Public transport address family: `auto`, `ipv4`, or `ipv6`; IPv6-only endpoints must select `ipv6`. |
+| `OVPN_TRANSPORT_FAMILY` | `auto` | `auto` | Public transport address family: `auto` detects IPv4/IPv6 literals without resolving hostnames; `ipv4` and `ipv6` force a family. |
 | `OVPN_PORT` | `1194` | `1194` | OpenVPN listen port. |
 | `OVPN_NETWORK` | `10.8.0.0/24` | `10.42.0.0/24` | IPv4 tunnel network. Select a non-overlapping canonical CIDR. |
 | `OVPN_TOPOLOGY` | `subnet` | `subnet` | Required IPv4 topology; no other topology is accepted. |
@@ -118,7 +118,7 @@ values are the deliberately opinionated values in
 `docker-compose.yaml` and `.env.example`; they are not an additional
 set of runtime defaults.
 
-For a server with only public IPv6, publish an AAAA record and set
+For a server with only public IPv6 that uses a hostname, publish an AAAA record and set
 `OVPN_TRANSPORT_FAMILY=ipv6`. This changes only the outer OpenVPN connection;
 tunnel addresses, pushed routes, and DNS configuration remain IPv4. If the
 server has no IPv4 egress, VPN clients cannot reach the public IPv4 Internet

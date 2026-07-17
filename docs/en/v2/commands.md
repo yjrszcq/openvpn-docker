@@ -408,8 +408,9 @@ ovpn render server [--stdout|--output <path>]
 
 Renders the server configuration from persistent configuration, transport
 address family, IPAM layout, PKI paths, and the compatible template family.
-`auto` preserves `udp`/`tcp`; `ipv4` and `ipv6` render explicit OpenVPN 4/6
-protocols. With no output option it
+`auto` infers `ipv4` or `ipv6` from IP literals without resolving hostnames;
+hostnames preserve `udp`/`tcp`. Explicit `ipv4` and `ipv6` values render the
+corresponding OpenVPN 4/6 protocols. With no output option it
 atomically updates `server/server.conf`; `--stdout` writes the result to
 standard output; `--output <path>` writes a mode-`0600` file at that path.
 

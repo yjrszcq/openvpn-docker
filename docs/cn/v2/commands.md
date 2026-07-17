@@ -317,7 +317,7 @@ ovpn state doctor [--json]
 ovpn render server [--stdout|--output <path>]
 ```
 
-根据持久化配置、传输地址族、IPAM 布局、PKI 路径和兼容的模板族渲染服务端配置。`auto` 保持 `udp`/`tcp`，`ipv4` 和 `ipv6` 分别渲染显式的 OpenVPN 4/6 协议。无输出选项时，原子更新 `server/server.conf`；`--stdout` 将结果写入标准输出；`--output <path>` 在指定路径写入 mode-`0600` 文件。
+根据持久化配置、传输地址族、IPAM 布局、PKI 路径和兼容的模板族渲染服务端配置。`auto` 会从 IP 字面量推断 `ipv4` 或 `ipv6`，但不会解析域名；域名保持 `udp`/`tcp`。显式的 `ipv4` 和 `ipv6` 分别渲染 OpenVPN 4/6 协议。无输出选项时，原子更新 `server/server.conf`；`--stdout` 将结果写入标准输出；`--output <path>` 在指定路径写入 mode-`0600` 文件。
 
 ### `ovpn render client`
 

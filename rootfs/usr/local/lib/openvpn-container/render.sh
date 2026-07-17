@@ -78,8 +78,18 @@ ovpn_join_pushes() {
 }
 
 ovpn_prepare_render_context() {
+  local transport_family
+
   ovpn_config_load
-  case "$OVPN_TRANSPORT_FAMILY:$OVPN_PROTO" in
+  transport_family="$OVPN_TRANSPORT_FAMILY"
+  if [ "$transport_family" = auto ]; then
+    if ovpn_ipam_ipv4_to_int "$OVPN_ENDPOINT" >/dev/null 2>&1; then
+      transport_family=ipv4
+    elif [[ "$OVPN_ENDPOINT" == *:* ]]; then
+      transport_family=ipv6
+    fi
+  fi
+  case "$transport_family:$OVPN_PROTO" in
     auto:*)
       OVPN_SERVER_PROTO="$OVPN_PROTO"
       OVPN_CLIENT_PROTO="$OVPN_PROTO"

@@ -85,6 +85,11 @@ assert_transport_render() {
 
 assert_transport_render auto udp vpn.example.test udp udp
 assert_transport_render auto tcp vpn.example.test tcp tcp
+assert_transport_render auto udp 198.51.100.10 udp4 udp4
+assert_transport_render auto tcp 198.51.100.10 tcp4-server tcp4-client
+assert_transport_render auto udp ::1 udp6 udp6
+assert_transport_render auto tcp ::ffff:192.0.2.1 tcp6-server tcp6-client
+grep -Fqx 'OVPN_TRANSPORT_FAMILY=auto' "$OVPN_DATA_DIR/config/project.env"
 assert_transport_render ipv4 udp vpn.example.test udp4 udp4
 assert_transport_render ipv4 tcp vpn.example.test tcp4-server tcp4-client
 assert_transport_render ipv6 udp 2001:db8::10 udp6 udp6
