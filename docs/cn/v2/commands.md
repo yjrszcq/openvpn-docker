@@ -74,10 +74,10 @@ ovpn -v
 ovpn --version
 ```
 
-`-v` 仅打印镜像版本号（如 `2.0.0`）。`--version` 打印三行摘要，包含镜像、OpenVPN 和 Easy-RSA 版本：
+`-v` 仅打印镜像版本号（如 `2.1.0`）。`--version` 打印三行摘要，包含镜像、OpenVPN 和 Easy-RSA 版本：
 
 ```text
-image:     2.0.0
+image:     2.1.0
 openvpn:   2.7.5
 easy-rsa:  3.2.2
 ```

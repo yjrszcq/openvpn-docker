@@ -80,11 +80,11 @@ ovpn -v
 ovpn --version
 ```
 
-`-v` prints only the image version (e.g. `2.0.0`). `--version` prints a
+`-v` prints only the image version (e.g. `2.1.0`). `--version` prints a
 three-line summary with image, OpenVPN, and Easy-RSA versions:
 
 ```text
-image:     2.0.0
+image:     2.1.0
 openvpn:   2.7.5
 easy-rsa:  3.2.2
 ```
