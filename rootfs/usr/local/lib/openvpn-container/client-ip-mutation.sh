@@ -173,8 +173,8 @@ ovpn_client_create_inner() {
   else
     OVPN_CLIENT_IP_INTS+=('')
   fi
-  ovpn_client_registry_set_state "$name" active
   ovpn_pki_issue_client "$name"
+  ovpn_client_registry_set_state "$name" active
   if ! ovpn_client_ip_apply_current_mutation; then
     ovpn_pki_try_revoke_client "$name" || true
     ovpn_die "failed to apply client creation for '$name'; the certificate was revoked"

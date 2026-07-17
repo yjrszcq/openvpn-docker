@@ -7,27 +7,6 @@ ovpn_client_name_or_die() {
   fi
 }
 
-ovpn_client_records() {
-  local index="$OVPN_DATA_DIR/pki/index.txt"
-  local line status subject name state
-  [ -r "$index" ] || return 0
-
-  while IFS= read -r line || [ -n "$line" ]; do
-    [ -n "$line" ] || continue
-    status="${line%%$'\t'*}"
-    subject="${line##*$'\t'}"
-    case "$status" in
-      V) state=active ;;
-      R) state=revoked ;;
-      *) continue ;;
-    esac
-    name="${subject##*/CN=}"
-    name="${name%%/*}"
-    [ -n "$name" ] || continue
-    [ "$name" != "$OVPN_SERVER_NAME" ] || continue
-    printf '%s %s\n' "$name" "$state"
-  done <"$index"
-}
 ovpn_client_status() {
   local wanted="$1"
   local name state
