@@ -19,7 +19,7 @@ pool_hook_upsert() {
   [ -n "$address" ] || return 0
 
   # Static clients have a CCD file with ifconfig-push — skip lease tracking.
-  ccd_dir="$(dirname "$(dirname "$lease_dir")")/ccd"
+  ccd_dir="${OVPN_DATA_DIR:-/etc/openvpn}/ccd"
   [ -f "$ccd_dir/$name" ] && return 0
 
   mkdir -p "$lease_dir"

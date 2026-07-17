@@ -89,7 +89,7 @@ ovpn_network_migration_plan() {
       used["$ip"]=1
       continue
     fi
-    value="$(ovpn_ipam_ipv4_to_int "$ip")"
+    value="$(ovpn_ipam_ipv4_to_int "$ip")" || ovpn_die "invalid IP in migration plan: $ip"
     candidate="$(ovpn_ipam_int_to_ipv4 "$((OVPN_IPAM_NETWORK_INT | (value & host_mask)))")"
     if ovpn_ipam_ip_in_static_range "$candidate" && [ -z "${used[$candidate]+present}" ]; then
       planned["$name"]="$candidate"
@@ -245,7 +245,12 @@ ovpn_network_migration_apply_inner() (
   OVPN_CLIENT_IP_VALUES=("${OVPN_NETWORK_MIGRATION_VALUES[@]}")
   OVPN_CLIENT_IP_INTS=()
   for ((index = 0; index < ${#OVPN_CLIENT_IP_VALUES[@]}; index++)); do
-    if [ -n "${OVPN_CLIENT_IP_VALUES[index]}" ]; then OVPN_CLIENT_IP_INTS+=("$(ovpn_ipam_ipv4_to_int "${OVPN_CLIENT_IP_VALUES[index]}")"); else OVPN_CLIENT_IP_INTS+=(''); fi
+    if [ -n "${OVPN_CLIENT_IP_VALUES[index]}" ]; then
+      ip_int_val="$(ovpn_ipam_ipv4_to_int "${OVPN_CLIENT_IP_VALUES[index]}")" || ovpn_die "invalid migration IP: ${OVPN_CLIENT_IP_VALUES[index]}"
+      OVPN_CLIENT_IP_INTS+=("$ip_int_val")
+    else
+      OVPN_CLIENT_IP_INTS+=('')
+    fi
   done
   ovpn_client_ip_apply_current_mutation
   mkdir -p "$lease_dir"

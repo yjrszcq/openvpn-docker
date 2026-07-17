@@ -49,6 +49,7 @@ ovpn_start_command() {
   mkdir -p "$OVPN_LEASE_DIR"
   find "$OVPN_LEASE_DIR" -maxdepth 1 -type f -delete 2>/dev/null || true
   export OVPN_LEASE_DIR
+  export OVPN_DATA_DIR
   ovpn_runtime_write_state HEALTHY running false
   ovpn_log "starting OpenVPN with $config_path"
   exec "$openvpn_bin" --config "$config_path"

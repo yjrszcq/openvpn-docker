@@ -10,7 +10,7 @@ ovpn_client_ip_require_applied_draft() {
   [ -r "$draft" ] && [ -r "$applied" ] || ovpn_die 'client-IP registry is unavailable; restore the V2 registry first'
   if ! cmp -s "$draft" "$applied"; then
     ovpn_log 'client-IP draft was out of sync; restoring from the applied snapshot'
-    cp "$applied" "$draft"
+    cp "$applied" "$draft" || ovpn_die 'failed to restore client-IP draft from the applied snapshot'
   fi
 }
 
@@ -43,7 +43,7 @@ ovpn_client_ip_set_current_assignment() {
   index="$(ovpn_client_ip_assignment_index "$name")" || ovpn_die "client '$name' is missing from the applied client-IP registry"
   OVPN_CLIENT_IP_VALUES[index]="$value"
   if [ -n "$value" ]; then
-    OVPN_CLIENT_IP_INTS[index]="$(ovpn_ipam_ipv4_to_int "$value")"
+    OVPN_CLIENT_IP_INTS[index]="$(ovpn_ipam_ipv4_to_int "$value")" || ovpn_die "invalid IP assignment '$value' for client '$name'"
   else
     OVPN_CLIENT_IP_INTS[index]=''
   fi
@@ -168,7 +168,8 @@ ovpn_client_create_inner() {
   OVPN_CLIENT_IP_NAMES+=("$name")
   OVPN_CLIENT_IP_VALUES+=("$assignment")
   if [ -n "$assignment" ]; then
-    OVPN_CLIENT_IP_INTS+=("$(ovpn_ipam_ipv4_to_int "$assignment")")
+    int_val="$(ovpn_ipam_ipv4_to_int "$assignment")" || ovpn_die "invalid assignment IP: $assignment"
+    OVPN_CLIENT_IP_INTS+=("$int_val")
   else
     OVPN_CLIENT_IP_INTS+=('')
   fi

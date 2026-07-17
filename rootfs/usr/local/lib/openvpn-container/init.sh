@@ -46,7 +46,7 @@ ovpn_init_inner() {
     ovpn_die "refusing to initialize non-empty data directory; current state is $state"
   fi
 
-  mkdir "$stage_dir"
+  mkdir "$stage_dir" || ovpn_die "failed to create init staging directory"
   cleanup_stage() {
     local status=$?
     if [ "$status" -ne 0 ]; then

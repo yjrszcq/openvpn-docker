@@ -228,7 +228,7 @@ ovpn_client_ip_apply_inner() (
   [ -r "$snapshot" ] || ovpn_die "cannot read applied registry snapshot: $snapshot"
   backup="$(mktemp "$OVPN_DATA_DIR/meta/.client-ip.apply.XXXXXX")"
   candidate="${draft}.candidate.$$"
-  cp "$snapshot" "$backup"
+  cp "$snapshot" "$backup" || ovpn_die "failed to backup applied client-IP registry"
   trap '
     status=$?
     trap - EXIT

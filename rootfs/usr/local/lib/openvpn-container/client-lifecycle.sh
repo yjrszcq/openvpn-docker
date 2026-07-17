@@ -419,7 +419,7 @@ ovpn_client_delete_inner() {
   fi
   state_file="$(ovpn_registry_client_state_file)"
   state_backup="$(mktemp "$OVPN_DATA_DIR/meta/.client-state.delete.XXXXXX")"
-  cp "$state_file" "$state_backup"
+  cp "$state_file" "$state_backup" || ovpn_die "failed to backup client state file"
   ovpn_client_registry_set_state "$name" deleted
   ovpn_client_delete_current_assignment "$name"
   if ! ovpn_client_ip_apply_current_mutation; then
