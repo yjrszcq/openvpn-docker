@@ -66,7 +66,7 @@ assignment_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint
 key_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /usr/bin/sha256sum "$IMAGE" "/etc/openvpn/pki/private/$client.key")"
 index_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /usr/bin/sha256sum "$IMAGE" /etc/openvpn/pki/index.txt)"
 
-if ! run_control client reissue "$client" >/tmp/ovpn-lifecycle-reissue.out 2>/tmp/ovpn-lifecycle-reissue.err; then
+if ! run_control client reissue "$client" --dynamic >/tmp/ovpn-lifecycle-reissue.out 2>/tmp/ovpn-lifecycle-reissue.err; then
   echo 'same-CN reissue unexpectedly failed in the shipped Easy-RSA runtime' >&2
   sed 's/^/  | /' /tmp/ovpn-lifecycle-reissue.err >&2
   exit 1
@@ -109,5 +109,15 @@ docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec
   test -f /etc/openvpn/meta/audit.jsonl
   ! grep -E -- "-----BEGIN [A-Z ]*PRIVATE KEY-----" /etc/openvpn/meta/audit.jsonl
 '
+
+# reissue no-IP client without params: should auto-allocate a static IP
+run_control client create keep-dynamic --dynamic >/tmp/ovpn-lifecycle-create-dynamic.out 2>/tmp/ovpn-lifecycle-create-dynamic.err
+run_control client revoke keep-dynamic --release-ip >/tmp/ovpn-lifecycle-revoke-dynamic.out 2>/tmp/ovpn-lifecycle-revoke-dynamic.err
+run_control client reissue keep-dynamic >/tmp/ovpn-lifecycle-reissue-dynamic.out 2>/tmp/ovpn-lifecycle-reissue-dynamic.err
+assignment_static="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, -v client=keep-dynamic '$1 == client { print; exit }' /etc/openvpn/data/client-ip.csv)"
+grep -q '^keep-dynamic,10\.88\.0\.' <<<"$assignment_static" || {
+  printf 'reissue without params did not auto-allocate a static IP for a no-IP client: %s\n' "$assignment_static" >&2
+  exit 1
+}
 
 printf 'client lifecycle container smoke passed (network=%s)\n' "$NETWORK"

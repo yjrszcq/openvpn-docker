@@ -240,7 +240,7 @@ before changing the live PKI, so a failing validation causes no changes.
 
 Clients that already have a static IP keep their assignment by default. Clients
 without an IP (released or originally dynamic) auto-allocate the lowest available
-static IP; reissue is refused when the static region is full. Options:
+static IP; reissue is refused when the static region has no free capacity. Options:
 
 - `--dynamic` → use a dynamic assignment after reissue; requires nonzero
   dynamic-pool capacity.
@@ -278,9 +278,8 @@ ovpn client ip release <name>
 ```
 
 Releases the retained static assignment of a revoked client. The client must be
-revoked, must still have a static reservation, and the dynamic pool must have
-nonzero capacity. The revoked profile, private key, certificate history, and
-audit history remain.
+revoked and must still have a static reservation. The revoked profile, private
+key, certificate history, and audit history remain.
 
 ### `ovpn client ip set`
 
