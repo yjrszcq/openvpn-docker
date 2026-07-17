@@ -124,7 +124,11 @@ transport. For a hostname, the server opens a dual-stack transport socket and
 the client resolves and tries A/AAAA records at connection time; `config apply`
 does not resolve DNS. A server with only public IPv6 can therefore publish an
 AAAA record and keep `OVPN_TRANSPORT_FAMILY=auto`; use `ipv6` only to reject
-IPv4 transport. This changes only the outer OpenVPN connection;
+IPv4 transport. The dual-stack listener is an IPv6 socket without
+`bind ipv6only`, so it also accepts IPv4-mapped peers such as
+`::ffff:198.51.100.10`. Explicit IPv6 transport adds `bind ipv6only`; IPv4
+transport needs no equivalent option because an IPv4 socket cannot accept
+IPv6. This changes only the outer OpenVPN connection;
 tunnel addresses, pushed routes, and DNS configuration remain IPv4. If the
 server has no IPv4 egress, VPN clients cannot reach the public IPv4 Internet
 through the existing IPv4 NAT, and this image does not provide NAT64.

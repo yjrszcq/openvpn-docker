@@ -317,7 +317,7 @@ ovpn state doctor [--json]
 ovpn render server [--stdout|--output <path>]
 ```
 
-根据持久化配置、传输地址族、IPAM 布局、PKI 路径和兼容的模板族渲染服务端配置。`auto` 会从 IP 字面量推断 `ipv4` 或 `ipv6`。对于域名，服务端渲染 IPv6 双栈 socket（`udp6` 或 `tcp6-server`，不设置 `bind ipv6only`），客户端 profile 保持地址族中立的 `udp`/`tcp`，并在连接时解析 A/AAAA 记录。显式的 `ipv4` 和 `ipv6` 分别渲染 OpenVPN 4/6 协议。无输出选项时，原子更新 `server/server.conf`；`--stdout` 将结果写入标准输出；`--output <path>` 在指定路径写入 mode-`0600` 文件。
+根据持久化配置、传输地址族、IPAM 布局、PKI 路径和兼容的模板族渲染服务端配置。`auto` 会从 IP 字面量推断 `ipv4` 或 `ipv6`。对于域名，服务端渲染 IPv6 双栈 socket（`udp6` 或 `tcp6-server`，不设置 `bind ipv6only`），客户端 profile 保持地址族中立的 `udp`/`tcp`，并在连接时解析 A/AAAA 记录。该 socket 同时接受原生 IPv6 和 IPv4-mapped 对端。显式 `ipv6` 会增加 `bind ipv6only`；显式 `ipv4` 使用的 IPv4 socket 本身无法接受 IPv6，因此不需要对应的 bind 选项。无输出选项时，原子更新 `server/server.conf`；`--stdout` 将结果写入标准输出；`--output <path>` 在指定路径写入 mode-`0600` 文件。
 
 ### `ovpn render client`
 

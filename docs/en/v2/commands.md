@@ -412,10 +412,12 @@ ovpn render server [--stdout|--output <path>]
 Renders the server configuration from persistent configuration, transport
 address family, IPAM layout, PKI paths, and the compatible template family.
 `auto` infers `ipv4` or `ipv6` from IP literals. For hostnames it renders an
-IPv6 dual-stack server socket (`udp6` or `tcp6-server` without `bind
-ipv6only`); client profiles preserve family-neutral `udp`/`tcp` and resolve
-A/AAAA records when connecting. Explicit `ipv4` and `ipv6` values render the
-corresponding OpenVPN 4/6 protocols. With no output option it
+IPv6 dual-stack server socket (`udp6` or `tcp6-server` without
+`bind ipv6only`); client profiles preserve family-neutral `udp`/`tcp` and resolve
+A/AAAA records when connecting. The socket accepts both native IPv6 and
+IPv4-mapped peers. Explicit `ipv6` adds `bind ipv6only`; explicit `ipv4` needs
+no matching bind option because its IPv4 socket cannot accept IPv6. With no
+output option it
 atomically updates `server/server.conf`; `--stdout` writes the result to
 standard output; `--output <path>` writes a mode-`0600` file at that path.
 

@@ -204,7 +204,8 @@ environment:
 
 按上一节的配置变更流程执行 `ovpn config apply`、重启服务并重新导出客户端
 profile。服务端使用双栈传输 socket，客户端在连接时解析并尝试 A/AAAA 记录；
-`config apply` 不解析 DNS。只有需要拒绝 IPv4 传输时才改用 `ipv6`。该设置只影响
+`config apply` 不解析 DNS。由于未设置 `bind ipv6only`，服务端 socket 会通过
+IPv4-mapped 地址接受 IPv4。只有需要拒绝 IPv4 传输时才改用 `ipv6`。该设置只影响
 OpenVPN 外层连接，VPN 内网仍使用 `OVPN_NETWORK`
 定义的 IPv4 TUN。若服务器没有 IPv4 出口，现有 IPv4 NAT 无法让客户端访问公网
 IPv4；本镜像不提供 NAT64。客户端所在网络也必须能够访问公网 IPv6。

@@ -214,9 +214,10 @@ environment:
 Follow the configuration-change workflow above to run `ovpn config apply`,
 restart the service, and re-export client profiles. The server uses a dual-stack
 transport socket, while clients resolve and try A/AAAA records when connecting;
-`config apply` does not resolve DNS. Set `ipv6` instead only when IPv4 transport
-must be rejected. This affects only the outer OpenVPN connection; the VPN data
-plane remains the IPv4 TUN defined by
+`config apply` does not resolve DNS. The server socket accepts IPv4 through
+IPv4-mapped addresses because `bind ipv6only` is omitted. Set `ipv6` instead
+only when IPv4 transport must be rejected. This affects only the outer OpenVPN
+connection; the VPN data plane remains the IPv4 TUN defined by
 `OVPN_NETWORK`. Without IPv4 egress on the server, the existing IPv4 NAT cannot
 provide public IPv4 access, and this image does not provide NAT64. Client
 networks must also have public IPv6 connectivity.

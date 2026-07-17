@@ -113,7 +113,10 @@ docker compose logs -f openvpn
 IPv4 传输，IPv6 字面量（如 `2001:db8::10`）会选择 IPv6 传输。使用域名时，
 服务端开启双栈传输 socket，客户端在连接时解析并尝试 A/AAAA 记录；`config apply`
 不会解析 DNS。因此仅有公网 IPv6 的服务器可配置 AAAA 记录并继续使用 `auto`；
-只有需要拒绝 IPv4 传输时才显式设置 `ipv6`。这只改变 OpenVPN 外层连接；隧道地址、
+只有需要拒绝 IPv4 传输时才显式设置 `ipv6`。双栈监听使用未设置 `bind ipv6only`
+的 IPv6 socket，因此也接受形如 `::ffff:198.51.100.10` 的 IPv4-mapped 对端。
+显式 IPv6 传输会增加 `bind ipv6only`；IPv4 socket 本身无法接受 IPv6，因此不需要
+对应的 `bind ipv4only`。这只改变 OpenVPN 外层连接；隧道地址、
 推送路由和 DNS 配置仍为 IPv4。若服务器本身没有 IPv4 出口，VPN 客户端也不能
 通过现有 IPv4 NAT 访问公网 IPv4；本镜像不提供 NAT64。
 
