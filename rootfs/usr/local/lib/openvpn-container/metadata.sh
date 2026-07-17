@@ -27,8 +27,7 @@ ovpn_instance_id() {
   fi
 
   if [ -n "${id_file:-}" ] && [ -d "$(dirname "$id_file")" ]; then
-    printf '%s\n' "$id" >"$id_file.tmp" && mv "$id_file.tmp" "$id_file" || true
-    chmod 600 "$id_file"
+    printf '%s\n' "$id" >"$id_file.tmp" && mv "$id_file.tmp" "$id_file" && chmod 600 "$id_file" || true
   fi
   printf '%s\n' "$id"
 }

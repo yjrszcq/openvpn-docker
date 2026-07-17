@@ -178,10 +178,10 @@ ovpn_network_migration_apply_inner() (
     cp "$backup/audit" "$audit" || ovpn_log "rollback: failed to restore audit log"
     rm -rf "$OVPN_DATA_DIR/ccd"
     if [ "$ccd_existed" = true ]; then
-      cp -a "$backup/ccd" "$OVPN_DATA_DIR/ccd"
+      cp -a "$backup/ccd" "$OVPN_DATA_DIR/ccd" || ovpn_log "rollback: failed to restore CCD directory"
     fi
     if [ "$server_existed" = true ]; then
-      cp "$backup/server" "$server"
+      cp "$backup/server" "$server" || ovpn_log "rollback: failed to restore server config"
     else
       rm -f "$server"
     fi

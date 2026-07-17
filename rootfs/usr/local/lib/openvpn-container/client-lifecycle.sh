@@ -263,7 +263,8 @@ ovpn_client_lifecycle_move_profile_to_revoked() {
 
   mkdir -p "$OVPN_DATA_DIR/clients/revoked"
   if [ -e "$OVPN_DATA_DIR/clients/active/$name.ovpn" ]; then
-    mv "$OVPN_DATA_DIR/clients/active/$name.ovpn" "$OVPN_DATA_DIR/clients/revoked/$name.ovpn"
+    mv "$OVPN_DATA_DIR/clients/active/$name.ovpn" "$OVPN_DATA_DIR/clients/revoked/$name.ovpn" || \
+      ovpn_log "warning: failed to move client profile for '$name' to revoked directory"
   fi
 }
 

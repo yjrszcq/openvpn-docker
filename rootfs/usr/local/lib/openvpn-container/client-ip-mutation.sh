@@ -241,7 +241,7 @@ ovpn_client_editor() {
     *[[:space:]]*) ovpn_die 'OVPN_EDITOR must be a single executable path' ;;
   esac
   command -v "$editor" >/dev/null 2>&1 || ovpn_die "editor is not available: $editor"
-  "$editor" "$file"
+  "$editor" "$file" || ovpn_die "editor exited with an error; client IP assignments were not changed"
 }
 
 ovpn_client_set_from_editor() {
