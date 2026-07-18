@@ -102,6 +102,8 @@ docker compose logs -f openvpn
 | `OVPN_CLIENT_TO_CLIENT` | `true` | `true` | 允许 VPN 客户端直接互访。 |
 | `OVPN_DNS` | 空 | 空 | 推送给客户端的逗号分隔 IPv4 DNS 服务器。 |
 | `OVPN_ROUTES` | 空 | 空 | 推送给客户端的逗号分隔 IPv4 CIDR。 |
+| `OVPN_LOG_MAX_BYTES` | `10485760` | `10485760` | 每个持久化 OpenVPN 日志文件触发轮转前的最大字节数。 |
+| `OVPN_LOG_BACKUPS` | `5` | `5` | 保留的轮转日志备份数量；`0` 表示不保留备份。 |
 | `OVPN_CRITICAL_MODE` | `exit` | `exit` | 仅在需要保留关键状态容器进行排障时使用 `maintenance`。 |
 | `OVPN_EDITOR` | `EDITOR`，否则 `nano` | 未设置 | 交互式 client-IP 操作使用的编辑器。 |
 | `OVPN_GITHUB_TOKEN` | 未设置 | 未设置 | 管理 Release 检查和下载使用的可选只读 GitHub token；遵循标准代理变量。 |
@@ -154,6 +156,40 @@ OpenVPN 内核，也不会迁移持久化数据。
 - [v2 命令参考](docs/cn/v2/commands.md)：当前 CLI。
   - [v2 操作手册](docs/cn/v2/operations.md)：按工作流组织的命令组合用法。
 
+## 更新、迁移与日志
+
+`MANAGEMENT_VERSION`、`IMAGE_VERSION`、`OPENVPN_VERSION` 和整数数据 schema
+相互独立。可通过 `ovpn --version` 与 `ovpn runtime version` 查看。
+
+不改变 schema 的管理代码修复可以在不重启 OpenVPN 的情况下安装：
+
+```bash
+docker compose exec openvpn ovpn upgrade --check
+docker compose exec openvpn ovpn upgrade --yes
+```
+
+新镜像遇到旧数据 schema 时，普通数据命令和服务启动都会以状态 `78` 拒绝。停止在线
+服务后，只能通过 maintenance 迁移：
+
+```bash
+docker compose stop openvpn
+docker compose run --rm openvpn-maintenance migrate plan
+docker compose run --rm openvpn-maintenance migrate apply --yes
+docker compose run --rm openvpn-maintenance state doctor
+docker compose up -d openvpn
+```
+
+迁移可能替换客户端凭据；必须重新分发 `migrate apply` 列出的所有活跃 profile。
+回滚代码或镜像不会回滚已迁移数据，必须改为恢复匹配的迁移前快照。目标版本迁移、
+快照和恢复步骤见操作手册。
+
+持久化 OpenVPN 日志会把已知 UUID 翻译回显示名称，事件流则提供结构化生命周期记录：
+
+```bash
+docker compose exec openvpn ovpn runtime logs --lines 100
+docker compose exec openvpn ovpn runtime events --lines 100 --json
+```
+
 ## 安全说明
 
 - 默认设计将 CA 保持在持久化数据卷内，便于日常运维；数据卷被攻破可能导致 CA 泄露。
@@ -200,6 +236,11 @@ GitHub Actions 将管理代码发布与镜像发布分开。推送稳定的
 使用仓库的 Ed25519 发布密钥签署严格清单，并且只发布
 [管理代码在线更新政策](docs/cn/management-update-policy.md)规定的三个管理资产。
 私钥保存在仓库 secret `MANAGEMENT_SIGNING_KEY` 中，绝不会写入镜像。
+
+由于提交无法包含自身哈希，应先形成发布源码提交，再在默认分支的
+`compatibility/data-schema-releases.tsv` 中将该精确哈希登记为 `signed-bundle`，
+最后给源码提交打 tag。发布 workflow 会读取默认分支登记表，并拒绝未登记 tag 或
+schema、platform、OpenVPN 不匹配的发布。
 
 默认分支的 `IMAGE_VERSION` 发生变化时，Candidate 才发布经过测试的 GHCR 候选
 镜像，随后 Image Release 创建稳定 GHCR tag 和 Docker Hub 的 OpenVPN 版本 tag。

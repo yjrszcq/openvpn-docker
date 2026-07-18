@@ -110,6 +110,8 @@ bootstrap environment variables do not rewrite an existing instance.
 | `OVPN_CLIENT_TO_CLIENT` | `true` | `true` | Allow direct traffic between VPN clients. |
 | `OVPN_DNS` | empty | empty | Comma-separated IPv4 DNS servers pushed to clients. |
 | `OVPN_ROUTES` | empty | empty | Comma-separated IPv4 CIDRs pushed to clients. |
+| `OVPN_LOG_MAX_BYTES` | `10485760` | `10485760` | Maximum size in bytes of each persistent OpenVPN log file before rotation. |
+| `OVPN_LOG_BACKUPS` | `5` | `5` | Number of rotated OpenVPN log backups to retain; `0` disables backups. |
 | `OVPN_CRITICAL_MODE` | `exit` | `exit` | Use `maintenance` only to hold a critical container for inspection. |
 | `OVPN_EDITOR` | `EDITOR`, otherwise `nano` | unset | Editor used by interactive client-IP workflows. |
 | `OVPN_GITHUB_TOKEN` | unset | unset | Optional read-only GitHub token for management-release checks and downloads. Standard proxy variables are honored. |
@@ -173,6 +175,44 @@ management updates never replace the OpenVPN kernel or migrate persistent data.
 - [v2 command reference](docs/en/v2/commands.md) — the current CLI.
   - [v2 operations guide](docs/en/v2/operations.md) — workflow-oriented command combinations.
 
+## Updates, migrations, and logs
+
+`MANAGEMENT_VERSION`, `IMAGE_VERSION`, `OPENVPN_VERSION`, and the integer data
+schema are independent. Inspect them with `ovpn --version` and
+`ovpn runtime version`.
+
+Same-schema management fixes can be installed without restarting OpenVPN:
+
+```bash
+docker compose exec openvpn ovpn upgrade --check
+docker compose exec openvpn ovpn upgrade --yes
+```
+
+If a new image finds an older data schema, normal data commands and server
+startup fail with status `78`. Stop the live service and migrate only through
+maintenance:
+
+```bash
+docker compose stop openvpn
+docker compose run --rm openvpn-maintenance migrate plan
+docker compose run --rm openvpn-maintenance migrate apply --yes
+docker compose run --rm openvpn-maintenance state doctor
+docker compose up -d openvpn
+```
+
+Migration may replace client credentials; redistribute every active profile
+listed by `migrate apply`. A code/image rollback does not roll back migrated
+data—restore the matching pre-migration snapshot instead. See the operations
+guide for target-version migration, snapshots, and recovery.
+
+Persistent OpenVPN logs translate known UUIDs back to display names, while the
+event stream provides structured lifecycle records:
+
+```bash
+docker compose exec openvpn ovpn runtime logs --lines 100
+docker compose exec openvpn ovpn runtime events --lines 100 --json
+```
+
 ## Security Notes
 
 - The default design keeps the CA inside the persistent data volume for
@@ -229,6 +269,12 @@ Ed25519 release key, and publishes only the three management assets described
 in the [management update policy](docs/en/management-update-policy.md). The
 repository secret `MANAGEMENT_SIGNING_KEY` contains that private key; it is
 never embedded in an image.
+
+Because a commit cannot contain its own hash, prepare the release source commit
+first, register that exact hash as a `signed-bundle` row in
+`compatibility/data-schema-releases.tsv` on the default branch, and only then
+tag the source commit. The release workflow reads the default-branch registry
+and rejects an unregistered tag or a schema/platform/OpenVPN mismatch.
 
 Changing `IMAGE_VERSION` on the default branch publishes a tested GHCR
 candidate and then runs the Image Release workflow, which creates stable GHCR

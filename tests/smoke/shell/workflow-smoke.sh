@@ -48,6 +48,7 @@ grep -Fq -- '--build-arg "PLATFORM_API=$PLATFORM_API"' "$WORKFLOWS/candidate.yml
 grep -Fq -- '--build-arg "DATA_SCHEMA=$DATA_SCHEMA"' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/container/upgrade-state-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/data-schema-policy-smoke.sh' "$WORKFLOWS/test.yml"
+grep -Fq 'tests/smoke/shell/current-docs-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/license-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'candidate-ovpn' "$WORKFLOWS/candidate.yml"
 grep -Fq 'packages: write' "$WORKFLOWS/candidate.yml"

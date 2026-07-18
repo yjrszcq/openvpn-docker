@@ -33,6 +33,7 @@ ovpn
 │   ├── list            List client certificate state and optional detailed IP assignment.
 │   ├── revoke          Revoke a client certificate, optionally release its static IP.
 │   ├── reissue         Issue a new certificate for an existing client, optionally adjusting IP assignment.
+│   ├── rename          Change a client's display name without changing its UUID.
 │   ├── delete          Remove a client and its local credentials.
 │   └── ip
 │       ├── release     Release the retained static IP of a revoked client.
@@ -53,7 +54,9 @@ ovpn
 │   ├── status          Print runtime state as JSON.
 │   ├── health          Return success only when the container is healthy.
 │   ├── capabilities    Print compatibility and feature information.
-│   └── version         Print image and runtime build information.
+│   ├── version         Print image and runtime build information.
+│   ├── logs            Read translated or raw persistent OpenVPN logs.
+│   └── events          Read structured runtime and lifecycle events.
 ├── upgrade             Check, install, or roll back signed management code.
 ├── migrate             Plan or apply an offline data-schema migration.
 └── help                Print this help message.
@@ -154,7 +157,7 @@ ovpn config apply
 
 Validates the current `OVPN_*` environment and atomically replaces
 `config/project.env` and `config/schema-version` with mode `0600`. It writes
-configuration schema version `2` and does not issue, revoke, delete, or reissue
+data schema version `3` and does not issue, revoke, delete, or reissue
 client certificates.
 
 `OVPN_ENDPOINT` must be a valid hostname or IP string; `OVPN_PROTO` is `udp` or
@@ -165,7 +168,8 @@ transport. `config apply` does not resolve DNS.
 `OVPN_TOPOLOGY` is `subnet`; boolean fields are `true` or `false`;
 `OVPN_DNS` and `OVPN_ROUTES` are comma-separated IPv4 values; and the network
 and dynamic-pool size must form a valid IPAM layout. Apply writes every
-configuration value from the current environment.
+configuration value from the current environment. `OVPN_LOG_MAX_BYTES` must be
+a positive integer and `OVPN_LOG_BACKUPS` a non-negative integer.
 
 ## Client lifecycle
 
@@ -514,6 +518,41 @@ confirmation, `69` reports GitHub/download unavailability, `74` reports
 verification or installation failure, and `78` reports an incompatible target
 or rollback. Success and an already-current target return `0`.
 
+## Persistent data migration
+
+### `ovpn migrate`
+
+Syntax:
+
+```text
+ovpn migrate plan [--to-version VERSION] [--json]
+ovpn migrate apply [--to-version VERSION] [--yes]
+```
+
+Available only through the stopped `openvpn-maintenance` service. `plan` is
+read-only and reports source/target schemas, the ordered migration chain,
+client count, blockers, and an optional target management release. `apply`
+requires confirmation, or `--yes` outside a TTY. An already-current schema is
+an idempotent success.
+
+Without `--to-version`, the currently active management code migrates to its
+current schema. With `--to-version`, the command verifies a compatible signed target
+bundle and stages target code and data together. Apply obtains the exclusive
+runtime lock, snapshots persistent data, migrates only a staging copy,
+validates schema, PKI, registries, profiles, and target code, then commits both
+selectors. Failure or interruption restores the data and active-code selector.
+Schema 1 runs `1→2→3`; schema 2 runs `2→3`. Both replace name-CN client
+credentials with UUID-CN credentials, so every active profile reported after
+success must be redistributed.
+
+Data-dependent commands reject old, conflicting, invalid, or newer schemas
+with exit status `78`; only `migrate` may read historical formats. Help,
+version, and capability inspection remain available without parsing instance
+data. Platform API or OpenVPN incompatibility also returns `78` and requires an image update.
+Snapshots and reports are retained below `repair/migrations`. Restoring an old
+image after migration requires restoring its matching pre-migration snapshot;
+an image rollback alone is not a data rollback.
+
 ## Runtime inspection
 
 ### `ovpn runtime status`
@@ -562,8 +601,37 @@ ovpn runtime version
 
 Prints build-information JSON from
 `/usr/local/share/openvpn-container/build-info.json`, with the Easy-RSA version
-detected at runtime. If that file is missing, it detects the Easy-RSA version
-and prints `unknown` for the remaining fields.
+detected at runtime. It reports the active management version and source
+(`embedded` or `online`), image version, platform API, data schema, OpenVPN,
+Easy-RSA, and the supported OpenVPN range. If build information is missing, it
+detects Easy-RSA and prints `unknown` for unavailable fields.
+
+### `ovpn runtime logs`
+
+Syntax:
+
+```text
+ovpn runtime logs [--lines N] [--follow] [--raw]
+```
+
+Reads persistent rotated OpenVPN logs, defaulting to the latest 100 lines.
+Known UUIDs are displayed as `name [uuid]`; unknown identities remain
+unchanged. `--raw` disables translation. `--follow` continues across append,
+rotation, and atomic replacement without owning or blocking the OpenVPN
+management socket.
+
+### `ovpn runtime events`
+
+Syntax:
+
+```text
+ovpn runtime events [--lines N] [--follow] [--json]
+```
+
+Reads the latest 100 structured connection, disconnection, client lifecycle,
+IP, rename, network migration, management update, and data migration events.
+The default is human-readable text; `--json` emits one JSON object per event.
+`--follow` streams new records without blocking management commands.
 
 ## Examples
 

@@ -27,6 +27,7 @@ ovpn
 │   ├── list            列出客户端证书状态和可选的详细 IP 分配信息。
 │   ├── revoke          吊销客户端证书，可选释放静态 IP。
 │   ├── reissue         为已有客户端签发新证书，可选调整 IP 分配。
+│   ├── rename          修改客户端显示名称而不改变 UUID。
 │   ├── delete          删除客户端及其本地凭据。
 │   └── ip
 │       ├── release     释放已吊销客户端的保留静态 IP。
@@ -47,7 +48,9 @@ ovpn
 │   ├── status          打印运行时状态 JSON。
 │   ├── health          仅当容器健康时返回成功。
 │   ├── capabilities    打印兼容性和特性信息。
-│   └── version         打印镜像和运行时构建信息。
+│   ├── version         打印镜像和运行时构建信息。
+│   ├── logs            读取已翻译或原始的持久化 OpenVPN 日志。
+│   └── events          读取结构化运行时和生命周期事件。
 ├── upgrade             检查、安装或回滚已签名的管理代码。
 ├── migrate             规划或执行离线数据 schema 迁移。
 └── help                打印此帮助。
@@ -132,9 +135,9 @@ ovpn config show
 ovpn config apply
 ```
 
-验证当前 `OVPN_*` 环境变量，并以 mode `0600` 原子替换 `config/project.env` 和 `config/schema-version`。它会写入配置 schema 版本 `2`，且不会签发、撤销、删除或重新签发客户端证书。
+验证当前 `OVPN_*` 环境变量，并以 mode `0600` 原子替换 `config/project.env` 和 `config/schema-version`。它会写入数据 schema 版本 `3`，且不会签发、撤销、删除或重新签发客户端证书。
 
-`OVPN_ENDPOINT` 必须为有效的主机名或 IP 字符串；`OVPN_PROTO` 为 `udp` 或 `tcp`；`OVPN_TRANSPORT_FAMILY` 为 `auto`、`ipv4` 或 `ipv6`。持久化的 `auto` 值保持不变：渲染时会识别 IPv4 和 IPv6 字面量；域名则选择双栈服务端传输和地址族中立的客户端传输。`config apply` 不进行 DNS 解析。`OVPN_TOPOLOGY` 为 `subnet`；布尔类型字段为 `true` 或 `false`；`OVPN_DNS` 和 `OVPN_ROUTES` 为逗号分隔的 IPv4 值；网络与动态池大小必须构成合法的 IPAM 布局。apply 会写入当前环境中所有的配置值。
+`OVPN_ENDPOINT` 必须为有效的主机名或 IP 字符串；`OVPN_PROTO` 为 `udp` 或 `tcp`；`OVPN_TRANSPORT_FAMILY` 为 `auto`、`ipv4` 或 `ipv6`。持久化的 `auto` 值保持不变：渲染时会识别 IPv4 和 IPv6 字面量；域名则选择双栈服务端传输和地址族中立的客户端传输。`config apply` 不进行 DNS 解析。`OVPN_TOPOLOGY` 为 `subnet`；布尔类型字段为 `true` 或 `false`；`OVPN_DNS` 和 `OVPN_ROUTES` 为逗号分隔的 IPv4 值；网络与动态池大小必须构成合法的 IPAM 布局。`OVPN_LOG_MAX_BYTES` 必须为正整数，`OVPN_LOG_BACKUPS` 必须为非负整数。apply 会写入当前环境中所有的配置值。
 
 ## 客户端生命周期
 
@@ -405,6 +408,34 @@ launcher 每次调用时解析 active bundle，后续命令与连接 hook 可直
 表示验证或安装事务失败，`78` 表示目标或回滚版本不兼容；成功及目标已是当前版本时
 返回 `0`。
 
+## 持久化数据迁移
+
+### `ovpn migrate`
+
+语法：
+
+```text
+ovpn migrate plan [--to-version VERSION] [--json]
+ovpn migrate apply [--to-version VERSION] [--yes]
+```
+
+此命令只能通过已停止服务的 `openvpn-maintenance` 使用。`plan` 为只读操作，报告
+源/目标 schema、有序迁移链、客户端数量、阻塞项和可选目标管理版本。`apply`
+要求交互确认；非 TTY 必须传 `--yes`。已经是当前 schema 时幂等成功。
+
+不传 `--to-version` 时，使用当前 active 管理代码迁移到其当前 schema。传入目标版本时，
+命令先验证兼容的已签名 bundle，再共同 staging 目标代码和数据。apply 获取独占
+运行锁、创建持久化快照、只迁移 staging 副本，验证 schema、PKI、清单、profile
+和目标代码后再同时提交。失败或中断时恢复数据与 active 代码指针。schema 1 执行
+`1→2→3`，schema 2 执行 `2→3`；两者都会把名称 CN 凭据替换为 UUID CN 凭据，
+成功后报告的所有活跃 profile 都必须重新分发。
+
+读取数据的命令对旧、冲突、非法或更新 schema 返回 `78`；只有 `migrate` 可以读取
+历史格式。不解析实例数据的 help、version 和 capabilities 仍可使用。platform API
+或 OpenVPN 不兼容同样返回 `78`，此时必须升级镜像。
+快照和报告保存在 `repair/migrations` 下。数据迁移后若要运行旧镜像，必须恢复与其
+匹配的迁移前快照；仅回滚镜像不等于回滚数据。
+
 ## 运行时检查
 
 ### `ovpn runtime status`
@@ -445,7 +476,34 @@ ovpn runtime capabilities
 ovpn runtime version
 ```
 
-打印 `/usr/local/share/openvpn-container/build-info.json` 中的构建信息 JSON，其中 Easy-RSA 版本为运行时检测的实际版本。如果该文件缺失，则从运行时获取 Easy-RSA 版本，其余字段打印 `unknown`。
+打印 `/usr/local/share/openvpn-container/build-info.json` 中的构建信息 JSON，其中
+Easy-RSA 版本为运行时检测值。输出包含 active 管理版本及来源（`embedded` 或
+`online`）、镜像版本、platform API、数据 schema、OpenVPN、Easy-RSA 和支持的
+OpenVPN 范围。若构建信息缺失，则检测 Easy-RSA，其余不可用字段打印 `unknown`。
+
+### `ovpn runtime logs`
+
+语法：
+
+```text
+ovpn runtime logs [--lines N] [--follow] [--raw]
+```
+
+读取持久化轮转的 OpenVPN 日志，默认最近 100 行。已知 UUID 显示为
+`名称 [uuid]`，未知身份保持原样；`--raw` 禁用翻译。`--follow` 可跨追加、轮转和
+原子替换持续跟随，且不会占用或阻塞 OpenVPN management socket。
+
+### `ovpn runtime events`
+
+语法：
+
+```text
+ovpn runtime events [--lines N] [--follow] [--json]
+```
+
+读取最近 100 条结构化连接、断开、客户端生命周期、IP、rename、网络迁移、管理更新
+和数据迁移事件。默认输出便于阅读的文本；`--json` 每行输出一个 JSON 对象。
+`--follow` 持续输出新记录且不阻塞 management 命令。
 
 ## 示例
 
