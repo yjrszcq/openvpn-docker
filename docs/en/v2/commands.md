@@ -223,6 +223,22 @@ current lease, `last-known` when a persisted lease record exists, or `unavailabl
 availability and the current route. The view reads the applied registry, not an
 unapplied draft.
 
+### `ovpn client rename`
+
+Syntax:
+
+```text
+ovpn client rename <client> <new-name>
+```
+
+Atomically changes the human-facing display name while preserving the UUID,
+certificate, key, IP assignment, CCD, lease, and any current OpenVPN
+connection. The identity registry, draft and applied IP registries, profile
+filename, and embedded name comment change together. The source may be the
+current name or UUID. The new name must be valid and unused by a current client.
+Renaming or deleting a client releases its old name for reuse; deleted UUID
+tombstones remain authoritative history.
+
 ### `ovpn client revoke`
 
 Syntax:
@@ -268,9 +284,10 @@ ovpn client delete <client>
 ```
 
 Irreversibly removes a client. An active client is revoked first; the command
-then removes its registry record, active or revoked profile, private key,
-issued certificate, and request file. Recover an old private key only from a
-secure backup.
+then removes its IP record, active or revoked profile, private key, issued
+certificate, and request file, while retaining a UUID tombstone in the identity
+registry. The deleted display name may be reused by a new UUID. Recover an old
+private key only from a secure backup.
 
 ## Client IP management
 

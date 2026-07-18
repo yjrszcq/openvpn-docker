@@ -263,6 +263,42 @@ fi
 grep -E "^laptop[[:space:]]+${laptop_id}[[:space:]]+active$" <("$OVPN" client list)
 test -f "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 
+"$OVPN" client create source --dynamic >"$TMP_DIR/rename-create.out" 2>"$TMP_DIR/rename-create.err"
+rename_id="$(awk -F, '$2 == "source" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
+rename_identity_before="$(sha256sum "$OVPN_DATA_DIR/pki/issued/$rename_id.crt" "$OVPN_DATA_DIR/pki/private/$rename_id.key")"
+"$OVPN" client rename "$rename_id" target >"$TMP_DIR/rename.out" 2>"$TMP_DIR/rename.err"
+grep -Fqx "$rename_id,target,active" "$OVPN_DATA_DIR/meta/client-state.csv"
+grep -Fqx "$rename_id,target," "$OVPN_DATA_DIR/data/client-ip.csv"
+grep -Fqx "$rename_id,target," "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
+test ! -e "$OVPN_DATA_DIR/clients/active/source.ovpn"
+grep -Fqx "# ovpn-client-id: $rename_id" "$OVPN_DATA_DIR/clients/active/target.ovpn"
+grep -Fqx '# ovpn-client-name: target' "$OVPN_DATA_DIR/clients/active/target.ovpn"
+[ "$rename_identity_before" = "$(sha256sum "$OVPN_DATA_DIR/pki/issued/$rename_id.crt" "$OVPN_DATA_DIR/pki/private/$rename_id.key")" ]
+grep -Fq "\"client_id\":\"$rename_id\",\"old_name\":\"source\",\"new_name\":\"target\"" "$OVPN_DATA_DIR/meta/audit.jsonl"
+[ "$("$OVPN" state show)" = HEALTHY ]
+
+if "$OVPN" client rename target laptop >"$TMP_DIR/rename-conflict.out" 2>"$TMP_DIR/rename-conflict.err"; then
+  echo 'rename to a current client name unexpectedly succeeded' >&2
+  exit 1
+fi
+grep -Fq 'client name already exists: laptop' "$TMP_DIR/rename-conflict.err"
+rename_before_failure="$(repair_snapshot)"
+if OVPN_CLIENT_RENAME_FAIL_AFTER=registries "$OVPN" client rename target broken >"$TMP_DIR/rename-failure.out" 2>"$TMP_DIR/rename-failure.err"; then
+  echo 'injected client rename failure unexpectedly succeeded' >&2
+  exit 1
+fi
+[ "$rename_before_failure" = "$(repair_snapshot)" ] || {
+  echo 'failed client rename did not roll back every persisted target' >&2
+  exit 1
+}
+test ! -e "$OVPN_DATA_DIR/clients/active/broken.ovpn"
+if compgen -G "$OVPN_DATA_DIR/meta/.client-rename.*" >/dev/null; then
+  echo 'failed client rename left a staging directory' >&2
+  exit 1
+fi
+"$OVPN" client rename target source >"$TMP_DIR/rename-back.out" 2>"$TMP_DIR/rename-back.err"
+grep -E "^source[[:space:]]+${rename_id}[[:space:]]+active$" <("$OVPN" client list)
+
 "$OVPN" client create phone --dynamic >"$TMP_DIR/phone-create.out" 2>"$TMP_DIR/phone-create.err"
 phone_id="$(awk -F, '$2 == "phone" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
 grep -Fqx "$phone_id,phone," "$OVPN_DATA_DIR/data/client-ip.csv"
@@ -405,6 +441,13 @@ if "$OVPN" client export "$phone_id" >"$TMP_DIR/deleted-export.out" 2>"$TMP_DIR/
   exit 1
 fi
 grep -Fq "client '$phone_id' does not exist" "$TMP_DIR/deleted-export.err"
+"$OVPN" client create phone --dynamic >"$TMP_DIR/reused-name-create.out" 2>"$TMP_DIR/reused-name-create.err"
+reused_phone_id="$(awk -F, '$2 == "phone" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
+[ "$reused_phone_id" != "$phone_id" ]
+grep -Fqx "$phone_id,phone,deleted" "$OVPN_DATA_DIR/meta/client-state.csv"
+grep -Fqx "$reused_phone_id,phone,active" "$OVPN_DATA_DIR/meta/client-state.csv"
+grep -Fqx "$reused_phone_id,phone," "$OVPN_DATA_DIR/data/client-ip.csv"
+[ "$("$OVPN" state show)" = HEALTHY ]
 
 tablet_index_before="$(sha256sum "$OVPN_DATA_DIR/pki/index.txt")"
 if FAKE_EASYRSA_FAIL_BUILD_CLIENT="$tablet_id" "$OVPN" client reissue tablet >"$TMP_DIR/tablet-reissue.out" 2>"$TMP_DIR/tablet-reissue.err"; then
@@ -449,5 +492,12 @@ if "$OVPN" client export laptop >"$TMP_DIR/revoked-export.out" 2>"$TMP_DIR/revok
 fi
 
 grep -q "is revoked" "$TMP_DIR/revoked-export.err"
+"$OVPN" client rename "$laptop_id" retired-laptop >"$TMP_DIR/rename-revoked.out" 2>"$TMP_DIR/rename-revoked.err"
+grep -E "^retired-laptop[[:space:]]+${laptop_id}[[:space:]]+revoked$" <("$OVPN" client list)
+grep -Fqx "$laptop_id,retired-laptop,revoked" "$OVPN_DATA_DIR/meta/client-state.csv"
+grep -Fqx "$laptop_id,retired-laptop," "$OVPN_DATA_DIR/data/client-ip.csv"
+test ! -e "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
+grep -Fqx '# ovpn-client-name: retired-laptop' "$OVPN_DATA_DIR/clients/revoked/retired-laptop.ovpn"
+[ "$("$OVPN" state show)" = HEALTHY ]
 
 printf 'client lifecycle smoke passed\n'

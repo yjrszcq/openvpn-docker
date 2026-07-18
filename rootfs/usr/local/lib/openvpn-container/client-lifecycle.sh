@@ -260,6 +260,164 @@ ovpn_client_lifecycle_audit() {
   chmod 600 "$audit_file"
 }
 
+ovpn_client_rename_rewrite_csv() {
+  local source="$1"
+  local destination="$2"
+  local id="$3"
+  local new_name="$4"
+
+  awk -F, -v OFS=, -v client_id="$id" -v name="$new_name" '
+    $1 == client_id {
+      $2 = name
+      found++
+    }
+    { print }
+    END { if (found != 1) exit 1 }
+  ' "$source" >"$destination"
+  chmod 600 "$destination"
+}
+
+ovpn_client_rename_rewrite_profile() {
+  local source="$1"
+  local destination="$2"
+  local id="$3"
+  local old_name="$4"
+  local new_name="$5"
+
+  awk -v client_id="$id" -v old_name="$old_name" -v new_name="$new_name" '
+    $0 == "# ovpn-client-id: " client_id {
+      ids++
+    }
+    $0 == "# ovpn-client-name: " old_name {
+      print "# ovpn-client-name: " new_name
+      names++
+      next
+    }
+    { print }
+    END { if (ids != 1 || names != 1) exit 1 }
+  ' "$source" >"$destination"
+  chmod 600 "$destination"
+}
+
+ovpn_client_rename_maybe_fail() {
+  [ "${OVPN_CLIENT_RENAME_FAIL_AFTER:-}" != "$1" ] || ovpn_die "injected client rename failure after $1"
+}
+
+ovpn_client_rename_audit() {
+  local id="$1"
+  local old_name="$2"
+  local new_name="$3"
+  local audit_file
+
+  audit_file="$(ovpn_registry_audit_file)"
+  printf '{"timestamp":"%s","operation":"rename","result":"applied","client_id":"%s","old_name":"%s","new_name":"%s"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$id" "$old_name" "$new_name" >>"$audit_file"
+  chmod 600 "$audit_file"
+}
+
+ovpn_client_rename_inner() (
+  local reference="$1"
+  local new_name="$2"
+  local id old_name state state_file draft applied audit_file profile_dir old_profile new_profile
+  local stage rollback_ok transaction_success=false
+
+  ovpn_require_healthy_state
+  ovpn_client_ip_prepare_mutation
+  ovpn_client_resolve_ref_or_die "$reference"
+  id="$OVPN_CLIENT_RESOLVED_ID"
+  old_name="$OVPN_CLIENT_RESOLVED_NAME"
+  state="$OVPN_CLIENT_RESOLVED_STATE"
+  ovpn_client_name_or_die "$new_name"
+  if [ "$old_name" = "$new_name" ]; then
+    ovpn_log "client '$old_name' already has that name"
+    return 0
+  fi
+  [ -z "${OVPN_REGISTRY_CURRENT_ID_BY_NAME[$new_name]:-}" ] || ovpn_die "client name already exists: $new_name"
+
+  state_file="$(ovpn_registry_client_state_file)"
+  draft="$(ovpn_registry_client_ip_file)"
+  applied="$(ovpn_registry_applied_file)"
+  audit_file="$(ovpn_registry_audit_file)"
+  profile_dir="$OVPN_DATA_DIR/clients/$state"
+  old_profile="$profile_dir/$old_name.ovpn"
+  new_profile="$profile_dir/$new_name.ovpn"
+  [ -r "$old_profile" ] || ovpn_die "client profile is missing: $old_profile"
+  [ ! -e "$OVPN_DATA_DIR/clients/active/$new_name.ovpn" ] &&
+    [ ! -e "$OVPN_DATA_DIR/clients/revoked/$new_name.ovpn" ] ||
+    ovpn_die "client profile path already exists for '$new_name'"
+
+  stage="$(mktemp -d "$OVPN_DATA_DIR/meta/.client-rename.XXXXXX")" ||
+    ovpn_die 'failed to create client rename staging directory'
+  chmod 700 "$stage"
+  if ! cp "$state_file" "$stage/state.original" ||
+    ! cp "$draft" "$stage/draft.original" ||
+    ! cp "$applied" "$stage/applied.original" ||
+    ! cp "$audit_file" "$stage/audit.original" ||
+    ! cp "$old_profile" "$stage/profile.original"; then
+    rm -rf "$stage"
+    ovpn_die 'failed to back up client rename targets'
+  fi
+
+  ovpn_client_rename_cleanup() {
+    local status=$?
+
+    trap - EXIT
+    set +e
+    if [ "$transaction_success" != true ]; then
+      rollback_ok=true
+      ovpn_client_ip_atomic_install "$stage/state.original" "$state_file" || rollback_ok=false
+      ovpn_client_ip_atomic_install "$stage/draft.original" "$draft" || rollback_ok=false
+      ovpn_client_ip_atomic_install "$stage/applied.original" "$applied" || rollback_ok=false
+      ovpn_client_ip_atomic_install "$stage/audit.original" "$audit_file" || rollback_ok=false
+      rm -f "$new_profile"
+      ovpn_client_ip_atomic_install "$stage/profile.original" "$old_profile" || rollback_ok=false
+      if [ "$rollback_ok" != true ]; then
+        ovpn_log "CRITICAL: client rename rollback was incomplete; recovery files remain at $stage"
+        exit "$status"
+      fi
+    fi
+    rm -rf "$stage"
+    exit "$status"
+  }
+  trap ovpn_client_rename_cleanup EXIT
+
+  ovpn_client_rename_rewrite_csv "$state_file" "$stage/state.candidate" "$id" "$new_name"
+  ovpn_client_rename_rewrite_csv "$draft" "$stage/draft.candidate" "$id" "$new_name"
+  ovpn_client_rename_rewrite_csv "$applied" "$stage/applied.candidate" "$id" "$new_name"
+  ovpn_client_rename_rewrite_profile "$old_profile" "$stage/profile.candidate" "$id" "$old_name" "$new_name"
+  ovpn_registry_load_identities "$stage/state.candidate" ||
+    ovpn_die 'renamed identity registry candidate is invalid'
+
+  ovpn_client_ip_atomic_install "$stage/state.candidate" "$state_file"
+  ovpn_client_rename_maybe_fail identity
+  ovpn_client_ip_validate_file "$stage/draft.candidate" ||
+    ovpn_die 'renamed client-IP draft candidate is invalid'
+  ovpn_client_ip_write_canonical_file "$stage/draft.canonical"
+  ovpn_client_ip_validate_file "$stage/applied.candidate" ||
+    ovpn_die 'renamed applied client-IP candidate is invalid'
+  ovpn_client_ip_write_canonical_file "$stage/applied.canonical"
+  ovpn_client_ip_atomic_install "$stage/draft.canonical" "$draft"
+  ovpn_client_ip_atomic_install "$stage/applied.canonical" "$applied"
+  ovpn_client_rename_maybe_fail registries
+  ovpn_client_ip_atomic_install "$stage/profile.candidate" "$new_profile"
+  rm -f "$old_profile"
+  ovpn_client_rename_maybe_fail profile
+  ovpn_client_rename_audit "$id" "$old_name" "$new_name"
+  ovpn_client_rename_maybe_fail audit
+
+  transaction_success=true
+  ovpn_log "renamed client '$old_name' to '$new_name' [$id]"
+)
+
+ovpn_client_rename_command() {
+  local reference="${1:-}"
+  local new_name="${2:-}"
+
+  [ -n "$reference" ] && [ -n "$new_name" ] && [ "$#" -eq 2 ] ||
+    ovpn_die 'usage: ovpn client rename <client> <new-name>'
+  ovpn_with_data_lock client ovpn_client_rename_inner "$reference" "$new_name"
+}
+
 ovpn_client_lifecycle_kick() {
   local id="$1"
 
@@ -530,7 +688,7 @@ ovpn_client_command() {
     ovpn_client_usage
     return 0
   fi
-  [ -n "$subcommand" ] || ovpn_die "usage: ovpn client <create|export|list|revoke|reissue|delete|ip> ..."
+  [ -n "$subcommand" ] || ovpn_die "usage: ovpn client <create|export|list|rename|revoke|reissue|delete|ip> ..."
   shift
   case "$subcommand" in
     create)
@@ -601,6 +759,13 @@ ovpn_client_command() {
         ovpn_client_list_command "$@"
       fi
       ;;
-    *) ovpn_die "usage: ovpn client <create|export|list|revoke|reissue|delete|ip> ..." ;;
+    rename)
+      if ovpn_help_requested "$@"; then
+        ovpn_command_usage "ovpn client rename <client> <new-name>" "Change a client's display name without replacing its UUID or certificate."
+      else
+        ovpn_client_rename_command "$@"
+      fi
+      ;;
+    *) ovpn_die "usage: ovpn client <create|export|list|rename|revoke|reissue|delete|ip> ..." ;;
   esac
 }

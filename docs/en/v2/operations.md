@@ -86,6 +86,17 @@ docker compose exec openvpn ovpn client list
 docker compose exec openvpn ovpn client list --detail
 ```
 
+### Rename a client
+
+```bash
+# accepts the current name or immutable UUID
+docker compose exec openvpn ovpn client rename laptop office-laptop
+```
+
+Rename does not replace the certificate or disconnect the client. Redistribute
+the renamed profile only when you want users to receive the new filename or
+embedded display-name comment.
+
 ### Revoke and release IPs
 
 ```bash
@@ -130,8 +141,9 @@ Re-export and distribute the profile afterward.
 docker compose exec openvpn ovpn client delete laptop
 ```
 
-Irreversible. Active clients are revoked first, then the registry record,
-profile, and private key are removed.
+Irreversible. Active clients are revoked first, then the IP record, profile,
+and private key are removed. The UUID tombstone remains and the old display
+name becomes reusable.
 
 ---
 

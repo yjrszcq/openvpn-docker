@@ -180,6 +180,20 @@ ovpn client list [--detail]
 
 在 IP 视图下，静态分配为 `configured`，或撤销后为 `retained`。动态地址在有当前租约时显示为 `connected`，在有持久化租约记录时显示为 `last-known`，否则为 `unavailable`。`CONNECTION` 根据管理套接字可用性和当前路由显示为 `online`、`offline` 或 `unknown`。该视图读取的是已应用的清单，而非未应用的草稿。
 
+### `ovpn client rename`
+
+语法：
+
+```text
+ovpn client rename <client> <new-name>
+```
+
+原子修改面向人的显示名称，同时保持 UUID、证书、私钥、IP 分配、CCD、租约以及当前
+OpenVPN 连接不变。身份目录、IP 草稿与已应用清单、profile 文件名及其中的名称注释
+会一同更新。源客户端可使用当前名称或 UUID；新名称必须合法且未被当前客户端占用。
+客户端改名或删除后，旧名称可由新的 UUID 复用；已删除 UUID 的 tombstone 仍作为
+权威历史保留。
+
 ### `ovpn client revoke`
 
 语法：
@@ -213,7 +227,9 @@ ovpn client reissue <client> [--dynamic|--ip <IPv4>]
 ovpn client delete <client>
 ```
 
-不可逆地移除客户端。活跃客户端会先被撤销；然后命令移除其清单记录、活跃或已撤销 profile、私钥、已签发证书和请求文件。旧私钥仅能从安全备份中恢复。
+不可逆地移除客户端。活跃客户端会先被撤销；然后命令移除其 IP 记录、活跃或已撤销
+profile、私钥、已签发证书和请求文件，同时在身份目录中保留 UUID tombstone。已删除
+客户端的显示名称可供新的 UUID 复用。旧私钥仅能从安全备份中恢复。
 
 ## 客户端 IP 管理
 

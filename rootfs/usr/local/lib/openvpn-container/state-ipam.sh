@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
 
-declare -A OVPN_STATE_IPAM_CLIENT_STATES=()
-declare -A OVPN_STATE_IPAM_CLIENT_IDS=()
+declare -A OVPN_STATE_IPAM_CLIENT_STATES_BY_ID=()
+declare -A OVPN_STATE_IPAM_CLIENT_NAMES_BY_ID=()
+declare -A OVPN_STATE_IPAM_CURRENT_IDS_BY_NAME=()
 
 ovpn_state_ipam_parse_client_states() {
   local state_file="$1"
   local line line_number=0 id name state extra header_seen=false
   local -A ids=()
 
-  OVPN_STATE_IPAM_CLIENT_STATES=()
-  OVPN_STATE_IPAM_CLIENT_IDS=()
+  OVPN_STATE_IPAM_CLIENT_STATES_BY_ID=()
+  OVPN_STATE_IPAM_CLIENT_NAMES_BY_ID=()
+  OVPN_STATE_IPAM_CURRENT_IDS_BY_NAME=()
   while IFS= read -r line || [ -n "$line" ]; do
     line_number=$((line_number + 1))
     if [ "$line" = '# id,name,state' ]; then
-      if [ "$header_seen" = true ] || [ "${#OVPN_STATE_IPAM_CLIENT_STATES[@]}" -ne 0 ]; then
+      if [ "$header_seen" = true ] || [ "${#OVPN_STATE_IPAM_CLIENT_STATES_BY_ID[@]}" -ne 0 ]; then
         return 1
       fi
       header_seen=true
@@ -28,10 +30,13 @@ ovpn_state_ipam_parse_client_states() {
     ovpn_registry_client_name_valid "$name" || return 1
     case "$state" in active|revoked|deleted) ;; *) return 1 ;; esac
     [ -z "${ids[$id]+present}" ] || return 1
-    [ -z "${OVPN_STATE_IPAM_CLIENT_STATES[$name]+present}" ] || return 1
     ids["$id"]=1
-    OVPN_STATE_IPAM_CLIENT_IDS["$name"]="$id"
-    OVPN_STATE_IPAM_CLIENT_STATES["$name"]="$state"
+    if [ "$state" != deleted ]; then
+      [ -z "${OVPN_STATE_IPAM_CURRENT_IDS_BY_NAME[$name]+present}" ] || return 1
+      OVPN_STATE_IPAM_CURRENT_IDS_BY_NAME["$name"]="$id"
+    fi
+    OVPN_STATE_IPAM_CLIENT_NAMES_BY_ID["$id"]="$name"
+    OVPN_STATE_IPAM_CLIENT_STATES_BY_ID["$id"]="$state"
   done <"$state_file"
   [ "$header_seen" = true ]
 }
@@ -63,6 +68,8 @@ ovpn_state_ipam_audit_is_valid() {
     regex="^\\{\"timestamp\":\"${timestamp}\",\"event\":\"network_migration\",\"outcome\":\"(applied|rejected)\"\\}$"
     [[ "$line" =~ $regex ]] && continue
     regex="^\\{\"timestamp\":\"${timestamp}\",\"operation\":\"(revoke|reissue|delete|release_ip)\",\"result\":\"(applied|rejected|failed)\"\\}$"
+    [[ "$line" =~ $regex ]] && continue
+    regex="^\\{\"timestamp\":\"${timestamp}\",\"operation\":\"rename\",\"result\":\"applied\",\"client_id\":\"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\",\"old_name\":\"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\",\"new_name\":\"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\"\\}$"
     [[ "$line" =~ $regex ]] && continue
     return 1
   done <"$audit_file"
@@ -121,7 +128,6 @@ ovpn_state_scan_ipam_consistency() {
   local draft applied state_file audit_file ccd_dir lease_dir protected
   local index id name ip expected actual lease_line lease_id state expected_state
   local ccd_out_of_sync=false
-  local -A applied_clients=()
   local -A applied_ids=()
 
   draft="$(ovpn_registry_client_ip_file)"
@@ -159,9 +165,12 @@ ovpn_state_scan_ipam_consistency() {
     id="${OVPN_CLIENT_IP_IDS[index]}"
     name="${OVPN_CLIENT_IP_NAMES[index]}"
     ip="${OVPN_CLIENT_IP_VALUES[index]}"
-    applied_clients["$name"]=1
     applied_ids["$id"]=1
-    state="${OVPN_STATE_IPAM_CLIENT_STATES[$name]:-}"
+    [ "${OVPN_STATE_IPAM_CLIENT_NAMES_BY_ID[$id]:-}" = "$name" ] || {
+      ovpn_state_add_critical_issue CLIENT_IP_LOGICAL_STATE_MISMATCH RESTORE_CLIENT_IP_REGISTRY
+      return 0
+    }
+    state="${OVPN_STATE_IPAM_CLIENT_STATES_BY_ID[$id]:-}"
     expected_state="${OVPN_CLIENT_IP_PKI_STATES[$name]:-}"
     if [ "$state" != "$expected_state" ]; then
       ovpn_state_add_critical_issue CLIENT_IP_LOGICAL_STATE_MISMATCH RESTORE_CLIENT_IP_REGISTRY
@@ -177,20 +186,22 @@ ovpn_state_scan_ipam_consistency() {
     if [ "$actual" != "$expected" ]; then ccd_out_of_sync=true; fi
   done
   for name in "${!OVPN_CLIENT_IP_PKI_STATES[@]}"; do
-    [ "${OVPN_STATE_IPAM_CLIENT_STATES[$name]:-}" = "${OVPN_CLIENT_IP_PKI_STATES[$name]}" ] || {
+    id="${OVPN_STATE_IPAM_CURRENT_IDS_BY_NAME[$name]:-}"
+    [ -n "$id" ] &&
+      [ "${OVPN_STATE_IPAM_CLIENT_STATES_BY_ID[$id]:-}" = "${OVPN_CLIENT_IP_PKI_STATES[$name]}" ] || {
       ovpn_state_add_critical_issue CLIENT_IP_LOGICAL_STATE_MISMATCH RESTORE_CLIENT_IP_REGISTRY
       return 0
     }
   done
-  for name in "${!OVPN_STATE_IPAM_CLIENT_STATES[@]}"; do
-    state="${OVPN_STATE_IPAM_CLIENT_STATES[$name]}"
+  for id in "${!OVPN_STATE_IPAM_CLIENT_STATES_BY_ID[@]}"; do
+    state="${OVPN_STATE_IPAM_CLIENT_STATES_BY_ID[$id]}"
+    name="${OVPN_STATE_IPAM_CLIENT_NAMES_BY_ID[$id]}"
     if [ "$state" = deleted ]; then
-      id="${OVPN_STATE_IPAM_CLIENT_IDS[$name]}"
-      if [ -n "${applied_clients[$name]+present}" ] || ovpn_state_ipam_deleted_client_has_active_certificate "$id"; then
+      if [ -n "${applied_ids[$id]+present}" ] || ovpn_state_ipam_deleted_client_has_active_certificate "$id"; then
         ovpn_state_add_critical_issue CLIENT_IP_LOGICAL_STATE_MISMATCH RESTORE_CLIENT_IP_REGISTRY
         return 0
       fi
-    elif [ -z "${applied_clients[$name]+present}" ]; then
+    elif [ -z "${applied_ids[$id]+present}" ]; then
       ovpn_state_add_critical_issue CLIENT_IP_LOGICAL_STATE_MISMATCH RESTORE_CLIENT_IP_REGISTRY
       return 0
     fi

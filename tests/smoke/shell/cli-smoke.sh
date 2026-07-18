@@ -61,6 +61,7 @@ assert_help "Usage: ovpn migrate <command> [options]" migrate --help
 assert_help "Usage: ovpn config show" config show --help
 assert_help "Usage: ovpn client export <client>" client export -h
 assert_help "Usage: ovpn client list [--detail]" client list --help
+assert_help "Usage: ovpn client rename <client> <new-name>" client rename -h
 assert_help "Usage: ovpn client revoke <client> [--release-ip]" client revoke -h
 assert_help "Usage: ovpn client ip release <client>" client ip release --help
 assert_help "Usage: ovpn client reissue <client>" client reissue -h

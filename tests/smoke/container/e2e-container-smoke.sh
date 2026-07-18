@@ -381,12 +381,31 @@ for proto in udp tcp; do
   assert_nat_policy "$server_name" "$POLICY_NAT"
 
   run_control "$data_dir" "$endpoint" ovpn client create "client-$proto"
+  client_id="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /usr/bin/awk "$IMAGE" \
+    -F, -v name="client-$proto" '$2 == name && $3 == "active" { print $1 }' /etc/openvpn/meta/client-state.csv)"
+  client_display="client-$proto"
   run_control "$data_dir" "$endpoint" ovpn client export "client-$proto" >"$profile_path"
   grep -q "^remote $endpoint $PORT$" "$profile_path"
   grep -q "^proto $proto$" "$profile_path"
   grep -E "^client-${proto}[[:space:]]+[0-9a-f-]{36}[[:space:]]+active$" <(run_control "$data_dir" "$endpoint" ovpn client list)
 
   assert_client_connects "$network_name" "$profile_path" "$WORK_DIR/client-$proto-active.log"
+
+  if [ "$proto" = udp ]; then
+    rename_client="$RUN_ID-rename-client"
+    containers+=("$rename_client")
+    start_persistent_client "$network_name" "$profile_path" "$rename_client"
+    wait_for_log "$rename_client" 'Initialization Sequence Completed' "$WORK_DIR/client-rename-active.log"
+    openvpn_pid="$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')"
+    run_control "$data_dir" "$endpoint" ovpn client rename "$client_id" renamed-udp
+    client_display=renamed-udp
+    [ "$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')" = "$openvpn_pid" ]
+    docker ps --format '{{.Names}}' | grep -Fqx "$rename_client"
+    docker exec "$rename_client" ip -4 address show dev tun0 | grep -Fq 'inet '
+    grep -E "^renamed-udp[[:space:]]+${client_id}[[:space:]]+active.*online$" \
+      <(docker exec "$server_name" ovpn client list --detail)
+    docker rm -f "$rename_client" >/dev/null
+  fi
 
   if [ "$proto" = udp ] && [ -n "$UPDATE_FIXTURES" ]; then
     update_client="$RUN_ID-upgrade-client"
@@ -413,8 +432,8 @@ for proto in udp tcp; do
   fi
 
   docker rm -f "$server_name" >/dev/null
-  run_control "$data_dir" "$endpoint" ovpn client revoke "client-$proto"
-  grep -E "^client-${proto}[[:space:]]+[0-9a-f-]{36}[[:space:]]+revoked$" <(run_control "$data_dir" "$endpoint" ovpn client list)
+  run_control "$data_dir" "$endpoint" ovpn client revoke "$client_id"
+  grep -E "^${client_display}[[:space:]]+${client_id}[[:space:]]+revoked$" <(run_control "$data_dir" "$endpoint" ovpn client list)
 
   start_server "$data_dir" "$endpoint" "$server_name" "$network_name"
   wait_for_log "$server_name" 'Initialization Sequence Completed' "$WORK_DIR/server-$proto-revoked-start.log"

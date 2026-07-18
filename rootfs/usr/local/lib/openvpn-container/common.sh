@@ -62,6 +62,7 @@ Commands:
   create            create a client certificate and profile
   export            write a client profile to stdout
   list              list client certificates and assignments
+  rename            change a client's display name
   revoke            revoke a client certificate
   reissue           issue a new certificate for an existing client
   delete            remove a client and its local credentials

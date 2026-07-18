@@ -83,6 +83,16 @@ docker compose exec openvpn ovpn client list
 docker compose exec openvpn ovpn client list --detail
 ```
 
+### 客户端改名
+
+```bash
+# 可使用当前名称或不可变 UUID
+docker compose exec openvpn ovpn client rename laptop office-laptop
+```
+
+改名不会换证或断开客户端。仅当希望用户获得新的文件名或 profile 内显示名称注释时，
+才需要重新分发改名后的 profile。
+
 ### 吊销和释放 IP
 
 ```bash
@@ -125,7 +135,8 @@ docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
 docker compose exec openvpn ovpn client delete laptop
 ```
 
-不可逆。活跃客户端先吊销再删除，同时移除清单记录、profile 和私钥。
+不可逆。活跃客户端先吊销再删除，同时移除 IP 记录、profile 和私钥；UUID tombstone
+会保留，原显示名称可再次使用。
 
 ---
 

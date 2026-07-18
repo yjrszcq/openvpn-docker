@@ -59,11 +59,16 @@ run_control init >/tmp/ovpn-lifecycle-init.out 2>/tmp/ovpn-lifecycle-init.err
 run_control client create "$client" --dynamic >/tmp/ovpn-lifecycle-create.out 2>/tmp/ovpn-lifecycle-create.err
 client_id="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, -v client="$client" '$2 == client { print $1 }' /etc/openvpn/meta/client-state.csv)"
 [[ "$client_id" =~ ^[0-9a-f-]{36}$ ]]
+original_client="$client"
+client='renamed-client'
+run_control client rename "$client_id" "$client" >/tmp/ovpn-lifecycle-rename.out 2>/tmp/ovpn-lifecycle-rename.err
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec '
   openssl x509 -in "/etc/openvpn/pki/issued/$1.crt" -noout -subject -nameopt RFC2253 | grep -Fq "CN=$1"
   grep -Fqx "# ovpn-client-id: $1" "/etc/openvpn/clients/active/$2.ovpn"
   grep -Fqx "# ovpn-client-name: $2" "/etc/openvpn/clients/active/$2.ovpn"
-' sh "$client_id" "$client"
+  test ! -e "/etc/openvpn/clients/active/$3.ovpn"
+  grep -Fqx "$1,$2,active" /etc/openvpn/meta/client-state.csv
+' sh "$client_id" "$client" "$original_client"
 
 assignment_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, -v client="$client" '$2 == client { print; exit }' /etc/openvpn/data/client-ip.csv)"
 [ "$assignment_before" = "$client_id,$client," ] || {
@@ -116,6 +121,13 @@ docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec
   test -f /etc/openvpn/meta/audit.jsonl
   ! grep -E -- "-----BEGIN [A-Z ]*PRIVATE KEY-----" /etc/openvpn/meta/audit.jsonl
 '
+
+# deleted display names may be reused by a new immutable identity
+run_control client create "$client" --dynamic >/tmp/ovpn-lifecycle-reuse.out 2>/tmp/ovpn-lifecycle-reuse.err
+reused_id="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, -v client="$client" '$2 == client && $3 == "active" { print $1 }' /etc/openvpn/meta/client-state.csv)"
+[[ "$reused_id" =~ ^[0-9a-f-]{36}$ ]]
+[ "$reused_id" != "$client_id" ]
+run_control state show | grep -Fqx HEALTHY
 
 # reissue no-IP client without params: should auto-allocate a static IP
 run_control client create keep-dynamic --dynamic >/tmp/ovpn-lifecycle-create-dynamic.out 2>/tmp/ovpn-lifecycle-create-dynamic.err
