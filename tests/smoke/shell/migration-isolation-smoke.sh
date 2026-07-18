@@ -13,6 +13,17 @@ mkdir -p "$OVPN_DATA_DIR/config"
 printf 'OVPN_CONFIG_VERSION=2\n' >"$OVPN_DATA_DIR/config/project.env"
 printf '2\n' >"$OVPN_DATA_DIR/config/schema-version"
 
+if grep -Eq 'ovpn_registry_(upgrade|write)_v1|1\|2' \
+  "$LIB_DIR/config.sh" "$LIB_DIR/registry.sh" "$LIB_DIR/start.sh"; then
+  echo 'current runtime contains a historical schema branch' >&2
+  exit 1
+fi
+if grep -Fq 'ovpn upgrade' "$ROOT_DIR/docs/en/data-schema-upgrade-policy.md" || \
+  grep -Fq 'ovpn upgrade' "$ROOT_DIR/docs/cn/data-schema-upgrade-policy.md"; then
+  echo 'data schema policy still assigns migration to upgrade' >&2
+  exit 1
+fi
+
 trace="$TMP_DIR/help.trace"
 BASH_XTRACEFD=3 bash -x "$OVPN" help 3>"$trace" >/dev/null 2>&1
 if grep -Fq '/migrations/' "$trace" || grep -Fq '/migrate.sh' "$trace"; then
