@@ -193,19 +193,26 @@ scripts/docker-build.sh -t szcq/openvpn-server:dev .
 OVPN_IMAGE=szcq/openvpn-server:dev docker compose up -d
 ```
 
-GitHub Actions 会执行兼容性、容器、E2E、升级状态和多架构门禁。默认分支的
-Candidate 会发布 GHCR 候选镜像；Candidate 成功后会自动触发 Release，创建稳定
-GHCR tag 并发布 Docker Hub 的 OpenVPN 版本 tag。
+GitHub Actions 将管理代码发布与镜像发布分开。推送稳定的
+`v<MANAGEMENT_VERSION>` tag 后，会先运行完整测试，再构建可复现的管理 bundle，
+使用仓库的 Ed25519 发布密钥签署严格清单，并且只发布
+[管理代码在线更新政策](docs/cn/management-update-policy.md)规定的三个管理资产。
+私钥保存在仓库 secret `MANAGEMENT_SIGNING_KEY` 中，绝不会写入镜像。
+
+默认分支的 `IMAGE_VERSION` 发生变化时，Candidate 才发布经过测试的 GHCR 候选
+镜像，随后 Image Release 创建稳定 GHCR tag 和 Docker Hub 的 OpenVPN 版本 tag。
+仅修改管理版本不会发布镜像；platform API、OpenVPN、基础系统或不可变 bootstrap
+变化时必须同时更新镜像版本。
 
 每周运行（也可手动运行）的 Upstream Check 会检查官方 OpenVPN 是否有新版本。
 发现新版时，它会推送 `automation/openvpn-<版本>` 分支，并创建指向 `dev` 的 PR。
 审阅并合并该 PR 到 `dev` 后会运行 PR 检查，但 Candidate 不会从 `dev` 发布；将
-已审阅的变更从 `dev` 提升到 `main` 才会触发 Candidate 和随后 Release。手动启动
+已审阅的变更从 `dev` 提升到 `main` 才会触发 Candidate 和随后 Image Release。手动启动
 Candidate 时也应选择 `main`。
 
 维护者注意：若 `DOCKER_TOKEN` 过期，在 `Settings → Secrets and variables →
 Actions` 更新它，然后手动启动一个默认分支的 Candidate。Candidate 成功会排队一个
-新的 Release。更新仓库 secret 后，不要依赖重跑旧的 Release。
+新的 Image Release。更新仓库 secret 后，不要依赖重跑旧的发布工作流。
 
 ## 许可证
 

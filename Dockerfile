@@ -54,6 +54,7 @@ ARG OPENVPN_VERSION
 ARG OPENVPN_SOURCE_SHA256
 ARG EASYRSA_VERSION
 ARG OPENVPN_SUPPORTED_RANGE
+ARG MANAGEMENT_SIGNING_PUBLIC_KEY_B64=
 ARG VCS_REF=unknown
 ARG BUILD_DATE=unknown
 
@@ -70,9 +71,11 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         bash \
         ca-certificates \
+        curl \
         easy-rsa \
         iproute2 \
         iptables \
+        jq \
         nano \
         openssl \
         procps \
@@ -122,6 +125,17 @@ RUN embedded=/usr/local/share/openvpn-container/embedded-management \
     && printf 'MANAGEMENT_VERSION=%s\nPLATFORM_API=%s\nDATA_SCHEMA=%s\n' \
        "$MANAGEMENT_VERSION" "$PLATFORM_API" "$DATA_SCHEMA" >"$embedded/management.env" \
     && chmod 600 "$embedded/management.env"
+
+RUN keyring=/usr/local/share/openvpn-container/trusted-management-keys \
+    && mkdir -p "$keyring" \
+    && if [ -n "$MANAGEMENT_SIGNING_PUBLIC_KEY_B64" ]; then \
+         printf '%s' "$MANAGEMENT_SIGNING_PUBLIC_KEY_B64" | base64 -d >"$keyring/release.pem"; \
+         openssl pkey -pubin -in "$keyring/release.pem" -noout; \
+         chmod 0444 "$keyring/release.pem"; \
+       else \
+         printf '%s\n' 'No management release key was configured for this development image.' >"$keyring/UNCONFIGURED"; \
+         chmod 0444 "$keyring/UNCONFIGURED"; \
+       fi
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=1 CMD ["/usr/local/bin/ovpn", "runtime", "health"]
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint"]

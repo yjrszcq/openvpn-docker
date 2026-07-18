@@ -1,4 +1,4 @@
-name: Release
+name: Image Release
 
 on:
   workflow_run:
@@ -29,6 +29,7 @@ jobs:
       in_range: ${{ steps.policy.outputs.in_range }}
       release_eligible: ${{ steps.policy.outputs.release_eligible }}
       decision: ${{ steps.policy.outputs.decision }}
+      image_required: ${{ steps.policy.outputs.image_required }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -42,6 +43,12 @@ jobs:
           set +a
           previous="$(git show HEAD^:versions.env 2>/dev/null | awk -F= '$1 == "OPENVPN_VERSION" {print $2}' || true)"
           [ -n "$previous" ] || previous="$OPENVPN_VERSION"
+          previous_image="$(git show HEAD^:versions.env 2>/dev/null | awk -F= '$1 == "IMAGE_VERSION" {print $2}' || true)"
+          if [ "${{ github.event.workflow_run.event }}" != workflow_dispatch ] && [ -n "$previous_image" ] && [ "$previous_image" = "$IMAGE_VERSION" ]; then
+            echo 'image_required=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'image_required=true' >> "$GITHUB_OUTPUT"
+          fi
           scripts/release-policy.sh \
             --previous-version "$previous" \
             --target-version "$OPENVPN_VERSION" \
@@ -68,7 +75,9 @@ jobs:
   publish-same-branch:
     name: Promote same-branch candidate to stable
     needs: policy
-    if: needs.policy.outputs.decision == 'READY_SAME_BRANCH'
+    if: >-
+      needs.policy.outputs.image_required == 'true' &&
+      needs.policy.outputs.decision == 'READY_SAME_BRANCH'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -102,7 +111,7 @@ jobs:
             echo "- OpenVPN version: $OPENVPN_VERSION"
             echo "- Easy-RSA version: $EASYRSA_VERSION"
             echo "- Supported range: $OPENVPN_SUPPORTED_RANGE"
-            echo '- Schema version: 2'
+            echo "- Schema version: $DATA_SCHEMA"
             echo '- Branch transition: same branch'
             echo '- Approval: not required'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -122,7 +131,9 @@ jobs:
   publish-cross-branch:
     name: Promote cross-branch candidate after approval
     needs: policy
-    if: needs.policy.outputs.decision == 'WAITING_CROSS_BRANCH_APPROVAL'
+    if: >-
+      needs.policy.outputs.image_required == 'true' &&
+      needs.policy.outputs.decision == 'WAITING_CROSS_BRANCH_APPROVAL'
     runs-on: ubuntu-latest
     environment:
       name: stable-cross-branch
@@ -158,7 +169,7 @@ jobs:
             echo "- OpenVPN version: $OPENVPN_VERSION"
             echo "- Easy-RSA version: $EASYRSA_VERSION"
             echo "- Supported range: $OPENVPN_SUPPORTED_RANGE"
-            echo '- Schema version: 2'
+            echo "- Schema version: $DATA_SCHEMA"
             echo '- Branch transition: cross branch'
             echo '- Approval: stable-cross-branch Environment approved'
           } >> "$GITHUB_STEP_SUMMARY"

@@ -27,6 +27,7 @@ jobs:
     outputs:
       in_range: ${{ steps.policy.outputs.in_range }}
       decision: ${{ steps.policy.outputs.decision }}
+      image_required: ${{ steps.policy.outputs.image_required }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -39,6 +40,12 @@ jobs:
           set +a
           previous="$(git show HEAD^:versions.env 2>/dev/null | awk -F= '$1 == "OPENVPN_VERSION" {print $2}' || true)"
           [ -n "$previous" ] || previous="$OPENVPN_VERSION"
+          previous_image="$(git show HEAD^:versions.env 2>/dev/null | awk -F= '$1 == "IMAGE_VERSION" {print $2}' || true)"
+          if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ] && [ -n "$previous_image" ] && [ "$previous_image" = "$IMAGE_VERSION" ]; then
+            echo 'image_required=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'image_required=true' >> "$GITHUB_OUTPUT"
+          fi
           scripts/release-policy.sh \
             --previous-version "$previous" \
             --target-version "$OPENVPN_VERSION" \
@@ -52,6 +59,7 @@ jobs:
     needs: policy
     if: >-
       needs.policy.outputs.in_range == 'true' &&
+      needs.policy.outputs.image_required == 'true' &&
       inputs.skip-test != true
     uses: ./.github/workflows/test.yml
     permissions:
@@ -64,6 +72,7 @@ jobs:
       - verify
     if: >-
       always() &&
+      needs.policy.outputs.image_required == 'true' &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
       (needs.policy.outputs.in_range == 'false' || needs.verify.result == 'success' || needs.verify.result == 'skipped')
     runs-on: ubuntu-latest
@@ -78,6 +87,15 @@ jobs:
         env:
           GHCR_TOKEN: ${{ github.token }}
         run: printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Prepare image-trusted management release key
+        env:
+          MANAGEMENT_SIGNING_KEY: ${{ secrets.MANAGEMENT_SIGNING_KEY }}
+        run: |
+          test -n "$MANAGEMENT_SIGNING_KEY"
+          umask 077
+          printf '%s\n' "$MANAGEMENT_SIGNING_KEY" > "$RUNNER_TEMP/management-signing-key.pem"
+          public_key_b64="$(openssl pkey -in "$RUNNER_TEMP/management-signing-key.pem" -pubout | base64 -w0)"
+          echo "MANAGEMENT_SIGNING_PUBLIC_KEY_B64=$public_key_b64" >> "$GITHUB_ENV"
       - name: Build and publish multi-architecture candidate
         run: |
           set -a
@@ -95,6 +113,7 @@ jobs:
             --build-arg "OPENVPN_SOURCE_SHA256=$OPENVPN_SOURCE_SHA256" \
             --build-arg "EASYRSA_VERSION=$EASYRSA_VERSION" \
             --build-arg "OPENVPN_SUPPORTED_RANGE=$OPENVPN_SUPPORTED_RANGE" \
+            --build-arg "MANAGEMENT_SIGNING_PUBLIC_KEY_B64=$MANAGEMENT_SIGNING_PUBLIC_KEY_B64" \
             --build-arg "VCS_REF=$GITHUB_SHA" \
             --build-arg "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \

@@ -220,22 +220,32 @@ scripts/docker-build.sh -t szcq/openvpn-server:dev .
 OVPN_IMAGE=szcq/openvpn-server:dev docker compose up -d
 ```
 
-GitHub Actions runs compatibility, container, E2E, upgrade-state, and
-multi-architecture gates. A default-branch Candidate publishes a GHCR
-candidate image; on success it automatically triggers a Release that creates a
-stable GHCR tag and publishes the OpenVPN-version tag to Docker Hub.
+GitHub Actions separates management releases from image releases. Pushing a
+stable `v<MANAGEMENT_VERSION>` tag runs the full test gate, builds a
+deterministic management bundle, signs its strict manifest with the repository
+Ed25519 release key, and publishes only the three management assets described
+in the [management update policy](docs/en/management-update-policy.md). The
+repository secret `MANAGEMENT_SIGNING_KEY` contains that private key; it is
+never embedded in an image.
+
+Changing `IMAGE_VERSION` on the default branch publishes a tested GHCR
+candidate and then runs the Image Release workflow, which creates stable GHCR
+tags and the OpenVPN-version tag on Docker Hub. A management-only version
+change does not publish an image. Platform API, OpenVPN, base-system, or
+immutable-bootstrap changes must include an image-version change.
 
 A weekly (or manually triggered) Upstream Check watches for new official
 OpenVPN releases. When one is found it pushes an `automation/openvpn-<version>`
 branch and opens a PR targeting `dev`. Review and merge that PR into `dev` to
 run PR checks; Candidate is never published from `dev`. Promote reviewed
-changes from `dev` to `main` to trigger Candidate and the subsequent Release.
+changes from `dev` to `main` to trigger Candidate and the subsequent Image Release.
 When triggering Candidate manually, select `main`.
 
 Maintainer note: if `DOCKER_TOKEN` expires, update it in
 `Settings → Secrets and variables → Actions`, then manually trigger a
-default-branch Candidate. A successful Candidate queues a new Release. After
-updating the repository secret, do not rely on re-running an old Release.
+default-branch Candidate. A successful Candidate queues a new Image Release.
+After updating the repository secret, do not rely on re-running an old release
+workflow.
 
 ## License
 

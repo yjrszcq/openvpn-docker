@@ -52,6 +52,13 @@ grep -Fq "\"openvpn_version\": \"$OPENVPN_VERSION\"" <<<"$metadata"
 grep -Fq "\"openvpn_source_version\": \"$OPENVPN_VERSION\"" <<<"$metadata"
 
 docker run --rm --entrypoint sh "$IMAGE" -ec '
+  command -v curl >/dev/null
+  command -v jq >/dev/null
+  command -v tar >/dev/null
+  command -v openssl >/dev/null
+  test -d /usr/local/share/openvpn-container/trusted-management-keys
+  test -r /usr/local/share/openvpn-container/trusted-management-keys/release.pem ||
+    test -r /usr/local/share/openvpn-container/trusted-management-keys/UNCONFIGURED
   test -s /usr/local/share/licenses/openvpn-container/LICENSE
   test -s /usr/local/share/licenses/openvpn-container/NOTICE
   test -s /usr/local/share/licenses/openvpn/COPYING

@@ -14,6 +14,8 @@ grep -Fq 'MANAGEMENT_VERSION="$MANAGEMENT_VERSION"' "$dockerfile"
 grep -Fq 'PLATFORM_API="$PLATFORM_API"' "$dockerfile"
 grep -Fq 'embedded-management' "$dockerfile"
 grep -Fq 'openvpn-bootstrap.sh' "$dockerfile"
+grep -Fq 'trusted-management-keys' "$dockerfile"
+grep -Fq 'MANAGEMENT_SIGNING_PUBLIC_KEY_B64' "$dockerfile"
 grep -Fq 'grep -Fq "OpenVPN $OPENVPN_VERSION" /tmp/openvpn-version' "$dockerfile"
 grep -Fq "! grep -Fq 'not found' /tmp/openvpn-ldd" "$dockerfile"
 

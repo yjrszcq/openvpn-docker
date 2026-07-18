@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 WORKFLOWS="$ROOT_DIR/.github/workflows"
 
-for workflow in test.yml candidate.yml upstream-check.yml release.yml; do
+for workflow in test.yml candidate.yml upstream-check.yml release.yml management-release.yml; do
   test -s "$WORKFLOWS/$workflow"
 done
 
@@ -16,6 +16,7 @@ grep -Fq 'OVPN_E2E_REQUIRED=1' "$WORKFLOWS/test.yml"
 grep -Fq 'OVPN_LIFECYCLE_REQUIRED=1' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/ipam-layout-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/management-bootstrap-smoke.sh' "$WORKFLOWS/test.yml"
+grep -Fq 'tests/smoke/shell/management-release-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/schema-gate-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/migration-isolation-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/registry-migration-smoke.sh' "$WORKFLOWS/test.yml"
@@ -24,8 +25,11 @@ grep -Fq 'tests/smoke/shell/ipam-repair-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/network-migration-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'OVPN_NETWORK_MIGRATION_REQUIRED=1' "$WORKFLOWS/test.yml"
 grep -Fq 'linux/amd64,linux/arm64' "$WORKFLOWS/test.yml"
+# shellcheck disable=SC2016 # Assert literal workflow build-argument expressions.
 grep -Fq -- '--build-arg "MANAGEMENT_VERSION=$MANAGEMENT_VERSION"' "$WORKFLOWS/test.yml"
+# shellcheck disable=SC2016 # Assert literal workflow build-argument expressions.
 grep -Fq -- '--build-arg "PLATFORM_API=$PLATFORM_API"' "$WORKFLOWS/candidate.yml"
+# shellcheck disable=SC2016 # Assert literal workflow build-argument expressions.
 grep -Fq -- '--build-arg "DATA_SCHEMA=$DATA_SCHEMA"' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/container/upgrade-state-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/data-schema-policy-smoke.sh' "$WORKFLOWS/test.yml"
@@ -34,10 +38,15 @@ grep -Fq 'candidate-ovpn' "$WORKFLOWS/candidate.yml"
 grep -Fq 'packages: write' "$WORKFLOWS/candidate.yml"
 grep -Fq "GHCR_TOKEN: \${{ github.token }}" "$WORKFLOWS/candidate.yml"
 grep -Fq 'scripts/release-policy.sh' "$WORKFLOWS/candidate.yml"
+grep -Fq 'image_required=false' "$WORKFLOWS/candidate.yml"
+grep -Fq 'secrets.MANAGEMENT_SIGNING_KEY' "$WORKFLOWS/candidate.yml"
+grep -Fq 'MANAGEMENT_SIGNING_PUBLIC_KEY_B64' "$WORKFLOWS/candidate.yml"
 grep -Fq 'schedule:' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'scripts/update-openvpn.sh' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'gh pr create' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'workflow_run:' "$WORKFLOWS/release.yml"
+grep -Fq 'name: Image Release' "$WORKFLOWS/release.yml"
+grep -Fq 'image_required == '\''true'\''' "$WORKFLOWS/release.yml"
 grep -Fq 'stable-cross-branch' "$WORKFLOWS/release.yml"
 grep -Fq 'docker buildx imagetools create' "$WORKFLOWS/release.yml"
 grep -Fq 'IMAGE_VERSION_BLOCKED' "$WORKFLOWS/release.yml"
@@ -47,5 +56,12 @@ grep -Fq 'secrets.DOCKER_TOKEN' "$WORKFLOWS/release.yml"
 grep -Fq "GHCR_TOKEN: \${{ github.token }}" "$WORKFLOWS/release.yml"
 # shellcheck disable=SC2016 # This asserts the literal shell assignment in the workflow.
 grep -Fq 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"' "$WORKFLOWS/release.yml"
+grep -Fq 'name: Management Release' "$WORKFLOWS/management-release.yml"
+grep -Fq 'secrets.MANAGEMENT_SIGNING_KEY' "$WORKFLOWS/management-release.yml"
+grep -Fq 'scripts/package-management-release.sh' "$WORKFLOWS/management-release.yml"
+grep -Fq 'scripts/verify-management-release.sh' "$WORKFLOWS/management-release.yml"
+grep -Fq 'management-bundle.tar.gz' "$WORKFLOWS/management-release.yml"
+grep -Fq 'management-release.env.sig' "$WORKFLOWS/management-release.yml"
+grep -Fq 'gh release create' "$WORKFLOWS/management-release.yml"
 
 printf 'workflow smoke passed\n'

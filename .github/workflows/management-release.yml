@@ -1,0 +1,71 @@
+name: Management Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: management-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Verify management release source
+    uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
+
+  publish:
+    name: Sign and publish management bundle
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - name: Validate stable tag and prepare signing key
+        env:
+          MANAGEMENT_SIGNING_KEY: ${{ secrets.MANAGEMENT_SIGNING_KEY }}
+        run: |
+          set -a
+          . ./versions.env
+          set +a
+          test "$GITHUB_REF_NAME" = "v$MANAGEMENT_VERSION"
+          test -n "$MANAGEMENT_SIGNING_KEY"
+          umask 077
+          printf '%s\n' "$MANAGEMENT_SIGNING_KEY" > "$RUNNER_TEMP/management-signing-key.pem"
+          openssl pkey -in "$RUNNER_TEMP/management-signing-key.pem" -pubout \
+            -out "$RUNNER_TEMP/management-signing-key.pub"
+      - name: Build and verify deterministic signed assets
+        run: |
+          mkdir -p release-assets
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)" \
+            scripts/package-management-release.sh \
+              --output-dir release-assets \
+              --signing-key "$RUNNER_TEMP/management-signing-key.pem" \
+              --vcs-ref "$GITHUB_SHA"
+          scripts/verify-management-release.sh \
+            --release-dir release-assets \
+            --public-key "$RUNNER_TEMP/management-signing-key.pub"
+      - name: Publish management-only stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            release-assets/management-bundle.tar.gz \
+            release-assets/management-release.env \
+            release-assets/management-release.env.sig \
+            --verify-tag \
+            --generate-notes \
+            --title "Management $GITHUB_REF_NAME"
+      - name: Upload signed release record
+        uses: actions/upload-artifact@v4
+        with:
+          name: management-release-${{ github.sha }}
+          path: release-assets
