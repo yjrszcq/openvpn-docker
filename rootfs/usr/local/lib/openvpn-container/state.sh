@@ -4,6 +4,7 @@ OVPN_STATE=EMPTY
 OVPN_STATE_ISSUE_IDS=()
 OVPN_STATE_ISSUE_SEVERITIES=()
 OVPN_STATE_ISSUE_ACTIONS=()
+OVPN_STATE_CLIENT_REGISTRY_RECOVERY_PENDING=false
 
 ovpn_empty_dir_entry_is_ignored() {
   case "$1" in
@@ -92,6 +93,7 @@ ovpn_state_reset() {
   OVPN_STATE_ISSUE_IDS=()
   OVPN_STATE_ISSUE_SEVERITIES=()
   OVPN_STATE_ISSUE_ACTIONS=()
+  OVPN_STATE_CLIENT_REGISTRY_RECOVERY_PENDING=false
 }
 
 ovpn_state_rank() {
@@ -134,7 +136,22 @@ ovpn_state_scan_client_profiles() {
 
   [ -r "$index" ] || return 0
   if ! ovpn_registry_load_identities; then
-    ovpn_state_add_critical_issue CLIENT_IDENTITY_REGISTRY_INVALID RESTORE_CLIENT_IP_REGISTRY
+    if ovpn_recovery_assess_client_registry; then
+      OVPN_STATE_CLIENT_REGISTRY_RECOVERY_PENDING=true
+      ovpn_state_add_recoverable_issue CLIENT_IDENTITY_REGISTRY_RECOVERABLE RECOVER_CLIENT_IDENTITY_REGISTRY
+    else
+      case "$OVPN_RECOVERY_STATUS" in
+        conflict)
+          ovpn_state_add_critical_issue CLIENT_IDENTITY_RECOVERY_CONFLICT RESTORE_BACKUP
+          ;;
+        invalid)
+          ovpn_state_add_critical_issue CLIENT_IDENTITY_RECOVERY_INVALID RESTORE_BACKUP
+          ;;
+        *)
+          ovpn_state_add_critical_issue CLIENT_IDENTITY_REGISTRY_INVALID RESTORE_CLIENT_IP_REGISTRY
+          ;;
+      esac
+    fi
     return 0
   fi
   while IFS= read -r line || [ -n "$line" ]; do
@@ -436,7 +453,8 @@ ovpn_state_scan() {
   ovpn_state_scan_client_ip_pending
   if [ -e "$OVPN_DATA_DIR/pki/index.txt" ]; then
     ovpn_state_scan_client_profiles
-    if declare -F ovpn_state_scan_ipam_consistency >/dev/null 2>&1; then
+    if [ "$OVPN_STATE_CLIENT_REGISTRY_RECOVERY_PENDING" != true ] &&
+      declare -F ovpn_state_scan_ipam_consistency >/dev/null 2>&1; then
       ovpn_state_scan_ipam_consistency
     fi
   fi

@@ -6,6 +6,10 @@ OVPN_RECOVERY_SELECTED_SOURCE=''
 OVPN_RECOVERY_CANDIDATE_SOURCES=()
 OVPN_RECOVERY_CANDIDATE_VALUES=()
 OVPN_RECOVERY_CANDIDATE_HASHES=()
+declare -a OVPN_RECOVERY_CLIENT_IDS=()
+declare -A OVPN_RECOVERY_CLIENT_NAMES=()
+declare -A OVPN_RECOVERY_CLIENT_STATES=()
+declare -A OVPN_RECOVERY_CLIENT_PROFILE_PATHS=()
 
 ovpn_recovery_reset() {
   OVPN_RECOVERY_STATUS=unavailable
@@ -54,6 +58,369 @@ ovpn_recovery_extract_profile_block() {
       if (!seen) exit 3
     }
   ' "$profile"
+}
+
+ovpn_recovery_extract_profile_identity() {
+  local profile="$1"
+  local line id='' name='' id_count=0 name_count=0
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      '# ovpn-client-id: '*)
+        id="${line#\# ovpn-client-id: }"
+        id_count=$((id_count + 1))
+        ;;
+      '# ovpn-client-name: '*)
+        name="${line#\# ovpn-client-name: }"
+        name_count=$((name_count + 1))
+        ;;
+    esac
+  done <"$profile"
+  [ "$id_count" -eq 1 ] && [ "$name_count" -eq 1 ] || return 1
+  ovpn_registry_uuid_valid "$id" && ovpn_registry_client_name_valid "$name" || return 1
+  printf '%s,%s\n' "$id" "$name"
+}
+
+ovpn_recovery_record_client_name() {
+  local id="$1"
+  local name="$2"
+  local current
+
+  [ -n "${OVPN_RECOVERY_CLIENT_STATES[$id]:-}" ] || {
+    OVPN_RECOVERY_STATUS=invalid
+    return 1
+  }
+  current="${OVPN_RECOVERY_CLIENT_NAMES[$id]:-}"
+  if [ -n "$current" ] && [ "$current" != "$name" ]; then
+    OVPN_RECOVERY_STATUS=conflict
+    return 1
+  fi
+  OVPN_RECOVERY_CLIENT_NAMES["$id"]="$name"
+}
+
+ovpn_recovery_load_ipam_layout() {
+  local layout
+
+  layout="$(
+    ovpn_config_load
+    printf '%s %s %s\n' \
+      "$OVPN_IPAM_STATIC_CAPACITY" \
+      "$OVPN_IPAM_STATIC_START_INT" \
+      "$OVPN_IPAM_STATIC_END_INT"
+  )" 2>/dev/null || {
+    OVPN_RECOVERY_STATUS=invalid
+    return 1
+  }
+  read -r \
+    OVPN_IPAM_STATIC_CAPACITY \
+    OVPN_IPAM_STATIC_START_INT \
+    OVPN_IPAM_STATIC_END_INT <<<"$layout"
+}
+
+ovpn_recovery_collect_client_pki() {
+  local index="$OVPN_DATA_DIR/pki/index.txt"
+  local line status subject id
+  local -A seen=()
+
+  OVPN_RECOVERY_CLIENT_IDS=()
+  OVPN_RECOVERY_CLIENT_NAMES=()
+  OVPN_RECOVERY_CLIENT_STATES=()
+  OVPN_RECOVERY_CLIENT_PROFILE_PATHS=()
+  [ -r "$index" ] || {
+    OVPN_RECOVERY_STATUS=unavailable
+    return 1
+  }
+  while IFS= read -r line || [ -n "$line" ]; do
+    status="${line%%$'\t'*}"
+    case "$status" in V|R) ;; *) continue ;; esac
+    subject="${line##*$'\t'}"
+    id="${subject##*/CN=}"
+    id="${id%%/*}"
+    [ "$id" = "$OVPN_SERVER_NAME" ] && continue
+    ovpn_registry_uuid_valid "$id" || {
+      OVPN_RECOVERY_STATUS=invalid
+      return 1
+    }
+    if [ -z "${seen[$id]+present}" ]; then
+      OVPN_RECOVERY_CLIENT_IDS+=("$id")
+      seen["$id"]=1
+    fi
+    if [ "$status" = V ]; then
+      OVPN_RECOVERY_CLIENT_STATES["$id"]=active
+    elif [ -z "${OVPN_RECOVERY_CLIENT_STATES[$id]:-}" ]; then
+      OVPN_RECOVERY_CLIENT_STATES["$id"]=revoked
+    fi
+  done <"$index"
+}
+
+ovpn_recovery_collect_registry_names() {
+  local file="$1"
+  local line line_number=0 id name ip extra header_seen=false
+  local -A ids=()
+  local -A ips=()
+
+  [ -e "$file" ] || return 0
+  [ -r "$file" ] || {
+    OVPN_RECOVERY_STATUS=invalid
+    return 1
+  }
+  while IFS= read -r line || [ -n "$line" ]; do
+    line_number=$((line_number + 1))
+    if [ "$line" = '# id,name,ip' ]; then
+      [ "$header_seen" = false ] && [ "$line_number" -eq 1 ] || {
+        OVPN_RECOVERY_STATUS=invalid
+        return 1
+      }
+      header_seen=true
+      continue
+    fi
+    [ "$header_seen" = true ] && [ -n "$line" ] && [[ "$line" != *[[:space:]]* ]] ||
+      {
+        OVPN_RECOVERY_STATUS=invalid
+        return 1
+      }
+    IFS=, read -r id name ip extra <<<"$line"
+    [ -z "${extra:-}" ] && [[ "$line" == *,*,* ]] && [[ "$line" != *,*,*,* ]] ||
+      {
+        OVPN_RECOVERY_STATUS=invalid
+        return 1
+      }
+    ovpn_registry_uuid_valid "$id" && ovpn_registry_client_name_valid "$name" ||
+      {
+        OVPN_RECOVERY_STATUS=invalid
+        return 1
+      }
+    [ -z "${ids[$id]+present}" ] || {
+      OVPN_RECOVERY_STATUS=invalid
+      return 1
+    }
+    ids["$id"]=1
+    if [ -n "$ip" ]; then
+      ovpn_ipam_ipv4_to_int "$ip" >/dev/null 2>&1 || {
+        OVPN_RECOVERY_STATUS=invalid
+        return 1
+      }
+      ovpn_ipam_ip_in_static_range "$ip" || {
+        OVPN_RECOVERY_STATUS=invalid
+        return 1
+      }
+      [ -z "${ips[$ip]+present}" ] || {
+        OVPN_RECOVERY_STATUS=invalid
+        return 1
+      }
+      ips["$ip"]=1
+    fi
+    ovpn_recovery_record_client_name "$id" "$name" || return 1
+  done <"$file"
+  [ "$header_seen" = true ] || {
+    OVPN_RECOVERY_STATUS=invalid
+    return 1
+  }
+}
+
+ovpn_recovery_collect_profile_names() {
+  local directory profile identity id name expected_state
+
+  for directory in active revoked; do
+    while IFS= read -r profile; do
+      [ -n "$profile" ] || continue
+      identity="$(ovpn_recovery_extract_profile_identity "$profile")" || {
+        OVPN_RECOVERY_STATUS=invalid
+        return 1
+      }
+      IFS=, read -r id name <<<"$identity"
+      expected_state="${OVPN_RECOVERY_CLIENT_STATES[$id]:-}"
+      [ "$expected_state" = "$directory" ] ||
+        {
+          OVPN_RECOVERY_STATUS=conflict
+          return 1
+        }
+      ovpn_recovery_record_client_name "$id" "$name" || return 1
+      [ -z "${OVPN_RECOVERY_CLIENT_PROFILE_PATHS[$id]:-}" ] ||
+        {
+          OVPN_RECOVERY_STATUS=conflict
+          return 1
+        }
+      OVPN_RECOVERY_CLIENT_PROFILE_PATHS["$id"]="$profile"
+    done < <(find "$OVPN_DATA_DIR/clients/$directory" -maxdepth 1 -type f -name '*.ovpn' -print 2>/dev/null | LC_ALL=C sort)
+  done
+}
+
+ovpn_recovery_collect_audit_names() {
+  local audit_file line id name
+  local regex='^\{"timestamp":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z","operation":"rename","result":"applied","client_id":"([0-9a-f-]{36})","old_name":"[A-Za-z0-9._-]+","new_name":"([A-Za-z0-9._-]+)"\}$'
+  local -A latest=()
+
+  audit_file="$(ovpn_registry_audit_file)"
+  [ -e "$audit_file" ] || return 0
+  if declare -F ovpn_state_ipam_audit_is_valid >/dev/null 2>&1 &&
+    ! ovpn_state_ipam_audit_is_valid "$audit_file"; then
+    OVPN_RECOVERY_STATUS=invalid
+    return 1
+  fi
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [[ "$line" =~ $regex ]]; then
+      id="${BASH_REMATCH[1]}"
+      name="${BASH_REMATCH[2]}"
+      latest["$id"]="$name"
+    fi
+  done <"$audit_file"
+  for id in "${!latest[@]}"; do
+    [ -n "${OVPN_RECOVERY_CLIENT_STATES[$id]:-}" ] || continue
+    ovpn_recovery_record_client_name "$id" "${latest[$id]}" || return 1
+  done
+}
+
+ovpn_recovery_assess_client_registry() {
+  local id name
+  local -A names=()
+
+  OVPN_RECOVERY_STATUS=unavailable
+  ovpn_recovery_collect_client_pki || return 1
+  ovpn_recovery_load_ipam_layout || return 1
+  ovpn_recovery_collect_registry_names "$(ovpn_registry_client_ip_file)" || return 1
+  ovpn_recovery_collect_registry_names "$(ovpn_registry_applied_file)" || return 1
+  ovpn_recovery_collect_profile_names || return 1
+  ovpn_recovery_collect_audit_names || return 1
+  for id in "${OVPN_RECOVERY_CLIENT_IDS[@]}"; do
+    name="${OVPN_RECOVERY_CLIENT_NAMES[$id]:-}"
+    if [ -z "$name" ]; then
+      name="client-${id//-/}"
+      OVPN_RECOVERY_CLIENT_NAMES["$id"]="$name"
+    fi
+    [ -z "${names[$name]+present}" ] || {
+      OVPN_RECOVERY_STATUS=conflict
+      return 1
+    }
+    names["$name"]="$id"
+  done
+  OVPN_RECOVERY_STATUS=recoverable
+}
+
+ovpn_recovery_stage_client_registry() {
+  local destination="$1"
+  local id
+
+  ovpn_recovery_assess_client_registry ||
+    ovpn_die "client identity registry recovery evidence is $OVPN_RECOVERY_STATUS"
+  mkdir -p "$(dirname "$destination")"
+  {
+    printf '%s\n' '# id,name,state'
+    for id in "${OVPN_RECOVERY_CLIENT_IDS[@]}"; do
+      printf '%s,%s,%s\n' "$id" "${OVPN_RECOVERY_CLIENT_NAMES[$id]}" "${OVPN_RECOVERY_CLIENT_STATES[$id]}"
+    done | LC_ALL=C sort -t, -k1,1
+  } >"$destination"
+  chmod 600 "$destination"
+}
+
+ovpn_recovery_stage_client_ip_registry() {
+  local source="$1"
+  local destination="$2"
+  local line id ignored_name ip
+  local -A assignments=()
+
+  ovpn_recovery_assess_client_registry ||
+    ovpn_die "client IP registry recovery evidence is $OVPN_RECOVERY_STATUS"
+  if [ -r "$source" ]; then
+    while IFS= read -r line || [ -n "$line" ]; do
+      [ "$line" = '# id,name,ip' ] && continue
+      IFS=, read -r id ignored_name ip <<<"$line"
+      assignments["$id"]="$ip"
+    done <"$source"
+  fi
+
+  OVPN_CLIENT_IP_IDS=()
+  OVPN_CLIENT_IP_NAMES=()
+  OVPN_CLIENT_IP_VALUES=()
+  OVPN_CLIENT_IP_INTS=()
+  for id in "${OVPN_RECOVERY_CLIENT_IDS[@]}"; do
+    ip="${assignments[$id]:-}"
+    OVPN_CLIENT_IP_IDS+=("$id")
+    OVPN_CLIENT_IP_NAMES+=("${OVPN_RECOVERY_CLIENT_NAMES[$id]}")
+    OVPN_CLIENT_IP_VALUES+=("$ip")
+    if [ -n "$ip" ]; then
+      OVPN_CLIENT_IP_INTS+=("$(ovpn_ipam_ipv4_to_int "$ip")")
+    else
+      OVPN_CLIENT_IP_INTS+=('')
+    fi
+  done
+  mkdir -p "$(dirname "$destination")"
+  ovpn_client_ip_write_canonical_file "$destination"
+}
+
+ovpn_recovery_rewrite_profile_identity() {
+  local source="$1"
+  local destination="$2"
+  local id="$3"
+  local name="$4"
+
+  awk -v client_id="$id" -v client_name="$name" '
+    /^# ovpn-client-id: / {
+      print "# ovpn-client-id: " client_id
+      ids++
+      next
+    }
+    /^# ovpn-client-name: / {
+      print "# ovpn-client-name: " client_name
+      names++
+      next
+    }
+    { print }
+    END { if (ids != 1 || names != 1) exit 1 }
+  ' "$source" >"$destination"
+  chmod 600 "$destination"
+}
+
+ovpn_recovery_render_client_with_registry() (
+  local name="$1"
+  local destination="$2"
+  local shadow="$3"
+
+  rm -rf "$shadow"
+  mkdir -p "$shadow/meta"
+  cp -a "$OVPN_DATA_DIR/config" "$shadow/config"
+  cp -a "$OVPN_DATA_DIR/pki" "$shadow/pki"
+  cp -a "$OVPN_DATA_DIR/secrets" "$shadow/secrets"
+  ovpn_recovery_stage_client_registry "$shadow/meta/client-state.csv"
+  OVPN_DATA_DIR="$shadow"
+  OVPN_CONFIG_DIR="$shadow/config"
+  OVPN_PROJECT_ENV="$OVPN_CONFIG_DIR/project.env"
+  OVPN_SCHEMA_VERSION_FILE="$OVPN_CONFIG_DIR/schema-version"
+  mkdir -p "$(dirname "$destination")"
+  ovpn_write_or_print "$destination" "$(ovpn_render_client_content "$name")"
+  rm -rf "$shadow"
+)
+
+ovpn_recovery_stage_client_profiles() {
+  local destination="$1"
+  local id name state source target old_basename shadow
+
+  ovpn_recovery_assess_client_registry ||
+    ovpn_die "client profile recovery evidence is $OVPN_RECOVERY_STATUS"
+  rm -rf "$destination"
+  if [ -d "$OVPN_DATA_DIR/clients" ]; then
+    cp -a "$OVPN_DATA_DIR/clients" "$destination"
+  else
+    mkdir -p "$destination"
+  fi
+  mkdir -p "$destination/active" "$destination/revoked"
+  shadow="$(dirname "$destination")/.identity-render"
+  for id in "${OVPN_RECOVERY_CLIENT_IDS[@]}"; do
+    name="${OVPN_RECOVERY_CLIENT_NAMES[$id]}"
+    state="${OVPN_RECOVERY_CLIENT_STATES[$id]}"
+    source="${OVPN_RECOVERY_CLIENT_PROFILE_PATHS[$id]:-}"
+    target="$destination/$state/$name.ovpn"
+    if [ -n "$source" ]; then
+      old_basename="${source##*/}"
+      ovpn_recovery_rewrite_profile_identity "$source" "$target.tmp" "$id" "$name"
+      mv "$target.tmp" "$target"
+      [ "$old_basename" = "$name.ovpn" ] || rm -f "$destination/$state/$old_basename"
+    elif [ "$state" = active ]; then
+      ovpn_recovery_render_client_with_registry "$name" "$target" "$shadow"
+    fi
+  done
+  rm -rf "$shadow"
+  chmod 700 "$destination" "$destination/active" "$destination/revoked"
 }
 
 ovpn_recovery_tls_crypt_is_valid() {

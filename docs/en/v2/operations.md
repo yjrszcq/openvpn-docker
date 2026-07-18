@@ -317,10 +317,15 @@ docker compose run --rm openvpn-maintenance repair apply
 ```
 
 `repair plan` lists `SAFE` actions (rebuild derived files) and `RECOVER` actions
-(restore certificates/keys from backup paths). `repair apply` stages, snapshots,
-and atomically applies allowed repairs. `CRITICAL` states refuse repair by
-default (exit code 78); set `OVPN_CRITICAL_MODE=maintenance` only to preserve
-a broken container for inspection.
+(restore verified identity material or registries). `repair apply` stages,
+snapshots, and atomically applies allowed repairs. If the client identity
+registry is lost, current-schema IP registries, profile identity comments, and
+the latest rename audit record must agree. Conflicts are `CRITICAL`; a client
+with only a recoverable PKI UUID receives a temporary
+`client-<uuid-without-dashes>` name that should be renamed after repair.
+`CRITICAL` states refuse repair by default (exit code 78); set
+`OVPN_CRITICAL_MODE=maintenance` only to preserve a broken container for
+inspection.
 
 ### Runtime inspection
 

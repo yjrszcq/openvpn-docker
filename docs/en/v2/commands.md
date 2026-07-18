@@ -396,7 +396,17 @@ return exit status `78` after reporting.
 
 Eligible actions include restoring derived configuration or metadata,
 regenerating a CRL, rendering a missing active profile, recovering verified
-certificate or key copies, and creating the runtime directory.
+certificate or key copies, recovering the current client identity/IP registries,
+and creating the runtime directory.
+
+When `meta/client-state.csv` is missing or invalid, recovery starts from UUID
+client entries in the current PKI. A display name is accepted only when
+current-format draft/applied IP registries, profile identity comments, and the
+latest applicable rename audit record agree. Conflicting evidence is
+`CRITICAL` and requires a backup or manual review. If no name evidence remains,
+repair assigns the deterministic temporary name `client-<uuid-without-dashes>`;
+rename it after repair. Historical registry or audit formats are not parsed by
+the current runtime.
 
 ### `ovpn repair apply`
 

@@ -67,6 +67,8 @@ run_control init >/tmp/ovpn-repair-init.out 2>/tmp/ovpn-repair-init.err
 run_control client create repair-client >/tmp/ovpn-repair-add.out 2>/tmp/ovpn-repair-add.err
 client_id="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, '$2 == "repair-client" { print $1 }' /etc/openvpn/meta/client-state.csv)"
 [[ "$client_id" =~ ^[0-9a-f-]{36}$ ]]
+assignment_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, '$2 == "repair-client" { print $0 }' /etc/openvpn/data/client-ip.csv)"
+[[ "$assignment_before" == "$client_id,repair-client,"* ]]
 identity_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec "sha256sum /etc/openvpn/pki/ca.crt /etc/openvpn/pki/private/ca.key /etc/openvpn/pki/issued/openvpn-server.crt /etc/openvpn/pki/private/openvpn-server.key /etc/openvpn/pki/issued/$client_id.crt /etc/openvpn/pki/private/$client_id.key")"
 docker run --rm -v "$data_dir:/etc/openvpn" --entrypoint /bin/sh "$IMAGE" -ec 'rm /etc/openvpn/config/schema-version /etc/openvpn/meta/instance.json /etc/openvpn/server/server.conf /etc/openvpn/pki/crl.pem /etc/openvpn/clients/active/repair-client.ovpn'
 run_control repair apply >/tmp/ovpn-repair.out 2>/tmp/ovpn-repair.err
@@ -75,6 +77,23 @@ docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec
 identity_after="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec "sha256sum /etc/openvpn/pki/ca.crt /etc/openvpn/pki/private/ca.key /etc/openvpn/pki/issued/openvpn-server.crt /etc/openvpn/pki/private/openvpn-server.key /etc/openvpn/pki/issued/$client_id.crt /etc/openvpn/pki/private/$client_id.key")"
 [ "$identity_before" = "$identity_after" ] || {
   echo 'container repair changed identity material' >&2
+  exit 1
+}
+
+docker run --rm -v "$data_dir:/etc/openvpn" --entrypoint /bin/rm "$IMAGE" /etc/openvpn/meta/client-state.csv
+[ "$(run_control state show)" = DEGRADED_RECOVERABLE ]
+run_control repair plan >/tmp/ovpn-identity-repair-plan.out 2>/tmp/ovpn-identity-repair-plan.err
+grep -Fq '[RECOVER] RECOVER_CLIENT_IDENTITY_REGISTRY' /tmp/ovpn-identity-repair-plan.out
+run_control repair apply >/tmp/ovpn-identity-repair.out 2>/tmp/ovpn-identity-repair.err
+[ "$(run_control state show)" = HEALTHY ]
+docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec \
+  "grep -Fqx '$client_id,repair-client,active' /etc/openvpn/meta/client-state.csv &&
+   grep -Fqx '$assignment_before' /etc/openvpn/data/client-ip.csv &&
+   grep -Fqx '# ovpn-client-id: $client_id' /etc/openvpn/clients/active/repair-client.ovpn &&
+   grep -Fqx '# ovpn-client-name: repair-client' /etc/openvpn/clients/active/repair-client.ovpn"
+identity_recovered="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec "sha256sum /etc/openvpn/pki/ca.crt /etc/openvpn/pki/private/ca.key /etc/openvpn/pki/issued/openvpn-server.crt /etc/openvpn/pki/private/openvpn-server.key /etc/openvpn/pki/issued/$client_id.crt /etc/openvpn/pki/private/$client_id.key")"
+[ "$identity_before" = "$identity_recovered" ] || {
+  echo 'client registry recovery changed identity material' >&2
   exit 1
 }
 

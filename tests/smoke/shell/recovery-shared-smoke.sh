@@ -86,6 +86,20 @@ write_profile() {
   write_profile_material "$path" "$data_dir/pki/ca.crt" "$data_dir/pki/issued/$CLIENT_ID.crt" "$data_dir/pki/private/$CLIENT_ID.key" "$data_dir/secrets/tls-crypt.key"
 }
 
+add_profile_identity() {
+  local path="$1"
+  local name="$2"
+  local temporary="$path.identity"
+
+  {
+    printf '# ovpn-client-id: %s\n' "$CLIENT_ID"
+    printf '# ovpn-client-name: %s\n' "$name"
+    cat "$path"
+  } >"$temporary"
+  mv "$temporary" "$path"
+  chmod 600 "$path"
+}
+
 make_fixture() {
   local data_dir="$1"
   local fingerprint
@@ -308,4 +322,78 @@ openssl genpkey -algorithm RSA -out "$TMP_DIR/mismatched-client.key" >/dev/null 
 write_profile_material "$mismatched_client_data/clients/active/laptop.ovpn" "$mismatched_client_data/pki/ca.crt" "$mismatched_client_data/pki/issued/$CLIENT_ID.crt" "$TMP_DIR/mismatched-client.key" "$mismatched_client_data/secrets/tls-crypt.key"
 rm "$mismatched_client_data/pki/private/$CLIENT_ID.key"
 assert_critical_recovery "$mismatched_client_data" CLIENT_IDENTITY_RECOVERY_INVALID_laptop mismatched-client
+
+identity_data="$TMP_DIR/identity"
+make_fixture "$identity_data"
+rm "$identity_data/clients/active/phone.ovpn"
+add_profile_identity "$identity_data/clients/active/laptop.ovpn" laptop
+rm "$identity_data/meta/client-state.csv"
+export OVPN_DATA_DIR="$identity_data"
+[ "$("$OVPN" state show)" = DEGRADED_RECOVERABLE ]
+"$OVPN" repair plan >"$TMP_DIR/identity-plan.out"
+grep -Fq '[RECOVER] RECOVER_CLIENT_IDENTITY_REGISTRY' "$TMP_DIR/identity-plan.out"
+grep -Fq '[RECOVER] RECOVER_CLIENT_IP_DRAFT' "$TMP_DIR/identity-plan.out"
+grep -Fq '[RECOVER] RECOVER_CLIENT_IP_APPLIED' "$TMP_DIR/identity-plan.out"
+grep -Fq '[RECOVER] RECOVER_CLIENT_PROFILES' "$TMP_DIR/identity-plan.out"
+identity_draft_before="$(sha256sum "$identity_data/data/client-ip.csv")"
+identity_applied_before="$(sha256sum "$identity_data/meta/client-ip.applied.csv")"
+identity_profile_before="$(sha256sum "$identity_data/clients/active/laptop.ovpn")"
+if OVPN_REPAIR_FAIL_AFTER_INSTALL=RECOVER_CLIENT_IP_DRAFT \
+  "$OVPN" repair apply >"$TMP_DIR/identity-failed-repair.out" 2>"$TMP_DIR/identity-failed-repair.err"; then
+  echo 'injected identity registry repair failure unexpectedly succeeded' >&2
+  exit 1
+fi
+[ ! -e "$identity_data/meta/client-state.csv" ]
+[ "$(sha256sum "$identity_data/data/client-ip.csv")" = "$identity_draft_before" ]
+[ "$(sha256sum "$identity_data/meta/client-ip.applied.csv")" = "$identity_applied_before" ]
+[ "$(sha256sum "$identity_data/clients/active/laptop.ovpn")" = "$identity_profile_before" ]
+[ "$("$OVPN" state show)" = DEGRADED_RECOVERABLE ]
+"$OVPN" repair apply >"$TMP_DIR/identity-repair.out" 2>"$TMP_DIR/identity-repair.err"
+[ "$("$OVPN" state show)" = HEALTHY ]
+grep -Fqx "$CLIENT_ID,laptop,active" "$identity_data/meta/client-state.csv"
+grep -Fqx "$CLIENT_ID,laptop," "$identity_data/data/client-ip.csv"
+grep -Fqx "$CLIENT_ID,laptop," "$identity_data/meta/client-ip.applied.csv"
+grep -Fqx "# ovpn-client-id: $CLIENT_ID" "$identity_data/clients/active/laptop.ovpn"
+grep -Fqx '# ovpn-client-name: laptop' "$identity_data/clients/active/laptop.ovpn"
+
+conflicting_identity_data="$TMP_DIR/conflicting-identity"
+make_fixture "$conflicting_identity_data"
+rm "$conflicting_identity_data/clients/active/phone.ovpn"
+add_profile_identity "$conflicting_identity_data/clients/active/laptop.ovpn" workstation
+rm "$conflicting_identity_data/meta/client-state.csv"
+assert_critical_recovery "$conflicting_identity_data" CLIENT_IDENTITY_RECOVERY_CONFLICT conflicting-identity
+
+audit_identity_data="$TMP_DIR/audit-identity"
+make_fixture "$audit_identity_data"
+printf '{"timestamp":"2026-07-18T00:00:00Z","operation":"rename","result":"applied","client_id":"%s","old_name":"laptop","new_name":"workstation"}\n' \
+  "$CLIENT_ID" >"$audit_identity_data/meta/audit.jsonl"
+chmod 600 "$audit_identity_data/meta/audit.jsonl"
+rm "$audit_identity_data/meta/client-state.csv" \
+  "$audit_identity_data/data/client-ip.csv" \
+  "$audit_identity_data/meta/client-ip.applied.csv"
+rm -rf "$audit_identity_data/clients"
+export OVPN_DATA_DIR="$audit_identity_data"
+[ "$("$OVPN" state show)" = DEGRADED_RECOVERABLE ]
+"$OVPN" repair apply >"$TMP_DIR/audit-identity-repair.out" 2>"$TMP_DIR/audit-identity-repair.err"
+[ "$("$OVPN" state show)" = HEALTHY ]
+grep -Fqx "$CLIENT_ID,workstation,active" "$audit_identity_data/meta/client-state.csv"
+grep -Fqx "# ovpn-client-name: workstation" "$audit_identity_data/clients/active/workstation.ovpn"
+
+uuid_only_data="$TMP_DIR/uuid-only"
+make_fixture "$uuid_only_data"
+rm "$uuid_only_data/meta/client-state.csv" \
+  "$uuid_only_data/data/client-ip.csv" \
+  "$uuid_only_data/meta/client-ip.applied.csv"
+rm -rf "$uuid_only_data/clients"
+export OVPN_DATA_DIR="$uuid_only_data"
+[ "$("$OVPN" state show)" = DEGRADED_RECOVERABLE ]
+"$OVPN" repair apply >"$TMP_DIR/uuid-only-repair.out" 2>"$TMP_DIR/uuid-only-repair.err"
+[ "$("$OVPN" state show)" = HEALTHY ]
+temporary_name="client-${CLIENT_ID//-/}"
+grep -Fqx "$CLIENT_ID,$temporary_name,active" "$uuid_only_data/meta/client-state.csv"
+grep -Fqx "$CLIENT_ID,$temporary_name," "$uuid_only_data/data/client-ip.csv"
+grep -Fqx "$CLIENT_ID,$temporary_name," "$uuid_only_data/meta/client-ip.applied.csv"
+grep -Fqx "# ovpn-client-id: $CLIENT_ID" "$uuid_only_data/clients/active/$temporary_name.ovpn"
+grep -Fqx "# ovpn-client-name: $temporary_name" "$uuid_only_data/clients/active/$temporary_name.ovpn"
+
 printf 'recovery smoke passed\n'
