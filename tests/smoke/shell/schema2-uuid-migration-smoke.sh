@@ -6,9 +6,6 @@ LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
 OVPN="$ROOT_DIR/rootfs/usr/local/bin/ovpn"
 TMP_DIR="$(mktemp -d)"
 FAKE_BIN="$TMP_DIR/bin"
-set -a
-. "$ROOT_DIR/versions.env"
-set +a
 
 cleanup() {
   rm -rf "$TMP_DIR"
@@ -87,58 +84,13 @@ exit 1
 FAKE_OPENVPN
 chmod +x "$FAKE_BIN/openvpn"
 
-mkdir -p "$TMP_DIR/keyring" "$TMP_DIR/target-release" "$TMP_DIR/embedded" \
-  "$TMP_DIR/management-runtime"
-openssl genpkey -algorithm ED25519 -out "$TMP_DIR/management-key.pem" >/dev/null 2>&1
-openssl pkey -in "$TMP_DIR/management-key.pem" -pubout \
-  -out "$TMP_DIR/keyring/release.pem" >/dev/null 2>&1
-"$ROOT_DIR/tests/helpers/create-management-release-fixture.sh" \
-  --output-dir "$TMP_DIR/target-release" \
-  --signing-key "$TMP_DIR/management-key.pem" \
-  --version 2.1.2
 cat >"$FAKE_BIN/curl" <<'FAKE_CURL'
 #!/usr/bin/env bash
 set -euo pipefail
-output=''
-url=''
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-  -o)
-    output="$2"
-    shift 2
-    ;;
-  -H | --connect-timeout | --max-time) shift 2 ;;
-  -*) shift ;;
-  *)
-    url="$1"
-    shift
-    ;;
-  esac
-done
-printf '%s\n' "$url" >>"$MIGRATION_CURL_LOG"
-case "$url" in
-mock://*/releases\?*) source_file="$MIGRATION_RELEASES_JSON" ;;
-file://*) source_file="${url#file://}" ;;
-*) exit 69 ;;
-esac
-cp "$source_file" "$output"
+printf '%s\n' "$*" >>"$MIGRATION_NETWORK_LOG"
+exit 99
 FAKE_CURL
 chmod +x "$FAKE_BIN/curl"
-jq -n --arg root "file://$TMP_DIR/target-release" '[
-  {tag_name:"v2.1.2",draft:false,prerelease:false,assets:[
-    {name:"management-release.env",browser_download_url:($root+"/management-release.env")},
-    {name:"management-release.env.sig",browser_download_url:($root+"/management-release.env.sig")},
-    {name:"management-bundle.tar.gz",browser_download_url:($root+"/management-bundle.tar.gz")}]}
-]' >"$TMP_DIR/releases.json"
-ln -s "$LIB_DIR" "$TMP_DIR/embedded/lib"
-ln -s "$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates" "$TMP_DIR/embedded/templates"
-ln -s "$ROOT_DIR/compatibility" "$TMP_DIR/embedded/compatibility"
-printf 'MANAGEMENT_VERSION=2.1.1\nPLATFORM_API=%s\nDATA_SCHEMA=3\n' \
-  "$PLATFORM_API" >"$TMP_DIR/embedded/management.env"
-IMAGE_VERSION=2.1.1 MANAGEMENT_VERSION=2.1.1 \
-  OVPN_RUNTIME_STRATEGY=source-build OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION" \
-  OVPN_VCS_REF=test OVPN_BUILD_DATE=1970-01-01T00:00:00Z \
-  "$ROOT_DIR/scripts/generate-build-info.sh" "$TMP_DIR/build-info.json"
 
 export OVPN_LIB_DIR="$LIB_DIR"
 export OVPN_TEMPLATE_ROOT="$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates"
@@ -148,22 +100,13 @@ export OVPN_RUNTIME_DIR="$TMP_DIR/run"
 export OVPN_EASYRSA_BIN="$FAKE_BIN/easyrsa"
 export OVPN_OPENVPN_BIN="$FAKE_BIN/openvpn"
 export OVPN_MAINTENANCE=true
-export OVPN_BUILD_INFO="$TMP_DIR/build-info.json"
 export OVPN_CURL_BIN="$FAKE_BIN/curl"
-export OVPN_GITHUB_API_URL=mock://migration-repository
-export OVPN_MANAGEMENT_KEYRING="$TMP_DIR/keyring"
-export OVPN_MANAGEMENT_VERIFIER="$ROOT_DIR/rootfs/usr/local/lib/openvpn-verify-management-release.sh"
-export OVPN_BOOTSTRAP_LIB="$ROOT_DIR/rootfs/usr/local/lib/openvpn-bootstrap.sh"
-export OVPN_EMBEDDED_MANAGEMENT_ROOT="$TMP_DIR/embedded"
-export OVPN_RUNTIME_MANAGEMENT_ROOT="$TMP_DIR/management-runtime"
-export MIGRATION_RELEASES_JSON="$TMP_DIR/releases.json"
-export MIGRATION_CURL_LOG="$TMP_DIR/curl.log"
+export MIGRATION_NETWORK_LOG="$TMP_DIR/network.log"
 mkdir -p \
   "$OVPN_DATA_DIR/config" "$OVPN_DATA_DIR/data/leases" "$OVPN_DATA_DIR/meta" \
   "$OVPN_DATA_DIR/pki/issued" "$OVPN_DATA_DIR/pki/private" "$OVPN_DATA_DIR/pki/reqs" \
   "$OVPN_DATA_DIR/clients/active" "$OVPN_DATA_DIR/clients/revoked" \
-  "$OVPN_DATA_DIR/ccd" "$OVPN_DATA_DIR/server" "$OVPN_DATA_DIR/secrets" \
-  "$OVPN_DATA_DIR/repair/.scripts"
+  "$OVPN_DATA_DIR/ccd" "$OVPN_DATA_DIR/server" "$OVPN_DATA_DIR/secrets"
 
 cat >"$OVPN_DATA_DIR/config/project.env" <<'CONFIG'
 OVPN_CONFIG_VERSION=2
@@ -224,7 +167,6 @@ printf 'old alpha profile\n' >"$OVPN_DATA_DIR/clients/active/alpha.ovpn"
 printf 'old beta profile\n' >"$OVPN_DATA_DIR/clients/revoked/beta.ovpn"
 printf 'old ccd\n' >"$OVPN_DATA_DIR/ccd/alpha"
 printf '10.88.0.200\n' >"$OVPN_DATA_DIR/data/leases/alpha"
-printf 'trusted management bundle\n' >"$OVPN_DATA_DIR/repair/.scripts/sentinel"
 chmod 600 \
   "$OVPN_DATA_DIR/config/project.env" "$OVPN_DATA_DIR/config/schema-version" \
   "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv" \
@@ -237,19 +179,20 @@ grep -Fq '"chain":"2-to-3"' "$TMP_DIR/plan.json"
 grep -Fq '"clients":3' "$TMP_DIR/plan.json"
 grep -Fq '"blocked":false' "$TMP_DIR/plan.json"
 grep -Fq 'must be redistributed' "$TMP_DIR/plan.json"
-"$OVPN" migrate plan --to-version 2.1.2 --json >"$TMP_DIR/target-plan.json"
-grep -Fq '"management_version":"2.1.2"' "$TMP_DIR/target-plan.json"
-if grep -Fq 'management-bundle.tar.gz' "$MIGRATION_CURL_LOG"; then
-  echo 'migrate plan downloaded the full target bundle' >&2
-  exit 1
-fi
+set +e
+"$OVPN" migrate plan --to-version 2.1.2 \
+  >"$TMP_DIR/removed-option.out" 2>"$TMP_DIR/removed-option.err"
+status=$?
+set -e
+[ "$status" -ne 0 ]
+grep -Fq "unknown migrate option '--to-version'" "$TMP_DIR/removed-option.err"
 
 cp "$OVPN_DATA_DIR/meta/audit.jsonl" "$TMP_DIR/valid-schema2-audit.jsonl"
 printf '{"timestamp":"2026-01-07T00:00:00Z","event":"unknown","outcome":"applied"}\n' \
   >>"$OVPN_DATA_DIR/meta/audit.jsonl"
 invalid_audit_before="$(sha256sum "$OVPN_DATA_DIR/meta/audit.jsonl")"
 set +e
-"$OVPN" migrate apply --to-version 2.1.2 --yes \
+"$OVPN" migrate apply --yes \
   >"$TMP_DIR/invalid-audit.out" 2>"$TMP_DIR/invalid-audit.err"
 status=$?
 set -e
@@ -257,7 +200,6 @@ set -e
 grep -Fq 'unsupported schema 2 audit record at line 7' "$TMP_DIR/invalid-audit.err"
 [ "$invalid_audit_before" = "$(sha256sum "$OVPN_DATA_DIR/meta/audit.jsonl")" ]
 grep -Fqx '2' "$OVPN_DATA_DIR/config/schema-version"
-grep -Fqx embedded "$OVPN_DATA_DIR/repair/.scripts/active"
 mv "$TMP_DIR/valid-schema2-audit.jsonl" "$OVPN_DATA_DIR/meta/audit.jsonl"
 chmod 600 "$OVPN_DATA_DIR/meta/audit.jsonl"
 
@@ -275,7 +217,7 @@ before_failure="$(
     LC_ALL=C sort -z | xargs -0 sha256sum
 )"
 set +e
-FAKE_EASYRSA_FAIL_UUID_ISSUE=true "$OVPN" migrate apply --to-version 2.1.2 --yes \
+FAKE_EASYRSA_FAIL_UUID_ISSUE=true "$OVPN" migrate apply --yes \
   >"$TMP_DIR/issuance-failure.out" 2>"$TMP_DIR/issuance-failure.err"
 status=$?
 set -e
@@ -288,37 +230,31 @@ after_failure="$(
 )"
 [ "$before_failure" = "$after_failure" ]
 grep -Fqx '2' "$OVPN_DATA_DIR/config/schema-version"
-grep -Fqx embedded "$OVPN_DATA_DIR/repair/.scripts/active"
 
 set +e
-OVPN_MIGRATE_FAIL_CODE_ACTIVATION=after \
-  "$OVPN" migrate apply --to-version 2.1.2 --yes \
-  >"$TMP_DIR/activation-failure.out" 2>"$TMP_DIR/activation-failure.err"
+OVPN_MIGRATION_FAIL_AFTER_COMMIT=config \
+  "$OVPN" migrate apply --yes \
+  >"$TMP_DIR/commit-failure.out" 2>"$TMP_DIR/commit-failure.err"
 status=$?
 set -e
 [ "$status" -eq 1 ]
-grep -Fq 'injected management activation failure after selector commit' \
-  "$TMP_DIR/activation-failure.err"
+grep -Fq 'injected migration failure after committing config' \
+  "$TMP_DIR/commit-failure.err"
 [ "$before_failure" = "$(
   cd "$OVPN_DATA_DIR"
   find ccd clients config data meta pki secrets server -type f -print0 |
     LC_ALL=C sort -z | xargs -0 sha256sum
 )" ]
 grep -Fqx '2' "$OVPN_DATA_DIR/config/schema-version"
-grep -Fqx embedded "$OVPN_DATA_DIR/repair/.scripts/active"
-test ! -e "$OVPN_DATA_DIR/repair/.scripts/transactions/migration.env"
 
 set +e
-OVPN_MIGRATE_INTERRUPT_AFTER_CODE_ACTIVATION=true \
-  "$OVPN" migrate apply --to-version 2.1.2 --yes \
-  >"$TMP_DIR/activation-interrupt.out" 2>"$TMP_DIR/activation-interrupt.err"
+OVPN_MIGRATION_INTERRUPT_AFTER_COMMIT=config \
+  "$OVPN" migrate apply --yes \
+  >"$TMP_DIR/commit-interrupt.out" 2>"$TMP_DIR/commit-interrupt.err"
 status=$?
 set -e
 [ "$status" -eq 137 ]
-grep -Fqx '3' "$OVPN_DATA_DIR/config/schema-version"
-grep -Fqx '2.1.2' "$OVPN_DATA_DIR/repair/.scripts/active"
 test -e "$OVPN_DATA_DIR/repair/migrations/transaction.env"
-test -e "$OVPN_DATA_DIR/repair/.scripts/transactions/migration.env"
 set +e
 "$OVPN" migrate plan --json >"$TMP_DIR/interrupted-plan.json" \
   2>"$TMP_DIR/interrupted-plan.err"
@@ -327,12 +263,9 @@ set -e
 [ "$status" -eq 78 ]
 grep -Fq '"blocked":true' "$TMP_DIR/interrupted-plan.json"
 grep -Fq 'interrupted migration must be recovered' "$TMP_DIR/interrupted-plan.json"
-grep -Fqx '3' "$OVPN_DATA_DIR/config/schema-version"
-grep -Fqx '2.1.2' "$OVPN_DATA_DIR/repair/.scripts/active"
 test -e "$OVPN_DATA_DIR/repair/migrations/transaction.env"
-test -e "$OVPN_DATA_DIR/repair/.scripts/transactions/migration.env"
 
-"$OVPN" migrate apply --to-version 2.1.2 --yes >"$TMP_DIR/apply.out" 2>"$TMP_DIR/apply.err"
+"$OVPN" migrate apply --yes >"$TMP_DIR/apply.out" 2>"$TMP_DIR/apply.err"
 grep -Fqx '3' "$OVPN_DATA_DIR/config/schema-version"
 grep -Fqx 'OVPN_CONFIG_VERSION=3' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'OVPN_TRANSPORT_FAMILY=auto' "$OVPN_DATA_DIR/config/project.env"
@@ -372,13 +305,6 @@ grep -Fqx 'ifconfig-push 10.88.0.3 255.255.255.0' "$OVPN_DATA_DIR/ccd/$alpha_id"
 test ! -e "$OVPN_DATA_DIR/ccd/alpha"
 grep -Fqx '10.88.0.200' "$OVPN_DATA_DIR/data/leases/$alpha_id"
 test ! -e "$OVPN_DATA_DIR/data/leases/alpha"
-grep -Fqx 'trusted management bundle' "$OVPN_DATA_DIR/repair/.scripts/sentinel"
-grep -Fqx '2.1.2' "$OVPN_DATA_DIR/repair/.scripts/active"
-grep -Fqx embedded "$OVPN_DATA_DIR/repair/.scripts/previous"
-case "$(readlink "$OVPN_RUNTIME_MANAGEMENT_ROOT/current")" in
-*'/online-2.1.2-'*) ;;
-*) exit 1 ;;
-esac
 grep -Fqx '{"timestamp":"2026-01-01T00:00:00Z","event":"client_ip_apply","outcome":"applied","client_id":null,"client_name":null,"legacy":true,"source_schema":2}' "$OVPN_DATA_DIR/meta/audit.jsonl"
 grep -Fqx '{"timestamp":"2026-01-02T00:00:00Z","event":"network_migration","outcome":"rejected","client_id":null,"client_name":null,"legacy":true,"source_schema":2}' "$OVPN_DATA_DIR/meta/audit.jsonl"
 grep -Fqx '{"timestamp":"2026-01-03T00:00:00Z","event":"client_lifecycle","operation":"revoke","outcome":"applied","client_id":null,"client_name":null,"legacy":true,"source_schema":2}' "$OVPN_DATA_DIR/meta/audit.jsonl"
@@ -404,8 +330,7 @@ mkdir -p \
   "$OVPN_DATA_DIR/config" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/pki/issued" \
   "$OVPN_DATA_DIR/pki/private" "$OVPN_DATA_DIR/pki/reqs" \
   "$OVPN_DATA_DIR/clients/active" "$OVPN_DATA_DIR/clients/revoked" \
-  "$OVPN_DATA_DIR/ccd" "$OVPN_DATA_DIR/server" "$OVPN_DATA_DIR/secrets" \
-  "$OVPN_DATA_DIR/repair/.scripts"
+  "$OVPN_DATA_DIR/ccd" "$OVPN_DATA_DIR/server" "$OVPN_DATA_DIR/secrets"
 cat >"$OVPN_DATA_DIR/config/project.env" <<'CONFIG_V1'
 OVPN_CONFIG_VERSION=1
 OVPN_ENDPOINT=v1.example.test
@@ -434,7 +359,6 @@ for name in v1-active v1-revoked; do
   printf 'OLD KEY %s\n' "$name" >"$OVPN_DATA_DIR/pki/private/$name.key"
 done
 printf 'TLS KEY\n' >"$OVPN_DATA_DIR/secrets/tls-crypt.key"
-printf 'trusted management bundle\n' >"$OVPN_DATA_DIR/repair/.scripts/sentinel"
 chmod 600 \
   "$OVPN_DATA_DIR/config/project.env" "$OVPN_DATA_DIR/config/schema-version" \
   "$OVPN_DATA_DIR/pki/private/ca.key" "$OVPN_DATA_DIR/secrets/tls-crypt.key"
@@ -460,6 +384,6 @@ grep -Fqx "$v1_active_id,v1-active," "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx "$v1_revoked_id,v1-revoked," "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx "# ovpn-client-id: $v1_active_id" "$OVPN_DATA_DIR/clients/active/v1-active.ovpn"
 grep -Fqx "# ovpn-client-id: $v1_revoked_id" "$OVPN_DATA_DIR/clients/revoked/v1-revoked.ovpn"
-grep -Fqx 'trusted management bundle' "$OVPN_DATA_DIR/repair/.scripts/sentinel"
+test ! -e "$MIGRATION_NETWORK_LOG"
 
 printf 'schema 2 UUID migration smoke passed\n'
