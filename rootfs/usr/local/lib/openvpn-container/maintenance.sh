@@ -4,8 +4,8 @@ OVPN_RUNTIME_STATE_FILE="${OVPN_RUNTIME_STATE_FILE:-$OVPN_RUNTIME_DIR/state.json
 
 ovpn_critical_mode() {
   case "${OVPN_CRITICAL_MODE:-exit}" in
-    exit|maintenance) printf '%s\n' "${OVPN_CRITICAL_MODE:-exit}" ;;
-    *) ovpn_die 'OVPN_CRITICAL_MODE must be exit or maintenance' ;;
+  exit | maintenance) printf '%s\n' "${OVPN_CRITICAL_MODE:-exit}" ;;
+  *) ovpn_die 'OVPN_CRITICAL_MODE must be exit or maintenance' ;;
   esac
 }
 

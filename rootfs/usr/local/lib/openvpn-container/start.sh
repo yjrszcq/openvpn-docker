@@ -24,7 +24,8 @@ ovpn_start_management_broker() {
     --backend "$OVPN_OPENVPN_MANAGEMENT_SOCKET" \
     --raw-log "$raw_log" \
     --max-bytes "$OVPN_LOG_MAX_BYTES" \
-    --backups "$OVPN_LOG_BACKUPS" &
+    --backups "$OVPN_LOG_BACKUPS" \
+    --reload-script "${OVPN_MANAGEMENT_BROKER_RELOAD_SCRIPT:-/usr/local/lib/openvpn-management-runtime/current/lib/management-broker.py}" &
   broker_pid=$!
   OVPN_MANAGEMENT_BROKER_PID="$broker_pid"
   printf '%s\n' "$broker_pid" >"$OVPN_RUNTIME_DIR/management-broker.pid"
@@ -76,13 +77,13 @@ ovpn_start_inner() {
   fi
   if [ "$state" != HEALTHY ]; then
     case "$state" in
-      CRITICAL|UNRECOVERABLE)
-        if [ "$critical_mode" = maintenance ]; then
-          ovpn_maintenance_enter "$state"
-        fi
-        ovpn_log 'recommended: docker compose run --rm openvpn-maintenance state doctor'
-        ovpn_log 'recommended: docker compose run --rm openvpn-maintenance repair plan'
-        ;;
+    CRITICAL | UNRECOVERABLE)
+      if [ "$critical_mode" = maintenance ]; then
+        ovpn_maintenance_enter "$state"
+      fi
+      ovpn_log 'recommended: docker compose run --rm openvpn-maintenance state doctor'
+      ovpn_log 'recommended: docker compose run --rm openvpn-maintenance repair plan'
+      ;;
     esac
     ovpn_log "instance state is $state; refusing to start"
     while IFS= read -r file; do

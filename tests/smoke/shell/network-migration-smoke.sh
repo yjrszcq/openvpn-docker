@@ -58,7 +58,7 @@ export PATH="$FAKE_BIN:$PATH"
 mkdir -p "$OVPN_RUNTIME_DIR"
 nc -lU "$OVPN_MANAGEMENT_SOCKET" >/dev/null 2>&1 &
 SOCKET_LISTENER_PID=$!
-for attempt in {1..20}; do
+for _attempt in {1..20}; do
   [ -S "$OVPN_MANAGEMENT_SOCKET" ] && break
   sleep 0.1
 done

@@ -480,12 +480,23 @@ for proto in udp tcp; do
     start_persistent_client "$network_name" "$profile_path" "$update_client"
     wait_for_log "$update_client" 'Initialization Sequence Completed' "$WORK_DIR/client-upgrade-active.log"
     openvpn_pid="$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')"
+    broker_pid="$(docker exec "$server_name" cat /run/openvpn-container/management-broker.pid)"
+    docker exec "$server_name" timeout 30 ovpn runtime logs --lines 0 --follow \
+      >"$WORK_DIR/log-follow-upgrade.out" &
+    log_follow_pid=$!
+    docker exec "$server_name" timeout 30 ovpn runtime events --lines 0 --follow --json \
+      >"$WORK_DIR/event-follow-upgrade.out" &
+    event_follow_pid=$!
     docker exec "$server_name" ovpn client list --detail >"$WORK_DIR/client-list-before-upgrade"
     grep -E "^${client_display}[[:space:]]+[0-9a-f-]{36}[[:space:]]+active.*online$" "$WORK_DIR/client-list-before-upgrade"
 
     docker exec "$server_name" ovpn upgrade --yes >"$WORK_DIR/upgrade.out"
     [ "$(docker exec "$server_name" ovpn -v)" = 2.1.2 ]
     [ "$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')" = "$openvpn_pid" ]
+    [ "$(docker exec "$server_name" cat /run/openvpn-container/management-broker.pid)" = "$broker_pid" ]
+    docker exec "$server_name" sh -ec \
+      'printf "broker-health\nquit\n" | socat - UNIX-CONNECT:/run/openvpn-container/management.sock' |
+      grep -Fq 'SUCCESS: broker connected to OpenVPN'
     docker ps --format '{{.Names}}' | grep -Fqx "$update_client"
     docker exec "$update_client" ip -4 address show dev tun0 | grep -Fq 'inet '
     docker exec "$server_name" ovpn client list --detail >"$WORK_DIR/client-list-after-upgrade"
@@ -493,14 +504,20 @@ for proto in udp tcp; do
     wait_for_runtime_event "$server_name" \
       'any(.[]; .event == "management_upgrade" and .operation == "apply" and .from_version == "2.1.1" and .to_version == "2.1.2")' \
       "$WORK_DIR/events-upgrade.jsonl"
+    grep -Fq '"event":"management_upgrade"' "$WORK_DIR/event-follow-upgrade.out"
+    kill -0 "$log_follow_pid"
+    kill -0 "$event_follow_pid"
 
     docker exec "$server_name" ovpn upgrade --rollback --yes >"$WORK_DIR/rollback.out"
     [ "$(docker exec "$server_name" ovpn -v)" = 2.1.1 ]
     [ "$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')" = "$openvpn_pid" ]
+    [ "$(docker exec "$server_name" cat /run/openvpn-container/management-broker.pid)" = "$broker_pid" ]
     docker ps --format '{{.Names}}' | grep -Fqx "$update_client"
     wait_for_runtime_event "$server_name" \
       'any(.[]; .event == "management_upgrade" and .operation == "rollback" and .from_version == "2.1.2" and .to_version == "embedded")' \
       "$WORK_DIR/events-rollback.jsonl"
+    kill "$log_follow_pid" "$event_follow_pid" >/dev/null 2>&1 || true
+    wait "$log_follow_pid" "$event_follow_pid" 2>/dev/null || true
     docker rm -f "$update_client" >/dev/null
   fi
 

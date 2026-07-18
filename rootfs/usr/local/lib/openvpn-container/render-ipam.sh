@@ -30,12 +30,18 @@ ovpn_management_socket_request() {
 ovpn_prepare_ipam_render_context() {
   local dynamic_start dynamic_end
 
+  # Consumed by render.sh after this sourced helper returns.
+  # shellcheck disable=SC2034
   OVPN_CCD_DIR="$OVPN_RENDER_DATA_DIR/ccd"
   OVPN_DYNAMIC_POOL_DIRECTIVE=''
   if [ "$OVPN_IPAM_DYNAMIC_POOL_SIZE" -gt 0 ]; then
     dynamic_start="$(ovpn_ipam_int_to_ipv4 "$OVPN_IPAM_DYNAMIC_START_INT")"
     dynamic_end="$(ovpn_ipam_int_to_ipv4 "$OVPN_IPAM_DYNAMIC_END_INT")"
-    [ -n "$dynamic_start" ] && [ -n "$dynamic_end" ] || ovpn_die "failed to compute dynamic pool range"
+    if [ -z "$dynamic_start" ] || [ -z "$dynamic_end" ]; then
+      ovpn_die "failed to compute dynamic pool range"
+    fi
+    # Consumed by render.sh after this sourced helper returns.
+    # shellcheck disable=SC2034
     OVPN_DYNAMIC_POOL_DIRECTIVE="ifconfig-pool $dynamic_start $dynamic_end"
   fi
 }

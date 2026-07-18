@@ -67,15 +67,15 @@ ovpn_join_pushes() {
   for item in "${items[@]}"; do
     [ -n "$item" ] || continue
     case "$kind" in
-      route)
-        ovpn_validate_cidr "$item"
-        ip="$(ovpn_cidr_ip "$item")"
-        mask="$(ovpn_cidr_netmask "$item")"
-        output+="push \"route $ip $mask\""$'\n'
-        ;;
-      dns)
-        output+="push \"dhcp-option DNS $item\""$'\n'
-        ;;
+    route)
+      ovpn_validate_cidr "$item"
+      ip="$(ovpn_cidr_ip "$item")"
+      mask="$(ovpn_cidr_netmask "$item")"
+      output+="push \"route $ip $mask\""$'\n'
+      ;;
+    dns)
+      output+="push \"dhcp-option DNS $item\""$'\n'
+      ;;
     esac
   done
   printf '%s' "$output"
@@ -94,30 +94,30 @@ ovpn_prepare_render_context() {
     fi
   fi
   case "$transport_family:$OVPN_PROTO" in
-    auto:udp)
-      OVPN_SERVER_PROTO=udp6
-      OVPN_CLIENT_PROTO=udp
-      ;;
-    auto:tcp)
-      OVPN_SERVER_PROTO=tcp6-server
-      OVPN_CLIENT_PROTO=tcp
-      ;;
-    ipv4:udp)
-      OVPN_SERVER_PROTO=udp4
-      OVPN_CLIENT_PROTO=udp4
-      ;;
-    ipv4:tcp)
-      OVPN_SERVER_PROTO=tcp4-server
-      OVPN_CLIENT_PROTO=tcp4-client
-      ;;
-    ipv6:udp)
-      OVPN_SERVER_PROTO=udp6
-      OVPN_CLIENT_PROTO=udp6
-      ;;
-    ipv6:tcp)
-      OVPN_SERVER_PROTO=tcp6-server
-      OVPN_CLIENT_PROTO=tcp6-client
-      ;;
+  auto:udp)
+    OVPN_SERVER_PROTO=udp6
+    OVPN_CLIENT_PROTO=udp
+    ;;
+  auto:tcp)
+    OVPN_SERVER_PROTO=tcp6-server
+    OVPN_CLIENT_PROTO=tcp
+    ;;
+  ipv4:udp)
+    OVPN_SERVER_PROTO=udp4
+    OVPN_CLIENT_PROTO=udp4
+    ;;
+  ipv4:tcp)
+    OVPN_SERVER_PROTO=tcp4-server
+    OVPN_CLIENT_PROTO=tcp4-client
+    ;;
+  ipv6:udp)
+    OVPN_SERVER_PROTO=udp6
+    OVPN_CLIENT_PROTO=udp6
+    ;;
+  ipv6:tcp)
+    OVPN_SERVER_PROTO=tcp6-server
+    OVPN_CLIENT_PROTO=tcp6-client
+    ;;
   esac
   OVPN_BIND_DIRECTIVE=""
   if [ "$transport_family" = ipv6 ]; then
@@ -213,17 +213,17 @@ ovpn_render_server() {
   local output_path="$OVPN_DATA_DIR/server/server.conf"
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --stdout)
-        output_path='-'
-        ;;
-      --output)
-        shift
-        [ "$#" -gt 0 ] || ovpn_die "--output requires a path"
-        output_path="$1"
-        ;;
-      *)
-        ovpn_die "unknown render server argument: $1"
-        ;;
+    --stdout)
+      output_path='-'
+      ;;
+    --output)
+      shift
+      [ "$#" -gt 0 ] || ovpn_die "--output requires a path"
+      output_path="$1"
+      ;;
+    *)
+      ovpn_die "unknown render server argument: $1"
+      ;;
     esac
     shift
   done
@@ -239,17 +239,17 @@ ovpn_render_client() {
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --stdout)
-        output_path='-'
-        ;;
-      --output)
-        shift
-        [ "$#" -gt 0 ] || ovpn_die "--output requires a path"
-        output_path="$1"
-        ;;
-      *)
-        ovpn_die "unknown render client argument: $1"
-        ;;
+    --stdout)
+      output_path='-'
+      ;;
+    --output)
+      shift
+      [ "$#" -gt 0 ] || ovpn_die "--output requires a path"
+      output_path="$1"
+      ;;
+    *)
+      ovpn_die "unknown render client argument: $1"
+      ;;
     esac
     shift
   done
@@ -257,7 +257,6 @@ ovpn_render_client() {
   client_name="$OVPN_CLIENT_RESOLVED_NAME"
   ovpn_write_or_print "$output_path" "$(ovpn_render_client_content "$client_name")"
 }
-
 
 ovpn_render_command() {
   local target="${1:-}"
@@ -270,24 +269,24 @@ ovpn_render_command() {
   shift
 
   case "$target" in
-    server)
-      if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn render server [--stdout|--output <path>]" "Render the server configuration."
-      else
-        ovpn_render_server "$@"
-      fi
-      ;;
-    client)
-      if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn render client <client> [--stdout|--output <path>]" "Render a client profile."
-      else
-        ovpn_render_client "$@"
-      fi
-      ;;
-    *)
-      ovpn_log "unknown render target '$target'"
-      ovpn_log "usage: ovpn render <server|client> ..."
-      exit 64
-      ;;
+  server)
+    if ovpn_help_requested "$@"; then
+      ovpn_command_usage "ovpn render server [--stdout|--output <path>]" "Render the server configuration."
+    else
+      ovpn_render_server "$@"
+    fi
+    ;;
+  client)
+    if ovpn_help_requested "$@"; then
+      ovpn_command_usage "ovpn render client <client> [--stdout|--output <path>]" "Render a client profile."
+    else
+      ovpn_render_client "$@"
+    fi
+    ;;
+  *)
+    ovpn_log "unknown render target '$target'"
+    ovpn_log "usage: ovpn render <server|client> ..."
+    exit 64
+    ;;
   esac
 }

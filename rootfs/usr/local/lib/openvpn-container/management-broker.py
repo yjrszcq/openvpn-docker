@@ -7,6 +7,7 @@ import argparse
 import os
 import signal
 import socket
+import sys
 import threading
 from dataclasses import dataclass, field
 
@@ -301,6 +302,7 @@ def main() -> int:
     parser.add_argument("--max-bytes", type=int, required=True)
     parser.add_argument("--backups", type=int, required=True)
     parser.add_argument("--timeout", type=float, default=5.0)
+    parser.add_argument("--reload-script")
     args = parser.parse_args()
     if args.max_bytes < 1:
         parser.error("--max-bytes must be positive")
@@ -314,16 +316,31 @@ def main() -> int:
         args.backups,
         args.timeout,
     )
+    reload_requested = False
 
     def stop(_signum: int, _frame: object) -> None:
         broker.close()
 
+    def reload_code(_signum: int, _frame: object) -> None:
+        nonlocal reload_requested
+        reload_requested = True
+        broker.close()
+
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
+    signal.signal(signal.SIGHUP, reload_code)
     try:
         broker.serve()
     finally:
         broker.close()
+    if reload_requested:
+        if not args.reload_script:
+            print("management broker: no reload script configured", file=sys.stderr)
+            return 1
+        os.execv(
+            sys.executable,
+            [sys.executable, args.reload_script, *sys.argv[1:]],
+        )
     return 0
 
 

@@ -236,6 +236,68 @@ ovpn_upgrade_prune_releases() {
   done
 }
 
+ovpn_upgrade_start_management_broker() {
+  local script="$1" python_bin raw_log broker_pid pid_file temporary
+
+  python_bin="${OVPN_PYTHON_BIN:-python3}"
+  raw_log="${OVPN_RAW_LOG_FILE:-$OVPN_DATA_DIR/logs/openvpn.log}"
+  pid_file="$OVPN_RUNTIME_DIR/management-broker.pid"
+  command -v setsid >/dev/null 2>&1 || return 1
+  command -v "$python_bin" >/dev/null 2>&1 || return 1
+  ovpn_config_load || return 1
+  mkdir -p "$OVPN_RUNTIME_DIR" "$OVPN_DATA_DIR/logs" || return 1
+  setsid "$python_bin" "$script" \
+    --listen "$OVPN_MANAGEMENT_SOCKET" \
+    --backend "$OVPN_OPENVPN_MANAGEMENT_SOCKET" \
+    --raw-log "$raw_log" \
+    --max-bytes "$OVPN_LOG_MAX_BYTES" \
+    --backups "$OVPN_LOG_BACKUPS" \
+    --reload-script "$script" \
+    </dev/null >>"$OVPN_DATA_DIR/logs/management-broker.log" 2>&1 &
+  broker_pid=$!
+  temporary="${pid_file}.reload.$$"
+  printf '%s\n' "$broker_pid" >"$temporary" || return 1
+  chmod 600 "$temporary" || return 1
+  mv -f "$temporary" "$pid_file" || return 1
+}
+
+ovpn_upgrade_reload_management_broker() {
+  local pid_file="$OVPN_RUNTIME_DIR/management-broker.pid"
+  local script="${OVPN_MANAGEMENT_BROKER_RELOAD_SCRIPT:-$OVPN_RUNTIME_MANAGEMENT_ROOT/current/lib/management-broker.py}"
+  local broker_pid old_signature='' new_signature='' deadline
+
+  [ -e "$pid_file" ] || return 0
+  [ -r "$script" ] || return 1
+  "${OVPN_PYTHON_BIN:-python3}" -c \
+    'import pathlib,sys; compile(pathlib.Path(sys.argv[1]).read_bytes(), sys.argv[1], "exec")' \
+    "$script" || return 1
+  IFS= read -r broker_pid <"$pid_file" || return 1
+  [[ "$broker_pid" =~ ^[1-9][0-9]*$ ]] || return 1
+  if kill -0 "$broker_pid" >/dev/null 2>&1; then
+    old_signature="$(stat -c '%i:%y' "$OVPN_MANAGEMENT_SOCKET" 2>/dev/null || true)"
+    kill -HUP "$broker_pid" >/dev/null 2>&1 || return 1
+  else
+    ovpn_upgrade_start_management_broker "$script" || return 1
+    IFS= read -r broker_pid <"$pid_file" || return 1
+  fi
+  deadline=$((SECONDS + 10))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if ! kill -0 "$broker_pid" >/dev/null 2>&1; then
+      ovpn_upgrade_start_management_broker "$script" || return 1
+      IFS= read -r broker_pid <"$pid_file" || return 1
+      old_signature=''
+    fi
+    new_signature="$(stat -c '%i:%y' "$OVPN_MANAGEMENT_SOCKET" 2>/dev/null || true)"
+    if [ -n "$new_signature" ] && { [ -z "$old_signature" ] || [ "$new_signature" != "$old_signature" ]; } &&
+      ovpn_management_socket_request "$OVPN_MANAGEMENT_SOCKET" broker-health 2>/dev/null |
+      grep -Fq 'SUCCESS: broker connected to OpenVPN'; then
+      return 0
+    fi
+    sleep 0.1
+  done
+  return 1
+}
+
 ovpn_upgrade_activate() {
   local version="$1" selected_dir="$2" mode="${3:-activate}" lock_held="${4:-false}"
   local release_target stage previous current_source persisted_active old_previous
@@ -367,6 +429,10 @@ ovpn_upgrade_rollback() {
   ovpn_upgrade_write_selector_transaction committed "$active" "$old_previous" "$previous" "$active" || return 74
   rm -f "$OVPN_MANAGEMENT_STORE/transactions/activation.env" || return 74
   flock -u "$management_lock_fd"
+  if ! ovpn_upgrade_reload_management_broker; then
+    ovpn_log 'management broker failed to reload after rollback'
+    return 74
+  fi
   if declare -F ovpn_event_write >/dev/null 2>&1; then
     ovpn_event_write management_upgrade rollback applied "" "" \
       "$(jq -cn --arg from "$active" --arg to "$previous" \
@@ -482,6 +548,20 @@ ovpn_upgrade_command() {
     rm -rf "$work"
     return "$status"
   }
+  if ! ovpn_upgrade_reload_management_broker; then
+    ovpn_log 'management broker failed to reload; rolling back management code'
+    if declare -F ovpn_event_write >/dev/null 2>&1; then
+      ovpn_event_write management_upgrade apply failed "" "" \
+        "$(jq -cn --arg from "$OVPN_UPGRADE_CURRENT_VERSION" \
+          --arg to "$OVPN_UPGRADE_SELECTED_VERSION" \
+          '{from_version:$from,to_version:$to,reason:"management_broker_reload_failed"}')" || true
+    fi
+    if ! ovpn_upgrade_rollback true >/dev/null; then
+      ovpn_log 'automatic management-code rollback failed'
+    fi
+    rm -rf "$work"
+    return 74
+  fi
   if declare -F ovpn_event_write >/dev/null 2>&1; then
     ovpn_event_write management_upgrade apply applied "" "" \
       "$(jq -cn --arg from "$OVPN_UPGRADE_CURRENT_VERSION" \

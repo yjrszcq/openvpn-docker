@@ -116,7 +116,7 @@ test -f "$OVPN_DATA_DIR/server/server.conf"
 
 export OVPN_DATA_DIR="$TMP_DIR/missing-endpoint"
 set +e
-OVPN_ENDPOINT= "$OVPN" start >"$TMP_DIR/missing-endpoint.out" 2>"$TMP_DIR/missing-endpoint.err"
+OVPN_ENDPOINT='' "$OVPN" start >"$TMP_DIR/missing-endpoint.out" 2>"$TMP_DIR/missing-endpoint.err"
 status=$?
 set -e
 if [ "$status" -eq 0 ]; then
@@ -172,7 +172,6 @@ if [ "$status" -eq 0 ]; then
   exit 1
 fi
 grep -q 'outside supported range' "$TMP_DIR/unsupported-start.err"
-
 
 export OVPN_DATA_DIR="$TMP_DIR/concurrent"
 export FAKE_EASYRSA_LOG="$TMP_DIR/concurrent-easyrsa.log"
