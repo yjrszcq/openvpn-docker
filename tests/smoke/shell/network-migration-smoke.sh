@@ -27,6 +27,7 @@ set -euo pipefail
 request="$(cat)"
 printf '%s\n' "$request" >>"$OVPN_TEST_SOCAT_LOG"
 case "$request" in
+  *broker-health*) printf 'SUCCESS: broker connected to OpenVPN\n' ;;
   *'signal SIGHUP'*) printf 'SUCCESS: signal SIGHUP thrown\n' ;;
   *version*) printf 'OpenVPN Version: OpenVPN 2.7.5 test-build\nEND\n' ;;
   *) printf 'SUCCESS: command accepted\n' ;;

@@ -6,6 +6,9 @@ LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
 OVPN="$ROOT_DIR/rootfs/usr/local/bin/ovpn"
 TMP_DIR="$(mktemp -d)"
 FAKE_BIN="$TMP_DIR/bin"
+set -a
+. "$ROOT_DIR/versions.env"
+set +a
 
 cleanup() {
   rm -rf "$TMP_DIR"
@@ -130,11 +133,8 @@ jq -n --arg root "file://$TMP_DIR/target-release" '[
 ln -s "$LIB_DIR" "$TMP_DIR/embedded/lib"
 ln -s "$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates" "$TMP_DIR/embedded/templates"
 ln -s "$ROOT_DIR/compatibility" "$TMP_DIR/embedded/compatibility"
-printf 'MANAGEMENT_VERSION=2.1.1\nPLATFORM_API=1\nDATA_SCHEMA=3\n' \
-  >"$TMP_DIR/embedded/management.env"
-set -a
-. "$ROOT_DIR/versions.env"
-set +a
+printf 'MANAGEMENT_VERSION=2.1.1\nPLATFORM_API=%s\nDATA_SCHEMA=3\n' \
+  "$PLATFORM_API" >"$TMP_DIR/embedded/management.env"
 OVPN_RUNTIME_STRATEGY=source-build OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION" \
   OVPN_VCS_REF=test OVPN_BUILD_DATE=1970-01-01T00:00:00Z \
   "$ROOT_DIR/scripts/generate-build-info.sh" "$TMP_DIR/build-info.json"

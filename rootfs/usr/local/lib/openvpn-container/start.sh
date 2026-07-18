@@ -11,6 +11,56 @@ ovpn_auto_init_if_empty() {
   ovpn_with_data_lock init ovpn_auto_init_if_empty_inner
 }
 
+ovpn_start_management_broker() {
+  local python_bin broker_log broker_pid
+
+  python_bin="${OVPN_PYTHON_BIN:-python3}"
+  broker_log="${OVPN_MANAGEMENT_ASYNC_LOG:-$OVPN_RUNTIME_DIR/management-async.log}"
+  command -v "$python_bin" >/dev/null 2>&1 ||
+    ovpn_die 'python3 is required for the OpenVPN management broker'
+  rm -f "$OVPN_MANAGEMENT_SOCKET" "$OVPN_OPENVPN_MANAGEMENT_SOCKET"
+  "$python_bin" "$LIB_DIR/management-broker.py" \
+    --listen "$OVPN_MANAGEMENT_SOCKET" \
+    --backend "$OVPN_OPENVPN_MANAGEMENT_SOCKET" \
+    --async-log "$broker_log" &
+  broker_pid=$!
+  OVPN_MANAGEMENT_BROKER_PID="$broker_pid"
+  printf '%s\n' "$broker_pid" >"$OVPN_RUNTIME_DIR/management-broker.pid"
+  chmod 600 "$OVPN_RUNTIME_DIR/management-broker.pid"
+  for _ in {1..50}; do
+    [ -S "$OVPN_MANAGEMENT_SOCKET" ] && return 0
+    kill -0 "$broker_pid" >/dev/null 2>&1 ||
+      ovpn_die 'OpenVPN management broker exited during startup'
+    sleep 0.1
+  done
+  kill "$broker_pid" >/dev/null 2>&1 || true
+  ovpn_die 'OpenVPN management broker did not create its socket'
+}
+
+ovpn_start_supervise() {
+  local openvpn_bin="$1"
+  local config_path="$2"
+  local openvpn_pid status
+
+  "$openvpn_bin" --config "$config_path" &
+  openvpn_pid=$!
+  trap 'kill -TERM "$openvpn_pid" >/dev/null 2>&1 || true' TERM
+  trap 'kill -INT "$openvpn_pid" >/dev/null 2>&1 || true' INT
+  trap 'kill -HUP "$openvpn_pid" >/dev/null 2>&1 || true' HUP
+  if wait "$openvpn_pid"; then
+    status=0
+  else
+    status=$?
+  fi
+  trap - TERM INT HUP
+  if [ -n "${OVPN_MANAGEMENT_BROKER_PID:-}" ]; then
+    kill -TERM "$OVPN_MANAGEMENT_BROKER_PID" >/dev/null 2>&1 || true
+    wait "$OVPN_MANAGEMENT_BROKER_PID" 2>/dev/null || true
+    rm -f "$OVPN_RUNTIME_DIR/management-broker.pid"
+  fi
+  return "$status"
+}
+
 ovpn_start_inner() {
   local state openvpn_bin config_path critical_mode
 
@@ -44,13 +94,21 @@ ovpn_start_inner() {
   config_path="$OVPN_DATA_DIR/server/server.conf"
   ovpn_render_server --output "$config_path"
   openvpn_bin="$(ovpn_openvpn_bin)" || ovpn_die "openvpn is required to start"
+  mkdir -p "$OVPN_RUNTIME_DIR"
+  if [ "${OVPN_MANAGEMENT_BROKER_DISABLED:-false}" = false ]; then
+    ovpn_start_management_broker
+  else
+    [ "$OVPN_MANAGEMENT_BROKER_DISABLED" = true ] ||
+      ovpn_die 'OVPN_MANAGEMENT_BROKER_DISABLED must be true or false'
+    OVPN_MANAGEMENT_BROKER_PID=''
+  fi
   mkdir -p "$OVPN_LEASE_DIR"
   find "$OVPN_LEASE_DIR" -maxdepth 1 -type f -delete 2>/dev/null || true
   export OVPN_LEASE_DIR
   export OVPN_DATA_DIR
   ovpn_runtime_write_state HEALTHY running false
   ovpn_log "starting OpenVPN with $config_path"
-  exec "$openvpn_bin" --config "$config_path"
+  ovpn_start_supervise "$openvpn_bin" "$config_path"
 }
 
 ovpn_start_command() {

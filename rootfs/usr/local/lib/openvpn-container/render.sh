@@ -38,6 +38,7 @@ ovpn_template_apply() {
   template="${template//\{\{OVPN_DYNAMIC_POOL_DIRECTIVE\}\}/$OVPN_DYNAMIC_POOL_DIRECTIVE}"
   template="${template//\{\{OVPN_LEASE_DIR\}\}/$OVPN_LEASE_DIR}"
   template="${template//\{\{OVPN_MANAGEMENT_SOCKET\}\}/$OVPN_MANAGEMENT_SOCKET}"
+  template="${template//\{\{OVPN_OPENVPN_MANAGEMENT_SOCKET\}\}/$OVPN_OPENVPN_MANAGEMENT_SOCKET}"
   template="${template//\{\{OVPN_CLIENT_TO_CLIENT_DIRECTIVE\}\}/$OVPN_CLIENT_TO_CLIENT_DIRECTIVE}"
   template="${template//\{\{OVPN_REDIRECT_GATEWAY_PUSH\}\}/$OVPN_REDIRECT_GATEWAY_PUSH}"
   template="${template//\{\{OVPN_ROUTE_PUSHES\}\}/$OVPN_ROUTE_PUSHES}"

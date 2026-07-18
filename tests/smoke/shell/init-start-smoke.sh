@@ -88,6 +88,7 @@ export OVPN_NAT=false
 export OVPN_EASYRSA_BIN="$FAKE_BIN/easyrsa"
 export OVPN_OPENVPN_BIN="$FAKE_BIN/openvpn"
 export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
+export OVPN_MANAGEMENT_BROKER_DISABLED=true
 
 if [ "$("$OVPN" state show)" != EMPTY ]; then
   echo 'fresh data dir should be EMPTY' >&2

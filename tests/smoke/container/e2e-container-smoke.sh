@@ -348,6 +348,12 @@ for proto in udp tcp; do
   wait_for_log "$server_name" 'Initialization Sequence Completed' "$WORK_DIR/server-$proto-active.log"
   test "$(run_control "$data_dir" "$endpoint" ovpn state show)" = HEALTHY
   docker exec "$server_name" ovpn runtime health
+  docker exec "$server_name" sh -ec '
+    test -S /run/openvpn-container/management.sock
+    test -S /run/openvpn-container/openvpn-management.sock
+    test -s /run/openvpn-container/management-broker.pid
+    kill -0 "$(cat /run/openvpn-container/management-broker.pid)"
+  '
 
   data_grep "$data_dir" "^OVPN_NETWORK=$NETWORK$" config/project.env
   data_grep "$data_dir" "^OVPN_PROTO=$proto$" config/project.env
@@ -392,6 +398,18 @@ for proto in udp tcp; do
   assert_client_connects "$network_name" "$profile_path" "$WORK_DIR/client-$proto-active.log"
 
   if [ "$proto" = udp ]; then
+    concurrent_pids=()
+    for index in 1 2 3 4 5 6 7 8; do
+      docker exec "$server_name" ovpn client list --detail \
+        >"$WORK_DIR/client-list-concurrent-$index" &
+      concurrent_pids+=("$!")
+    done
+    for index in "${!concurrent_pids[@]}"; do
+      wait "${concurrent_pids[$index]}"
+      grep -E "^client-udp[[:space:]]+${client_id}[[:space:]]+active" \
+        "$WORK_DIR/client-list-concurrent-$((index + 1))"
+    done
+
     rename_client="$RUN_ID-rename-client"
     containers+=("$rename_client")
     start_persistent_client "$network_name" "$profile_path" "$rename_client"

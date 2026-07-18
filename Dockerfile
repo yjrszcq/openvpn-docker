@@ -78,6 +78,7 @@ RUN apt-get update \
         nano \
         openssl \
         procps \
+        python3-minimal \
         tini \
         socat \
         util-linux \

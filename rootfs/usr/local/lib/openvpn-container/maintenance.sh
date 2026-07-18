@@ -72,6 +72,11 @@ ovpn_healthcheck_command() {
     ovpn_log 'OpenVPN daemon is not running'
     return 1
   fi
+  if ! ovpn_management_socket_request "$OVPN_MANAGEMENT_SOCKET" broker-health |
+    grep -Fq 'SUCCESS: broker connected to OpenVPN'; then
+    ovpn_log 'OpenVPN management broker is unavailable'
+    return 1
+  fi
 }
 ovpn_maintenance_enter() {
   local state="$1"

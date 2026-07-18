@@ -6,6 +6,9 @@ OVPN="$ROOT_DIR/rootfs/usr/local/bin/ovpn"
 LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
+set -a
+. "$ROOT_DIR/versions.env"
+set +a
 
 mkdir -p "$TMP_DIR/bin" "$TMP_DIR/keyring" "$TMP_DIR/fixtures" "$TMP_DIR/data" "$TMP_DIR/runtime"
 openssl genpkey -algorithm ED25519 -out "$TMP_DIR/key.pem" >/dev/null 2>&1
@@ -60,8 +63,8 @@ FORMAT_VERSION=1
 MANAGEMENT_VERSION=$version
 VCS_REF=0123456789abcdef0123456789abcdef01234567
 DATA_SCHEMA=$schema
-PLATFORM_API_MIN=1
-PLATFORM_API_MAX=1
+PLATFORM_API_MIN=$PLATFORM_API
+PLATFORM_API_MAX=$PLATFORM_API
 OPENVPN_MIN=$minimum
 OPENVPN_MAX_EXCLUSIVE=$maximum
 REQUIRED_FEATURES=tls-crypt,data-ciphers,crl-verify,topology-subnet
@@ -77,8 +80,8 @@ FORMAT_VERSION=1
 MANAGEMENT_VERSION=$version
 VCS_REF=0123456789abcdef0123456789abcdef01234567
 DATA_SCHEMA=$schema
-PLATFORM_API_MIN=1
-PLATFORM_API_MAX=1
+PLATFORM_API_MIN=$PLATFORM_API
+PLATFORM_API_MAX=$PLATFORM_API
 OPENVPN_MIN=$minimum
 OPENVPN_MAX_EXCLUSIVE=$maximum
 REQUIRED_FEATURES=tls-crypt,data-ciphers,crl-verify,topology-subnet
@@ -114,11 +117,8 @@ mkdir -p "$embedded"
 ln -s "$LIB_DIR" "$embedded/lib"
 ln -s "$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates" "$embedded/templates"
 ln -s "$ROOT_DIR/compatibility" "$embedded/compatibility"
-printf 'MANAGEMENT_VERSION=2.1.1\nPLATFORM_API=1\nDATA_SCHEMA=3\n' >"$embedded/management.env"
-
-set -a
-. "$ROOT_DIR/versions.env"
-set +a
+printf 'MANAGEMENT_VERSION=2.1.1\nPLATFORM_API=%s\nDATA_SCHEMA=3\n' \
+  "$PLATFORM_API" >"$embedded/management.env"
 build_info="$TMP_DIR/build-info.json"
 OVPN_RUNTIME_STRATEGY=source-build OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION" \
   OVPN_VCS_REF=test OVPN_BUILD_DATE=1970-01-01T00:00:00Z \
@@ -154,7 +154,7 @@ business_checksum="$(business_state_checksum)"
 
 "$OVPN" upgrade --check --json >"$TMP_DIR/check.json"
 jq -e '.current_version == "2.1.1" and .target_version == "2.1.2" and
-  .platform_api == 1 and .openvpn_version == "2.7.5" and
+  .platform_api == 2 and .openvpn_version == "2.7.5" and
   .current_schema == 3 and .target_schema == 3 and .schema_change == false and
   .download_asset == "management-bundle.tar.gz" and (.skipped | length) == 2' \
   "$TMP_DIR/check.json" >/dev/null

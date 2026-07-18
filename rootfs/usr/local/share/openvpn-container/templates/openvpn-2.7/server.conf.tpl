@@ -10,7 +10,7 @@ client-config-dir {{OVPN_CCD_DIR}}
 script-security 2
 client-connect "/usr/local/bin/ovpn-hook pool-persist"
 client-disconnect "/usr/local/bin/ovpn-hook pool-persist"
-management {{OVPN_MANAGEMENT_SOCKET}} unix
+management {{OVPN_OPENVPN_MANAGEMENT_SOCKET}} unix
 management-client-user root
 
 
