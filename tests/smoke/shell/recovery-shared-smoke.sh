@@ -91,7 +91,7 @@ make_fixture() {
 
   mkdir -p "$data_dir/config" "$data_dir/data" "$data_dir/meta" "$data_dir/server" "$data_dir/pki/private" "$data_dir/pki/issued" "$data_dir/secrets" "$data_dir/clients/active" "$data_dir/ca-db/newcerts"
   printf '%s\n' \
-    'OVPN_CONFIG_VERSION=2' \
+    'OVPN_CONFIG_VERSION=3' \
     'OVPN_ENDPOINT=vpn.example.test' \
     'OVPN_PROTO=udp' \
     'OVPN_PORT=1194' \
@@ -104,10 +104,10 @@ make_fixture() {
     'OVPN_CLIENT_TO_CLIENT=false' \
     'OVPN_DNS=' \
     'OVPN_ROUTES=' >"$data_dir/config/project.env"
-  printf '2\n' >"$data_dir/config/schema-version"
-  printf '%s\n' '# client,ip' 'laptop,' >"$data_dir/data/client-ip.csv"
+  printf '3\n' >"$data_dir/config/schema-version"
+  printf '%s\n' '# id,name,ip' '11111111-1111-4111-8111-111111111111,laptop,' >"$data_dir/data/client-ip.csv"
   cp "$data_dir/data/client-ip.csv" "$data_dir/meta/client-ip.applied.csv"
-  printf '%s\n' '# client,state' 'laptop,active' >"$data_dir/meta/client-state.csv"
+  printf '%s\n' '# id,name,state' '11111111-1111-4111-8111-111111111111,laptop,active' >"$data_dir/meta/client-state.csv"
   : >"$data_dir/meta/audit.jsonl"
   chmod 600 "$data_dir/data/client-ip.csv" "$data_dir/meta/client-ip.applied.csv" "$data_dir/meta/client-state.csv" "$data_dir/meta/audit.jsonl"
   : >"$data_dir/pki/index.txt"

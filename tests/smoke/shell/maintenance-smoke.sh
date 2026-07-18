@@ -23,8 +23,8 @@ make_critical() {
   local data_dir="$1"
 
   mkdir -p "$data_dir/config" "$data_dir/meta" "$data_dir/server" "$data_dir/pki/private" "$data_dir/pki/issued" "$data_dir/secrets"
-  printf 'OVPN_CONFIG_VERSION=2\n' >"$data_dir/config/project.env"
-  printf '2\n' >"$data_dir/config/schema-version"
+  printf 'OVPN_CONFIG_VERSION=3\n' >"$data_dir/config/project.env"
+  printf '3\n' >"$data_dir/config/schema-version"
   printf '{\n  "ca_fingerprint_sha256": "FAKE:CA:FINGERPRINT"\n}\n' >"$data_dir/meta/instance.json"
   : >"$data_dir/pki/ca.crt"
   : >"$data_dir/pki/private/ca.key"

@@ -34,8 +34,12 @@ ovpn_migration_1_to_2_load_legacy_config() {
   [ -r "$OVPN_PROJECT_ENV" ] || ovpn_die "missing schema 1 project configuration: $OVPN_PROJECT_ENV"
   ovpn_config_load_file
   [ "$OVPN_CONFIG_VERSION" = 1 ] || ovpn_die "expected schema 1 configuration"
-  OVPN_CONFIG_VERSION=2
+  # Reuse current field validation without allowing schema 2 in the runtime
+  # parser. This module is migration-only and still writes the schema-2
+  # intermediate format consumed by the next migration step.
+  OVPN_CONFIG_VERSION=3
   ovpn_config_validate
+  OVPN_CONFIG_VERSION=2
 }
 
 ovpn_migration_1_to_2_write_clients() {

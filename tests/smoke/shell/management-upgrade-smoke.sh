@@ -89,9 +89,9 @@ EOF
     -in "$release/management-release.env" -out "$release/management-release.env.sig"
 }
 
-create_release 2.1.2 2 2.7.0 2.8.0
-create_release 2.1.3 3 2.7.0 2.8.0
-create_release 2.1.4 2 2.8.0 2.9.0
+create_release 2.1.2 3 2.7.0 2.8.0
+create_release 2.1.3 4 2.7.0 2.8.0
+create_release 2.1.4 3 2.8.0 2.9.0
 
 jq -n --arg root "file://$TMP_DIR/fixtures" '[
   {tag_name:"v2.1.3",draft:false,prerelease:false,assets:[
@@ -114,7 +114,7 @@ mkdir -p "$embedded"
 ln -s "$LIB_DIR" "$embedded/lib"
 ln -s "$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates" "$embedded/templates"
 ln -s "$ROOT_DIR/compatibility" "$embedded/compatibility"
-printf 'MANAGEMENT_VERSION=2.1.1\nPLATFORM_API=1\nDATA_SCHEMA=2\n' >"$embedded/management.env"
+printf 'MANAGEMENT_VERSION=2.1.1\nPLATFORM_API=1\nDATA_SCHEMA=3\n' >"$embedded/management.env"
 
 set -a
 . "$ROOT_DIR/versions.env"
@@ -139,8 +139,8 @@ export OVPN_BOOTSTRAP_LIB="$ROOT_DIR/rootfs/usr/local/lib/openvpn-bootstrap.sh"
 export OVPN_EMBEDDED_MANAGEMENT_ROOT="$embedded"
 export OVPN_RUNTIME_MANAGEMENT_ROOT="$TMP_DIR/runtime"
 mkdir -p "$OVPN_DATA_DIR/config"
-printf 'OVPN_CONFIG_VERSION=2\n' >"$OVPN_DATA_DIR/config/project.env"
-printf '2\n' >"$OVPN_DATA_DIR/config/schema-version"
+printf 'OVPN_CONFIG_VERSION=3\n' >"$OVPN_DATA_DIR/config/project.env"
+printf '3\n' >"$OVPN_DATA_DIR/config/schema-version"
 mkdir -p "$OVPN_DATA_DIR/pki/private" "$OVPN_DATA_DIR/clients/active" "$OVPN_DATA_DIR/server"
 printf 'credential sentinel\n' >"$OVPN_DATA_DIR/pki/private/client.key"
 printf 'profile sentinel\n' >"$OVPN_DATA_DIR/clients/active/client.ovpn"
@@ -155,7 +155,7 @@ business_checksum="$(business_state_checksum)"
 "$OVPN" upgrade --check --json >"$TMP_DIR/check.json"
 jq -e '.current_version == "2.1.1" and .target_version == "2.1.2" and
   .platform_api == 1 and .openvpn_version == "2.7.5" and
-  .current_schema == 2 and .target_schema == 2 and .schema_change == false and
+  .current_schema == 3 and .target_schema == 3 and .schema_change == false and
   .download_asset == "management-bundle.tar.gz" and (.skipped | length) == 2' \
   "$TMP_DIR/check.json" >/dev/null
 if grep -Fq 'management-bundle.tar.gz' "$CURL_LOG"; then

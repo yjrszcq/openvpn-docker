@@ -387,6 +387,7 @@ ovpn_client_reissue_inner() {
     ovpn_client_lifecycle_audit reissue failed || true
     ovpn_die 'client reissue failed; the previous certificate remains revoked and the IP assignment was retained'
   fi
+  ovpn_client_registry_set_state "$name" active
 
   case "$mode" in
     dynamic)
@@ -405,7 +406,6 @@ ovpn_client_reissue_inner() {
       ;;
   esac
 
-  ovpn_client_registry_set_state "$name" active
   ovpn_render_client "$name" --output "$OVPN_DATA_DIR/clients/active/$name.ovpn"
   ovpn_client_lifecycle_kick "$name"
   ovpn_client_lifecycle_audit reissue applied || true
@@ -441,16 +441,19 @@ ovpn_client_reissue_command() {
 ovpn_client_delete_current_assignment() {
   local name="$1"
   local index
+  local -a ids=()
   local -a names=()
   local -a values=()
   local -a ints=()
 
   for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
     [ "${OVPN_CLIENT_IP_NAMES[index]}" = "$name" ] && continue
+    ids+=("${OVPN_CLIENT_IP_IDS[index]}")
     names+=("${OVPN_CLIENT_IP_NAMES[index]}")
     values+=("${OVPN_CLIENT_IP_VALUES[index]}")
     ints+=("${OVPN_CLIENT_IP_INTS[index]}")
   done
+  OVPN_CLIENT_IP_IDS=("${ids[@]}")
   OVPN_CLIENT_IP_NAMES=("${names[@]}")
   OVPN_CLIENT_IP_VALUES=("${values[@]}")
   OVPN_CLIENT_IP_INTS=("${ints[@]}")
@@ -471,6 +474,7 @@ ovpn_client_delete_inner() {
       ovpn_die 'failed to revoke the active certificate before deletion'
     fi
     ovpn_client_lifecycle_move_profile_to_revoked "$name"
+    ovpn_client_registry_set_state "$name" revoked
   fi
   state_file="$(ovpn_registry_client_state_file)"
   state_backup="$(mktemp "$OVPN_DATA_DIR/meta/.client-state.delete.XXXXXX")" || ovpn_die "failed to create backup temp file"

@@ -14,8 +14,8 @@ make_healthy() {
   local data_dir="$1"
 
   mkdir -p "$data_dir/config" "$data_dir/meta" "$data_dir/server" "$data_dir/pki/private" "$data_dir/pki/issued" "$data_dir/secrets"
-  printf 'OVPN_CONFIG_VERSION=2\n' >"$data_dir/config/project.env"
-  printf '2\n' >"$data_dir/config/schema-version"
+  printf 'OVPN_CONFIG_VERSION=3\n' >"$data_dir/config/project.env"
+  printf '3\n' >"$data_dir/config/schema-version"
   printf '{\n  "ca_fingerprint_sha256": "FAKE:CA:FINGERPRINT"\n}\n' >"$data_dir/meta/instance.json"
   : >"$data_dir/pki/ca.crt"
   : >"$data_dir/pki/private/ca.key"
@@ -55,16 +55,16 @@ pending="$TMP_DIR/pending"
 cp -a "$healthy" "$pending"
 mkdir -p "$pending/data"
 cat >"$pending/data/client-ip.csv" <<'EOF'
-# client,ip
-draft,
+# id,name,ip
+22222222-2222-4222-8222-222222222222,draft,
 EOF
 cat >"$pending/meta/client-ip.applied.csv" <<'EOF'
-# client,ip
-applied,
+# id,name,ip
+11111111-1111-4111-8111-111111111111,applied,
 EOF
 cat >"$pending/meta/client-state.csv" <<'EOF'
-# client,state
-applied,active
+# id,name,state
+11111111-1111-4111-8111-111111111111,applied,active
 EOF
 : >"$pending/meta/audit.jsonl"
 printf 'V\t9999\t\t01\tunknown\t/CN=applied\n' >"$pending/pki/index.txt"

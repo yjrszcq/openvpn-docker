@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 
 declare -A OVPN_STATE_IPAM_CLIENT_STATES=()
+declare -A OVPN_STATE_IPAM_CLIENT_IDS=()
 
 ovpn_state_ipam_parse_client_states() {
   local state_file="$1"
-  local line line_number=0 name state header_seen=false
+  local line line_number=0 id name state extra header_seen=false
+  local -A ids=()
 
   OVPN_STATE_IPAM_CLIENT_STATES=()
+  OVPN_STATE_IPAM_CLIENT_IDS=()
   while IFS= read -r line || [ -n "$line" ]; do
     line_number=$((line_number + 1))
-    if [ "$line" = '# client,state' ]; then
+    if [ "$line" = '# id,name,state' ]; then
       if [ "$header_seen" = true ] || [ "${#OVPN_STATE_IPAM_CLIENT_STATES[@]}" -ne 0 ]; then
         return 1
       fi
@@ -18,12 +21,16 @@ ovpn_state_ipam_parse_client_states() {
     fi
     [ "$header_seen" = true ] || return 1
     [[ "$line" != *[[:space:]]* ]] || return 1
-    [[ "$line" = *,* && "$line" != *,*,* ]] || return 1
-    name="${line%%,*}"
-    state="${line#*,}"
+    [[ "$line" = *,*,* && "$line" != *,*,*,* ]] || return 1
+    IFS=, read -r id name state extra <<<"$line"
+    [ -z "${extra:-}" ] || return 1
+    ovpn_registry_uuid_valid "$id" || return 1
     ovpn_registry_client_name_valid "$name" || return 1
     case "$state" in active|revoked|deleted) ;; *) return 1 ;; esac
+    [ -z "${ids[$id]+present}" ] || return 1
     [ -z "${OVPN_STATE_IPAM_CLIENT_STATES[$name]+present}" ] || return 1
+    ids["$id"]=1
+    OVPN_STATE_IPAM_CLIENT_IDS["$name"]="$id"
     OVPN_STATE_IPAM_CLIENT_STATES["$name"]="$state"
   done <"$state_file"
   [ "$header_seen" = true ]
@@ -190,7 +197,7 @@ ovpn_state_scan_ipam_consistency() {
     shopt -s nullglob
     for lease_line in "$ccd_dir"/*; do
       name="${lease_line##*/}"
-      [ -n "${applied_clients[$name]+present}" ] && [ -n "$(awk -F, -v client="$name" '$1 == client && $2 != "" { print; exit }' "$applied")" ] || ccd_out_of_sync=true
+      [ -n "${applied_clients[$name]+present}" ] && [ -n "$(awk -F, -v client="$name" '$2 == client && $3 != "" { print; exit }' "$applied")" ] || ccd_out_of_sync=true
     done
     eval "$_nullglob" 2>/dev/null || true
   fi
@@ -202,7 +209,7 @@ ovpn_state_scan_ipam_consistency() {
       [ -f "$lease_file" ] || continue
       lease_name="$(basename "$lease_file")"
       [ -n "${applied_clients[$lease_name]+present}" ] || continue
-      ip="$(awk -F, -v client="$lease_name" '$1 == client { print $2; exit }' "$applied")"
+      ip="$(awk -F, -v client="$lease_name" '$2 == client { print $3; exit }' "$applied")"
       [ -z "$ip" ] || ovpn_state_add_issue "STATIC_CLIENT_LEASE_$lease_name" manual RUN_CLIENT_IP_APPLY
     done
   fi

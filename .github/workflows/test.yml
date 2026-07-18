@@ -38,6 +38,7 @@ jobs:
             tests/smoke/shell/management-release-smoke.sh \
             tests/smoke/shell/management-upgrade-smoke.sh \
             tests/smoke/shell/management-hook-smoke.sh \
+            tests/smoke/shell/uuid-registry-smoke.sh \
             tests/helpers/create-management-release-fixture.sh \
             tests/helpers/fake-release-curl.sh \
             tests/smoke/container/upgrade-state-smoke.sh \
@@ -72,6 +73,7 @@ jobs:
             tests/smoke/shell/schema-gate-smoke.sh \
             tests/smoke/shell/migration-isolation-smoke.sh \
             tests/smoke/shell/registry-migration-smoke.sh \
+            tests/smoke/shell/uuid-registry-smoke.sh \
             tests/smoke/shell/client-ip-set-smoke.sh \
             tests/smoke/shell/init-start-smoke.sh \
             tests/smoke/shell/bootstrap-init-smoke.sh \

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 declare -a OVPN_CLIENT_IP_NAMES=()
+declare -a OVPN_CLIENT_IP_IDS=()
 declare -a OVPN_CLIENT_IP_VALUES=()
 declare -a OVPN_CLIENT_IP_INTS=()
 declare -A OVPN_CLIENT_IP_PKI_STATES=()
@@ -12,11 +13,13 @@ ovpn_client_ip_error() {
 
 ovpn_client_ip_parse_file() {
   local file="$1"
-  local line line_number=0 name ip ip_int records=0 header_seen=false
+  local line line_number=0 id name ip extra ip_int records=0 header_seen=false
+  local -A ids=()
   local -A names=()
   local -A ips=()
 
   OVPN_CLIENT_IP_NAMES=()
+  OVPN_CLIENT_IP_IDS=()
   OVPN_CLIENT_IP_VALUES=()
   OVPN_CLIENT_IP_INTS=()
 
@@ -31,7 +34,7 @@ ovpn_client_ip_parse_file() {
       ovpn_client_ip_error "line $line_number is empty"
       return 1
     }
-    if [ "$line" = '# client,ip' ]; then
+    if [ "$line" = '# id,name,ip' ]; then
       if [ "$records" -ne 0 ] || [ "$header_seen" = true ]; then
         ovpn_client_ip_error "line $line_number has an invalid header position"
         return 1
@@ -45,12 +48,21 @@ ovpn_client_ip_parse_file() {
         return 1
         ;;
     esac
-    if [[ "$line" =~ [[:space:]] ]] || [[ "$line" != *,* ]] || [[ "$line" == *,*,* ]]; then
-      ovpn_client_ip_error "line $line_number must contain exactly client,ip without whitespace"
+    if [[ "$line" =~ [[:space:]] ]] || [[ "$line" != *,*,* ]] || [[ "$line" == *,*,*,* ]]; then
+      ovpn_client_ip_error "line $line_number must contain exactly id,name,ip without whitespace"
       return 1
     fi
-    name="${line%%,*}"
-    ip="${line#*,}"
+    IFS=, read -r id name ip extra <<<"$line"
+    [ -z "${extra:-}" ] || return 1
+    ovpn_registry_uuid_valid "$id" || {
+      ovpn_client_ip_error "line $line_number has an invalid client UUID"
+      return 1
+    }
+    if [ -n "${ids[$id]+present}" ]; then
+      ovpn_client_ip_error "line $line_number duplicates client UUID '$id'"
+      return 1
+    fi
+    ids["$id"]=1
     ovpn_registry_client_name_valid "$name" || {
       ovpn_client_ip_error "line $line_number has an invalid client name"
       return 1
@@ -76,16 +88,22 @@ ovpn_client_ip_parse_file() {
         return 1
       fi
     fi
+    OVPN_CLIENT_IP_IDS+=("$id")
     OVPN_CLIENT_IP_NAMES+=("$name")
     OVPN_CLIENT_IP_VALUES+=("$ip")
     OVPN_CLIENT_IP_INTS+=("$ip_int")
     records=$((records + 1))
   done <"$file"
+  [ "$header_seen" = true ] || {
+    ovpn_client_ip_error 'registry is missing the id,name,ip header'
+    return 1
+  }
 }
 
 ovpn_client_ip_collect_pki_clients() {
   local index="$OVPN_DATA_DIR/pki/index.txt"
-  local line status subject name
+  local line status subject name id identity_state
+  local -A pki_states=()
 
   OVPN_CLIENT_IP_PKI_STATES=()
   [ -r "$index" ] || {
@@ -106,27 +124,54 @@ ovpn_client_ip_collect_pki_clients() {
       return 1
     }
     [ "$name" = "$OVPN_SERVER_NAME" ] && continue
-    ovpn_registry_client_is_deleted "$name" && continue
     ovpn_registry_client_name_valid "$name" || {
       ovpn_client_ip_error "PKI index contains an invalid client name '$name'"
       return 1
     }
     if [ "$status" = V ]; then
-      OVPN_CLIENT_IP_PKI_STATES["$name"]=active
-    elif [ -z "${OVPN_CLIENT_IP_PKI_STATES[$name]+present}" ]; then
-      OVPN_CLIENT_IP_PKI_STATES["$name"]=revoked
+      pki_states["$name"]=active
+    elif [ -z "${pki_states[$name]+present}" ]; then
+      pki_states["$name"]=revoked
     fi
   done <"$index"
+  ovpn_registry_load_identities || {
+    ovpn_client_ip_error 'cannot read the authoritative client identity registry'
+    return 1
+  }
+  for id in "${OVPN_REGISTRY_CLIENT_IDS[@]}"; do
+    name="${OVPN_REGISTRY_NAME_BY_ID[$id]}"
+    identity_state="${OVPN_REGISTRY_STATE_BY_ID[$id]}"
+    if [ "$identity_state" = deleted ]; then
+      [ -n "${OVPN_REGISTRY_CURRENT_ID_BY_NAME[$name]:-}" ] || unset 'pki_states[$name]'
+      continue
+    fi
+    [ "${pki_states[$name]:-}" = "$identity_state" ] || {
+      ovpn_client_ip_error "identity registry and PKI disagree for client '$name'"
+      return 1
+    }
+    OVPN_CLIENT_IP_PKI_STATES["$name"]="$identity_state"
+    unset 'pki_states[$name]'
+  done
+  [ "${#pki_states[@]}" -eq 0 ] || {
+    ovpn_client_ip_error 'PKI contains a client missing from the identity registry'
+    return 1
+  }
 }
 
 ovpn_client_ip_validate_logical_clients() {
-  local index name
+  local index id name
   local -A registry_names=()
 
   ovpn_client_ip_collect_pki_clients || return 1
   for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
     name="${OVPN_CLIENT_IP_NAMES[index]}"
+    id="${OVPN_CLIENT_IP_IDS[index]}"
     registry_names["$name"]=1
+    [ "${OVPN_REGISTRY_NAME_BY_ID[$id]:-}" = "$name" ] &&
+      [ "${OVPN_REGISTRY_STATE_BY_ID[$id]:-}" != deleted ] || {
+      ovpn_client_ip_error "registry identity does not match client '$name'"
+      return 1
+    }
     if [ -z "${OVPN_CLIENT_IP_PKI_STATES[$name]+present}" ]; then
       ovpn_client_ip_error "registry contains unknown client '$name'"
       return 1
@@ -164,21 +209,22 @@ ovpn_client_ip_write_canonical_file() {
   local index
 
   umask 077
-  printf '%s\n' '# client,ip' >"$output"
+  printf '%s\n' '# id,name,ip' >"$output"
   for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
     [ -n "${OVPN_CLIENT_IP_VALUES[index]}" ] || continue
-    printf '%010d,%s,%s\n' \
+    printf '%010d,%s,%s,%s\n' \
       "${OVPN_CLIENT_IP_INTS[index]}" \
+      "${OVPN_CLIENT_IP_IDS[index]}" \
       "${OVPN_CLIENT_IP_NAMES[index]}" \
       "${OVPN_CLIENT_IP_VALUES[index]}"
-  done | LC_ALL=C sort -t, -k1,1 -k2,2 | while IFS=, read -r _ name ip; do
-    printf '%s,%s\n' "$name" "$ip"
+  done | LC_ALL=C sort -t, -k1,1 -k3,3 -k2,2 | while IFS=, read -r _ id name ip; do
+    printf '%s,%s,%s\n' "$id" "$name" "$ip"
   done >>"$output"
   for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
     [ -z "${OVPN_CLIENT_IP_VALUES[index]}" ] || continue
-    printf '%s\n' "${OVPN_CLIENT_IP_NAMES[index]}"
-  done | LC_ALL=C sort | while IFS= read -r name; do
-    printf '%s,\n' "$name"
+    printf '%s,%s\n' "${OVPN_CLIENT_IP_NAMES[index]}" "${OVPN_CLIENT_IP_IDS[index]}"
+  done | LC_ALL=C sort -t, -k1,1 -k2,2 | while IFS=, read -r name id; do
+    printf '%s,%s,\n' "$id" "$name"
   done >>"$output"
   chmod 600 "$output"
 }
@@ -253,6 +299,3 @@ ovpn_client_ip_apply_inner() (
   transaction_success=true
   printf 'client-ip registry applied\n'
 )
-
-
-

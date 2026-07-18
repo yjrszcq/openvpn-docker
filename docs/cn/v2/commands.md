@@ -207,7 +207,7 @@ ovpn client delete <name>
 
 ## 客户端 IP 管理
 
-草稿清单为 `data/client-ip.csv`；最近一次已接受的清单为 `meta/client-ip.applied.csv`。两者均使用 `client,ip` 行格式。非空 IP 为静态分配；空 IP 为动态分配。可选的第一个整行内容恰好为 `# client,ip`。名称和静态地址必须唯一，静态地址必须落在静态区域内，且清单必须包含每一个逻辑 PKI 客户端。
+草稿清单为 `data/client-ip.csv`；最近一次已接受的清单为 `meta/client-ip.applied.csv`。两者都必须以 `# id,name,ip` 为首行，后续使用 `id,name,ip` 行，其中 `id` 是客户端不可变的 UUID。非空 IP 为静态分配；空 IP 为动态分配。UUID、名称和静态地址必须唯一，静态地址必须落在静态区域内，且清单必须包含权威身份目录中的每一个活跃或已撤销客户端。
 
 ### `ovpn client ip release`
 

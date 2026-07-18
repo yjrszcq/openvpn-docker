@@ -51,7 +51,7 @@ grep -Fq 'only through the openvpn-maintenance service' "$TMP_DIR/migrate.err"
 
 current_incomplete="$TMP_DIR/current-incomplete"
 mkdir -p "$current_incomplete/config"
-printf 'OVPN_CONFIG_VERSION=2\n' >"$current_incomplete/config/project.env"
+printf 'OVPN_CONFIG_VERSION=3\n' >"$current_incomplete/config/project.env"
 set +e
 OVPN_DATA_DIR="$current_incomplete" "$OVPN" config show >"$TMP_DIR/incomplete.out" 2>"$TMP_DIR/incomplete.err"
 status=$?
@@ -60,7 +60,7 @@ set -e
 grep -Fq 'metadata is incomplete' "$TMP_DIR/incomplete.err"
 
 conflict="$TMP_DIR/conflict"
-write_schema "$conflict" 1 2
+write_schema "$conflict" 1 3
 set +e
 OVPN_DATA_DIR="$conflict" "$OVPN" state show >"$TMP_DIR/conflict.out" 2>"$TMP_DIR/conflict.err"
 status=$?
@@ -69,7 +69,7 @@ set -e
 grep -Fq 'metadata conflicts' "$TMP_DIR/conflict.err"
 
 newer="$TMP_DIR/newer"
-write_schema "$newer" 3 3
+write_schema "$newer" 4 4
 set +e
 OVPN_DATA_DIR="$newer" "$OVPN" state show >"$TMP_DIR/newer.out" 2>"$TMP_DIR/newer.err"
 status=$?

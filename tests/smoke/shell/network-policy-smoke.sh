@@ -168,7 +168,7 @@ make_project_env() {
 
   mkdir -p "$data_dir/config"
   cat >"$data_dir/config/project.env" <<EOF_PROJECT
-OVPN_CONFIG_VERSION=2
+OVPN_CONFIG_VERSION=3
 OVPN_ENDPOINT=vpn.example.test
 OVPN_PROTO=udp
 OVPN_TRANSPORT_FAMILY=auto

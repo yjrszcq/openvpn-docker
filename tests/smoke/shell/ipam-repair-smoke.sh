@@ -45,15 +45,15 @@ printf '%s\n' \
 : >"$OVPN_DATA_DIR/clients/active/dynamic.ovpn"
 : >"$OVPN_DATA_DIR/clients/active/static.ovpn"
 cat >"$OVPN_DATA_DIR/data/client-ip.csv" <<'EOF'
-# client,ip
-dynamic,
-static,10.88.0.2
+# id,name,ip
+11111111-1111-4111-8111-111111111111,dynamic,
+22222222-2222-4222-8222-222222222222,static,10.88.0.2
 EOF
 cp "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 cat >"$OVPN_DATA_DIR/meta/client-state.csv" <<'EOF'
-# client,state
-dynamic,active
-static,active
+# id,name,state
+11111111-1111-4111-8111-111111111111,dynamic,active
+22222222-2222-4222-8222-222222222222,static,active
 EOF
 : >"$OVPN_DATA_DIR/meta/audit.jsonl"
 printf 'ifconfig-push 10.88.0.3 255.255.255.0\n' >"$OVPN_DATA_DIR/ccd/static"
@@ -70,9 +70,9 @@ grep -Fq '[SAFE] NORMALIZE_CLIENT_IP_DRAFT' "$TMP_DIR/plan.out"
 grep -Fq '[SAFE] NORMALIZE_CLIENT_IP_APPLIED' "$TMP_DIR/plan.out"
 "$OVPN" repair apply >"$TMP_DIR/repair.out" 2>"$TMP_DIR/repair.err"
 cat >"$TMP_DIR/expected.csv" <<'EOF'
-# client,ip
-static,10.88.0.2
-dynamic,
+# id,name,ip
+22222222-2222-4222-8222-222222222222,static,10.88.0.2
+11111111-1111-4111-8111-111111111111,dynamic,
 EOF
 cmp "$TMP_DIR/expected.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
 cmp "$TMP_DIR/expected.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
@@ -82,9 +82,9 @@ test ! -e "$OVPN_DATA_DIR/ccd/dynamic"
 
 ccd_before="$(sha256sum "$OVPN_DATA_DIR/ccd/static")"
 cat >"$OVPN_DATA_DIR/data/client-ip.csv" <<'EOF'
-# client,ip
-static,10.88.0.129
-dynamic,
+# id,name,ip
+22222222-2222-4222-8222-222222222222,static,10.88.0.129
+11111111-1111-4111-8111-111111111111,dynamic,
 EOF
 cp "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 if "$OVPN" repair apply >"$TMP_DIR/invalid.out" 2>"$TMP_DIR/invalid.err"; then

@@ -25,13 +25,16 @@ printf '%s\n' \
   $'V\t30000101000000Z\t\t03\tunknown\t/CN=zulu' \
   >"$OVPN_DATA_DIR/pki/index.txt"
 cat >"$OVPN_DATA_DIR/data/client-ip.csv" <<'EOF'
-# client,ip
-bravo,10.88.0.3
-alpha,10.88.0.4
-zulu,
+# id,name,ip
+22222222-2222-4222-8222-222222222222,bravo,10.88.0.3
+11111111-1111-4111-8111-111111111111,alpha,10.88.0.4
+33333333-3333-4333-8333-333333333333,zulu,
 EOF
 cp "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
-printf '%s\n' '# client,state' 'alpha,active' 'bravo,active' 'zulu,active' >"$OVPN_DATA_DIR/meta/client-state.csv"
+printf '%s\n' '# id,name,state' \
+  '11111111-1111-4111-8111-111111111111,alpha,active' \
+  '22222222-2222-4222-8222-222222222222,bravo,active' \
+  '33333333-3333-4333-8333-333333333333,zulu,active' >"$OVPN_DATA_DIR/meta/client-state.csv"
 : >"$OVPN_DATA_DIR/meta/audit.jsonl"
 mkdir -p "$OVPN_LEASE_DIR"
 printf '10.88.0.200\n' >"$OVPN_LEASE_DIR/alpha"
@@ -40,10 +43,10 @@ printf '10.88.0.202\n' >"$OVPN_LEASE_DIR/unrelated"
 
 canonical="$(mktemp "$TMP_DIR/canonical.XXXXXX")"
 cat >"$canonical" <<'EOF'
-# client,ip
-bravo,10.88.0.3
-alpha,10.88.0.4
-zulu,
+# id,name,ip
+22222222-2222-4222-8222-222222222222,bravo,10.88.0.3
+11111111-1111-4111-8111-111111111111,alpha,10.88.0.4
+33333333-3333-4333-8333-333333333333,zulu,
 EOF
 
 # Test: set triggers apply transaction, canonical ordering, CCD generation
@@ -71,10 +74,10 @@ cmp "$canonical" "$OVPN_DATA_DIR/data/client-ip.csv"
 
 # Test: boundary addresses in static region
 cat >"$TMP_DIR/boundary.csv" <<'EOF'
-# client,ip
-bravo,10.88.0.2
-alpha,10.88.0.128
-zulu,
+# id,name,ip
+22222222-2222-4222-8222-222222222222,bravo,10.88.0.2
+11111111-1111-4111-8111-111111111111,alpha,10.88.0.128
+33333333-3333-4333-8333-333333333333,zulu,
 EOF
 "$OVPN" client ip set bravo --ip 10.88.0.2 >"$TMP_DIR/boundary-bravo.out" 2>&1
 "$OVPN" client ip set alpha --ip 10.88.0.128 >"$TMP_DIR/boundary-alpha.out" 2>&1
@@ -82,10 +85,10 @@ cmp "$TMP_DIR/boundary.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
 
 # Test: address in dynamic pool rejected
 cat >"$TMP_DIR/pre-overlap.csv" <<'EOF'
-# client,ip
-bravo,10.88.0.2
-alpha,10.88.0.128
-zulu,
+# id,name,ip
+22222222-2222-4222-8222-222222222222,bravo,10.88.0.2
+11111111-1111-4111-8111-111111111111,alpha,10.88.0.128
+33333333-3333-4333-8333-333333333333,zulu,
 EOF
 if "$OVPN" client ip set alpha --ip 10.88.0.129 >"$TMP_DIR/pool-overlap.out" 2>&1; then
   echo 'dynamic-pool IP set unexpectedly succeeded' >&2
@@ -97,10 +100,10 @@ cmp "$TMP_DIR/pre-overlap.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
 # Test: dynamic assignment removes CCD
 "$OVPN" client ip set alpha --dynamic >"$TMP_DIR/dynamic.out" 2>&1
 cat >"$TMP_DIR/dynamic.csv" <<'EOF'
-# client,ip
-bravo,10.88.0.2
-alpha,
-zulu,
+# id,name,ip
+22222222-2222-4222-8222-222222222222,bravo,10.88.0.2
+11111111-1111-4111-8111-111111111111,alpha,
+33333333-3333-4333-8333-333333333333,zulu,
 EOF
 cmp "$TMP_DIR/dynamic.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/bravo"

@@ -28,7 +28,7 @@ done
 "$VERIFIER" --release-dir "$TMP_DIR/first" --public-key "$TMP_DIR/signing-key.pub" >/dev/null
 grep -Fqx 'FORMAT_VERSION=1' "$TMP_DIR/first/management-release.env"
 grep -Fqx 'MANAGEMENT_VERSION=2.1.1' "$TMP_DIR/first/management-release.env"
-grep -Fqx 'DATA_SCHEMA=2' "$TMP_DIR/first/management-release.env"
+grep -Fqx 'DATA_SCHEMA=3' "$TMP_DIR/first/management-release.env"
 grep -Fqx 'PLATFORM_API_MIN=1' "$TMP_DIR/first/management-release.env"
 grep -Fqx 'PLATFORM_API_MAX=1' "$TMP_DIR/first/management-release.env"
 grep -Fqx 'OPENVPN_MIN=2.7.0' "$TMP_DIR/first/management-release.env"
@@ -43,7 +43,7 @@ grep -Fqx './templates/openvpn-2.7/server.conf.tpl' "$TMP_DIR/files"
 grep -Fqx './compatibility/contract.env' "$TMP_DIR/files"
 
 cp -a "$TMP_DIR/first" "$TMP_DIR/tampered-manifest"
-sed -i 's/DATA_SCHEMA=2/DATA_SCHEMA=3/' "$TMP_DIR/tampered-manifest/management-release.env"
+sed -i 's/DATA_SCHEMA=3/DATA_SCHEMA=4/' "$TMP_DIR/tampered-manifest/management-release.env"
 if "$VERIFIER" --release-dir "$TMP_DIR/tampered-manifest" --public-key "$TMP_DIR/signing-key.pub" >/dev/null 2>&1; then
   printf 'tampered manifest was accepted\n' >&2
   exit 1
@@ -59,7 +59,7 @@ fi
 cp -a "$TMP_DIR/first" "$TMP_DIR/mismatched-contract"
 mkdir -p "$TMP_DIR/unpacked"
 tar -xzf "$TMP_DIR/mismatched-contract/management-bundle.tar.gz" -C "$TMP_DIR/unpacked"
-sed -i 's/DATA_SCHEMA=2/DATA_SCHEMA=3/' "$TMP_DIR/unpacked/management.env"
+sed -i 's/DATA_SCHEMA=3/DATA_SCHEMA=4/' "$TMP_DIR/unpacked/management.env"
 tar --sort=name --format=ustar --mtime='@0' --owner=0 --group=0 --numeric-owner \
   -C "$TMP_DIR/unpacked" -cf - . | gzip -n -9 >"$TMP_DIR/mismatched-contract/management-bundle.tar.gz"
 new_sha="$(sha256sum "$TMP_DIR/mismatched-contract/management-bundle.tar.gz" | awk '{print $1}')"

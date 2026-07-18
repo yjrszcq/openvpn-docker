@@ -10,15 +10,15 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 export OVPN_LIB_DIR="$LIB_DIR"
 export OVPN_DATA_DIR="$TMP_DIR/current"
 mkdir -p "$OVPN_DATA_DIR/config"
-printf 'OVPN_CONFIG_VERSION=2\n' >"$OVPN_DATA_DIR/config/project.env"
-printf '2\n' >"$OVPN_DATA_DIR/config/schema-version"
+printf 'OVPN_CONFIG_VERSION=3\n' >"$OVPN_DATA_DIR/config/project.env"
+printf '3\n' >"$OVPN_DATA_DIR/config/schema-version"
 
 if grep -Eq 'ovpn_registry_(upgrade|write)_v1|1\|2' \
   "$LIB_DIR/config.sh" "$LIB_DIR/registry.sh" "$LIB_DIR/start.sh"; then
   echo 'current runtime contains a historical schema branch' >&2
   exit 1
 fi
-if grep -Fq 'ovpn upgrade' "$ROOT_DIR/docs/en/data-schema-upgrade-policy.md" || \
+if grep -Fq 'ovpn upgrade' "$ROOT_DIR/docs/en/data-schema-upgrade-policy.md" ||
   grep -Fq 'ovpn upgrade' "$ROOT_DIR/docs/cn/data-schema-upgrade-policy.md"; then
   echo 'data schema policy still assigns migration to upgrade' >&2
   exit 1
@@ -32,7 +32,7 @@ if grep -Fq '/migrations/' "$trace" || grep -Fq '/migrate.sh' "$trace"; then
 fi
 
 OVPN_MAINTENANCE=true "$OVPN" migrate plan --json >"$TMP_DIR/current.json"
-grep -Fq '"source_schema":2' "$TMP_DIR/current.json"
+grep -Fq '"source_schema":3' "$TMP_DIR/current.json"
 grep -Fq '"chain":"none"' "$TMP_DIR/current.json"
 
 set +e

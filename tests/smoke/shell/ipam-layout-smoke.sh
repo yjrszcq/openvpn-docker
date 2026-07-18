@@ -13,7 +13,7 @@ export OVPN_NETWORK="10.88.0.0/24"
 
 "$OVPN" config apply
 "$OVPN" config show >"$TMP_DIR/default.out"
-grep -Fqx 'OVPN_CONFIG_VERSION=2' "$TMP_DIR/default.out"
+grep -Fqx 'OVPN_CONFIG_VERSION=3' "$TMP_DIR/default.out"
 grep -Fqx 'OVPN_TOPOLOGY=subnet' "$TMP_DIR/default.out"
 grep -Fqx 'OVPN_DYNAMIC_POOL_SIZE=126' "$TMP_DIR/default.out"
 

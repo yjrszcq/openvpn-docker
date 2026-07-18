@@ -75,6 +75,11 @@ test -d "$OVPN_DATA_DIR/repair/.scripts"
 test "$(stat -c '%a' "$OVPN_DATA_DIR/repair/.scripts")" = 700
 grep -Fqx 'OVPN_ENDPOINT=vpn.example.test' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'OVPN_NETWORK=10.88.0.0/24' "$OVPN_DATA_DIR/config/project.env"
+grep -Fqx 'OVPN_CONFIG_VERSION=3' "$OVPN_DATA_DIR/config/project.env"
+grep -Fqx '3' "$OVPN_DATA_DIR/config/schema-version"
+grep -Fqx '# id,name,state' "$OVPN_DATA_DIR/meta/client-state.csv"
+grep -Fqx '# id,name,ip' "$OVPN_DATA_DIR/data/client-ip.csv"
+cmp "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 OVPN_ENDPOINT=changed.example.test "$OVPN" config show >"$TMP_DIR/config.out"
 grep -Fqx 'OVPN_ENDPOINT=vpn.example.test' "$TMP_DIR/config.out"
 
@@ -133,7 +138,7 @@ fi
 
 export OVPN_DATA_DIR="$TMP_DIR/interrupted-commit"
 mkdir -p "$OVPN_DATA_DIR"
-printf 'target_schema=2\n' >"$OVPN_DATA_DIR/.init-transaction"
+printf 'target_schema=3\n' >"$OVPN_DATA_DIR/.init-transaction"
 if [ "$("$OVPN" state show)" != CRITICAL ]; then
   echo 'interrupted initialization should be CRITICAL' >&2
   exit 1

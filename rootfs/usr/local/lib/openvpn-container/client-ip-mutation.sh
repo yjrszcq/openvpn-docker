@@ -7,7 +7,7 @@ ovpn_client_ip_require_applied_draft() {
 
   draft="$(ovpn_registry_client_ip_file)"
   applied="$(ovpn_registry_applied_file)"
-  [ -r "$draft" ] && [ -r "$applied" ] || ovpn_die 'client-IP registry is unavailable; restore the V2 registry first'
+  [ -r "$draft" ] && [ -r "$applied" ] || ovpn_die 'client-IP registry is unavailable; restore the current registry first'
   if ! cmp -s "$draft" "$applied"; then
     ovpn_log 'client-IP draft was out of sync; restoring from the applied snapshot'
     cp "$applied" "$draft" || ovpn_die 'failed to restore client-IP draft from the applied snapshot'
@@ -109,25 +109,34 @@ ovpn_client_ip_apply_current_mutation() {
 ovpn_client_registry_set_state() {
   local name="$1"
   local state="$2"
-  local state_file temporary line current_name current_state
+  local requested_id="${3:-}"
+  local state_file temporary index id current_name current_state
 
   state_file="$(ovpn_registry_client_state_file)"
+  ovpn_registry_load_identities "$state_file" || ovpn_die 'authoritative client identity registry is invalid'
+  if [ -n "$requested_id" ]; then
+    ovpn_registry_uuid_valid "$requested_id" || ovpn_die "invalid client UUID: $requested_id"
+    [ -z "${OVPN_REGISTRY_NAME_BY_ID[$requested_id]+present}" ] || ovpn_die "client UUID already exists: $requested_id"
+    id="$requested_id"
+  else
+    id="${OVPN_REGISTRY_CURRENT_ID_BY_NAME[$name]:-}"
+    [ -n "$id" ] || ovpn_die "current client identity is missing for '$name'"
+  fi
   temporary="${state_file}.mutation.$$"
   {
-    printf '%s\n' '# client,state'
+    printf '%s\n' '# id,name,state'
     {
-      if [ -r "$state_file" ]; then
-        while IFS= read -r line || [ -n "$line" ]; do
-          [ "$line" = '# client,state' ] && continue
-          current_name="${line%%,*}"
-          current_state="${line#*,}"
-          [ "$current_name" = "$name" ] && continue
-          [ -n "$current_name" ] || continue
-          printf '%s,%s\n' "$current_name" "$current_state"
-        done <"$state_file"
-      fi
-      printf '%s,%s\n' "$name" "$state"
-    } | LC_ALL=C sort
+      for ((index = 0; index < ${#OVPN_REGISTRY_CLIENT_IDS[@]}; index++)); do
+        current_name="${OVPN_REGISTRY_CLIENT_NAMES[index]}"
+        current_state="${OVPN_REGISTRY_CLIENT_STATES[index]}"
+        if [ "${OVPN_REGISTRY_CLIENT_IDS[index]}" = "$id" ]; then
+          current_name="$name"
+          current_state="$state"
+        fi
+        printf '%s,%s,%s\n' "${OVPN_REGISTRY_CLIENT_IDS[index]}" "$current_name" "$current_state"
+      done
+      [ -z "$requested_id" ] || printf '%s,%s,%s\n' "$id" "$name" "$state"
+    } | LC_ALL=C sort -t, -k1,1
   } >"$temporary"
   mv "$temporary" "$state_file"
   chmod 600 "$state_file"
@@ -143,7 +152,7 @@ ovpn_client_create_inner() {
   local name="$1"
   local mode="$2"
   local requested_ip="$3"
-  local assignment int_val
+  local id assignment int_val
 
   ovpn_client_name_or_die "$name"
   ovpn_require_healthy_state
@@ -165,6 +174,8 @@ ovpn_client_create_inner() {
     *) ovpn_die "unsupported client assignment mode: $mode" ;;
   esac
 
+  id="$(ovpn_registry_uuid_generate)" || ovpn_die 'failed to generate a client UUID'
+  OVPN_CLIENT_IP_IDS+=("$id")
   OVPN_CLIENT_IP_NAMES+=("$name")
   OVPN_CLIENT_IP_VALUES+=("$assignment")
   if [ -n "$assignment" ]; then
@@ -174,7 +185,7 @@ ovpn_client_create_inner() {
     OVPN_CLIENT_IP_INTS+=('')
   fi
   ovpn_pki_issue_client "$name"
-  ovpn_client_registry_set_state "$name" active
+  ovpn_client_registry_set_state "$name" active "$id"
   if ! ovpn_client_ip_apply_current_mutation; then
     ovpn_pki_try_revoke_client "$name" || true
     ovpn_die "failed to apply client creation for '$name'; the certificate was revoked"

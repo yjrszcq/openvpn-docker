@@ -267,11 +267,12 @@ secure backup.
 ## Client IP management
 
 The draft registry is `data/client-ip.csv`; the last accepted registry is
-`meta/client-ip.applied.csv`. Both use `client,ip` rows. A non-empty IP is a
-static assignment; an empty IP is dynamic. The optional first line is exactly
-`# client,ip`. Names and static addresses must be unique, static addresses must
-fall in the static region, and the registry must contain every logical PKI
-client.
+`meta/client-ip.applied.csv`. Both require a `# id,name,ip` header followed by
+`id,name,ip` rows, where `id` is the client's immutable UUID. A non-empty IP is
+a static assignment; an empty IP is dynamic. UUIDs, names, and static addresses
+must be unique, static addresses must fall in the static region, and the
+registry must contain every active or revoked client from the authoritative
+identity registry.
 
 ### `ovpn client ip release`
 

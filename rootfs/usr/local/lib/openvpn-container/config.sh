@@ -5,7 +5,7 @@ OVPN_PROJECT_ENV="${OVPN_PROJECT_ENV:-$OVPN_CONFIG_DIR/project.env}"
 OVPN_SCHEMA_VERSION_FILE="${OVPN_SCHEMA_VERSION_FILE:-$OVPN_CONFIG_DIR/schema-version}"
 
 ovpn_config_defaults() {
-  OVPN_CONFIG_VERSION=2
+  OVPN_CONFIG_VERSION=3
   OVPN_ENDPOINT="${OVPN_ENDPOINT:-}"
   OVPN_PROTO="${OVPN_PROTO:-udp}"
   OVPN_TRANSPORT_FAMILY="${OVPN_TRANSPORT_FAMILY:-auto}"
@@ -185,7 +185,7 @@ ovpn_validate_nat_interface() {
 
 ovpn_config_validate() {
   case "$OVPN_CONFIG_VERSION" in
-    2) ;;
+    3) ;;
     *) ovpn_die "unsupported OVPN_CONFIG_VERSION: $OVPN_CONFIG_VERSION" ;;
   esac
   ovpn_validate_single_line OVPN_ENDPOINT "$OVPN_ENDPOINT"
@@ -269,7 +269,7 @@ ovpn_config_write() {
 }
 
 ovpn_config_regenerate_derived() {
-  local name status output_path client_ip_csv
+  local id name status output_path client_ip_csv
 
   [ -r "$OVPN_DATA_DIR/pki/index.txt" ] || return 0
 
@@ -278,9 +278,10 @@ ovpn_config_regenerate_derived() {
   client_ip_csv="$OVPN_DATA_DIR/data/client-ip.csv"
   ovpn_client_ip_collect_pki_clients || ovpn_die "failed to collect PKI client state"
   [ -r "$client_ip_csv" ] || return 0
-  while IFS=, read -r name _; do
+  while IFS=, read -r id name _; do
+    [ -n "$id" ] || continue
     [ -n "$name" ] || continue
-    [ "$name" = "${name##\#*}" ] || continue
+    [ "$id" = "${id##\#*}" ] || continue
     status="${OVPN_CLIENT_IP_PKI_STATES[$name]:-}"
     [ "$status" = active ] || continue
     ovpn_render_client "$name" --output "$OVPN_DATA_DIR/clients/active/$name.ovpn" || ovpn_die "failed to regenerate profile for client $name"
