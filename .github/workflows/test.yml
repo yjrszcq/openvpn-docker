@@ -39,6 +39,7 @@ jobs:
             rootfs/usr/local/lib/openvpn-container/upgrade.sh \
             rootfs/usr/local/lib/openvpn-container/events.sh \
             tests/smoke/container/e2e-container-smoke.sh \
+            tests/smoke/container/released-migration-matrix-smoke.sh \
             tests/smoke/container/runtime-image-smoke.sh \
             tests/smoke/shell/init-start-smoke.sh \
             tests/smoke/shell/management-broker-smoke.sh \
@@ -58,7 +59,7 @@ jobs:
             tests/smoke/container/upgrade-state-smoke.sh \
             tests/smoke/shell/workflow-smoke.sh \
             tests/smoke/shell/license-smoke.sh
-          docker run --rm -v "$PWD:/work:ro" -w /work mvdan/shfmt:v3.10.0 -i 2 -d scripts/update-openvpn.sh scripts/release-policy.sh scripts/package-management-release.sh scripts/verify-management-release.sh rootfs/usr/local/bin/ovpn-hook rootfs/usr/local/lib/openvpn-bootstrap.sh rootfs/usr/local/lib/openvpn-verify-management-release.sh rootfs/usr/local/lib/openvpn-container/maintenance.sh rootfs/usr/local/lib/openvpn-container/render-ipam.sh rootfs/usr/local/lib/openvpn-container/render.sh rootfs/usr/local/lib/openvpn-container/start.sh rootfs/usr/local/lib/openvpn-container/upgrade.sh rootfs/usr/local/lib/openvpn-container/events.sh tests/helpers/create-management-release-fixture.sh tests/helpers/fake-release-curl.sh tests/smoke/container/e2e-container-smoke.sh tests/smoke/container/runtime-image-smoke.sh tests/smoke/shell/init-start-smoke.sh tests/smoke/shell/management-broker-smoke.sh tests/smoke/shell/update-openvpn-smoke.sh tests/smoke/shell/release-policy-smoke.sh tests/smoke/shell/management-release-smoke.sh tests/smoke/shell/management-upgrade-smoke.sh tests/smoke/shell/management-hook-smoke.sh tests/smoke/shell/network-migration-smoke.sh tests/smoke/shell/render-smoke.sh tests/smoke/shell/runtime-logs-smoke.sh tests/smoke/shell/runtime-events-smoke.sh tests/smoke/shell/schema2-uuid-migration-smoke.sh tests/smoke/container/upgrade-state-smoke.sh tests/smoke/shell/workflow-smoke.sh tests/smoke/shell/license-smoke.sh
+          docker run --rm -v "$PWD:/work:ro" -w /work mvdan/shfmt:v3.10.0 -i 2 -d scripts/update-openvpn.sh scripts/release-policy.sh scripts/package-management-release.sh scripts/verify-management-release.sh rootfs/usr/local/bin/ovpn-hook rootfs/usr/local/lib/openvpn-bootstrap.sh rootfs/usr/local/lib/openvpn-verify-management-release.sh rootfs/usr/local/lib/openvpn-container/maintenance.sh rootfs/usr/local/lib/openvpn-container/render-ipam.sh rootfs/usr/local/lib/openvpn-container/render.sh rootfs/usr/local/lib/openvpn-container/start.sh rootfs/usr/local/lib/openvpn-container/upgrade.sh rootfs/usr/local/lib/openvpn-container/events.sh tests/helpers/create-management-release-fixture.sh tests/helpers/fake-release-curl.sh tests/smoke/container/e2e-container-smoke.sh tests/smoke/container/released-migration-matrix-smoke.sh tests/smoke/container/runtime-image-smoke.sh tests/smoke/shell/init-start-smoke.sh tests/smoke/shell/management-broker-smoke.sh tests/smoke/shell/update-openvpn-smoke.sh tests/smoke/shell/release-policy-smoke.sh tests/smoke/shell/management-release-smoke.sh tests/smoke/shell/management-upgrade-smoke.sh tests/smoke/shell/management-hook-smoke.sh tests/smoke/shell/network-migration-smoke.sh tests/smoke/shell/render-smoke.sh tests/smoke/shell/runtime-logs-smoke.sh tests/smoke/shell/runtime-events-smoke.sh tests/smoke/shell/schema2-uuid-migration-smoke.sh tests/smoke/container/upgrade-state-smoke.sh tests/smoke/shell/workflow-smoke.sh tests/smoke/shell/license-smoke.sh
       - name: Run shell and control-plane smoke tests
         run: |
           run_smoke() {
@@ -139,6 +140,8 @@ jobs:
       IMAGE: openvpn-ci:${{ github.sha }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Build pinned runtime image
         run: |
           signing_key="$RUNNER_TEMP/management-e2e-signing-key.pem"
@@ -160,6 +163,12 @@ jobs:
           OVPN_NETWORK_MIGRATION_SKIP_BUILD=1 OVPN_NETWORK_MIGRATION_REQUIRED=1 OVPN_NETWORK_MIGRATION_IMAGE="$IMAGE" tests/smoke/container/network-migration-container-smoke.sh
           OVPN_MAINTENANCE_SKIP_BUILD=1 OVPN_MAINTENANCE_REQUIRED=1 OVPN_MAINTENANCE_IMAGE="$IMAGE" tests/smoke/container/maintenance-container-smoke.sh
           OVPN_SCHEMA_MIGRATION_SKIP_BUILD=1 OVPN_SCHEMA_MIGRATION_REQUIRED=1 OVPN_SCHEMA_MIGRATION_IMAGE="$IMAGE" tests/smoke/container/schema-migration-container-smoke.sh
+      - name: Verify every released data-schema migration baseline
+        run: |
+          OVPN_RELEASED_MIGRATION_SKIP_TARGET_BUILD=1 \
+            OVPN_RELEASED_MIGRATION_REQUIRED=1 \
+            OVPN_RELEASED_MIGRATION_IMAGE="$IMAGE" \
+            tests/smoke/container/released-migration-matrix-smoke.sh
       - name: Verify UDP and TCP VPN E2E
         run: OVPN_E2E_SKIP_BUILD=1 OVPN_E2E_REQUIRED=1 OVPN_E2E_UPGRADE_REQUIRED=1 OVPN_E2E_IMAGE="$IMAGE" tests/smoke/container/e2e-container-smoke.sh
       - name: Collect runtime metadata
