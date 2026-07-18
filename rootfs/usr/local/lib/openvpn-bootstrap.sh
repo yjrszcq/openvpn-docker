@@ -181,8 +181,10 @@ ovpn_bootstrap_activate_online() {
   ovpn_bootstrap_read_metadata || return 1
   [ "$OVPN_BOOTSTRAP_PLATFORM_API" -ge "$platform_min" ] &&
     [ "$OVPN_BOOTSTRAP_PLATFORM_API" -le "$platform_max" ] || return 1
-  observed_schema="$(ovpn_bootstrap_observed_data_schema)" || return 1
-  [ "$target_schema" = "$observed_schema" ] || return 1
+  if [ "$mode" != hydrate-for-migration ]; then
+    observed_schema="$(ovpn_bootstrap_observed_data_schema)" || return 1
+    [ "$target_schema" = "$observed_schema" ] || return 1
+  fi
   asset="$release_dir/management-bundle.tar.gz"
   ovpn_bootstrap_bundle_is_safe "$asset" || return 1
 
@@ -208,7 +210,7 @@ ovpn_bootstrap_activate_online() {
   fi
   [ "$(cat "$target/.ready")" = "$asset_sha" ] || return 1
   OVPN_BOOTSTRAP_SELECTED_ROOT="$target"
-  if [ "$mode" = hydrate-only ]; then
+  if [ "$mode" = hydrate-only ] || [ "$mode" = hydrate-for-migration ]; then
     flock -u "$bootstrap_lock_fd"
     return 0
   fi

@@ -7,6 +7,8 @@ OVPN_MIGRATION_TRANSACTION_SNAPSHOT=''
 OVPN_MIGRATION_TRANSACTION_SNAPSHOT_SHA256=''
 OVPN_MIGRATION_TRANSACTION_REPORT=''
 OVPN_MIGRATION_TRANSACTION_SUCCESS=false
+OVPN_MIGRATION_TRANSACTION_FINALIZE_CALLBACK=''
+OVPN_MIGRATION_TRANSACTION_ROLLBACK_CALLBACK=''
 
 ovpn_migration_business_entries() {
   printf '%s\n' ccd clients config data meta pki secrets server
@@ -192,6 +194,10 @@ ovpn_migration_transaction_cleanup() {
 
   if [ "$OVPN_MIGRATION_TRANSACTION_SUCCESS" != true ]; then
     ovpn_migration_transaction_restore "$OVPN_MIGRATION_TRANSACTION_SNAPSHOT" || true
+    if [ -n "$OVPN_MIGRATION_TRANSACTION_ROLLBACK_CALLBACK" ]; then
+      "$OVPN_MIGRATION_TRANSACTION_ROLLBACK_CALLBACK" ||
+        ovpn_log 'CRITICAL: failed to restore the management-code selector after migration failure'
+    fi
     ovpn_migration_transaction_write_report "$source_schema" "$target_schema" failed || true
   fi
   rm -rf "$(dirname "$OVPN_MIGRATION_TRANSACTION_STAGE")"
@@ -213,8 +219,11 @@ ovpn_migration_transaction_inner() {
   "$validate_callback" "$OVPN_MIGRATION_TRANSACTION_STAGE"
   ovpn_migration_transaction_commit
   "$validate_callback" "$OVPN_DATA_DIR"
-  ovpn_migration_transaction_write_report "$source_schema" "$target_schema" success
+  if [ -n "$OVPN_MIGRATION_TRANSACTION_FINALIZE_CALLBACK" ]; then
+    "$OVPN_MIGRATION_TRANSACTION_FINALIZE_CALLBACK"
+  fi
   OVPN_MIGRATION_TRANSACTION_SUCCESS=true
+  ovpn_migration_transaction_write_report "$source_schema" "$target_schema" success
   rm -rf "$(dirname "$OVPN_MIGRATION_TRANSACTION_STAGE")"
   rm -f "$OVPN_MIGRATION_TRANSACTION_ROOT/transaction.env"
   trap - EXIT
@@ -225,8 +234,12 @@ ovpn_migration_transaction_run() {
   local target_schema="$2"
   local migrate_callback="$3"
   local validate_callback="$4"
+  local finalize_callback="${5:-}"
+  local rollback_callback="${6:-}"
 
   ovpn_migrate_require_maintenance || return $?
+  OVPN_MIGRATION_TRANSACTION_FINALIZE_CALLBACK="$finalize_callback"
+  OVPN_MIGRATION_TRANSACTION_ROLLBACK_CALLBACK="$rollback_callback"
   ovpn_with_runtime_exclusive_lock \
     ovpn_with_data_lock migration \
     ovpn_migration_transaction_inner \

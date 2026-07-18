@@ -39,6 +39,11 @@ ovpn_upgrade_runtime_facts() {
   case "$OVPN_SCHEMA_STATUS" in
   EMPTY) OVPN_UPGRADE_DATA_SCHEMA="$OVPN_CURRENT_DATA_SCHEMA" ;;
   CURRENT | CURRENT_INCOMPLETE) OVPN_UPGRADE_DATA_SCHEMA="${OVPN_SCHEMA_PROJECT_VERSION:-${OVPN_SCHEMA_FILE_VERSION:-$OVPN_CURRENT_DATA_SCHEMA}}" ;;
+  OLD)
+    [ -n "${OVPN_UPGRADE_SCHEMA_CHANGE_TARGET:-}" ] || return 1
+    [ "$OVPN_SCHEMA_PROJECT_VERSION" = "$OVPN_SCHEMA_FILE_VERSION" ] || return 1
+    OVPN_UPGRADE_DATA_SCHEMA="$OVPN_SCHEMA_PROJECT_VERSION"
+    ;;
   *) return 1 ;;
   esac
 }
@@ -63,8 +68,11 @@ ovpn_upgrade_manifest_compatible() {
     return 1
   fi
   if [ "$schema" != "$OVPN_UPGRADE_DATA_SCHEMA" ]; then
-    OVPN_UPGRADE_REJECTION="data schema $schema requires ovpn migrate"
-    return 1
+    if [ -z "${OVPN_UPGRADE_SCHEMA_CHANGE_TARGET:-}" ] ||
+      [ "$schema" != "$OVPN_UPGRADE_SCHEMA_CHANGE_TARGET" ]; then
+      OVPN_UPGRADE_REJECTION="data schema $schema requires ovpn migrate"
+      return 1
+    fi
   fi
   if [ "$OVPN_UPGRADE_PLATFORM_API" -lt "$platform_min" ] || [ "$OVPN_UPGRADE_PLATFORM_API" -gt "$platform_max" ]; then
     OVPN_UPGRADE_REJECTION="platform API $OVPN_UPGRADE_PLATFORM_API is outside [$platform_min,$platform_max]"
@@ -229,7 +237,7 @@ ovpn_upgrade_prune_releases() {
 }
 
 ovpn_upgrade_activate() {
-  local version="$1" selected_dir="$2"
+  local version="$1" selected_dir="$2" mode="${3:-activate}" lock_held="${4:-false}"
   local release_target stage previous current_source persisted_active old_previous
 
   current_source=embedded
@@ -240,15 +248,19 @@ ovpn_upgrade_activate() {
   . "$OVPN_BOOTSTRAP_LIB"
   mkdir -p "$OVPN_MANAGEMENT_STORE/releases" "$OVPN_MANAGEMENT_STORE/transactions" || return 74
   chmod 700 "$OVPN_MANAGEMENT_STORE" "$OVPN_MANAGEMENT_STORE/releases" "$OVPN_MANAGEMENT_STORE/transactions" || return 74
-  exec {management_lock_fd}>"$OVPN_MANAGEMENT_STORE/.management.lock" || return 74
-  flock -n -x "$management_lock_fd" || {
-    ovpn_log 'another management update is in progress'
-    return 74
-  }
+  if [ "$lock_held" = false ]; then
+    exec {management_lock_fd}>"$OVPN_MANAGEMENT_STORE/.management.lock" || return 74
+    flock -n -x "$management_lock_fd" || {
+      ovpn_log 'another management update is in progress'
+      return 74
+    }
+  else
+    [ "$lock_held" = true ] || return 74
+  fi
   persisted_active="$(ovpn_bootstrap_read_pointer "$OVPN_MANAGEMENT_STORE/active")" || persisted_active=embedded
   if [ "$persisted_active" = "$version" ]; then
     ovpn_bootstrap_activate_online "$version" || return 74
-    flock -u "$management_lock_fd"
+    [ "$lock_held" = true ] || flock -u "$management_lock_fd"
     return 0
   fi
   if [ "$persisted_active" != "$current_source" ]; then
@@ -271,10 +283,19 @@ ovpn_upgrade_activate() {
     return 74
   fi
   "$OVPN_MANAGEMENT_VERIFIER" --release-dir "$release_target" --keyring "$OVPN_MANAGEMENT_KEYRING" >/dev/null || return 74
-  ovpn_bootstrap_activate_online "$version" hydrate-only || return 74
+  if [ "$mode" = migration-prepare ]; then
+    ovpn_bootstrap_activate_online "$version" hydrate-for-migration || return 74
+  else
+    [ "$mode" = activate ] || return 74
+    ovpn_bootstrap_activate_online "$version" hydrate-only || return 74
+  fi
   OVPN_LIB_DIR="$OVPN_BOOTSTRAP_SELECTED_ROOT/lib" \
     OVPN_ACTIVE_MANAGEMENT_VERSION="$version" OVPN_MANAGEMENT_SOURCE=online \
     "$OVPN_BOOTSTRAP_SELECTED_ROOT/lib/cli.sh" help >/dev/null || return 74
+  if [ "$mode" = migration-prepare ]; then
+    [ "$lock_held" = true ] || flock -u "$management_lock_fd"
+    return 0
+  fi
 
   previous="$(ovpn_bootstrap_read_pointer "$OVPN_MANAGEMENT_STORE/active")" || previous="$current_source"
   old_previous="$(ovpn_bootstrap_read_pointer "$OVPN_MANAGEMENT_STORE/previous")" || old_previous=embedded
@@ -286,7 +307,7 @@ ovpn_upgrade_activate() {
   rm -f "$OVPN_MANAGEMENT_STORE/transactions/activation.env" || return 74
   ovpn_upgrade_prune_releases "$version" "$previous" ||
     ovpn_log 'unable to prune an older management release'
-  flock -u "$management_lock_fd"
+  [ "$lock_held" = true ] || flock -u "$management_lock_fd"
   return 0
 }
 
