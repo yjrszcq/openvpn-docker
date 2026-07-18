@@ -323,6 +323,9 @@ registry is lost, current-schema IP registries, profile identity comments, and
 the latest rename audit record must agree. Conflicts are `CRITICAL`; a client
 with only a recoverable PKI UUID receives a temporary
 `client-<uuid-without-dashes>` name that should be renamed after repair.
+Deleted tombstone status cannot be reconstructed from PKI alone; such an
+identity remains revoked and cannot connect.
+
 `CRITICAL` states refuse repair by default (exit code 78); set
 `OVPN_CRITICAL_MODE=maintenance` only to preserve a broken container for
 inspection.

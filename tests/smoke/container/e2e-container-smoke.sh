@@ -414,7 +414,7 @@ for proto in udp tcp; do
     wait_for_log "$update_client" 'Initialization Sequence Completed' "$WORK_DIR/client-upgrade-active.log"
     openvpn_pid="$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')"
     docker exec "$server_name" ovpn client list --detail >"$WORK_DIR/client-list-before-upgrade"
-    grep -E '^client-udp[[:space:]]+[0-9a-f-]{36}[[:space:]]+active.*online$' "$WORK_DIR/client-list-before-upgrade"
+    grep -E "^${client_display}[[:space:]]+[0-9a-f-]{36}[[:space:]]+active.*online$" "$WORK_DIR/client-list-before-upgrade"
 
     docker exec "$server_name" ovpn upgrade --yes >"$WORK_DIR/upgrade.out"
     [ "$(docker exec "$server_name" ovpn -v)" = 2.1.2 ]
@@ -422,7 +422,7 @@ for proto in udp tcp; do
     docker ps --format '{{.Names}}' | grep -Fqx "$update_client"
     docker exec "$update_client" ip -4 address show dev tun0 | grep -Fq 'inet '
     docker exec "$server_name" ovpn client list --detail >"$WORK_DIR/client-list-after-upgrade"
-    grep -E '^client-udp[[:space:]]+[0-9a-f-]{36}[[:space:]]+active.*online$' "$WORK_DIR/client-list-after-upgrade"
+    grep -E "^${client_display}[[:space:]]+[0-9a-f-]{36}[[:space:]]+active.*online$" "$WORK_DIR/client-list-after-upgrade"
 
     docker exec "$server_name" ovpn upgrade --rollback --yes >"$WORK_DIR/rollback.out"
     [ "$(docker exec "$server_name" ovpn -v)" = 2.1.1 ]

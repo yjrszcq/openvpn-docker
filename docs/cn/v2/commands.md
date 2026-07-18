@@ -318,7 +318,9 @@ ovpn repair plan [--json]
 的 rename 审计记录相互一致时才会采用。证据冲突会进入 `CRITICAL`，需要使用备份或
 人工检查。若名称证据全部丢失，repair 会分配确定性的临时名称
 `client-<去掉连字符的 UUID>`；修复后应将其改名。当前 runtime 不解析历史清单或
-历史审计格式。
+历史审计格式。由于 PKI 只能记录证书处于 active 还是 revoked，权威身份清单丢失后
+无法区分 deleted tombstone 与 revoked 客户端；repair 会让该 UUID 保持 revoked，
+不会将其恢复为 active。
 
 ### `ovpn repair apply`
 

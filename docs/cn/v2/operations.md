@@ -302,8 +302,10 @@ docker compose run --rm openvpn-maintenance repair apply
 或清单）操作。`repair apply` 暂存、快照并原子应用允许的修复。客户端身份清单丢失
 时，当前 schema 的 IP 清单、profile 身份注释和最后一条 rename 审计记录必须一致；
 冲突会进入 `CRITICAL`。仅剩可恢复 PKI UUID 的客户端会获得
-`client-<去掉连字符的 UUID>` 临时名称，修复后应将其改名。`CRITICAL` 状态默认拒绝
-修复（退出码 78）；仅在排障需要保留现场时设
+`client-<去掉连字符的 UUID>` 临时名称，修复后应将其改名。仅凭 PKI 无法重建
+deleted tombstone 状态；这类身份会保持 revoked，无法连接。
+
+`CRITICAL` 状态默认拒绝修复（退出码 78）；仅在排障需要保留现场时设
 `OVPN_CRITICAL_MODE=maintenance`。
 
 ### 运行时检查

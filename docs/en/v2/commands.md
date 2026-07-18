@@ -406,7 +406,10 @@ latest applicable rename audit record agree. Conflicting evidence is
 `CRITICAL` and requires a backup or manual review. If no name evidence remains,
 repair assigns the deterministic temporary name `client-<uuid-without-dashes>`;
 rename it after repair. Historical registry or audit formats are not parsed by
-the current runtime.
+the current runtime. Because the PKI records only active versus revoked
+certificates, a deleted tombstone cannot be distinguished from a revoked client
+after the authoritative identity registry is lost; repair keeps that UUID
+revoked rather than making it active.
 
 ### `ovpn repair apply`
 
