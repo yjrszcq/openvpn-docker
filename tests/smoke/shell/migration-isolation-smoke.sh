@@ -34,6 +34,8 @@ fi
 OVPN_MAINTENANCE=true "$OVPN" migrate plan --json >"$TMP_DIR/current.json"
 grep -Fq '"source_schema":3' "$TMP_DIR/current.json"
 grep -Fq '"chain":"none"' "$TMP_DIR/current.json"
+OVPN_MAINTENANCE=true "$OVPN" migrate apply --yes
+grep -Fqx '3' "$OVPN_DATA_DIR/config/schema-version"
 
 set +e
 "$OVPN" migrate plan >"$TMP_DIR/live.out" 2>"$TMP_DIR/live.err"
@@ -41,5 +43,38 @@ status=$?
 set -e
 [ "$status" -eq 78 ]
 grep -Fq 'only through the openvpn-maintenance service' "$TMP_DIR/live.err"
+
+for fixture in conflict newer; do
+  export OVPN_DATA_DIR="$TMP_DIR/$fixture"
+  mkdir -p "$OVPN_DATA_DIR/config"
+  if [ "$fixture" = conflict ]; then
+    printf 'OVPN_CONFIG_VERSION=2\n' >"$OVPN_DATA_DIR/config/project.env"
+    printf '3\n' >"$OVPN_DATA_DIR/config/schema-version"
+    expected='schema status is CONFLICT'
+  else
+    printf 'OVPN_CONFIG_VERSION=4\n' >"$OVPN_DATA_DIR/config/project.env"
+    printf '4\n' >"$OVPN_DATA_DIR/config/schema-version"
+    expected='schema status is NEWER'
+  fi
+  for command in plan apply; do
+    set +e
+    if [ "$command" = plan ]; then
+      OVPN_MAINTENANCE=true "$OVPN" migrate plan \
+        >"$TMP_DIR/$fixture-$command.out" 2>"$TMP_DIR/$fixture-$command.err"
+    else
+      OVPN_MAINTENANCE=true "$OVPN" migrate apply --yes \
+        >"$TMP_DIR/$fixture-$command.out" 2>"$TMP_DIR/$fixture-$command.err"
+    fi
+    status=$?
+    set -e
+    [ "$status" -eq 78 ]
+    if [ "$command" = plan ]; then
+      grep -Fq "$expected" "$TMP_DIR/$fixture-$command.out"
+    else
+      grep -Fq 'cannot migrate while schema status is' \
+        "$TMP_DIR/$fixture-$command.err"
+    fi
+  done
+done
 
 printf 'migration isolation smoke passed\n'
