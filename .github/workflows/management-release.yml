@@ -28,7 +28,18 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0
+      - name: Validate release registration and compatibility matrix
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          registry="$RUNNER_TEMP/data-schema-releases.tsv"
+          git fetch --no-tags origin "$DEFAULT_BRANCH"
+          git show "origin/$DEFAULT_BRANCH:compatibility/data-schema-releases.tsv" > "$registry"
+          scripts/validate-management-matrix.sh \
+            --registry "$registry" \
+            --release-tag "$GITHUB_REF_NAME" \
+            --release-commit "$GITHUB_SHA"
       - name: Validate stable tag and prepare signing key
         env:
           MANAGEMENT_SIGNING_KEY: ${{ secrets.MANAGEMENT_SIGNING_KEY }}

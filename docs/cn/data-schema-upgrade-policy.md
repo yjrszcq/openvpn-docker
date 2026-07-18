@@ -9,8 +9,10 @@
 数据 schema 使用单调递增整数，只在持久化状态发生不兼容变化时递增；多个管理代码
 和镜像版本可以共用同一个 schema。
 
-所有已发布管理代码、精确源码提交及其 schema 记录在
-`compatibility/data-schema-releases.tsv`，每次发布都必须登记。
+所有已发布管理代码、精确源码提交、schema、分发类型、platform API 范围及 OpenVPN
+范围记录在 `compatibility/data-schema-releases.tsv`，每次发布都必须登记。历史
+`legacy-image` 条目明确不声明在线 platform 范围；支持在线更新的版本使用
+`signed-bundle`。
 
 ## 运行边界
 
@@ -41,4 +43,4 @@ profile 失效和不可恢复历史报告。
 
 缺少 migration、夹具、文档或测试的 schema 更新不算完成。CI 必须覆盖清单中每个
 已发布版本到当前 schema 的迁移。即使 schema 不变，新管理代码发布仍必须登记版本、
-精确源码提交和 schema。
+精确源码提交、schema、分发类型、platform API 范围和 OpenVPN 范围。

@@ -108,12 +108,17 @@ verify_migrated_data() {
       openssl x509 -in "/etc/openvpn/pki/issued/$alpha_id.crt" -noout -subject |
         grep -Eq "CN ?= ?$alpha_id"
       openssl crl -in /etc/openvpn/pki/crl.pem -noout
-      if openssl verify -crl_check -CAfile /etc/openvpn/pki/ca.crt \
-        -CRLfile /etc/openvpn/pki/crl.pem "/etc/openvpn/repair/old-alpha-$version.crt"; then
-        printf "old alpha certificate remains valid for %s\n" "$version" >&2
-        exit 1
+      if [ "$source_schema" -lt 3 ]; then
+        if openssl verify -crl_check -CAfile /etc/openvpn/pki/ca.crt \
+          -CRLfile /etc/openvpn/pki/crl.pem "/etc/openvpn/repair/old-alpha-$version.crt"; then
+          printf "old alpha certificate remains valid for %s\n" "$version" >&2
+          exit 1
+        fi
+      else
+        openssl verify -crl_check -CAfile /etc/openvpn/pki/ca.crt \
+          -CRLfile /etc/openvpn/pki/crl.pem "/etc/openvpn/repair/old-alpha-$version.crt"
       fi
-      if [ "$source_schema" = 2 ]; then
+      if [ "$source_schema" -ge 2 ]; then
         grep -Fqx "$alpha_id,alpha,10.8.0.2" /etc/openvpn/data/client-ip.csv
         grep -Eq "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12},reusable,deleted$" \
           /etc/openvpn/meta/client-state.csv
@@ -122,20 +127,24 @@ verify_migrated_data() {
   [ "$(docker run --rm -v "$data_dir:/etc/openvpn:ro" "$TARGET_IMAGE" state show)" = HEALTHY ]
 }
 
-while IFS=$'\t' read -r version commit schema; do
+while IFS=$'\t' read -r version commit schema _distribution _platform_min _platform_max _openvpn_min _openvpn_max; do
   [ -n "$version" ] || continue
   [[ "$version" == \#* ]] && continue
   image="$(build_release_image "$version" "$commit")"
   data_dir="$WORK_DIR/data-$version"
   generate_release_data "$version" "$schema" "$image" "$data_dir"
 
-  set +e
-  docker run --rm -v "$data_dir:/etc/openvpn:ro" "$TARGET_IMAGE" state show \
-    >"$WORK_DIR/pre-$version.out" 2>"$WORK_DIR/pre-$version.err"
-  status=$?
-  set -e
-  [ "$status" -eq 78 ]
-  grep -Fq 'data schema migration required' "$WORK_DIR/pre-$version.err"
+  if [ "$schema" -lt 3 ]; then
+    set +e
+    docker run --rm -v "$data_dir:/etc/openvpn:ro" "$TARGET_IMAGE" state show \
+      >"$WORK_DIR/pre-$version.out" 2>"$WORK_DIR/pre-$version.err"
+    status=$?
+    set -e
+    [ "$status" -eq 78 ]
+    grep -Fq 'data schema migration required' "$WORK_DIR/pre-$version.err"
+  else
+    [ "$(docker run --rm -v "$data_dir:/etc/openvpn:ro" "$TARGET_IMAGE" state show)" = HEALTHY ]
+  fi
 
   docker run --rm -e OVPN_MAINTENANCE=true -v "$data_dir:/etc/openvpn" \
     "$TARGET_IMAGE" migrate plan --json >"$WORK_DIR/plan-$version.json"

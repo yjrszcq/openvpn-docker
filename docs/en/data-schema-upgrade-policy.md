@@ -10,8 +10,11 @@ persistent data schema are independent. The data schema is a monotonically
 increasing integer and changes only for incompatible persisted-state changes.
 Multiple management and image releases may use the same schema.
 
-Published management versions, exact source commits, and schemas are recorded in
+Published management versions, exact source commits, schemas, distribution
+type, platform API range, and OpenVPN range are recorded in
 `compatibility/data-schema-releases.tsv`. Every release must be registered.
+Historical `legacy-image` rows explicitly have no online platform range;
+online-capable releases use `signed-bundle`.
 
 ## Runtime boundary
 
@@ -51,4 +54,5 @@ matching pre-migration snapshot when their embedded code does not support it.
 A schema-changing release is incomplete without migration, fixtures,
 documentation, and tests. CI must exercise every published release baseline in
 the manifest to the current schema. Every management release must register its
-version, exact source commit, and schema even when the schema is unchanged.
+version, exact source commit, schema, distribution type, platform range, and
+OpenVPN range even when the schema is unchanged.

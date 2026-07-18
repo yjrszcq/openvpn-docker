@@ -12,22 +12,27 @@ test -r "$MANIFEST"
 
 awk -F '\t' '
   NR == 1 {
-    if ($0 != "# management_version\tcommit\tdata_schema") exit 1
+    if ($0 != "# management_version\tcommit\tdata_schema\tdistribution\tplatform_api_min\tplatform_api_max\topenvpn_min\topenvpn_max_exclusive") exit 1
     next
   }
-  NF != 3 { exit 1 }
+  NF != 8 { exit 1 }
   $1 !~ /^[0-9]+\.[0-9]+\.[0-9]+$/ { exit 1 }
   $2 !~ /^[0-9a-f]{40}$/ { exit 1 }
   $3 !~ /^[1-9][0-9]*$/ { exit 1 }
+  $4 == "legacy-image" && ($5 != "-" || $6 != "-") { exit 1 }
+  $4 == "signed-bundle" && ($5 !~ /^[1-9][0-9]*$/ || $6 !~ /^[1-9][0-9]*$/ || $5 > $6) { exit 1 }
+  $4 != "legacy-image" && $4 != "signed-bundle" { exit 1 }
+  $7 !~ /^[0-9]+\.[0-9]+\.[0-9]+$/ { exit 1 }
+  $8 !~ /^[0-9]+\.[0-9]+\.[0-9]+$/ { exit 1 }
   seen_version[$1]++ { if (seen_version[$1] != 1) exit 1 }
   seen_commit[$2]++ { if (seen_commit[$2] != 1) exit 1 }
-  END { if (NR != 5) exit 1 }
+  END { if (NR < 5) exit 1 }
 ' "$MANIFEST"
 
-grep -Fqx $'1.0.0\t6619921e5257e604f5df2c63d2fa10505b680d84\t1' "$MANIFEST"
-grep -Fqx $'2.0.0\t6f8b77dfe58087fe66073929d70d89d8c92e6cac\t2' "$MANIFEST"
-grep -Fqx $'2.1.0\ta8ddaca5345a9cc75cf04b56d07b0072a9d44019\t2' "$MANIFEST"
-grep -Fqx $'2.1.1\t11bdee954b2e875621f83a21564d048593adb68a\t2' "$MANIFEST"
+grep -Fqx $'1.0.0\t6619921e5257e604f5df2c63d2fa10505b680d84\t1\tlegacy-image\t-\t-\t2.7.0\t2.8.0' "$MANIFEST"
+grep -Fqx $'2.0.0\t6f8b77dfe58087fe66073929d70d89d8c92e6cac\t2\tlegacy-image\t-\t-\t2.7.0\t2.8.0' "$MANIFEST"
+grep -Fqx $'2.1.0\ta8ddaca5345a9cc75cf04b56d07b0072a9d44019\t2\tlegacy-image\t-\t-\t2.7.0\t2.8.0' "$MANIFEST"
+grep -Fqx $'2.1.1\t11bdee954b2e875621f83a21564d048593adb68a\t2\tlegacy-image\t-\t-\t2.7.0\t2.8.0' "$MANIFEST"
 
 grep -Fq 'runs only its current schema' "$ROOT_DIR/docs/en/data-schema-upgrade-policy.md"
 grep -Fq '支持旧版本是指支持其迁移' "$ROOT_DIR/docs/cn/data-schema-upgrade-policy.md"

@@ -25,6 +25,7 @@ grep -Fq 'rootfs/usr/local/lib/openvpn-container/events.sh' "$WORKFLOWS/test.yml
 grep -Fq 'tests/smoke/shell/management-hook-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/uuid-registry-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/management-release-smoke.sh' "$WORKFLOWS/test.yml"
+grep -Fq 'tests/smoke/shell/management-matrix-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/management-upgrade-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/schema-gate-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/migration-isolation-smoke.sh' "$WORKFLOWS/test.yml"
@@ -73,6 +74,9 @@ grep -Fq 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"' 
 grep -Fq 'name: Management Release' "$WORKFLOWS/management-release.yml"
 grep -Fq 'secrets.MANAGEMENT_SIGNING_KEY' "$WORKFLOWS/management-release.yml"
 grep -Fq 'scripts/package-management-release.sh' "$WORKFLOWS/management-release.yml"
+grep -Fq 'scripts/validate-management-matrix.sh' "$WORKFLOWS/management-release.yml"
+# shellcheck disable=SC2016 # Assert the literal default-branch registry lookup.
+grep -Fq 'origin/$DEFAULT_BRANCH:compatibility/data-schema-releases.tsv' "$WORKFLOWS/management-release.yml"
 grep -Fq 'scripts/verify-management-release.sh' "$WORKFLOWS/management-release.yml"
 grep -Fq 'management-bundle.tar.gz' "$WORKFLOWS/management-release.yml"
 grep -Fq 'management-release.env.sig' "$WORKFLOWS/management-release.yml"

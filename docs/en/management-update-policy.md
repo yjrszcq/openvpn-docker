@@ -15,6 +15,13 @@ range, and exact data schema. Online update must reject an incompatible target
 and direct the operator to update the image when the platform or OpenVPN kernel
 is outside that declaration.
 
+The release registry distinguishes historical `legacy-image` versions, which
+cannot be installed online, from `signed-bundle` versions. Since a source commit
+cannot contain its own hash, a signed release is prepared as a source commit,
+then registered by exact hash on the default branch before that source commit
+is tagged. The release workflow reads the default-branch registry and refuses
+an unregistered tag or any schema/platform/OpenVPN mismatch.
+
 ## Online update boundary
 
 `ovpn upgrade` may replace only signed management code whose data schema equals

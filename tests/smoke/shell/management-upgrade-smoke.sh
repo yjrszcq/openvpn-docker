@@ -52,6 +52,7 @@ chmod +x "$TMP_DIR/bin/openvpn" "$TMP_DIR/bin/curl"
 
 create_release() {
   local version="$1" schema="$2" minimum="$3" maximum="$4"
+  local platform_min="${5:-$PLATFORM_API}" platform_max="${6:-$PLATFORM_API}"
   local release="$TMP_DIR/fixtures/$version" bundle="$TMP_DIR/bundle-$version"
   local sha
   mkdir -p "$release" "$bundle/lib" "$bundle/templates" "$bundle/compatibility"
@@ -63,8 +64,8 @@ FORMAT_VERSION=1
 MANAGEMENT_VERSION=$version
 VCS_REF=0123456789abcdef0123456789abcdef01234567
 DATA_SCHEMA=$schema
-PLATFORM_API_MIN=$PLATFORM_API
-PLATFORM_API_MAX=$PLATFORM_API
+PLATFORM_API_MIN=$platform_min
+PLATFORM_API_MAX=$platform_max
 OPENVPN_MIN=$minimum
 OPENVPN_MAX_EXCLUSIVE=$maximum
 REQUIRED_FEATURES=tls-crypt,data-ciphers,crl-verify,topology-subnet
@@ -80,8 +81,8 @@ FORMAT_VERSION=1
 MANAGEMENT_VERSION=$version
 VCS_REF=0123456789abcdef0123456789abcdef01234567
 DATA_SCHEMA=$schema
-PLATFORM_API_MIN=$PLATFORM_API
-PLATFORM_API_MAX=$PLATFORM_API
+PLATFORM_API_MIN=$platform_min
+PLATFORM_API_MAX=$platform_max
 OPENVPN_MIN=$minimum
 OPENVPN_MAX_EXCLUSIVE=$maximum
 REQUIRED_FEATURES=tls-crypt,data-ciphers,crl-verify,topology-subnet
@@ -95,8 +96,18 @@ EOF
 create_release 2.1.2 3 2.7.0 2.8.0
 create_release 2.1.3 4 2.7.0 2.8.0
 create_release 2.1.4 3 2.8.0 2.9.0
+create_release 2.1.5 3 2.7.0 2.8.0 3 3
+create_release 2.1.6 3 2.7.0 2.8.0 1 1
 
 jq -n --arg root "file://$TMP_DIR/fixtures" '[
+  {tag_name:"v2.1.6",draft:false,prerelease:false,assets:[
+    {name:"management-release.env",browser_download_url:($root+"/2.1.6/management-release.env")},
+    {name:"management-release.env.sig",browser_download_url:($root+"/2.1.6/management-release.env.sig")},
+    {name:"management-bundle.tar.gz",browser_download_url:($root+"/2.1.6/management-bundle.tar.gz")}]},
+  {tag_name:"v2.1.5",draft:false,prerelease:false,assets:[
+    {name:"management-release.env",browser_download_url:($root+"/2.1.5/management-release.env")},
+    {name:"management-release.env.sig",browser_download_url:($root+"/2.1.5/management-release.env.sig")},
+    {name:"management-bundle.tar.gz",browser_download_url:($root+"/2.1.5/management-bundle.tar.gz")}]},
   {tag_name:"v2.1.3",draft:false,prerelease:false,assets:[
     {name:"management-release.env",browser_download_url:($root+"/2.1.3/management-release.env")},
     {name:"management-release.env.sig",browser_download_url:($root+"/2.1.3/management-release.env.sig")},
@@ -158,7 +169,7 @@ business_checksum="$(business_state_checksum)"
 jq -e '.current_version == "2.1.1" and .target_version == "2.1.2" and
   .platform_api == 2 and .openvpn_version == "2.7.5" and
   .current_schema == 3 and .target_schema == 3 and .schema_change == false and
-  .download_asset == "management-bundle.tar.gz" and (.skipped | length) == 2' \
+  .download_asset == "management-bundle.tar.gz" and (.skipped | length) == 4' \
   "$TMP_DIR/check.json" >/dev/null
 if grep -Fq 'management-bundle.tar.gz' "$CURL_LOG"; then
   printf 'upgrade --check downloaded a full bundle\n' >&2
@@ -175,6 +186,16 @@ status=$?
 set -e
 [ "$status" -eq 78 ]
 grep -Fq 'requires ovpn migrate' "$TMP_DIR/incompatible.err"
+
+for version in 2.1.5 2.1.6; do
+  set +e
+  "$OVPN" upgrade --version "$version" --check \
+    >"$TMP_DIR/platform-$version.out" 2>"$TMP_DIR/platform-$version.err"
+  status=$?
+  set -e
+  [ "$status" -eq 78 ]
+  grep -Fq 'platform API 2 is outside' "$TMP_DIR/platform-$version.err"
+done
 
 set +e
 FAKE_CURL_FAIL=1 "$OVPN" upgrade --check >"$TMP_DIR/network.out" 2>"$TMP_DIR/network.err"
