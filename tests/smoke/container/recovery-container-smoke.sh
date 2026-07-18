@@ -68,8 +68,10 @@ run_control() {
 
 run_control init >/tmp/ovpn-recovery-init.out 2>/tmp/ovpn-recovery-init.err
 run_control client create recovery-client >/tmp/ovpn-recovery-add.out 2>/tmp/ovpn-recovery-add.err
-identity_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec 'sha256sum /etc/openvpn/pki/ca.crt /etc/openvpn/secrets/tls-crypt.key /etc/openvpn/pki/issued/recovery-client.crt /etc/openvpn/pki/private/recovery-client.key')"
-docker run --rm -v "$data_dir:/etc/openvpn" --entrypoint /bin/sh "$IMAGE" -ec 'rm /etc/openvpn/pki/ca.crt /etc/openvpn/secrets/tls-crypt.key /etc/openvpn/pki/issued/recovery-client.crt /etc/openvpn/pki/private/recovery-client.key'
+client_id="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, '$2 == "recovery-client" { print $1 }' /etc/openvpn/meta/client-state.csv)"
+[[ "$client_id" =~ ^[0-9a-f-]{36}$ ]]
+identity_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec "sha256sum /etc/openvpn/pki/ca.crt /etc/openvpn/secrets/tls-crypt.key /etc/openvpn/pki/issued/$client_id.crt /etc/openvpn/pki/private/$client_id.key")"
+docker run --rm -v "$data_dir:/etc/openvpn" --entrypoint /bin/sh "$IMAGE" -ec "rm /etc/openvpn/pki/ca.crt /etc/openvpn/secrets/tls-crypt.key /etc/openvpn/pki/issued/$client_id.crt /etc/openvpn/pki/private/$client_id.key"
 recovery_state="$(run_control state show)"
 if [ "$recovery_state" != DEGRADED_RECOVERABLE ]; then
   run_control state doctor --json >&2 || true
@@ -83,10 +85,10 @@ grep -Fq '[RECOVER] RECOVER_CLIENT_CERT' /tmp/ovpn-recovery-plan.out
 grep -Fq '[RECOVER] RECOVER_CLIENT_KEY' /tmp/ovpn-recovery-plan.out
 run_control repair apply >/tmp/ovpn-recovery-repair.out 2>/tmp/ovpn-recovery-repair.err
 [ "$(run_control state show)" = HEALTHY ]
-identity_after="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec 'sha256sum /etc/openvpn/pki/ca.crt /etc/openvpn/secrets/tls-crypt.key /etc/openvpn/pki/issued/recovery-client.crt /etc/openvpn/pki/private/recovery-client.key')"
+identity_after="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec "sha256sum /etc/openvpn/pki/ca.crt /etc/openvpn/secrets/tls-crypt.key /etc/openvpn/pki/issued/$client_id.crt /etc/openvpn/pki/private/$client_id.key")"
 [ "$identity_before" = "$identity_after" ] || {
   echo 'container recovery changed identity material' >&2
   exit 1
 }
-docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec 'test "$(stat -c %a /etc/openvpn/pki/ca.crt)" = 644 && test "$(stat -c %a /etc/openvpn/secrets/tls-crypt.key)" = 600 && test "$(stat -c %a /etc/openvpn/pki/issued/recovery-client.crt)" = 644 && test "$(stat -c %a /etc/openvpn/pki/private/recovery-client.key)" = 600'
+docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec "test \"\$(stat -c %a /etc/openvpn/pki/ca.crt)\" = 644 && test \"\$(stat -c %a /etc/openvpn/secrets/tls-crypt.key)\" = 600 && test \"\$(stat -c %a /etc/openvpn/pki/issued/$client_id.crt)\" = 644 && test \"\$(stat -c %a /etc/openvpn/pki/private/$client_id.key)\" = 600"
 printf 'recovery container smoke passed (network=%s)\n' "$NETWORK"

@@ -22,41 +22,42 @@ ovpn_client_list_prepare_applied_registry() {
 }
 
 ovpn_client_list_dynamic_ip_is_valid() {
-  local name="$1"
+  local id="$1"
   local address="$2"
 
-  ovpn_registry_client_name_valid "$name" || return 1
-  [ "${OVPN_CLIENT_IP_PKI_STATES[$name]:-}" = active ] || return 1
+  ovpn_registry_uuid_valid "$id" || return 1
+  [ "${OVPN_REGISTRY_STATE_BY_ID[$id]:-}" = active ] || return 1
   ovpn_ipam_ip_in_dynamic_pool "$address"
 }
 
 ovpn_client_list_connected_client_is_valid() {
-  local name="$1"
+  local id="$1"
   local address="$2"
 
-  ovpn_registry_client_name_valid "$name" || return 1
-  [ "${OVPN_CLIENT_IP_PKI_STATES[$name]:-}" = active ] || return 1
+  ovpn_registry_uuid_valid "$id" || return 1
+  [ "${OVPN_REGISTRY_STATE_BY_ID[$id]:-}" = active ] || return 1
   ovpn_ipam_ipv4_to_int "$address" >/dev/null
 }
 
 ovpn_client_list_load_persisted_dynamic_ips() {
   local lease_dir="$OVPN_LEASE_DIR"
-  local name address f
+  local id name address f
 
   OVPN_CLIENT_LIST_PERSISTED_IPS=()
   [ -d "$lease_dir" ] || return 0
   for f in "$lease_dir"/*; do
     [ -f "$f" ] || continue
-    name="$(basename "$f")"
+    id="$(basename "$f")"
     address="$(cat "$f" 2>/dev/null || true)"
-    ovpn_client_list_dynamic_ip_is_valid "$name" "$address" || continue
+    ovpn_client_list_dynamic_ip_is_valid "$id" "$address" || continue
+    name="${OVPN_REGISTRY_NAME_BY_ID[$id]}"
     [ -n "${OVPN_CLIENT_LIST_PERSISTED_IPS[$name]+present}" ] && continue
     OVPN_CLIENT_LIST_PERSISTED_IPS["$name"]="$address"
   done
 }
 
 ovpn_client_list_load_connected_clients() {
-  local response line address name ignored
+  local response line address id name ignored_field
   local in_routing_table=false
 
   OVPN_CLIENT_LIST_CONNECTED_IPS=()
@@ -71,10 +72,10 @@ ovpn_client_list_load_connected_clients() {
     line="${line%$'\r'}"
     case "$line" in
       ROUTING_TABLE$'\t'*)
-        IFS=$'\t' read -r ignored address name ignored <<<"$line"
+        IFS=$'\t' read -r ignored_field address id ignored_field <<<"$line"
         ;;
       ROUTING_TABLE,*)
-        IFS=, read -r ignored address name ignored <<<"$line"
+        IFS=, read -r ignored_field address id ignored_field <<<"$line"
         ;;
       'ROUTING TABLE')
         in_routing_table=true
@@ -86,10 +87,11 @@ ovpn_client_list_load_connected_clients() {
         ;;
       *)
         [ "$in_routing_table" = true ] || continue
-        IFS=, read -r address name ignored <<<"$line"
+        IFS=, read -r address id ignored_field <<<"$line"
         ;;
     esac
-    ovpn_client_list_connected_client_is_valid "$name" "$address" || continue
+    ovpn_client_list_connected_client_is_valid "$id" "$address" || continue
+    name="${OVPN_REGISTRY_NAME_BY_ID[$id]}"
     [ -n "${OVPN_CLIENT_LIST_CONNECTED_IPS[$name]+present}" ] && continue
     OVPN_CLIENT_LIST_CONNECTED_IPS["$name"]="$address"
   done <<<"$response"
@@ -191,34 +193,37 @@ ovpn_client_list_command() {
 }
 
 ovpn_pki_try_revoke_client() {
-  local name="$1"
+  local id="$1"
   local bin
 
+  ovpn_registry_uuid_valid "$id" || return 1
   bin="$(ovpn_easyrsa_bin)" || return 1
-  EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" "$bin" revoke "$name"
+  EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" "$bin" revoke "$id"
   EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" "$bin" gen-crl
   [ -s "$OVPN_DATA_DIR/pki/crl.pem" ] || return 1
   chmod 644 "$OVPN_DATA_DIR/pki/crl.pem"
 }
 
 ovpn_pki_try_issue_client() {
-  local name="$1"
+  local id="$1"
   local bin
 
+  ovpn_registry_uuid_valid "$id" || return 1
   bin="$(ovpn_easyrsa_bin)" || return 1
-  rm -f "$OVPN_DATA_DIR/pki/reqs/$name.req" "$OVPN_DATA_DIR/pki/private/$name.key"
-  EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" EASYRSA_REQ_CN="$name" "$bin" build-client-full "$name" nopass
-  [ -r "$OVPN_DATA_DIR/pki/issued/$name.crt" ] || return 1
-  [ -r "$OVPN_DATA_DIR/pki/private/$name.key" ] || return 1
-  chmod 644 "$OVPN_DATA_DIR/pki/issued/$name.crt"
-  chmod 600 "$OVPN_DATA_DIR/pki/private/$name.key"
+  rm -f "$OVPN_DATA_DIR/pki/reqs/$id.req" "$OVPN_DATA_DIR/pki/private/$id.key"
+  EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" EASYRSA_REQ_CN="$id" "$bin" build-client-full "$id" nopass
+  [ -r "$OVPN_DATA_DIR/pki/issued/$id.crt" ] || return 1
+  [ -r "$OVPN_DATA_DIR/pki/private/$id.key" ] || return 1
+  chmod 644 "$OVPN_DATA_DIR/pki/issued/$id.crt"
+  chmod 600 "$OVPN_DATA_DIR/pki/private/$id.key"
 }
 
 ovpn_pki_reissue_supported() {
-  local name="$1"
+  local id="$1"
   local state="$2"
   local bin probe status=0
 
+  ovpn_registry_uuid_valid "$id" || return 1
   bin="$(ovpn_easyrsa_bin)" || return 1
   probe="$(mktemp -d "$OVPN_DATA_DIR/.reissue-probe.XXXXXX")" || return 1
   if ! cp -a "$OVPN_DATA_DIR/pki" "$probe/pki"; then
@@ -226,16 +231,16 @@ ovpn_pki_reissue_supported() {
     return 1
   fi
   if [ "$state" = active ]; then
-    EASYRSA_BATCH=1 EASYRSA_PKI="$probe/pki" "$bin" revoke "$name" >/dev/null 2>&1 || status=1
+    EASYRSA_BATCH=1 EASYRSA_PKI="$probe/pki" "$bin" revoke "$id" >/dev/null 2>&1 || status=1
     if [ "$status" -eq 0 ]; then
       EASYRSA_BATCH=1 EASYRSA_PKI="$probe/pki" "$bin" gen-crl >/dev/null 2>&1 || status=1
     fi
   fi
   if [ "$status" -eq 0 ]; then
-    rm -f "$probe/pki/reqs/$name.req" "$probe/pki/private/$name.key"
-    EASYRSA_BATCH=1 EASYRSA_PKI="$probe/pki" EASYRSA_REQ_CN="$name" "$bin" build-client-full "$name" nopass >/dev/null 2>&1 || status=1
+    rm -f "$probe/pki/reqs/$id.req" "$probe/pki/private/$id.key"
+    EASYRSA_BATCH=1 EASYRSA_PKI="$probe/pki" EASYRSA_REQ_CN="$id" "$bin" build-client-full "$id" nopass >/dev/null 2>&1 || status=1
   fi
-  [ -r "$probe/pki/issued/$name.crt" ] && [ -r "$probe/pki/private/$name.key" ] || status=1
+  [ -r "$probe/pki/issued/$id.crt" ] && [ -r "$probe/pki/private/$id.key" ] || status=1
   rm -rf "$probe"
   return "$status"
 }
@@ -252,9 +257,9 @@ ovpn_client_lifecycle_audit() {
 }
 
 ovpn_client_lifecycle_kick() {
-  local name="$1"
+  local id="$1"
 
-  OVPN_CLIENT_IP_SYNC_CHANGED_CLIENTS=("$name")
+  OVPN_CLIENT_IP_SYNC_CHANGED_CLIENTS=("$id")
   ovpn_client_ip_kick_changed_clients
 }
 
@@ -271,15 +276,16 @@ ovpn_client_lifecycle_move_profile_to_revoked() {
 ovpn_client_revoke_inner() {
   local name="$1"
   local release_ip="$2"
-  local index assignment
+  local index id assignment
 
   ovpn_client_name_or_die "$name"
   ovpn_require_healthy_state
   ovpn_client_ip_prepare_mutation
   ovpn_client_require_registry_active "$name"
   index="$(ovpn_client_ip_assignment_index "$name")" || ovpn_die "client '$name' is missing from the in-memory registry"
+  id="${OVPN_CLIENT_IP_IDS[index]}"
   assignment="${OVPN_CLIENT_IP_VALUES[index]}"
-  if ! ovpn_pki_try_revoke_client "$name"; then
+  if ! ovpn_pki_try_revoke_client "$id"; then
     ovpn_client_lifecycle_audit revoke failed || true
     ovpn_die 'failed to revoke client certificate; no assignment changes were applied'
   fi
@@ -289,8 +295,8 @@ ovpn_client_revoke_inner() {
     ovpn_client_ip_set_current_assignment "$name" ''
     ovpn_client_ip_apply_current_mutation
   else
-    [ -n "$assignment" ] || ovpn_client_ip_clear_dynamic_lease "$name"
-    ovpn_client_lifecycle_kick "$name"
+    [ -n "$assignment" ] || ovpn_client_ip_clear_dynamic_lease "$id"
+    ovpn_client_lifecycle_kick "$id"
   fi
   ovpn_client_lifecycle_audit revoke applied || true
   ovpn_log "revoked client '$name'"
@@ -343,7 +349,7 @@ ovpn_client_reissue_inner() {
   local name="$1"
   local mode="$2"
   local requested_ip="$3"
-  local status index assignment allocated_ip=''
+  local status index id assignment allocated_ip=''
 
   ovpn_client_name_or_die "$name"
   ovpn_require_healthy_state
@@ -352,6 +358,7 @@ ovpn_client_reissue_inner() {
   [ -n "$status" ] || ovpn_die "client '$name' does not exist"
 
   index="$(ovpn_client_ip_assignment_index "$name")" || ovpn_die "client '$name' is missing from the in-memory registry"
+  id="${OVPN_CLIENT_IP_IDS[index]}"
   assignment="${OVPN_CLIENT_IP_VALUES[index]}"
 
   case "$mode" in
@@ -369,20 +376,20 @@ ovpn_client_reissue_inner() {
     *) ovpn_die "unsupported reissue mode: $mode" ;;
   esac
 
-  if ! ovpn_pki_reissue_supported "$name" "$status"; then
+  if ! ovpn_pki_reissue_supported "$id" "$status"; then
     ovpn_client_lifecycle_audit reissue rejected || true
     ovpn_die 'the current Easy-RSA runtime does not support same-CN reissue; no PKI index changes were made'
   fi
 
   if [ "$status" = active ]; then
-    if ! ovpn_pki_try_revoke_client "$name"; then
+    if ! ovpn_pki_try_revoke_client "$id"; then
       ovpn_client_lifecycle_audit reissue failed || true
       ovpn_die 'failed to revoke the active certificate before reissue'
     fi
     ovpn_client_lifecycle_move_profile_to_revoked "$name"
     ovpn_client_registry_set_state "$name" revoked
   fi
-  if ! ovpn_pki_try_issue_client "$name"; then
+  if ! ovpn_pki_try_issue_client "$id"; then
     ovpn_client_registry_set_state "$name" revoked
     ovpn_client_lifecycle_audit reissue failed || true
     ovpn_die 'client reissue failed; the previous certificate remains revoked and the IP assignment was retained'
@@ -407,7 +414,7 @@ ovpn_client_reissue_inner() {
   esac
 
   ovpn_render_client "$name" --output "$OVPN_DATA_DIR/clients/active/$name.ovpn"
-  ovpn_client_lifecycle_kick "$name"
+  ovpn_client_lifecycle_kick "$id"
   ovpn_client_lifecycle_audit reissue applied || true
   ovpn_log "reissued client '$name'"
 }
@@ -461,15 +468,17 @@ ovpn_client_delete_current_assignment() {
 
 ovpn_client_delete_inner() {
   local name="$1"
-  local status state_file state_backup
+  local status index id state_file state_backup
 
   ovpn_client_name_or_die "$name"
   ovpn_require_healthy_state
   ovpn_client_ip_prepare_mutation
   status="${OVPN_CLIENT_IP_PKI_STATES[$name]:-}"
   [ -n "$status" ] || ovpn_die "client '$name' does not exist"
+  index="$(ovpn_client_ip_assignment_index "$name")" || ovpn_die "client '$name' is missing from the in-memory registry"
+  id="${OVPN_CLIENT_IP_IDS[index]}"
   if [ "$status" = active ]; then
-    if ! ovpn_pki_try_revoke_client "$name"; then
+    if ! ovpn_pki_try_revoke_client "$id"; then
       ovpn_client_lifecycle_audit delete failed || true
       ovpn_die 'failed to revoke the active certificate before deletion'
     fi
@@ -492,7 +501,7 @@ ovpn_client_delete_inner() {
   fi
   rm -f "$state_backup"
   rm -f "$OVPN_DATA_DIR/clients/active/$name.ovpn" "$OVPN_DATA_DIR/clients/revoked/$name.ovpn"
-  rm -f "$OVPN_DATA_DIR/pki/private/$name.key" "$OVPN_DATA_DIR/pki/issued/$name.crt" "$OVPN_DATA_DIR/pki/reqs/$name.req"
+  rm -f "$OVPN_DATA_DIR/pki/private/$id.key" "$OVPN_DATA_DIR/pki/issued/$id.crt" "$OVPN_DATA_DIR/pki/reqs/$id.req"
   ovpn_client_lifecycle_audit delete applied || true
   ovpn_log "deleted client '$name'"
 }

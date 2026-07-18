@@ -77,8 +77,8 @@ EOF
 "$OVPN" config apply
 mkdir -p "$OVPN_DATA_DIR/data" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/pki" "$OVPN_LEASE_DIR"
 printf '%s\n' \
-  $'V\t30000101000000Z\t\t01\tunknown\t/CN=alpha' \
-  $'V\t30000101000000Z\t\t02\tunknown\t/CN=bravo' \
+  $'V\t30000101000000Z\t\t01\tunknown\t/CN=11111111-1111-4111-8111-111111111111' \
+  $'V\t30000101000000Z\t\t02\tunknown\t/CN=22222222-2222-4222-8222-222222222222' \
   >"$OVPN_DATA_DIR/pki/index.txt"
 cat >"$OVPN_DATA_DIR/data/client-ip.csv" <<'EOF'
 # id,name,ip
@@ -90,7 +90,7 @@ printf '%s\n' '# id,name,state' \
   '11111111-1111-4111-8111-111111111111,alpha,active' \
   '22222222-2222-4222-8222-222222222222,bravo,active' >"$OVPN_DATA_DIR/meta/client-state.csv"
 : >"$OVPN_DATA_DIR/meta/audit.jsonl"
-printf '10.88.0.200\n' >"$OVPN_LEASE_DIR/bravo"
+printf '10.88.0.200\n' >"$OVPN_LEASE_DIR/22222222-2222-4222-8222-222222222222"
 "$OVPN" client ip set alpha --ip 10.88.0.20
 
 "$OVPN" network plan --network 10.89.0.0/24 --dynamic-pool-size 100 >"$TMP_DIR/dry.out"
@@ -101,7 +101,7 @@ grep -Fqx 'OVPN_NETWORK=10.88.0.0/24' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'OVPN_NETWORK=10.89.0.0/24' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'OVPN_DYNAMIC_POOL_SIZE=100' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx '11111111-1111-4111-8111-111111111111,alpha,10.89.0.20' "$OVPN_DATA_DIR/data/client-ip.csv"
-grep -Fqx 'ifconfig-push 10.89.0.20 255.255.255.0' "$OVPN_DATA_DIR/ccd/alpha"
+grep -Fqx 'ifconfig-push 10.89.0.20 255.255.255.0' "$OVPN_DATA_DIR/ccd/11111111-1111-4111-8111-111111111111"
 test -z "$(ls -A "$OVPN_LEASE_DIR" 2>/dev/null)"
 grep -q '^server 10.89.0.0 255.255.255.0 nopool$' "$OVPN_DATA_DIR/server/server.conf"
 grep -Fq 'signal SIGHUP' "$OVPN_TEST_SOCAT_LOG"

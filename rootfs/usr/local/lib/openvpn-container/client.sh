@@ -38,9 +38,6 @@ ovpn_client_refuse_duplicate() {
   if [ -n "$status" ]; then
     ovpn_die "client '$name' already exists with status $status"
   fi
-  if [ -e "$OVPN_DATA_DIR/pki/issued/$name.crt" ] || [ -e "$OVPN_DATA_DIR/pki/private/$name.key" ]; then
-    ovpn_die "client '$name' already has PKI material"
-  fi
 }
 
 ovpn_client_export_inner() {

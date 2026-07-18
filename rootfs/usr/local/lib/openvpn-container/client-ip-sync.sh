@@ -29,54 +29,54 @@ ovpn_client_ip_sync_reset() {
 ovpn_client_ip_sync_collect_changes() {
   local snapshot="$1"
   local draft="$2"
-  local index id name old_ip new_ip line
+  local index id ignored_name old_ip new_ip line
   local -A old_assignments=()
   local -A new_assignments=()
 
   [ -r "$snapshot" ] || return 1
   for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
-    new_assignments["${OVPN_CLIENT_IP_NAMES[index]}"]="${OVPN_CLIENT_IP_VALUES[index]}"
+    new_assignments["${OVPN_CLIENT_IP_IDS[index]}"]="${OVPN_CLIENT_IP_VALUES[index]}"
   done
   while IFS= read -r line || [ -n "$line" ]; do
     [ "$line" = '# id,name,ip' ] && continue
     [ -n "$line" ] || continue
-    IFS=, read -r id name old_ip <<<"$line"
-    old_assignments["$name"]="$old_ip"
+    IFS=, read -r id ignored_name old_ip <<<"$line"
+    old_assignments["$id"]="$old_ip"
   done <"$snapshot"
-  for name in "${!new_assignments[@]}"; do
-    if [ -n "${old_assignments[$name]+present}" ]; then
-      old_ip="${old_assignments[$name]}"
+  for id in "${!new_assignments[@]}"; do
+    if [ -n "${old_assignments[$id]+present}" ]; then
+      old_ip="${old_assignments[$id]}"
     else
       old_ip=''
     fi
-    new_ip="${new_assignments[$name]}"
+    new_ip="${new_assignments[$id]}"
     [ "$old_ip" = "$new_ip" ] && continue
-    OVPN_CLIENT_IP_SYNC_CHANGED_CLIENTS+=("$name")
+    OVPN_CLIENT_IP_SYNC_CHANGED_CLIENTS+=("$id")
     if [ -z "$old_ip" ] || [ -z "$new_ip" ]; then
-      OVPN_CLIENT_IP_SYNC_LEASE_CLIENTS+=("$name")
+      OVPN_CLIENT_IP_SYNC_LEASE_CLIENTS+=("$id")
     fi
   done
-  for name in "${!old_assignments[@]}"; do
-    [ -z "${new_assignments[$name]+present}" ] || continue
-    OVPN_CLIENT_IP_SYNC_CHANGED_CLIENTS+=("$name")
-    if [ -z "${old_assignments[$name]}" ]; then
-      OVPN_CLIENT_IP_SYNC_LEASE_CLIENTS+=("$name")
+  for id in "${!old_assignments[@]}"; do
+    [ -z "${new_assignments[$id]+present}" ] || continue
+    OVPN_CLIENT_IP_SYNC_CHANGED_CLIENTS+=("$id")
+    if [ -z "${old_assignments[$id]}" ]; then
+      OVPN_CLIENT_IP_SYNC_LEASE_CLIENTS+=("$id")
     fi
   done
 }
 
 ovpn_client_ip_sync_stage_ccd() {
-  local index name ip
+  local index id ip
 
   OVPN_CLIENT_IP_SYNC_CCD_STAGE="$(mktemp -d "$OVPN_DATA_DIR/.ccd-ipam.stage.XXXXXX")" || ovpn_die "failed to create CCD stage directory"
   chmod 700 "$OVPN_CLIENT_IP_SYNC_CCD_STAGE"
   for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
-    name="${OVPN_CLIENT_IP_NAMES[index]}"
+    id="${OVPN_CLIENT_IP_IDS[index]}"
     ip="${OVPN_CLIENT_IP_VALUES[index]}"
     [ -n "$ip" ] || continue
     umask 077
-    printf 'ifconfig-push %s %s\n' "$ip" "$OVPN_IPAM_NETMASK" >"$OVPN_CLIENT_IP_SYNC_CCD_STAGE/$name"
-    chmod 600 "$OVPN_CLIENT_IP_SYNC_CCD_STAGE/$name"
+    printf 'ifconfig-push %s %s\n' "$ip" "$OVPN_IPAM_NETMASK" >"$OVPN_CLIENT_IP_SYNC_CCD_STAGE/$id"
+    chmod 600 "$OVPN_CLIENT_IP_SYNC_CCD_STAGE/$id"
   done
 }
 
@@ -100,11 +100,11 @@ ovpn_client_ip_sync_stage_leases() {
 }
 
 ovpn_client_ip_sync_swap_leases() {
-  local name
+  local id
 
   [ "${#OVPN_CLIENT_IP_SYNC_LEASE_CLIENTS[@]}" -gt 0 ] || return 0
-  for name in "${OVPN_CLIENT_IP_SYNC_LEASE_CLIENTS[@]}"; do
-    rm -f "$OVPN_LEASE_DIR/$name"
+  for id in "${OVPN_CLIENT_IP_SYNC_LEASE_CLIENTS[@]}"; do
+    rm -f "$OVPN_LEASE_DIR/$id"
   done
   OVPN_CLIENT_IP_SYNC_LEASE_SWAPPED=true
 }
@@ -114,12 +114,12 @@ ovpn_client_ip_clear_dynamic_lease() {
 }
 
 ovpn_client_ip_kick_changed_clients() {
-  local client_name response
+  local client_id response
 
   [ "${#OVPN_CLIENT_IP_SYNC_CHANGED_CLIENTS[@]}" -gt 0 ] || return 0
   [ -S "$OVPN_MANAGEMENT_SOCKET" ] || return 0
-  for client_name in "${OVPN_CLIENT_IP_SYNC_CHANGED_CLIENTS[@]}"; do
-    if ! response="$(ovpn_management_socket_request "$OVPN_MANAGEMENT_SOCKET" "kill $client_name")"; then
+  for client_id in "${OVPN_CLIENT_IP_SYNC_CHANGED_CLIENTS[@]}"; do
+    if ! response="$(ovpn_management_socket_request "$OVPN_MANAGEMENT_SOCKET" "kill $client_id")"; then
       ovpn_log 'client-ip: failed to contact the OpenVPN management socket'
       return 1
     fi

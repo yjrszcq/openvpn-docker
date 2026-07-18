@@ -56,6 +56,9 @@ docker compose run --rm openvpn-maintenance <command>
 
 ### 创建和分发客户端
 
+显示名称是管理标签和 profile 文件名。OpenVPN 使用生成 profile 注释中记录的不可变
+UUID 作为证书 CN 和运行时身份。
+
 ```bash
 # 创建客户端证书和 IP 分配（默认静态）
 docker compose exec openvpn ovpn client create laptop

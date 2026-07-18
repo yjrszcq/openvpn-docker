@@ -79,6 +79,15 @@ ovpn_registry_current_id_by_name() {
   printf '%s\n' "${OVPN_REGISTRY_CURRENT_ID_BY_NAME[$name]}"
 }
 
+ovpn_registry_name_by_id() {
+  local id="$1"
+
+  ovpn_registry_uuid_valid "$id" || return 1
+  ovpn_registry_load_identities || return 1
+  [ -n "${OVPN_REGISTRY_NAME_BY_ID[$id]:-}" ] || return 1
+  printf '%s\n' "${OVPN_REGISTRY_NAME_BY_ID[$id]}"
+}
+
 ovpn_registry_dir() {
   printf '%s/data\n' "$OVPN_DATA_DIR"
 }

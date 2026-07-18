@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 OVPN="$ROOT_DIR/rootfs/usr/local/bin/ovpn"
 TMP_DIR="$(mktemp -d)"
 FAKE_BIN="$TMP_DIR/bin"
+CLIENT_ID=11111111-1111-4111-8111-111111111111
 
 cleanup() {
   rm -rf "$TMP_DIR"
@@ -82,7 +83,7 @@ write_profile() {
   local data_dir="$1"
   local path="$2"
 
-  write_profile_material "$path" "$data_dir/pki/ca.crt" "$data_dir/pki/issued/laptop.crt" "$data_dir/pki/private/laptop.key" "$data_dir/secrets/tls-crypt.key"
+  write_profile_material "$path" "$data_dir/pki/ca.crt" "$data_dir/pki/issued/$CLIENT_ID.crt" "$data_dir/pki/private/$CLIENT_ID.key" "$data_dir/secrets/tls-crypt.key"
 }
 
 make_fixture() {
@@ -120,10 +121,10 @@ make_fixture() {
   openssl req -newkey rsa:2048 -nodes -subj '/CN=openvpn-server' -keyout "$data_dir/pki/private/openvpn-server.key" -out "$data_dir/server.csr" >/dev/null 2>&1
   printf '%s\n' 'basicConstraints=CA:FALSE' 'keyUsage=digitalSignature,keyEncipherment' 'extendedKeyUsage=serverAuth' >"$data_dir/server.ext"
   openssl x509 -req -in "$data_dir/server.csr" -CA "$data_dir/pki/ca.crt" -CAkey "$data_dir/pki/private/ca.key" -CAcreateserial -days 1 -out "$data_dir/pki/issued/openvpn-server.crt" -extfile "$data_dir/server.ext" >/dev/null 2>&1
-  openssl req -newkey rsa:2048 -nodes -subj '/CN=laptop' -keyout "$data_dir/pki/private/laptop.key" -out "$data_dir/laptop.csr" >/dev/null 2>&1
+  openssl req -newkey rsa:2048 -nodes -subj "/CN=$CLIENT_ID" -keyout "$data_dir/pki/private/$CLIENT_ID.key" -out "$data_dir/laptop.csr" >/dev/null 2>&1
   printf '%s\n' 'basicConstraints=CA:FALSE' 'keyUsage=digitalSignature,keyEncipherment' 'extendedKeyUsage=clientAuth' >"$data_dir/laptop.ext"
-  openssl x509 -req -in "$data_dir/laptop.csr" -CA "$data_dir/pki/ca.crt" -CAkey "$data_dir/pki/private/ca.key" -set_serial 0x01 -days 1 -out "$data_dir/pki/issued/laptop.crt" -extfile "$data_dir/laptop.ext" >/dev/null 2>&1
-  printf 'V\t30000101000000Z\t\t01\tunknown\t/CN=laptop\n' >"$data_dir/pki/index.txt"
+  openssl x509 -req -in "$data_dir/laptop.csr" -CA "$data_dir/pki/ca.crt" -CAkey "$data_dir/pki/private/ca.key" -set_serial 0x01 -days 1 -out "$data_dir/pki/issued/$CLIENT_ID.crt" -extfile "$data_dir/laptop.ext" >/dev/null 2>&1
+  printf 'V\t30000101000000Z\t\t01\tunknown\t/CN=%s\n' "$CLIENT_ID" >"$data_dir/pki/index.txt"
   cat >"$data_dir/crl.cnf" <<CRL_CONFIG
 [ ca ]
 default_ca = CA_default
@@ -229,9 +230,9 @@ fi
 [ "$("$OVPN" state show)" = HEALTHY ]
 [ "$(sha256sum "$data_dir/pki/ca.crt")" = "$ca_hash" ]
 [ "$(sha256sum "$data_dir/secrets/tls-crypt.key")" = "$tls_hash" ]
-client_certificate_hash="$(sha256sum "$data_dir/pki/issued/laptop.crt")"
-client_key_hash="$(sha256sum "$data_dir/pki/private/laptop.key")"
-rm "$data_dir/pki/issued/laptop.crt"
+client_certificate_hash="$(sha256sum "$data_dir/pki/issued/$CLIENT_ID.crt")"
+client_key_hash="$(sha256sum "$data_dir/pki/private/$CLIENT_ID.key")"
+rm "$data_dir/pki/issued/$CLIENT_ID.crt"
 client_state="$("$OVPN" state show)"
 if [ "$client_state" != DEGRADED_RECOVERABLE ]; then
   "$OVPN" state doctor --json >&2 || true
@@ -242,27 +243,27 @@ fi
 grep -Fq '[RECOVER] RECOVER_CLIENT_CERT' "$TMP_DIR/client-cert-plan.out"
 "$OVPN" repair apply >"$TMP_DIR/client-cert-repair.out" 2>"$TMP_DIR/client-cert-repair.err"
 [ "$("$OVPN" state show)" = HEALTHY ]
-[ "$(sha256sum "$data_dir/pki/issued/laptop.crt")" = "$client_certificate_hash" ]
-[ "$(stat -c '%a' "$data_dir/pki/issued/laptop.crt")" = 644 ]
+[ "$(sha256sum "$data_dir/pki/issued/$CLIENT_ID.crt")" = "$client_certificate_hash" ]
+[ "$(stat -c '%a' "$data_dir/pki/issued/$CLIENT_ID.crt")" = 644 ]
 
-rm "$data_dir/pki/private/laptop.key"
+rm "$data_dir/pki/private/$CLIENT_ID.key"
 [ "$("$OVPN" state show)" = DEGRADED_RECOVERABLE ]
 "$OVPN" repair plan >"$TMP_DIR/client-key-plan.out"
 grep -Fq '[RECOVER] RECOVER_CLIENT_KEY' "$TMP_DIR/client-key-plan.out"
 "$OVPN" repair apply >"$TMP_DIR/client-key-repair.out" 2>"$TMP_DIR/client-key-repair.err"
 [ "$("$OVPN" state show)" = HEALTHY ]
-[ "$(sha256sum "$data_dir/pki/private/laptop.key")" = "$client_key_hash" ]
-[ "$(stat -c '%a' "$data_dir/pki/private/laptop.key")" = 600 ]
+[ "$(sha256sum "$data_dir/pki/private/$CLIENT_ID.key")" = "$client_key_hash" ]
+[ "$(stat -c '%a' "$data_dir/pki/private/$CLIENT_ID.key")" = 600 ]
 
-rm "$data_dir/pki/issued/laptop.crt" "$data_dir/pki/private/laptop.key"
+rm "$data_dir/pki/issued/$CLIENT_ID.crt" "$data_dir/pki/private/$CLIENT_ID.key"
 [ "$("$OVPN" state show)" = DEGRADED_RECOVERABLE ]
 if ! "$OVPN" start >"$TMP_DIR/client-start.out" 2>"$TMP_DIR/client-start.err"; then
   cat "$TMP_DIR/client-start.err" >&2
   exit 1
 fi
 [ "$("$OVPN" state show)" = HEALTHY ]
-[ "$(sha256sum "$data_dir/pki/issued/laptop.crt")" = "$client_certificate_hash" ]
-[ "$(sha256sum "$data_dir/pki/private/laptop.key")" = "$client_key_hash" ]
+[ "$(sha256sum "$data_dir/pki/issued/$CLIENT_ID.crt")" = "$client_certificate_hash" ]
+[ "$(sha256sum "$data_dir/pki/private/$CLIENT_ID.key")" = "$client_key_hash" ]
 
 rm "$data_dir/clients/active/laptop.ovpn" "$data_dir/clients/active/phone.ovpn" "$data_dir/pki/ca.crt"
 [ "$("$OVPN" state show)" = CRITICAL ]
@@ -276,14 +277,14 @@ set -e
 conflicting_ca_data="$TMP_DIR/conflicting-ca"
 make_fixture "$conflicting_ca_data"
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=Conflicting Recovery CA' -keyout "$TMP_DIR/conflicting-ca.key" -out "$TMP_DIR/conflicting-ca.crt" >/dev/null 2>&1
-write_profile_material "$conflicting_ca_data/clients/active/phone.ovpn" "$TMP_DIR/conflicting-ca.crt" "$conflicting_ca_data/pki/issued/laptop.crt" "$conflicting_ca_data/pki/private/laptop.key" "$conflicting_ca_data/secrets/tls-crypt.key"
+write_profile_material "$conflicting_ca_data/clients/active/phone.ovpn" "$TMP_DIR/conflicting-ca.crt" "$conflicting_ca_data/pki/issued/$CLIENT_ID.crt" "$conflicting_ca_data/pki/private/$CLIENT_ID.key" "$conflicting_ca_data/secrets/tls-crypt.key"
 rm "$conflicting_ca_data/pki/ca.crt"
 assert_critical_recovery "$conflicting_ca_data" CRITICAL_RECOVERY_CONFLICT conflicting-ca
 
 conflicting_tls_data="$TMP_DIR/conflicting-tls"
 make_fixture "$conflicting_tls_data"
 write_tls_crypt_key "$TMP_DIR/conflicting-tls.key" 8
-write_profile_material "$conflicting_tls_data/clients/active/phone.ovpn" "$conflicting_tls_data/pki/ca.crt" "$conflicting_tls_data/pki/issued/laptop.crt" "$conflicting_tls_data/pki/private/laptop.key" "$TMP_DIR/conflicting-tls.key"
+write_profile_material "$conflicting_tls_data/clients/active/phone.ovpn" "$conflicting_tls_data/pki/ca.crt" "$conflicting_tls_data/pki/issued/$CLIENT_ID.crt" "$conflicting_tls_data/pki/private/$CLIENT_ID.key" "$TMP_DIR/conflicting-tls.key"
 rm "$conflicting_tls_data/secrets/tls-crypt.key"
 assert_critical_recovery "$conflicting_tls_data" CRITICAL_RECOVERY_CONFLICT conflicting-tls
 
@@ -296,15 +297,15 @@ assert_critical_recovery "$malformed_ca_data" CA_CERT_RECOVERY_INVALID malformed
 non_equivalent_ca_data="$TMP_DIR/non-equivalent-ca"
 make_fixture "$non_equivalent_ca_data"
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=Non-equivalent Recovery CA' -keyout "$TMP_DIR/non-equivalent-ca.key" -out "$TMP_DIR/non-equivalent-ca.crt" >/dev/null 2>&1
-write_profile_material "$non_equivalent_ca_data/clients/active/laptop.ovpn" "$TMP_DIR/non-equivalent-ca.crt" "$non_equivalent_ca_data/pki/issued/laptop.crt" "$non_equivalent_ca_data/pki/private/laptop.key" "$non_equivalent_ca_data/secrets/tls-crypt.key"
-write_profile_material "$non_equivalent_ca_data/clients/active/phone.ovpn" "$TMP_DIR/non-equivalent-ca.crt" "$non_equivalent_ca_data/pki/issued/laptop.crt" "$non_equivalent_ca_data/pki/private/laptop.key" "$non_equivalent_ca_data/secrets/tls-crypt.key"
+write_profile_material "$non_equivalent_ca_data/clients/active/laptop.ovpn" "$TMP_DIR/non-equivalent-ca.crt" "$non_equivalent_ca_data/pki/issued/$CLIENT_ID.crt" "$non_equivalent_ca_data/pki/private/$CLIENT_ID.key" "$non_equivalent_ca_data/secrets/tls-crypt.key"
+write_profile_material "$non_equivalent_ca_data/clients/active/phone.ovpn" "$TMP_DIR/non-equivalent-ca.crt" "$non_equivalent_ca_data/pki/issued/$CLIENT_ID.crt" "$non_equivalent_ca_data/pki/private/$CLIENT_ID.key" "$non_equivalent_ca_data/secrets/tls-crypt.key"
 rm "$non_equivalent_ca_data/pki/ca.crt"
 assert_critical_recovery "$non_equivalent_ca_data" CA_CERT_RECOVERY_INVALID non-equivalent-ca
 
 mismatched_client_data="$TMP_DIR/mismatched-client"
 make_fixture "$mismatched_client_data"
 openssl genpkey -algorithm RSA -out "$TMP_DIR/mismatched-client.key" >/dev/null 2>&1
-write_profile_material "$mismatched_client_data/clients/active/laptop.ovpn" "$mismatched_client_data/pki/ca.crt" "$mismatched_client_data/pki/issued/laptop.crt" "$TMP_DIR/mismatched-client.key" "$mismatched_client_data/secrets/tls-crypt.key"
-rm "$mismatched_client_data/pki/private/laptop.key"
+write_profile_material "$mismatched_client_data/clients/active/laptop.ovpn" "$mismatched_client_data/pki/ca.crt" "$mismatched_client_data/pki/issued/$CLIENT_ID.crt" "$TMP_DIR/mismatched-client.key" "$mismatched_client_data/secrets/tls-crypt.key"
+rm "$mismatched_client_data/pki/private/$CLIENT_ID.key"
 assert_critical_recovery "$mismatched_client_data" CLIENT_IDENTITY_RECOVERY_INVALID_laptop mismatched-client
 printf 'recovery smoke passed\n'

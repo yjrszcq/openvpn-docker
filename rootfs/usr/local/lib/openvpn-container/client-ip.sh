@@ -102,12 +102,16 @@ ovpn_client_ip_parse_file() {
 
 ovpn_client_ip_collect_pki_clients() {
   local index="$OVPN_DATA_DIR/pki/index.txt"
-  local line status subject name id identity_state
+  local line status subject id name identity_state
   local -A pki_states=()
 
   OVPN_CLIENT_IP_PKI_STATES=()
   [ -r "$index" ] || {
     ovpn_client_ip_error "cannot read PKI index: $index"
+    return 1
+  }
+  ovpn_registry_load_identities || {
+    ovpn_client_ip_error 'cannot read the authoritative client identity registry'
     return 1
   }
   while IFS= read -r line || [ -n "$line" ]; do
@@ -117,40 +121,36 @@ ovpn_client_ip_collect_pki_clients() {
       *) continue ;;
     esac
     subject="${line##*$'\t'}"
-    name="${subject##*/CN=}"
-    name="${name%%/*}"
-    [ -n "$name" ] || {
+    id="${subject##*/CN=}"
+    id="${id%%/*}"
+    [ -n "$id" ] || {
       ovpn_client_ip_error 'PKI index contains a logical client without a CN'
       return 1
     }
-    [ "$name" = "$OVPN_SERVER_NAME" ] && continue
-    ovpn_registry_client_name_valid "$name" || {
-      ovpn_client_ip_error "PKI index contains an invalid client name '$name'"
+    [ "$id" = "$OVPN_SERVER_NAME" ] && continue
+    ovpn_registry_uuid_valid "$id" || {
+      ovpn_client_ip_error "PKI index contains an invalid client UUID '$id'"
       return 1
     }
     if [ "$status" = V ]; then
-      pki_states["$name"]=active
-    elif [ -z "${pki_states[$name]+present}" ]; then
-      pki_states["$name"]=revoked
+      pki_states["$id"]=active
+    elif [ -z "${pki_states[$id]+present}" ]; then
+      pki_states["$id"]=revoked
     fi
   done <"$index"
-  ovpn_registry_load_identities || {
-    ovpn_client_ip_error 'cannot read the authoritative client identity registry'
-    return 1
-  }
   for id in "${OVPN_REGISTRY_CLIENT_IDS[@]}"; do
     name="${OVPN_REGISTRY_NAME_BY_ID[$id]}"
     identity_state="${OVPN_REGISTRY_STATE_BY_ID[$id]}"
     if [ "$identity_state" = deleted ]; then
-      [ -n "${OVPN_REGISTRY_CURRENT_ID_BY_NAME[$name]:-}" ] || unset 'pki_states[$name]'
+      unset 'pki_states[$id]'
       continue
     fi
-    [ "${pki_states[$name]:-}" = "$identity_state" ] || {
+    [ "${pki_states[$id]:-}" = "$identity_state" ] || {
       ovpn_client_ip_error "identity registry and PKI disagree for client '$name'"
       return 1
     }
     OVPN_CLIENT_IP_PKI_STATES["$name"]="$identity_state"
-    unset 'pki_states[$name]'
+    unset 'pki_states[$id]'
   done
   [ "${#pki_states[@]}" -eq 0 ] || {
     ovpn_client_ip_error 'PKI contains a client missing from the identity registry'

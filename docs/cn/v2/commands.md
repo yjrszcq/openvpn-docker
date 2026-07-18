@@ -138,6 +138,11 @@ ovpn config apply
 
 ## 客户端生命周期
 
+每个客户端都有不可变的 UUID 身份。证书 CN、Easy-RSA 实体、CCD 文件名、动态租约
+文件名和 OpenVPN management 身份均使用该 UUID；客户端名称仍作为面向人的管理标签和
+profile 文件名。生成的 profile 包含 `ovpn-client-id` 与 `ovpn-client-name` 注释，
+因此无需改变 OpenVPN 语法也能恢复两种身份。本节命令目前仍接收客户端名称。
+
 ### `ovpn client create`
 
 语法：
@@ -146,7 +151,10 @@ ovpn config apply
 ovpn client create <name> [--dynamic|--ip <IPv4>]
 ```
 
-在一个事务中创建唯一的客户端证书、私钥、活跃 profile、清单记录以及 IP 分配。不带选项时，客户端获取最低的可用静态地址。`--dynamic` 创建动态分配，要求动态池容量非零。`--ip <IPv4>` 请求静态区内的特定未使用地址。`--dynamic` 与 `--ip` 不可同时使用。
+在一个事务中创建由唯一 UUID 标识的客户端证书、私钥、活跃 profile、清单记录以及
+IP 分配。不带选项时，客户端获取最低的可用静态地址。`--dynamic` 创建动态分配，
+要求动态池容量非零。`--ip <IPv4>` 请求静态区内的特定未使用地址。`--dynamic` 与
+`--ip` 不可同时使用。
 
 ### `ovpn client export`
 

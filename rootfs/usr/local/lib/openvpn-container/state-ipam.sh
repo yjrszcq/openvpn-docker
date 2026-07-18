@@ -39,15 +39,15 @@ ovpn_state_ipam_parse_client_states() {
 ovpn_state_ipam_deleted_client_has_active_certificate() {
   local wanted="$1"
   local index="$OVPN_DATA_DIR/pki/index.txt"
-  local line status subject name
+  local line status subject id
 
   while IFS= read -r line || [ -n "$line" ]; do
     status="${line%%$'\t'*}"
     [ "$status" = V ] || continue
     subject="${line##*$'\t'}"
-    name="${subject##*/CN=}"
-    name="${name%%/*}"
-    [ "$name" = "$wanted" ] && return 0
+    id="${subject##*/CN=}"
+    id="${id%%/*}"
+    [ "$id" = "$wanted" ] && return 0
   done <"$index"
   return 1
 }
@@ -90,7 +90,7 @@ ovpn_state_ipam_applied_is_canonical() {
 
 ovpn_state_ipam_stage_ccd() {
   local destination="$1"
-  local applied index name ip
+  local applied index id ip
 
   applied="$(ovpn_registry_applied_file)"
   ovpn_client_ip_validate_file "$applied" || ovpn_die 'cannot safely rebuild CCD from an invalid applied client-IP registry'
@@ -98,12 +98,12 @@ ovpn_state_ipam_stage_ccd() {
   mkdir -p "$destination"
   chmod 700 "$destination"
   for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
-    name="${OVPN_CLIENT_IP_NAMES[index]}"
+    id="${OVPN_CLIENT_IP_IDS[index]}"
     ip="${OVPN_CLIENT_IP_VALUES[index]}"
     [ -n "$ip" ] || continue
-    printf 'ifconfig-push %s %s\n' "$ip" "$OVPN_IPAM_NETMASK" >"$destination/.$name.tmp"
-    mv "$destination/.$name.tmp" "$destination/$name"
-    chmod 600 "$destination/$name"
+    printf 'ifconfig-push %s %s\n' "$ip" "$OVPN_IPAM_NETMASK" >"$destination/.$id.tmp"
+    mv "$destination/.$id.tmp" "$destination/$id"
+    chmod 600 "$destination/$id"
   done
 }
 
@@ -119,9 +119,10 @@ ovpn_state_ipam_stage_canonical_registry() {
 
 ovpn_state_scan_ipam_consistency() {
   local draft applied state_file audit_file ccd_dir lease_dir protected
-  local index name ip expected actual lease_line lease_name state expected_state
+  local index id name ip expected actual lease_line lease_id state expected_state
   local ccd_out_of_sync=false
   local -A applied_clients=()
+  local -A applied_ids=()
 
   draft="$(ovpn_registry_client_ip_file)"
   applied="$(ovpn_registry_applied_file)"
@@ -155,9 +156,11 @@ ovpn_state_scan_ipam_consistency() {
     return 0
   }
   for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
+    id="${OVPN_CLIENT_IP_IDS[index]}"
     name="${OVPN_CLIENT_IP_NAMES[index]}"
     ip="${OVPN_CLIENT_IP_VALUES[index]}"
     applied_clients["$name"]=1
+    applied_ids["$id"]=1
     state="${OVPN_STATE_IPAM_CLIENT_STATES[$name]:-}"
     expected_state="${OVPN_CLIENT_IP_PKI_STATES[$name]:-}"
     if [ "$state" != "$expected_state" ]; then
@@ -165,12 +168,12 @@ ovpn_state_scan_ipam_consistency() {
       return 0
     fi
     if [ -z "$ip" ]; then
-      if [ -e "$ccd_dir/$name" ]; then ccd_out_of_sync=true; fi
+      if [ -e "$ccd_dir/$id" ]; then ccd_out_of_sync=true; fi
       continue
     fi
     expected="ifconfig-push $ip $OVPN_IPAM_NETMASK"
     actual=''
-    [ -r "$ccd_dir/$name" ] && actual="$(cat "$ccd_dir/$name")"
+    [ -r "$ccd_dir/$id" ] && actual="$(cat "$ccd_dir/$id")"
     if [ "$actual" != "$expected" ]; then ccd_out_of_sync=true; fi
   done
   for name in "${!OVPN_CLIENT_IP_PKI_STATES[@]}"; do
@@ -182,7 +185,8 @@ ovpn_state_scan_ipam_consistency() {
   for name in "${!OVPN_STATE_IPAM_CLIENT_STATES[@]}"; do
     state="${OVPN_STATE_IPAM_CLIENT_STATES[$name]}"
     if [ "$state" = deleted ]; then
-      if [ -n "${applied_clients[$name]+present}" ] || ovpn_state_ipam_deleted_client_has_active_certificate "$name"; then
+      id="${OVPN_STATE_IPAM_CLIENT_IDS[$name]}"
+      if [ -n "${applied_clients[$name]+present}" ] || ovpn_state_ipam_deleted_client_has_active_certificate "$id"; then
         ovpn_state_add_critical_issue CLIENT_IP_LOGICAL_STATE_MISMATCH RESTORE_CLIENT_IP_REGISTRY
         return 0
       fi
@@ -196,8 +200,8 @@ ovpn_state_scan_ipam_consistency() {
     _nullglob="$(shopt -p nullglob 2>/dev/null || true)"
     shopt -s nullglob
     for lease_line in "$ccd_dir"/*; do
-      name="${lease_line##*/}"
-      [ -n "${applied_clients[$name]+present}" ] && [ -n "$(awk -F, -v client="$name" '$2 == client && $3 != "" { print; exit }' "$applied")" ] || ccd_out_of_sync=true
+      id="${lease_line##*/}"
+      [ -n "${applied_ids[$id]+present}" ] && [ -n "$(awk -F, -v client_id="$id" '$1 == client_id && $3 != "" { print; exit }' "$applied")" ] || ccd_out_of_sync=true
     done
     eval "$_nullglob" 2>/dev/null || true
   fi
@@ -207,10 +211,10 @@ ovpn_state_scan_ipam_consistency() {
   if [ -d "$lease_dir" ]; then
     for lease_file in "$lease_dir"/*; do
       [ -f "$lease_file" ] || continue
-      lease_name="$(basename "$lease_file")"
-      [ -n "${applied_clients[$lease_name]+present}" ] || continue
-      ip="$(awk -F, -v client="$lease_name" '$2 == client { print $3; exit }' "$applied")"
-      [ -z "$ip" ] || ovpn_state_add_issue "STATIC_CLIENT_LEASE_$lease_name" manual RUN_CLIENT_IP_APPLY
+      lease_id="$(basename "$lease_file")"
+      [ -n "${applied_ids[$lease_id]+present}" ] || continue
+      ip="$(awk -F, -v client_id="$lease_id" '$1 == client_id { print $3; exit }' "$applied")"
+      [ -z "$ip" ] || ovpn_state_add_issue "STATIC_CLIENT_LEASE_$lease_id" manual RUN_CLIENT_IP_APPLY
     done
   fi
   if cmp -s "$draft" "$applied" && ! ovpn_state_ipam_applied_is_canonical "$applied"; then

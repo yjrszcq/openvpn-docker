@@ -13,7 +13,7 @@ export OVPN_SERVER_NAME=openvpn-server
 make_healthy() {
   local data_dir="$1"
 
-  mkdir -p "$data_dir/config" "$data_dir/meta" "$data_dir/server" "$data_dir/pki/private" "$data_dir/pki/issued" "$data_dir/secrets"
+  mkdir -p "$data_dir/config" "$data_dir/data" "$data_dir/meta" "$data_dir/server" "$data_dir/pki/private" "$data_dir/pki/issued" "$data_dir/secrets"
   printf 'OVPN_CONFIG_VERSION=3\n' >"$data_dir/config/project.env"
   printf '3\n' >"$data_dir/config/schema-version"
   printf '{\n  "ca_fingerprint_sha256": "FAKE:CA:FINGERPRINT"\n}\n' >"$data_dir/meta/instance.json"
@@ -26,6 +26,11 @@ make_healthy() {
   : >"$data_dir/pki/crl.pem"
   : >"$data_dir/secrets/tls-crypt.key"
   : >"$data_dir/server/server.conf"
+  printf '# id,name,ip\n' >"$data_dir/data/client-ip.csv"
+  cp "$data_dir/data/client-ip.csv" "$data_dir/meta/client-ip.applied.csv"
+  printf '# id,name,state\n' >"$data_dir/meta/client-state.csv"
+  : >"$data_dir/meta/audit.jsonl"
+  chmod 600 "$data_dir/data/client-ip.csv" "$data_dir/meta/client-ip.applied.csv" "$data_dir/meta/client-state.csv" "$data_dir/meta/audit.jsonl"
 }
 
 snapshot() {
@@ -67,9 +72,9 @@ cat >"$pending/meta/client-state.csv" <<'EOF'
 11111111-1111-4111-8111-111111111111,applied,active
 EOF
 : >"$pending/meta/audit.jsonl"
-printf 'V\t9999\t\t01\tunknown\t/CN=applied\n' >"$pending/pki/index.txt"
-: >"$pending/pki/issued/applied.crt"
-: >"$pending/pki/private/applied.key"
+printf 'V\t9999\t\t01\tunknown\t/CN=11111111-1111-4111-8111-111111111111\n' >"$pending/pki/index.txt"
+: >"$pending/pki/issued/11111111-1111-4111-8111-111111111111.crt"
+: >"$pending/pki/private/11111111-1111-4111-8111-111111111111.key"
 mkdir -p "$pending/clients/active"
 : >"$pending/clients/active/applied.ovpn"
 chmod 600 "$pending/data/client-ip.csv" "$pending/meta/client-ip.applied.csv" "$pending/meta/client-state.csv" "$pending/meta/audit.jsonl"
@@ -115,7 +120,11 @@ cp -a "$healthy" "$quoted"
 printf 'V\t9999\t\t/CN=bad"client\n' >"$quoted/pki/index.txt"
 : >"$quoted/pki/issued/bad\"client.crt"
 : >"$quoted/pki/private/bad\"client.key"
-OVPN_DATA_DIR="$quoted" "$OVPN" state doctor --json >"$TMP_DIR/quoted.json"
-grep -Fq '"id": "CLIENT_PROFILE_MISSING_bad\"client"' "$TMP_DIR/quoted.json"
+set +e
+OVPN_DATA_DIR="$quoted" "$OVPN" state doctor --json >"$TMP_DIR/quoted.json" 2>"$TMP_DIR/quoted.err"
+status=$?
+set -e
+[ "$status" -eq 78 ]
+grep -Fq '"id": "CLIENT_PKI_IDENTITY_UNKNOWN_bad\"client"' "$TMP_DIR/quoted.json"
 
 printf 'doctor smoke passed\n'

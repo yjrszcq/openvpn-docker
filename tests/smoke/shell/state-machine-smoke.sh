@@ -11,6 +11,7 @@ export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
 export OVPN_SERVER_NAME=openvpn-server
 # shellcheck source=../rootfs/usr/local/lib/openvpn-container/common.sh
 . "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/common.sh"
+. "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/registry.sh"
 . "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/recovery.sh"
 . "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/state.sh"
 
@@ -30,6 +31,7 @@ make_healthy() {
   : >"$data_dir/pki/crl.pem"
   : >"$data_dir/secrets/tls-crypt.key"
   : >"$data_dir/server/server.conf"
+  printf '# id,name,state\n' >"$data_dir/meta/client-state.csv"
 }
 
 assert_state() {

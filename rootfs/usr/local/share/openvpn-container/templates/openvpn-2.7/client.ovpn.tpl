@@ -1,4 +1,6 @@
 client
+# ovpn-client-id: {{CLIENT_ID}}
+# ovpn-client-name: {{CLIENT_NAME}}
 dev tun
 proto {{OVPN_CLIENT_PROTO}}
 remote {{OVPN_ENDPOINT}} {{OVPN_PORT}}

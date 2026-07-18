@@ -256,28 +256,30 @@ echo "=== Phase 11: Dynamic lease hook ==="
 
 LEASE_DIR="${OVPN_LEASE_DIR:-/etc/openvpn/data/leases}"
 mkdir -p "$LEASE_DIR"
+dynamic01_id=11111111-1111-4111-8111-111111111111
+dynamic02_id=22222222-2222-4222-8222-222222222222
 
 # simulate client connect
-script_type=client-connect common_name=dynamic01 ifconfig_pool_remote_ip=10.213.0.200 \
+script_type=client-connect common_name="$dynamic01_id" ifconfig_pool_remote_ip=10.213.0.200 \
   /usr/local/bin/ovpn-hook pool-persist
 check $? "hook client-connect dynamic01"
-[ -f "$LEASE_DIR/dynamic01" ]; check $? "lease file exists"
-[ "$(cat "$LEASE_DIR/dynamic01")" = "10.213.0.200" ]; check $? "lease file content correct"
+[ -f "$LEASE_DIR/$dynamic01_id" ]; check $? "lease file exists"
+[ "$(cat "$LEASE_DIR/$dynamic01_id")" = "10.213.0.200" ]; check $? "lease file content correct"
 
 # reconnect with new IP
-script_type=client-connect common_name=dynamic01 ifconfig_pool_remote_ip=10.213.0.201 \
+script_type=client-connect common_name="$dynamic01_id" ifconfig_pool_remote_ip=10.213.0.201 \
   /usr/local/bin/ovpn-hook pool-persist
-[ "$(cat "$LEASE_DIR/dynamic01")" = "10.213.0.201" ]; check $? "lease updated on reconnect"
+[ "$(cat "$LEASE_DIR/$dynamic01_id")" = "10.213.0.201" ]; check $? "lease updated on reconnect"
 
 # another client gets recycled IP
-script_type=client-connect common_name=dynamic02 ifconfig_pool_remote_ip=10.213.0.200 \
+script_type=client-connect common_name="$dynamic02_id" ifconfig_pool_remote_ip=10.213.0.200 \
   /usr/local/bin/ovpn-hook pool-persist
-[ -f "$LEASE_DIR/dynamic02" ]; check $? "recycled IP attributed to new client"
+[ -f "$LEASE_DIR/$dynamic02_id" ]; check $? "recycled IP attributed to new client"
 
 # disconnect is no-op
-script_type=client-disconnect common_name=dynamic01 \
+script_type=client-disconnect common_name="$dynamic01_id" \
   /usr/local/bin/ovpn-hook pool-persist
-[ -f "$LEASE_DIR/dynamic01" ]; check $? "lease preserved after disconnect"
+[ -f "$LEASE_DIR/$dynamic01_id" ]; check $? "lease preserved after disconnect"
 
 # verify no duplicate IP files
 dup_count=0

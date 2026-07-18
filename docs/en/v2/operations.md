@@ -58,6 +58,10 @@ on the Docker host, including `http://127.0.0.1:7890`.
 
 ### Create and distribute clients
 
+The displayed name is a management label and profile filename. OpenVPN uses
+the immutable UUID stored in the generated profile comments as the certificate
+CN and runtime identity.
+
 ```bash
 # create with default static IP
 docker compose exec openvpn ovpn client create laptop

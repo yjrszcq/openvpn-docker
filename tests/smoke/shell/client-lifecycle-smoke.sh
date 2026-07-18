@@ -117,8 +117,8 @@ cat >"$FAKE_BIN/socat" <<'FAKE_SOCAT'
 set -euo pipefail
 cat >/dev/null
 printf 'HEADER\tROUTING_TABLE\tVirtual Address\tCommon Name\tReal Address\tLast Ref\r\n'
-printf 'ROUTING_TABLE\t10.88.0.2\tlaptop\t198.51.100.11:1194\tWed Jul 15 00:00:00 2026\r\n'
-printf 'ROUTING_TABLE\t10.88.0.200\tonline\t198.51.100.10:1194\tWed Jul 15 00:00:00 2026\r\n'
+printf 'ROUTING_TABLE\t10.88.0.2\t%s\t198.51.100.11:1194\tWed Jul 15 00:00:00 2026\r\n' "${TEST_LAPTOP_ID:-unknown}"
+printf 'ROUTING_TABLE\t10.88.0.200\t%s\t198.51.100.10:1194\tWed Jul 15 00:00:00 2026\r\n' "${TEST_ONLINE_ID:-unknown}"
 printf 'END\r\n'
 FAKE_SOCAT
 chmod +x "$FAKE_BIN/socat"
@@ -148,6 +148,7 @@ export OVPN_OPENSSL_BIN="$ROOT_DIR/tests/helpers/fake-openssl.sh"
 "$OVPN" client create laptop >/tmp/ovpn-add-client.out 2>/tmp/ovpn-add-client.err
 laptop_id="$(awk -F, '$2 == "laptop" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
 [[ "$laptop_id" =~ ^[0-9a-f-]{36}$ ]]
+export TEST_LAPTOP_ID="$laptop_id"
 
 repair_snapshot() {
   find "$OVPN_DATA_DIR" \
@@ -160,8 +161,8 @@ identity_before="$(sha256sum \
   "$OVPN_DATA_DIR/pki/private/ca.key" \
   "$OVPN_DATA_DIR/pki/issued/openvpn-server.crt" \
   "$OVPN_DATA_DIR/pki/private/openvpn-server.key" \
-  "$OVPN_DATA_DIR/pki/issued/laptop.crt" \
-  "$OVPN_DATA_DIR/pki/private/laptop.key")"
+  "$OVPN_DATA_DIR/pki/issued/$laptop_id.crt" \
+  "$OVPN_DATA_DIR/pki/private/$laptop_id.key")"
 rm "$OVPN_DATA_DIR/config/schema-version" \
   "$OVPN_DATA_DIR/meta/instance.json" \
   "$OVPN_DATA_DIR/server/server.conf" \
@@ -184,8 +185,8 @@ identity_after="$(sha256sum \
   "$OVPN_DATA_DIR/pki/private/ca.key" \
   "$OVPN_DATA_DIR/pki/issued/openvpn-server.crt" \
   "$OVPN_DATA_DIR/pki/private/openvpn-server.key" \
-  "$OVPN_DATA_DIR/pki/issued/laptop.crt" \
-  "$OVPN_DATA_DIR/pki/private/laptop.key")"
+  "$OVPN_DATA_DIR/pki/issued/$laptop_id.crt" \
+  "$OVPN_DATA_DIR/pki/private/$laptop_id.key")"
 [ "$identity_before" = "$identity_after" ] || {
   echo 'safe repair changed identity material' >&2
   exit 1
@@ -219,6 +220,7 @@ if grep -Fqx build-client-full "$FAKE_EASYRSA_LOG"; then
 fi
 wait "$repair_pid"
 wait "$add_client_pid"
+tablet_id="$(awk -F, '$2 == "tablet" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
 grep -Fqx build-client-full "$FAKE_EASYRSA_LOG"
 unset FAKE_OPENSSL_LOG FAKE_OPENSSL_SLEEP_ON FAKE_OPENSSL_SLEEP_SECONDS FAKE_EASYRSA_LOG
 if [ "$("$OVPN" state show)" != HEALTHY ]; then
@@ -247,7 +249,7 @@ journal="$(grep -rl -- '"result": "failed"' "$OVPN_DATA_DIR/repair/journal" | he
   echo 'failed repair did not create a journal' >&2
   exit 1
 }
-if grep -Fq 'FAKE CLIENT KEY laptop' "$journal"; then
+if grep -Fq "FAKE CLIENT KEY $laptop_id" "$journal"; then
   echo 'repair journal contains private profile material' >&2
   exit 1
 fi
@@ -264,20 +266,20 @@ test -f "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 "$OVPN" client create phone --dynamic >"$TMP_DIR/phone-create.out" 2>"$TMP_DIR/phone-create.err"
 phone_id="$(awk -F, '$2 == "phone" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
 grep -Fqx "$phone_id,phone," "$OVPN_DATA_DIR/data/client-ip.csv"
-test ! -e "$OVPN_DATA_DIR/ccd/phone"
+test ! -e "$OVPN_DATA_DIR/ccd/$phone_id"
 "$OVPN" client ip set phone --ip 10.88.0.20 >"$TMP_DIR/phone-static.out" 2>"$TMP_DIR/phone-static.err"
 grep -Fqx "$phone_id,phone,10.88.0.20" "$OVPN_DATA_DIR/data/client-ip.csv"
-grep -Fqx 'ifconfig-push 10.88.0.20 255.255.255.0' "$OVPN_DATA_DIR/ccd/phone"
+grep -Fqx 'ifconfig-push 10.88.0.20 255.255.255.0' "$OVPN_DATA_DIR/ccd/$phone_id"
 "$OVPN" client ip set laptop --dynamic >"$TMP_DIR/laptop-dynamic.out" 2>"$TMP_DIR/laptop-dynamic.err"
 grep -Fqx "$laptop_id,laptop," "$OVPN_DATA_DIR/data/client-ip.csv"
-test ! -e "$OVPN_DATA_DIR/ccd/laptop"
+test ! -e "$OVPN_DATA_DIR/ccd/$laptop_id"
 env -u OVPN_EDITOR -u EDITOR \
   OVPN_TEST_EDITOR_LOG="$TMP_DIR/editor.log" \
   PATH="$FAKE_BIN:$PATH" \
   "$OVPN" client ip set laptop phone >"$TMP_DIR/batch-static.out" 2>"$TMP_DIR/batch-static.err"
 grep -Eq '^nano:\.client-ip-set\.' "$TMP_DIR/editor.log"
 grep -Fqx "$laptop_id,laptop,10.88.0.2" "$OVPN_DATA_DIR/data/client-ip.csv"
-grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/laptop"
+grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/$laptop_id"
 
 mkdir -p "$OVPN_RUNTIME_DIR"
 nc -lU "$OVPN_MANAGEMENT_SOCKET" >/dev/null 2>&1 &
@@ -294,11 +296,14 @@ done
 "$OVPN" client create old --ip 10.88.0.30 >"$TMP_DIR/old-create.out" 2>"$TMP_DIR/old-create.err"
 "$OVPN" client revoke old >"$TMP_DIR/old-revoke.out" 2>"$TMP_DIR/old-revoke.err"
 "$OVPN" client create online --dynamic >"$TMP_DIR/online-create.out" 2>"$TMP_DIR/online-create.err"
+online_id="$(awk -F, '$2 == "online" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
+export TEST_ONLINE_ID="$online_id"
 "$OVPN" client create known --dynamic >"$TMP_DIR/known-create.out" 2>"$TMP_DIR/known-create.err"
+known_id="$(awk -F, '$2 == "known" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
 "$OVPN" client create missing --dynamic >"$TMP_DIR/missing-create.out" 2>"$TMP_DIR/missing-create.err"
 mkdir -p "$OVPN_LEASE_DIR"
-printf '10.88.0.201\n' >"$OVPN_LEASE_DIR/online"
-printf '10.88.0.202\n' >"$OVPN_LEASE_DIR/known"
+printf '10.88.0.201\n' >"$OVPN_LEASE_DIR/$online_id"
+printf '10.88.0.202\n' >"$OVPN_LEASE_DIR/$known_id"
 printf '10.88.0.203\n' >"$OVPN_LEASE_DIR/unrelated"
 "$OVPN" client list --detail >"$TMP_DIR/client-list-ip.out"
 grep -Fqx "$(format_client_list_row CLIENT STATE MODE IP 'IP STATE' CONNECTION)" "$TMP_DIR/client-list-ip.out"
@@ -322,8 +327,10 @@ grep -Fqx "$(format_client_list_row online active dynamic 10.88.0.201 last-known
 "$OVPN" client export laptop >"$TMP_DIR/laptop.ovpn" 2>"$TMP_DIR/export.err"
 test ! -s "$TMP_DIR/export.err"
 grep -q '^remote vpn.example.test 1194$' "$TMP_DIR/laptop.ovpn"
-grep -q 'FAKE CLIENT CERT laptop' "$TMP_DIR/laptop.ovpn"
-grep -q 'FAKE CLIENT KEY laptop' "$TMP_DIR/laptop.ovpn"
+grep -q "FAKE CLIENT CERT $laptop_id" "$TMP_DIR/laptop.ovpn"
+grep -q "FAKE CLIENT KEY $laptop_id" "$TMP_DIR/laptop.ovpn"
+grep -Fqx "# ovpn-client-id: $laptop_id" "$TMP_DIR/laptop.ovpn"
+grep -Fqx '# ovpn-client-name: laptop' "$TMP_DIR/laptop.ovpn"
 
 OVPN_ENDPOINT=changed.example.test \
   OVPN_PROTO=tcp \
@@ -362,11 +369,11 @@ grep -q 'already exists' "$TMP_DIR/duplicate.err"
 "$OVPN" client revoke phone --release-ip >"$TMP_DIR/phone-revoke.out" 2>"$TMP_DIR/phone-revoke.err"
 grep -E '^phone[[:space:]]+revoked$' <("$OVPN" client list)
 grep -Fqx "$phone_id,phone," "$OVPN_DATA_DIR/data/client-ip.csv"
-test ! -e "$OVPN_DATA_DIR/ccd/phone"
+test ! -e "$OVPN_DATA_DIR/ccd/$phone_id"
 test -f "$OVPN_DATA_DIR/clients/revoked/phone.ovpn"
-phone_key_before="$(sha256sum "$OVPN_DATA_DIR/pki/private/phone.key")"
+phone_key_before="$(sha256sum "$OVPN_DATA_DIR/pki/private/$phone_id.key")"
 "$OVPN" client reissue phone >"$TMP_DIR/phone-reissue.out" 2>"$TMP_DIR/phone-reissue.err"
-phone_key_after="$(sha256sum "$OVPN_DATA_DIR/pki/private/phone.key")"
+phone_key_after="$(sha256sum "$OVPN_DATA_DIR/pki/private/$phone_id.key")"
 [ "$phone_key_before" != "$phone_key_after" ] || {
   echo 'reissue did not generate a new private key' >&2
   exit 1
@@ -383,11 +390,11 @@ if grep -Fq ',phone,' "$OVPN_DATA_DIR/data/client-ip.csv"; then
   exit 1
 fi
 grep -Fqx "$phone_id,phone,deleted" "$OVPN_DATA_DIR/meta/client-state.csv"
-test ! -e "$OVPN_DATA_DIR/pki/private/phone.key"
+test ! -e "$OVPN_DATA_DIR/pki/private/$phone_id.key"
 test ! -e "$OVPN_DATA_DIR/clients/active/phone.ovpn"
 
 tablet_index_before="$(sha256sum "$OVPN_DATA_DIR/pki/index.txt")"
-if FAKE_EASYRSA_FAIL_BUILD_CLIENT=tablet "$OVPN" client reissue tablet >"$TMP_DIR/tablet-reissue.out" 2>"$TMP_DIR/tablet-reissue.err"; then
+if FAKE_EASYRSA_FAIL_BUILD_CLIENT="$tablet_id" "$OVPN" client reissue tablet >"$TMP_DIR/tablet-reissue.out" 2>"$TMP_DIR/tablet-reissue.err"; then
   echo 'unsupported same-CN reissue unexpectedly succeeded' >&2
   exit 1
 fi
@@ -413,9 +420,9 @@ test ! -e "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 "$OVPN" client ip release laptop >"$TMP_DIR/release-ip.out" 2>"$TMP_DIR/release-ip.err"
 grep -Fqx "$laptop_id,laptop," "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -E "^laptop[[:space:]]+revoked$" <("$OVPN" client list)
-test ! -e "$OVPN_DATA_DIR/ccd/laptop"
+test ! -e "$OVPN_DATA_DIR/ccd/$laptop_id"
 test -f "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
-test -f "$OVPN_DATA_DIR/pki/private/laptop.key"
+test -f "$OVPN_DATA_DIR/pki/private/$laptop_id.key"
 grep -Fq release_ip "$OVPN_DATA_DIR/meta/audit.jsonl"
 if "$OVPN" client ip release laptop >"$TMP_DIR/repeated-release-ip.out" 2>"$TMP_DIR/repeated-release-ip.err"; then
   echo "repeated client IP release unexpectedly succeeded" >&2

@@ -62,11 +62,12 @@ ovpn_tls_crypt_generate() {
 
 
 ovpn_pki_issue_client() {
-  local name="$1"
-  EASYRSA_REQ_CN="$name" ovpn_run_easyrsa build-client-full "$name" nopass
-  [ -r "$OVPN_DATA_DIR/pki/issued/$name.crt" ] || ovpn_die "Easy-RSA did not create client cert for $name"
-  [ -r "$OVPN_DATA_DIR/pki/private/$name.key" ] || ovpn_die "Easy-RSA did not create client key for $name"
-  chmod 644 "$OVPN_DATA_DIR/pki/issued/$name.crt"
-  chmod 600 "$OVPN_DATA_DIR/pki/private/$name.key"
-}
+  local id="$1"
 
+  ovpn_registry_uuid_valid "$id" || ovpn_die "invalid client UUID: $id"
+  EASYRSA_REQ_CN="$id" ovpn_run_easyrsa build-client-full "$id" nopass
+  [ -r "$OVPN_DATA_DIR/pki/issued/$id.crt" ] || ovpn_die "Easy-RSA did not create client cert for $id"
+  [ -r "$OVPN_DATA_DIR/pki/private/$id.key" ] || ovpn_die "Easy-RSA did not create client key for $id"
+  chmod 644 "$OVPN_DATA_DIR/pki/issued/$id.crt"
+  chmod 600 "$OVPN_DATA_DIR/pki/private/$id.key"
+}

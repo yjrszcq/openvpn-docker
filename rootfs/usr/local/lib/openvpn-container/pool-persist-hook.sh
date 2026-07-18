@@ -3,7 +3,7 @@
 # Called by OpenVPN with environment variables: $common_name, $ifconfig_pool_remote_ip, $trusted_ip.
 # Also expects $OVPN_LEASE_DIR to be set in OpenVPN's environment.
 #
-# Each client gets its own file named by common name, containing the IP address.
+# Each client gets its own file named by UUID common name, containing the IP address.
 # This eliminates read-modify-write races with sync code and other hook instances.
 
 set -euo pipefail
@@ -15,7 +15,7 @@ pool_hook_upsert() {
   local address="$2"
   local f ccd_dir
 
-  [ -n "$name" ] || return 0
+  [[ "$name" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] || return 1
   [ -n "$address" ] || return 0
 
   # Static clients have a CCD file with ifconfig-push — skip lease tracking.

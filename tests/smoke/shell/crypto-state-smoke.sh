@@ -12,6 +12,7 @@ export OVPN_RUNTIME_DIR="$TMP_DIR/run"
 export OVPN_SERVER_NAME=openvpn-server
 # shellcheck source=../rootfs/usr/local/lib/openvpn-container/common.sh
 . "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/common.sh"
+. "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/registry.sh"
 . "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/state.sh"
 
 make_crypto_healthy() {

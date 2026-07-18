@@ -130,25 +130,34 @@ ovpn_state_add_issue() {
 
 ovpn_state_scan_client_profiles() {
   local index="$OVPN_DATA_DIR/pki/index.txt"
-  local line status subject name profile serial
+  local line status subject id name profile serial
 
   [ -r "$index" ] || return 0
+  if ! ovpn_registry_load_identities; then
+    ovpn_state_add_critical_issue CLIENT_IDENTITY_REGISTRY_INVALID RESTORE_CLIENT_IP_REGISTRY
+    return 0
+  fi
   while IFS= read -r line || [ -n "$line" ]; do
     status="${line%%$'\t'*}"
     [ "$status" = V ] || continue
     subject="${line##*$'\t'}"
-    name="${subject##*/CN=}"
-    name="${name%%/*}"
-    [ -n "$name" ] || continue
-    [ "$name" != "$OVPN_SERVER_NAME" ] || continue
+    id="${subject##*/CN=}"
+    id="${id%%/*}"
+    [ -n "$id" ] || continue
+    [ "$id" != "$OVPN_SERVER_NAME" ] || continue
+    if ! ovpn_registry_uuid_valid "$id" || [ -z "${OVPN_REGISTRY_NAME_BY_ID[$id]:-}" ]; then
+      ovpn_state_add_critical_issue "CLIENT_PKI_IDENTITY_UNKNOWN_$id" RESTORE_CLIENT_IP_REGISTRY
+      continue
+    fi
+    name="${OVPN_REGISTRY_NAME_BY_ID[$id]}"
     serial="$(printf '%s\n' "$line" | awk -F '\t' 'NF >= 4 {print $4}')"
     profile="$OVPN_DATA_DIR/clients/active/$name.ovpn"
     if [ ! -e "$profile" ]; then
       ovpn_state_add_issue "CLIENT_PROFILE_MISSING_$name" repairable RENDER_CLIENT_PROFILE
       ovpn_state_consider DEGRADED_REPAIRABLE
     fi
-    if [ ! -e "$OVPN_DATA_DIR/pki/issued/$name.crt" ] || [ ! -e "$OVPN_DATA_DIR/pki/private/$name.key" ]; then
-      ovpn_state_classify_missing_client_identity "$name" "$serial"
+    if [ ! -e "$OVPN_DATA_DIR/pki/issued/$id.crt" ] || [ ! -e "$OVPN_DATA_DIR/pki/private/$id.key" ]; then
+      ovpn_state_classify_missing_client_identity "$name" "$id" "$serial"
     fi
   done <"$index"
 }
@@ -214,11 +223,12 @@ ovpn_state_classify_missing_tls_crypt_key() {
 
 ovpn_state_classify_missing_client_identity() {
   local name="$1"
-  local serial="$2"
-  local certificate="$OVPN_DATA_DIR/pki/issued/$name.crt"
-  local key="$OVPN_DATA_DIR/pki/private/$name.key"
+  local id="$2"
+  local serial="$3"
+  local certificate="$OVPN_DATA_DIR/pki/issued/$id.crt"
+  local key="$OVPN_DATA_DIR/pki/private/$id.key"
 
-  if ovpn_recovery_assess_client_identity "$name" "$serial"; then
+  if ovpn_recovery_assess_client_identity "$id" "$serial"; then
     [ -e "$certificate" ] || ovpn_state_add_recoverable_issue "CLIENT_CERT_MISSING_$name" RECOVER_CLIENT_CERT
     [ -e "$key" ] || ovpn_state_add_recoverable_issue "CLIENT_KEY_MISSING_$name" RECOVER_CLIENT_KEY
     return 0
@@ -423,10 +433,12 @@ ovpn_state_scan() {
   fi
 
   ovpn_state_validate_crypto
-  ovpn_state_scan_client_profiles
   ovpn_state_scan_client_ip_pending
-  if declare -F ovpn_state_scan_ipam_consistency >/dev/null 2>&1; then
-    ovpn_state_scan_ipam_consistency
+  if [ -e "$OVPN_DATA_DIR/pki/index.txt" ]; then
+    ovpn_state_scan_client_profiles
+    if declare -F ovpn_state_scan_ipam_consistency >/dev/null 2>&1; then
+      ovpn_state_scan_ipam_consistency
+    fi
   fi
 }
 

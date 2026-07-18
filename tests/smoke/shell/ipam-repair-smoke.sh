@@ -14,6 +14,8 @@ export OVPN_LEASE_DIR="$TMP_DIR/runtime/leases"
 export OVPN_ENDPOINT="vpn.example.test"
 export OVPN_NETWORK="10.88.0.0/24"
 export OVPN_SERVER_NAME=openvpn-server
+dynamic_id=11111111-1111-4111-8111-111111111111
+static_id=22222222-2222-4222-8222-222222222222
 
 "$OVPN" config apply
 mkdir -p \
@@ -35,13 +37,13 @@ printf '{\n  "ca_fingerprint_sha256": "FAKE:CA:FINGERPRINT"\n}\n' >"$OVPN_DATA_D
 : >"$OVPN_DATA_DIR/secrets/tls-crypt.key"
 : >"$OVPN_DATA_DIR/server/server.conf"
 printf '%s\n' \
-  $'V\t30000101000000Z\t\t01\tunknown\t/CN=dynamic' \
-  $'V\t30000101000000Z\t\t02\tunknown\t/CN=static' \
+  $'V\t30000101000000Z\t\t01\tunknown\t/CN=11111111-1111-4111-8111-111111111111' \
+  $'V\t30000101000000Z\t\t02\tunknown\t/CN=22222222-2222-4222-8222-222222222222' \
   >"$OVPN_DATA_DIR/pki/index.txt"
-: >"$OVPN_DATA_DIR/pki/issued/dynamic.crt"
-: >"$OVPN_DATA_DIR/pki/private/dynamic.key"
-: >"$OVPN_DATA_DIR/pki/issued/static.crt"
-: >"$OVPN_DATA_DIR/pki/private/static.key"
+: >"$OVPN_DATA_DIR/pki/issued/$dynamic_id.crt"
+: >"$OVPN_DATA_DIR/pki/private/$dynamic_id.key"
+: >"$OVPN_DATA_DIR/pki/issued/$static_id.crt"
+: >"$OVPN_DATA_DIR/pki/private/$static_id.key"
 : >"$OVPN_DATA_DIR/clients/active/dynamic.ovpn"
 : >"$OVPN_DATA_DIR/clients/active/static.ovpn"
 cat >"$OVPN_DATA_DIR/data/client-ip.csv" <<'EOF'
@@ -56,13 +58,13 @@ cat >"$OVPN_DATA_DIR/meta/client-state.csv" <<'EOF'
 22222222-2222-4222-8222-222222222222,static,active
 EOF
 : >"$OVPN_DATA_DIR/meta/audit.jsonl"
-printf 'ifconfig-push 10.88.0.3 255.255.255.0\n' >"$OVPN_DATA_DIR/ccd/static"
+printf 'ifconfig-push 10.88.0.3 255.255.255.0\n' >"$OVPN_DATA_DIR/ccd/$static_id"
 chmod 600 \
   "$OVPN_DATA_DIR/data/client-ip.csv" \
   "$OVPN_DATA_DIR/meta/client-ip.applied.csv" \
   "$OVPN_DATA_DIR/meta/client-state.csv" \
   "$OVPN_DATA_DIR/meta/audit.jsonl" \
-  "$OVPN_DATA_DIR/ccd/static"
+  "$OVPN_DATA_DIR/ccd/$static_id"
 
 "$OVPN" repair plan >"$TMP_DIR/plan.out"
 grep -Fq '[SAFE] SYNCHRONIZE_CLIENT_IP_CCD' "$TMP_DIR/plan.out"
@@ -76,11 +78,11 @@ cat >"$TMP_DIR/expected.csv" <<'EOF'
 EOF
 cmp "$TMP_DIR/expected.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
 cmp "$TMP_DIR/expected.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
-grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/static"
-test ! -e "$OVPN_DATA_DIR/ccd/dynamic"
+grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/$static_id"
+test ! -e "$OVPN_DATA_DIR/ccd/$dynamic_id"
 [ "$("$OVPN" state show)" = HEALTHY ]
 
-ccd_before="$(sha256sum "$OVPN_DATA_DIR/ccd/static")"
+ccd_before="$(sha256sum "$OVPN_DATA_DIR/ccd/$static_id")"
 cat >"$OVPN_DATA_DIR/data/client-ip.csv" <<'EOF'
 # id,name,ip
 22222222-2222-4222-8222-222222222222,static,10.88.0.129
@@ -92,7 +94,7 @@ if "$OVPN" repair apply >"$TMP_DIR/invalid.out" 2>"$TMP_DIR/invalid.err"; then
   exit 1
 fi
 grep -Fq 'CLIENT_IP_APPLIED_INVALID' "$TMP_DIR/invalid.err"
-[ "$ccd_before" = "$(sha256sum "$OVPN_DATA_DIR/ccd/static")" ] || {
+[ "$ccd_before" = "$(sha256sum "$OVPN_DATA_DIR/ccd/$static_id")" ] || {
   echo 'repair changed derived state for an invalid registry' >&2
   exit 1
 }

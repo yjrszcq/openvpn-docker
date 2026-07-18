@@ -32,7 +32,7 @@ ovpn_repair_plan_add_issue() {
   local id="$1"
   local severity="$2"
   local action="$3"
-  local client_name
+  local client_name client_id
 
   case "$severity" in
     repairable)
@@ -75,11 +75,19 @@ ovpn_repair_plan_add_issue() {
           ;;
         CLIENT_CERT_MISSING_*)
           client_name="${id#CLIENT_CERT_MISSING_}"
-          ovpn_repair_plan_add_action RECOVER_CLIENT_CERT "pki/issued/$client_name.crt" recover
+          client_id="$(ovpn_registry_current_id_by_name "$client_name")" || {
+            ovpn_repair_plan_add_blocked "$id" "$severity" RESTORE_CLIENT_IP_REGISTRY
+            return 0
+          }
+          ovpn_repair_plan_add_action RECOVER_CLIENT_CERT "pki/issued/$client_id.crt" recover
           ;;
         CLIENT_KEY_MISSING_*)
           client_name="${id#CLIENT_KEY_MISSING_}"
-          ovpn_repair_plan_add_action RECOVER_CLIENT_KEY "pki/private/$client_name.key" recover
+          client_id="$(ovpn_registry_current_id_by_name "$client_name")" || {
+            ovpn_repair_plan_add_blocked "$id" "$severity" RESTORE_CLIENT_IP_REGISTRY
+            return 0
+          }
+          ovpn_repair_plan_add_action RECOVER_CLIENT_KEY "pki/private/$client_id.key" recover
           ;;
         *)
           ovpn_repair_plan_add_blocked "$id" "$severity" "$action"
@@ -282,7 +290,7 @@ ovpn_repair_stage_crl() {
 ovpn_repair_stage_action() {
   local id="$1"
   local target="$2"
-  local client_name
+  local client_id
 
   case "$id" in
     WRITE_SCHEMA_VERSION)
@@ -309,14 +317,14 @@ ovpn_repair_stage_action() {
       ovpn_recovery_stage_tls_crypt_key "$OVPN_REPAIR_STAGE_DIR/$target"
       ;;
     RECOVER_CLIENT_CERT)
-      client_name="${target#pki/issued/}"
-      client_name="${client_name%.crt}"
-      ovpn_recovery_stage_client_certificate "$client_name" "$OVPN_REPAIR_STAGE_DIR/$target"
+      client_id="${target#pki/issued/}"
+      client_id="${client_id%.crt}"
+      ovpn_recovery_stage_client_certificate "$client_id" "$OVPN_REPAIR_STAGE_DIR/$target"
       ;;
     RECOVER_CLIENT_KEY)
-      client_name="${target#pki/private/}"
-      client_name="${client_name%.key}"
-      ovpn_recovery_stage_client_key "$client_name" "$OVPN_REPAIR_STAGE_DIR/$target"
+      client_id="${target#pki/private/}"
+      client_id="${client_id%.key}"
+      ovpn_recovery_stage_client_key "$client_id" "$OVPN_REPAIR_STAGE_DIR/$target"
       ;;
     SYNCHRONIZE_CLIENT_IP_CCD)
       ovpn_state_ipam_stage_ccd "$OVPN_REPAIR_STAGE_DIR/$target"

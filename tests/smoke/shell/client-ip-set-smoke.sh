@@ -16,13 +16,16 @@ export OVPN_RUNTIME_DIR="$TMP_DIR/run"
 export OVPN_LEASE_DIR="$TMP_DIR/leases"
 export OVPN_ENDPOINT="vpn.example.test"
 export OVPN_NETWORK="10.88.0.0/24"
+alpha_id=11111111-1111-4111-8111-111111111111
+bravo_id=22222222-2222-4222-8222-222222222222
+zulu_id=33333333-3333-4333-8333-333333333333
 
 "$OVPN" config apply
 mkdir -p "$OVPN_DATA_DIR/data" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/pki"
 printf '%s\n' \
-  $'V\t30000101000000Z\t\t01\tunknown\t/CN=alpha' \
-  $'V\t30000101000000Z\t\t02\tunknown\t/CN=bravo' \
-  $'V\t30000101000000Z\t\t03\tunknown\t/CN=zulu' \
+  $'V\t30000101000000Z\t\t01\tunknown\t/CN=11111111-1111-4111-8111-111111111111' \
+  $'V\t30000101000000Z\t\t02\tunknown\t/CN=22222222-2222-4222-8222-222222222222' \
+  $'V\t30000101000000Z\t\t03\tunknown\t/CN=33333333-3333-4333-8333-333333333333' \
   >"$OVPN_DATA_DIR/pki/index.txt"
 cat >"$OVPN_DATA_DIR/data/client-ip.csv" <<'EOF'
 # id,name,ip
@@ -37,8 +40,8 @@ printf '%s\n' '# id,name,state' \
   '33333333-3333-4333-8333-333333333333,zulu,active' >"$OVPN_DATA_DIR/meta/client-state.csv"
 : >"$OVPN_DATA_DIR/meta/audit.jsonl"
 mkdir -p "$OVPN_LEASE_DIR"
-printf '10.88.0.200\n' >"$OVPN_LEASE_DIR/alpha"
-printf '10.88.0.201\n' >"$OVPN_LEASE_DIR/zulu"
+printf '10.88.0.200\n' >"$OVPN_LEASE_DIR/$alpha_id"
+printf '10.88.0.201\n' >"$OVPN_LEASE_DIR/$zulu_id"
 printf '10.88.0.202\n' >"$OVPN_LEASE_DIR/unrelated"
 
 canonical="$(mktemp "$TMP_DIR/canonical.XXXXXX")"
@@ -55,9 +58,9 @@ grep -Fq 'set client' "$TMP_DIR/apply.out"
 cmp "$canonical" "$OVPN_DATA_DIR/data/client-ip.csv"
 cmp "$canonical" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 grep -Fq '"outcome":"applied"' "$OVPN_DATA_DIR/meta/audit.jsonl"
-grep -Fqx 'ifconfig-push 10.88.0.3 255.255.255.0' "$OVPN_DATA_DIR/ccd/bravo"
-grep -Fqx 'ifconfig-push 10.88.0.4 255.255.255.0' "$OVPN_DATA_DIR/ccd/alpha"
-test ! -e "$OVPN_DATA_DIR/ccd/zulu"
+grep -Fqx 'ifconfig-push 10.88.0.3 255.255.255.0' "$OVPN_DATA_DIR/ccd/$bravo_id"
+grep -Fqx 'ifconfig-push 10.88.0.4 255.255.255.0' "$OVPN_DATA_DIR/ccd/$alpha_id"
+test ! -e "$OVPN_DATA_DIR/ccd/$zulu_id"
 
 # Test: duplicate IP rejected, state rolled back
 if "$OVPN" client ip set bravo --ip 10.88.0.4 >"$TMP_DIR/rejected.out" 2>&1; then
@@ -106,19 +109,19 @@ cat >"$TMP_DIR/dynamic.csv" <<'EOF'
 33333333-3333-4333-8333-333333333333,zulu,
 EOF
 cmp "$TMP_DIR/dynamic.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
-grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/bravo"
-test ! -e "$OVPN_DATA_DIR/ccd/alpha"
-test ! -e "$OVPN_DATA_DIR/ccd/zulu"
-grep -Fqx '10.88.0.201' "$OVPN_LEASE_DIR/zulu"
+grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/$bravo_id"
+test ! -e "$OVPN_DATA_DIR/ccd/$alpha_id"
+test ! -e "$OVPN_DATA_DIR/ccd/$zulu_id"
+grep -Fqx '10.88.0.201' "$OVPN_LEASE_DIR/$zulu_id"
 grep -Fqx '10.88.0.202' "$OVPN_LEASE_DIR/unrelated"
-if [ -f "$OVPN_LEASE_DIR/alpha" ]; then
+if [ -f "$OVPN_LEASE_DIR/$alpha_id" ]; then
   echo 'dynamic lease was not cleared for a converted client' >&2
   exit 1
 fi
 
 # Test: transaction rollback on derived-state failure
 cp "$OVPN_DATA_DIR/meta/client-ip.applied.csv" "$TMP_DIR/before-failure.csv"
-ccd_before="$(sha256sum "$OVPN_DATA_DIR/ccd/bravo")"
+ccd_before="$(sha256sum "$OVPN_DATA_DIR/ccd/$bravo_id")"
 lease_before="$(find "$OVPN_LEASE_DIR" -type f -exec sha256sum {} + | sort -k2 | sha256sum)"
 if OVPN_CLIENT_IP_APPLY_FAIL_AFTER=ccd "$OVPN" client ip set zulu --ip 10.88.0.4 >"$TMP_DIR/derived-failure.out" 2>&1; then
   echo 'injected derived-state failure unexpectedly succeeded' >&2
@@ -127,8 +130,8 @@ fi
 grep -Fq 'injected client-ip apply failure after ccd' "$TMP_DIR/derived-failure.out"
 cmp "$TMP_DIR/before-failure.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
 cmp "$TMP_DIR/before-failure.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
-[ "$ccd_before" = "$(sha256sum "$OVPN_DATA_DIR/ccd/bravo")" ]
+[ "$ccd_before" = "$(sha256sum "$OVPN_DATA_DIR/ccd/$bravo_id")" ]
 [ "$lease_before" = "$(find "$OVPN_LEASE_DIR" -type f -exec sha256sum {} + | sort -k2 | sha256sum)" ]
-grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/bravo"
+grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/$bravo_id"
 
 printf 'client-ip set smoke passed\n'

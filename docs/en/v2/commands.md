@@ -169,6 +169,13 @@ configuration value from the current environment.
 
 ## Client lifecycle
 
+Each client has an immutable UUID identity. The certificate CN, Easy-RSA
+entity, CCD filename, dynamic-lease filename, and OpenVPN management identity
+use that UUID; the client name remains the human-facing label and profile
+filename. Generated profiles include `ovpn-client-id` and `ovpn-client-name`
+comments so both identities can be recovered without changing OpenVPN syntax.
+The commands in this section currently accept the client name.
+
 ### `ovpn client create`
 
 Syntax:
@@ -177,12 +184,12 @@ Syntax:
 ovpn client create <name> [--dynamic|--ip <IPv4>]
 ```
 
-Creates a unique client certificate, private key, active profile, registry
-record, and IP assignment in one transaction. Without an option the client
-receives the lowest available static address. `--dynamic` creates a dynamic
-assignment and requires a nonzero dynamic-pool capacity. `--ip <IPv4>` requests
-a specific unused address in the static region. `--dynamic` and `--ip` cannot
-be combined.
+Creates a unique UUID-backed client certificate, private key, active profile,
+registry record, and IP assignment in one transaction. Without an option the
+client receives the lowest available static address. `--dynamic` creates a
+dynamic assignment and requires a nonzero dynamic-pool capacity. `--ip <IPv4>`
+requests a specific unused address in the static region. `--dynamic` and `--ip`
+cannot be combined.
 
 ### `ovpn client export`
 

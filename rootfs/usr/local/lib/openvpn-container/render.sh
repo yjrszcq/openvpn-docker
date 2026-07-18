@@ -43,6 +43,8 @@ ovpn_template_apply() {
   template="${template//\{\{OVPN_ROUTE_PUSHES\}\}/$OVPN_ROUTE_PUSHES}"
   template="${template//\{\{OVPN_DNS_PUSHES\}\}/$OVPN_DNS_PUSHES}"
   template="${template//\{\{CA_CERT\}\}/$CA_CERT}"
+  template="${template//\{\{CLIENT_ID\}\}/$CLIENT_ID}"
+  template="${template//\{\{CLIENT_NAME\}\}/$CLIENT_NAME}"
   template="${template//\{\{CLIENT_CERT\}\}/$CLIENT_CERT}"
   template="${template//\{\{CLIENT_KEY\}\}/$CLIENT_KEY}"
   template="${template//\{\{TLS_CRYPT_KEY\}\}/$TLS_CRYPT_KEY}"
@@ -146,6 +148,8 @@ ovpn_render_server_content() {
   [ -r "$template_path" ] || ovpn_die "missing server template: $template_path"
   ovpn_prepare_render_context
   CA_CERT=""
+  CLIENT_ID=""
+  CLIENT_NAME=""
   CLIENT_CERT=""
   CLIENT_KEY=""
   TLS_CRYPT_KEY=""
@@ -167,11 +171,12 @@ ovpn_validate_client_name() {
 
 ovpn_render_client_content() {
   local client_name="$1"
-  local template_dir template_path
+  local client_id template_dir template_path
   template_dir="$(ovpn_template_dir)" || ovpn_die "no compatible template family for OpenVPN runtime"
   template_path="$template_dir/client.ovpn.tpl"
   [ -r "$template_path" ] || ovpn_die "missing client template: $template_path"
   ovpn_validate_client_name "$client_name"
+  client_id="$(ovpn_registry_current_id_by_name "$client_name")" || ovpn_die "current client identity is missing for '$client_name'"
   ovpn_prepare_render_context
 
   if [ -z "$OVPN_ENDPOINT" ]; then
@@ -179,8 +184,10 @@ ovpn_render_client_content() {
   fi
 
   CA_CERT="$(ovpn_read_required_file "$OVPN_DATA_DIR/pki/ca.crt")" || exit 1
-  CLIENT_CERT="$(ovpn_read_required_file "$OVPN_DATA_DIR/pki/issued/$client_name.crt")" || exit 1
-  CLIENT_KEY="$(ovpn_read_required_file "$OVPN_DATA_DIR/pki/private/$client_name.key")" || exit 1
+  CLIENT_ID="$client_id"
+  CLIENT_NAME="$client_name"
+  CLIENT_CERT="$(ovpn_read_required_file "$OVPN_DATA_DIR/pki/issued/$client_id.crt")" || exit 1
+  CLIENT_KEY="$(ovpn_read_required_file "$OVPN_DATA_DIR/pki/private/$client_id.key")" || exit 1
   TLS_CRYPT_KEY="$(ovpn_read_required_file "$OVPN_DATA_DIR/secrets/tls-crypt.key")" || exit 1
   ovpn_template_apply "$(cat "$template_path")"
 }
