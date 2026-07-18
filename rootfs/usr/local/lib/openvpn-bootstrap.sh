@@ -181,6 +181,7 @@ ovpn_bootstrap_activate_online() {
   ovpn_bootstrap_read_metadata || return 1
   [ "$OVPN_BOOTSTRAP_PLATFORM_API" -ge "$platform_min" ] &&
     [ "$OVPN_BOOTSTRAP_PLATFORM_API" -le "$platform_max" ] || return 1
+  [ "$target_schema" = "$OVPN_BOOTSTRAP_DATA_SCHEMA" ] || return 1
   if [ "$mode" != hydrate-for-migration ]; then
     observed_schema="$(ovpn_bootstrap_observed_data_schema)" || return 1
     [ "$target_schema" = "$observed_schema" ] || return 1

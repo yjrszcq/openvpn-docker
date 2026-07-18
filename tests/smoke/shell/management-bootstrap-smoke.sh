@@ -148,4 +148,45 @@ if ovpn_bootstrap_bundle_is_safe "$TMP_DIR/unsafe-path.tar.gz" 2>/dev/null; then
   exit 1
 fi
 
+# A new image must not keep running old-schema online code merely because that
+# bundle matches the old data. The embedded current-schema CLI must take over
+# and enforce the migration gate.
+old_release="$data/repair/.scripts/releases/2.0.0"
+old_bundle="$TMP_DIR/old-schema-bundle"
+online_root="$(find "$runtime/releases" -maxdepth 1 -type d \
+  -name "online-$MANAGEMENT_VERSION-*" -print -quit)"
+mkdir -p "$old_release" "$old_bundle"
+cp -a "$online_root/." "$old_bundle/"
+rm -f "$old_bundle/.ready"
+sed -i \
+  -e 's/^MANAGEMENT_VERSION=.*/MANAGEMENT_VERSION=2.0.0/' \
+  -e 's/^DATA_SCHEMA=.*/DATA_SCHEMA=2/' \
+  "$old_bundle/management.env"
+tar --sort=name --format=ustar --mtime='@0' --owner=0 --group=0 --numeric-owner \
+  -C "$old_bundle" -cf - . | gzip -n -9 >"$old_release/management-bundle.tar.gz"
+old_sha="$(sha256sum "$old_release/management-bundle.tar.gz" | awk '{print $1}')"
+sed \
+  -e 's/^MANAGEMENT_VERSION=.*/MANAGEMENT_VERSION=2.0.0/' \
+  -e 's/^DATA_SCHEMA=.*/DATA_SCHEMA=2/' \
+  -e "s/^ASSET_SHA256=.*/ASSET_SHA256=$old_sha/" \
+  "$data/repair/.scripts/releases/$MANAGEMENT_VERSION/management-release.env" \
+  >"$old_release/management-release.env"
+openssl pkeyutl -sign -rawin -inkey "$TMP_DIR/key.pem" \
+  -in "$old_release/management-release.env" \
+  -out "$old_release/management-release.env.sig"
+printf '%s\n' 2.0.0 >"$data/repair/.scripts/active"
+mkdir -p "$data/config"
+printf 'OVPN_CONFIG_VERSION=2\n' >"$data/config/project.env"
+printf '2\n' >"$data/config/schema-version"
+rm -rf "$runtime"
+[ "$(run_bootstrapped -v 2>"$TMP_DIR/old-schema-fallback.err")" = "$MANAGEMENT_VERSION" ]
+grep -Fq 'using embedded fallback' "$TMP_DIR/old-schema-fallback.err"
+set +e
+run_bootstrapped state show \
+  >"$TMP_DIR/old-schema-state.out" 2>"$TMP_DIR/old-schema-state.err"
+status=$?
+set -e
+[ "$status" -eq 78 ]
+grep -Fq 'data schema migration required' "$TMP_DIR/old-schema-state.err"
+
 printf 'management bootstrap smoke passed\n'
