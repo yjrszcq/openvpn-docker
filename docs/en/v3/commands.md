@@ -1,4 +1,4 @@
-# OpenVPN CLI v2 Reference
+# OpenVPN CLI v3 Reference
 
 This is the complete command reference for the current CLI in this source tree.
 
@@ -33,6 +33,7 @@ ovpn
 │   ├── list            List client certificate state and optional detailed IP assignment.
 │   ├── revoke          Revoke a client certificate, optionally release its static IP.
 │   ├── reissue         Issue a new certificate for an existing client, optionally adjusting IP assignment.
+│   ├── rename          Change a client's display name without changing its UUID.
 │   ├── delete          Remove a client and its local credentials.
 │   └── ip
 │       ├── release     Release the retained static IP of a revoked client.
@@ -53,7 +54,11 @@ ovpn
 │   ├── status          Print runtime state as JSON.
 │   ├── health          Return success only when the container is healthy.
 │   ├── capabilities    Print compatibility and feature information.
-│   └── version         Print image and runtime build information.
+│   ├── version         Print image and runtime build information.
+│   ├── logs            Read translated or raw persistent OpenVPN logs.
+│   └── events          Read structured runtime and lifecycle events.
+├── upgrade             Check, install, or roll back signed management code.
+├── migrate             Plan or apply an offline data-schema migration.
 └── help                Print this help message.
 ```
 
@@ -80,13 +85,15 @@ ovpn -v
 ovpn --version
 ```
 
-`-v` prints only the image version (e.g. `2.1.1`). `--version` prints a
-three-line summary with image, OpenVPN, and Easy-RSA versions:
+`-v` prints only the active management-code version (e.g. `3.0.0`).
+`--version` prints a four-line summary with management, image, OpenVPN, and
+Easy-RSA versions:
 
 ```text
-image:     2.1.1
-openvpn:   2.7.5
-easy-rsa:  3.2.2
+management:   3.0.0
+image:        3.0.0
+openvpn:      2.7.5
+easy-rsa:     3.2.2
 ```
 
 Use `ovpn runtime version` for the complete build-information JSON.
@@ -150,7 +157,7 @@ ovpn config apply
 
 Validates the current `OVPN_*` environment and atomically replaces
 `config/project.env` and `config/schema-version` with mode `0600`. It writes
-configuration schema version `2` and does not issue, revoke, delete, or reissue
+data schema version `3` and does not issue, revoke, delete, or reissue
 client certificates.
 
 `OVPN_ENDPOINT` must be a valid hostname or IP string; `OVPN_PROTO` is `udp` or
@@ -161,9 +168,18 @@ transport. `config apply` does not resolve DNS.
 `OVPN_TOPOLOGY` is `subnet`; boolean fields are `true` or `false`;
 `OVPN_DNS` and `OVPN_ROUTES` are comma-separated IPv4 values; and the network
 and dynamic-pool size must form a valid IPAM layout. Apply writes every
-configuration value from the current environment.
+configuration value from the current environment. `OVPN_LOG_MAX_BYTES` must be
+a positive integer and `OVPN_LOG_BACKUPS` a non-negative integer.
 
 ## Client lifecycle
+
+Each client has an immutable UUID identity. The certificate CN, Easy-RSA
+entity, CCD filename, dynamic-lease filename, and OpenVPN management identity
+use that UUID; the client name remains the human-facing label and profile
+filename. Generated profiles include `ovpn-client-id` and `ovpn-client-name`
+comments so both identities can be recovered without changing OpenVPN syntax.
+Except for `create`, each `<client>` argument accepts either the current display
+name or the immutable UUID. A UUID cannot be used as a display name.
 
 ### `ovpn client create`
 
@@ -173,19 +189,19 @@ Syntax:
 ovpn client create <name> [--dynamic|--ip <IPv4>]
 ```
 
-Creates a unique client certificate, private key, active profile, registry
-record, and IP assignment in one transaction. Without an option the client
-receives the lowest available static address. `--dynamic` creates a dynamic
-assignment and requires a nonzero dynamic-pool capacity. `--ip <IPv4>` requests
-a specific unused address in the static region. `--dynamic` and `--ip` cannot
-be combined.
+Creates a unique UUID-backed client certificate, private key, active profile,
+registry record, and IP assignment in one transaction. Without an option the
+client receives the lowest available static address. `--dynamic` creates a
+dynamic assignment and requires a nonzero dynamic-pool capacity. `--ip <IPv4>`
+requests a specific unused address in the static region. `--dynamic` and `--ip`
+cannot be combined.
 
 ### `ovpn client export`
 
 Syntax:
 
 ```text
-ovpn client export <name>
+ovpn client export <client>
 ```
 
 Requires a healthy active client. Regenerates
@@ -200,9 +216,9 @@ Syntax:
 ovpn client list [--detail]
 ```
 
-Without `--detail`, prints a two-column table with `CLIENT` and `STATE` headers,
-auto-sized to the widest name. With `--detail`, prints the aligned columns
-`CLIENT`, `STATE`, `MODE`, `IP`, `IP STATE`, and `CONNECTION`.
+Without `--detail`, prints the aligned columns `CLIENT`, `ID`, and `STATE`.
+With `--detail`, it additionally prints `MODE`, `IP`, `IP STATE`, and
+`CONNECTION`. The immutable `ID` is shown in both views.
 
 For the IP view, static assignments are `configured` or `retained` after
 revocation. Dynamic addresses are `connected` when the management socket has a
@@ -211,12 +227,28 @@ current lease, `last-known` when a persisted lease record exists, or `unavailabl
 availability and the current route. The view reads the applied registry, not an
 unapplied draft.
 
+### `ovpn client rename`
+
+Syntax:
+
+```text
+ovpn client rename <client> <new-name>
+```
+
+Atomically changes the human-facing display name while preserving the UUID,
+certificate, key, IP assignment, CCD, lease, and any current OpenVPN
+connection. The identity registry, draft and applied IP registries, profile
+filename, and embedded name comment change together. The source may be the
+current name or UUID. The new name must be valid and unused by a current client.
+Renaming or deleting a client releases its old name for reuse; deleted UUID
+tombstones remain authoritative history.
+
 ### `ovpn client revoke`
 
 Syntax:
 
 ```text
-ovpn client revoke <name> [--release-ip]
+ovpn client revoke <client> [--release-ip]
 ```
 
 Revokes an active certificate, regenerates the CRL, moves its active profile to
@@ -230,7 +262,7 @@ operation.
 Syntax:
 
 ```text
-ovpn client reissue <name> [--dynamic|--ip <IPv4>]
+ovpn client reissue <client> [--dynamic|--ip <IPv4>]
 ```
 
 Issues a new key and certificate for an existing client name. For an active
@@ -252,29 +284,31 @@ static IP; reissue is refused when the static region has no free capacity. Optio
 Syntax:
 
 ```text
-ovpn client delete <name>
+ovpn client delete <client>
 ```
 
 Irreversibly removes a client. An active client is revoked first; the command
-then removes its registry record, active or revoked profile, private key,
-issued certificate, and request file. Recover an old private key only from a
-secure backup.
+then removes its IP record, active or revoked profile, private key, issued
+certificate, and request file, while retaining a UUID tombstone in the identity
+registry. The deleted display name may be reused by a new UUID. Recover an old
+private key only from a secure backup.
 
 ## Client IP management
 
 The draft registry is `data/client-ip.csv`; the last accepted registry is
-`meta/client-ip.applied.csv`. Both use `client,ip` rows. A non-empty IP is a
-static assignment; an empty IP is dynamic. The optional first line is exactly
-`# client,ip`. Names and static addresses must be unique, static addresses must
-fall in the static region, and the registry must contain every logical PKI
-client.
+`meta/client-ip.applied.csv`. Both require a `# id,name,ip` header followed by
+`id,name,ip` rows, where `id` is the client's immutable UUID. A non-empty IP is
+a static assignment; an empty IP is dynamic. UUIDs, names, and static addresses
+must be unique, static addresses must fall in the static region, and the
+registry must contain every active or revoked client from the authoritative
+identity registry.
 
 ### `ovpn client ip release`
 
 Syntax:
 
 ```text
-ovpn client ip release <name>
+ovpn client ip release <client>
 ```
 
 Releases the retained static assignment of a revoked client. The client must be
@@ -366,7 +400,20 @@ return exit status `78` after reporting.
 
 Eligible actions include restoring derived configuration or metadata,
 regenerating a CRL, rendering a missing active profile, recovering verified
-certificate or key copies, and creating the runtime directory.
+certificate or key copies, recovering the current client identity/IP registries,
+and creating the runtime directory.
+
+When `meta/client-state.csv` is missing or invalid, recovery starts from UUID
+client entries in the current PKI. A display name is accepted only when
+current-format draft/applied IP registries, profile identity comments, and the
+latest applicable rename audit record agree. Conflicting evidence is
+`CRITICAL` and requires a backup or manual review. If no name evidence remains,
+repair assigns the deterministic temporary name `client-<uuid-without-dashes>`;
+rename it after repair. Historical registry or audit formats are not parsed by
+the current runtime. Because the PKI records only active versus revoked
+certificates, a deleted tombstone cannot be distinguished from a revoked client
+after the authoritative identity registry is lost; repair keeps that UUID
+revoked rather than making it active.
 
 ### `ovpn repair apply`
 
@@ -431,12 +478,80 @@ standard output; `--output <path>` writes a mode-`0600` file at that path.
 Syntax:
 
 ```text
-ovpn render client <name> [--stdout|--output <path>]
+ovpn render client <client> [--stdout|--output <path>]
 ```
 
 Builds a client `.ovpn` profile from the configured endpoint, CA certificate,
-named client certificate and key, and tls-crypt key. Output defaults to standard
-output; `--output` writes an atomically replaced mode-`0600` file.
+selected client certificate and key, and tls-crypt key. `<client>` may be the
+current name or UUID. Output defaults to standard output; `--output` writes an
+atomically replaced mode-`0600` file.
+
+## Management code updates
+
+### `ovpn upgrade`
+
+Syntax:
+
+```text
+ovpn upgrade [--check] [--version VERSION] [--json] [--yes]
+ovpn upgrade --rollback [--yes]
+```
+
+Without `--version`, selects the highest newer stable GitHub Release compatible
+with the image platform API, OpenVPN runtime and capabilities, and current data
+schema. `--check` downloads and verifies only signed manifests. A target using a
+different schema is rejected with a maintenance `ovpn migrate` instruction.
+
+An update verifies Ed25519 signature, SHA-256, archive paths and types, and the
+inner compatibility contract before self-testing and atomically switching the
+active management bundle. It preserves active and previous assets under
+`repair/.scripts`, does not reload OpenVPN, and requires `--yes` outside a TTY.
+`--rollback` swaps to the retained compatible previous bundle or embedded
+fallback. Standard proxy variables and optional `OVPN_GITHUB_TOKEN` are honored.
+The supplied Compose file passes these values to both live and maintenance
+services; because both use host networking, `http://127.0.0.1:7890` addresses a
+proxy on the Docker host. Stable image-owned CLI and hook launchers resolve the
+active bundle per invocation, so later commands and connection hooks change
+versions without signaling OpenVPN.
+Exit status `64` reports invalid arguments or missing non-interactive
+confirmation, `69` reports GitHub/download unavailability, `74` reports
+verification or installation failure, and `78` reports an incompatible target
+or rollback. Success and an already-current target return `0`.
+
+## Persistent data migration
+
+### `ovpn migrate`
+
+Syntax:
+
+```text
+ovpn migrate plan [--to-version VERSION] [--json]
+ovpn migrate apply [--to-version VERSION] [--yes]
+```
+
+Available only through the stopped `openvpn-maintenance` service. `plan` is
+read-only and reports source/target schemas, the ordered migration chain,
+client count, blockers, and an optional target management release. `apply`
+requires confirmation, or `--yes` outside a TTY. An already-current schema is
+an idempotent success.
+
+Without `--to-version`, the currently active management code migrates to its
+current schema. With `--to-version`, the command verifies a compatible signed target
+bundle and stages target code and data together. Apply obtains the exclusive
+runtime lock, snapshots persistent data, migrates only a staging copy,
+validates schema, PKI, registries, profiles, and target code, then commits both
+selectors. Failure or interruption restores the data and active-code selector.
+Schema 1 runs `1→2→3`; schema 2 runs `2→3`. Both replace name-CN client
+credentials with UUID-CN credentials, so every active profile reported after
+success must be redistributed.
+
+Data-dependent commands reject old, conflicting, invalid, or newer schemas
+with exit status `78`; only `migrate` may read historical formats. Help,
+version, and capability inspection remain available without parsing instance
+data. Platform API or OpenVPN incompatibility also returns `78` and requires an image update.
+Snapshots and reports are retained below `repair/migrations`. Restoring an old
+image after migration requires restoring its matching pre-migration snapshot;
+an image rollback alone is not a data rollback.
 
 ## Runtime inspection
 
@@ -486,8 +601,37 @@ ovpn runtime version
 
 Prints build-information JSON from
 `/usr/local/share/openvpn-container/build-info.json`, with the Easy-RSA version
-detected at runtime. If that file is missing, it detects the Easy-RSA version
-and prints `unknown` for the remaining fields.
+detected at runtime. It reports the active management version and source
+(`embedded` or `online`), image version, platform API, data schema, OpenVPN,
+Easy-RSA, and the supported OpenVPN range. If build information is missing, it
+detects Easy-RSA and prints `unknown` for unavailable fields.
+
+### `ovpn runtime logs`
+
+Syntax:
+
+```text
+ovpn runtime logs [--lines N] [--follow] [--raw]
+```
+
+Reads persistent rotated OpenVPN logs, defaulting to the latest 100 lines.
+Known UUIDs are displayed as `name [uuid]`; unknown identities remain
+unchanged. `--raw` disables translation. `--follow` continues across append,
+rotation, and atomic replacement without owning or blocking the OpenVPN
+management socket.
+
+### `ovpn runtime events`
+
+Syntax:
+
+```text
+ovpn runtime events [--lines N] [--follow] [--json]
+```
+
+Reads the latest 100 structured connection, disconnection, client lifecycle,
+IP, rename, network migration, management update, and data migration events.
+The default is human-readable text; `--json` emits one JSON object per event.
+`--follow` streams new records without blocking management commands.
 
 ## Examples
 

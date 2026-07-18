@@ -131,7 +131,8 @@ ln -s "$ROOT_DIR/compatibility" "$embedded/compatibility"
 printf 'MANAGEMENT_VERSION=2.1.1\nPLATFORM_API=%s\nDATA_SCHEMA=3\n' \
   "$PLATFORM_API" >"$embedded/management.env"
 build_info="$TMP_DIR/build-info.json"
-OVPN_RUNTIME_STRATEGY=source-build OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION" \
+IMAGE_VERSION=2.1.1 MANAGEMENT_VERSION=2.1.1 \
+  OVPN_RUNTIME_STRATEGY=source-build OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION" \
   OVPN_VCS_REF=test OVPN_BUILD_DATE=1970-01-01T00:00:00Z \
   "$ROOT_DIR/scripts/generate-build-info.sh" "$build_info"
 

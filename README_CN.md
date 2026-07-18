@@ -153,8 +153,10 @@ OpenVPN 内核，也不会迁移持久化数据。
 
 - [v1 命令参考](docs/cn/v1/commands.md)：发布提交 `6619921e5257e604f5df2c63d2fa10505b680d84`。
   - [v1 操作手册](docs/cn/v1/operations.md)：按工作流组织的命令组合用法。
-- [v2 命令参考](docs/cn/v2/commands.md)：当前 CLI。
+- [v2 命令参考](docs/cn/v2/commands.md)：适用于 `2.0.0` 至 `2.1.1`。
   - [v2 操作手册](docs/cn/v2/operations.md)：按工作流组织的命令组合用法。
+- [v3 命令参考](docs/cn/v3/commands.md)：当前 CLI。
+  - [v3 操作手册](docs/cn/v3/operations.md)：按工作流组织的命令组合用法。
 
 ## 更新、迁移与日志
 

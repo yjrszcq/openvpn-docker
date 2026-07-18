@@ -84,18 +84,18 @@ fi
 
 if [ -n "$UPGRADE_SIGNING_KEY" ]; then
   UPDATE_FIXTURES="$WORK_DIR/update-fixtures"
-  mkdir -p "$UPDATE_FIXTURES/2.1.2"
+  mkdir -p "$UPDATE_FIXTURES/3.0.1"
   "$ROOT_DIR/tests/helpers/create-management-release-fixture.sh" \
-    --output-dir "$UPDATE_FIXTURES/2.1.2" \
+    --output-dir "$UPDATE_FIXTURES/3.0.1" \
     --signing-key "$UPGRADE_SIGNING_KEY" \
-    --version 2.1.2
+    --version 3.0.1
   cp "$ROOT_DIR/tests/helpers/fake-release-curl.sh" "$UPDATE_FIXTURES/fake-release-curl"
   chmod +x "$UPDATE_FIXTURES/fake-release-curl"
   jq -n ' [{
-    tag_name:"v2.1.2", draft:false, prerelease:false, assets:[
-      {name:"management-release.env",browser_download_url:"file:///update-fixtures/2.1.2/management-release.env"},
-      {name:"management-release.env.sig",browser_download_url:"file:///update-fixtures/2.1.2/management-release.env.sig"},
-      {name:"management-bundle.tar.gz",browser_download_url:"file:///update-fixtures/2.1.2/management-bundle.tar.gz"}
+    tag_name:"v3.0.1", draft:false, prerelease:false, assets:[
+      {name:"management-release.env",browser_download_url:"file:///update-fixtures/3.0.1/management-release.env"},
+      {name:"management-release.env.sig",browser_download_url:"file:///update-fixtures/3.0.1/management-release.env.sig"},
+      {name:"management-bundle.tar.gz",browser_download_url:"file:///update-fixtures/3.0.1/management-bundle.tar.gz"}
     ]
   }] ' >"$UPDATE_FIXTURES/releases.json"
 elif [ "$UPGRADE_REQUIRED" = 1 ]; then
@@ -491,7 +491,7 @@ for proto in udp tcp; do
     grep -E "^${client_display}[[:space:]]+[0-9a-f-]{36}[[:space:]]+active.*online$" "$WORK_DIR/client-list-before-upgrade"
 
     docker exec "$server_name" ovpn upgrade --yes >"$WORK_DIR/upgrade.out"
-    [ "$(docker exec "$server_name" ovpn -v)" = 2.1.2 ]
+    [ "$(docker exec "$server_name" ovpn -v)" = 3.0.1 ]
     [ "$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')" = "$openvpn_pid" ]
     [ "$(docker exec "$server_name" cat /run/openvpn-container/management-broker.pid)" = "$broker_pid" ]
     docker exec "$server_name" sh -ec \
@@ -502,19 +502,19 @@ for proto in udp tcp; do
     docker exec "$server_name" ovpn client list --detail >"$WORK_DIR/client-list-after-upgrade"
     grep -E "^${client_display}[[:space:]]+[0-9a-f-]{36}[[:space:]]+active.*online$" "$WORK_DIR/client-list-after-upgrade"
     wait_for_runtime_event "$server_name" \
-      'any(.[]; .event == "management_upgrade" and .operation == "apply" and .from_version == "2.1.1" and .to_version == "2.1.2")' \
+      'any(.[]; .event == "management_upgrade" and .operation == "apply" and .from_version == "3.0.0" and .to_version == "3.0.1")' \
       "$WORK_DIR/events-upgrade.jsonl"
     grep -Fq '"event":"management_upgrade"' "$WORK_DIR/event-follow-upgrade.out"
     kill -0 "$log_follow_pid"
     kill -0 "$event_follow_pid"
 
     docker exec "$server_name" ovpn upgrade --rollback --yes >"$WORK_DIR/rollback.out"
-    [ "$(docker exec "$server_name" ovpn -v)" = 2.1.1 ]
+    [ "$(docker exec "$server_name" ovpn -v)" = 3.0.0 ]
     [ "$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')" = "$openvpn_pid" ]
     [ "$(docker exec "$server_name" cat /run/openvpn-container/management-broker.pid)" = "$broker_pid" ]
     docker ps --format '{{.Names}}' | grep -Fqx "$update_client"
     wait_for_runtime_event "$server_name" \
-      'any(.[]; .event == "management_upgrade" and .operation == "rollback" and .from_version == "2.1.2" and .to_version == "embedded")' \
+      'any(.[]; .event == "management_upgrade" and .operation == "rollback" and .from_version == "3.0.1" and .to_version == "embedded")' \
       "$WORK_DIR/events-rollback.jsonl"
     kill "$log_follow_pid" "$event_follow_pid" >/dev/null 2>&1 || true
     wait "$log_follow_pid" "$event_follow_pid" 2>/dev/null || true

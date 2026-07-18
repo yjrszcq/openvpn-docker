@@ -28,19 +28,22 @@ if "$VALIDATOR" --registry "$TMP_DIR/invalid-range.tsv" \
 fi
 grep -Fq 'empty OpenVPN range' "$TMP_DIR/range.err"
 
-head -n 4 "$REGISTRY" >"$TMP_DIR/release.tsv"
-release_commit="$(git -C "$ROOT_DIR" rev-parse HEAD)"
-printf '2.1.1\t%s\t3\tsigned-bundle\t2\t2\t2.7.0\t2.8.0\n' \
+cp "$REGISTRY" "$TMP_DIR/release.tsv"
+release_commit="$(git -C "$ROOT_DIR" stash create)"
+if [ -z "$release_commit" ]; then
+  release_commit="$(git -C "$ROOT_DIR" rev-parse HEAD)"
+fi
+printf '3.0.0\t%s\t3\tsigned-bundle\t2\t2\t2.7.0\t2.8.0\n' \
   "$release_commit" >>"$TMP_DIR/release.tsv"
 "$VALIDATOR" --registry "$TMP_DIR/release.tsv" \
-  --release-tag v2.1.1 --release-commit "$release_commit" \
+  --release-tag v3.0.0 --release-commit "$release_commit" \
   >"$TMP_DIR/release.out"
 grep -Fqx 'management compatibility matrix passed' "$TMP_DIR/release.out"
 
 cp "$TMP_DIR/release.tsv" "$TMP_DIR/incompatible-release.tsv"
 sed -i '$s/signed-bundle\t2\t2/signed-bundle\t3\t3/' "$TMP_DIR/incompatible-release.tsv"
 if "$VALIDATOR" --registry "$TMP_DIR/incompatible-release.tsv" \
-  --release-tag v2.1.1 --release-commit "$release_commit" \
+  --release-tag v3.0.0 --release-commit "$release_commit" \
   >"$TMP_DIR/incompatible-release.out" 2>"$TMP_DIR/incompatible-release.err"; then
   echo 'release incompatible with its image platform unexpectedly passed' >&2
   exit 1

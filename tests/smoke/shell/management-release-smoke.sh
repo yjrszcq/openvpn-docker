@@ -27,7 +27,7 @@ done
 
 "$VERIFIER" --release-dir "$TMP_DIR/first" --public-key "$TMP_DIR/signing-key.pub" >/dev/null
 grep -Fqx 'FORMAT_VERSION=1' "$TMP_DIR/first/management-release.env"
-grep -Fqx 'MANAGEMENT_VERSION=2.1.1' "$TMP_DIR/first/management-release.env"
+grep -Fqx 'MANAGEMENT_VERSION=3.0.0' "$TMP_DIR/first/management-release.env"
 grep -Fqx 'DATA_SCHEMA=3' "$TMP_DIR/first/management-release.env"
 grep -Fqx 'PLATFORM_API_MIN=2' "$TMP_DIR/first/management-release.env"
 grep -Fqx 'PLATFORM_API_MAX=2' "$TMP_DIR/first/management-release.env"

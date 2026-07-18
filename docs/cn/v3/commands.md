@@ -1,4 +1,4 @@
-# OpenVPN CLI v2 参考手册
+# OpenVPN CLI v3 参考手册
 
 本文是本源码树当前 CLI 的完整命令参考。
 
@@ -27,6 +27,7 @@ ovpn
 │   ├── list            列出客户端证书状态和可选的详细 IP 分配信息。
 │   ├── revoke          吊销客户端证书，可选释放静态 IP。
 │   ├── reissue         为已有客户端签发新证书，可选调整 IP 分配。
+│   ├── rename          修改客户端显示名称而不改变 UUID。
 │   ├── delete          删除客户端及其本地凭据。
 │   └── ip
 │       ├── release     释放已吊销客户端的保留静态 IP。
@@ -47,7 +48,11 @@ ovpn
 │   ├── status          打印运行时状态 JSON。
 │   ├── health          仅当容器健康时返回成功。
 │   ├── capabilities    打印兼容性和特性信息。
-│   └── version         打印镜像和运行时构建信息。
+│   ├── version         打印镜像和运行时构建信息。
+│   ├── logs            读取已翻译或原始的持久化 OpenVPN 日志。
+│   └── events          读取结构化运行时和生命周期事件。
+├── upgrade             检查、安装或回滚已签名的管理代码。
+├── migrate             规划或执行离线数据 schema 迁移。
 └── help                打印此帮助。
 ```
 
@@ -74,12 +79,14 @@ ovpn -v
 ovpn --version
 ```
 
-`-v` 仅打印镜像版本号（如 `2.1.1`）。`--version` 打印三行摘要，包含镜像、OpenVPN 和 Easy-RSA 版本：
+`-v` 仅打印当前管理代码版本（如 `3.0.0`）。`--version` 打印四行摘要，包含
+管理代码、镜像、OpenVPN 和 Easy-RSA 版本：
 
 ```text
-image:     2.1.1
-openvpn:   2.7.5
-easy-rsa:  3.2.2
+management:   3.0.0
+image:        3.0.0
+openvpn:      2.7.5
+easy-rsa:     3.2.2
 ```
 
 完整的构建信息 JSON 可通过 `ovpn runtime version` 获取。
@@ -128,11 +135,17 @@ ovpn config show
 ovpn config apply
 ```
 
-验证当前 `OVPN_*` 环境变量，并以 mode `0600` 原子替换 `config/project.env` 和 `config/schema-version`。它会写入配置 schema 版本 `2`，且不会签发、撤销、删除或重新签发客户端证书。
+验证当前 `OVPN_*` 环境变量，并以 mode `0600` 原子替换 `config/project.env` 和 `config/schema-version`。它会写入数据 schema 版本 `3`，且不会签发、撤销、删除或重新签发客户端证书。
 
-`OVPN_ENDPOINT` 必须为有效的主机名或 IP 字符串；`OVPN_PROTO` 为 `udp` 或 `tcp`；`OVPN_TRANSPORT_FAMILY` 为 `auto`、`ipv4` 或 `ipv6`。持久化的 `auto` 值保持不变：渲染时会识别 IPv4 和 IPv6 字面量；域名则选择双栈服务端传输和地址族中立的客户端传输。`config apply` 不进行 DNS 解析。`OVPN_TOPOLOGY` 为 `subnet`；布尔类型字段为 `true` 或 `false`；`OVPN_DNS` 和 `OVPN_ROUTES` 为逗号分隔的 IPv4 值；网络与动态池大小必须构成合法的 IPAM 布局。apply 会写入当前环境中所有的配置值。
+`OVPN_ENDPOINT` 必须为有效的主机名或 IP 字符串；`OVPN_PROTO` 为 `udp` 或 `tcp`；`OVPN_TRANSPORT_FAMILY` 为 `auto`、`ipv4` 或 `ipv6`。持久化的 `auto` 值保持不变：渲染时会识别 IPv4 和 IPv6 字面量；域名则选择双栈服务端传输和地址族中立的客户端传输。`config apply` 不进行 DNS 解析。`OVPN_TOPOLOGY` 为 `subnet`；布尔类型字段为 `true` 或 `false`；`OVPN_DNS` 和 `OVPN_ROUTES` 为逗号分隔的 IPv4 值；网络与动态池大小必须构成合法的 IPAM 布局。`OVPN_LOG_MAX_BYTES` 必须为正整数，`OVPN_LOG_BACKUPS` 必须为非负整数。apply 会写入当前环境中所有的配置值。
 
 ## 客户端生命周期
+
+每个客户端都有不可变的 UUID 身份。证书 CN、Easy-RSA 实体、CCD 文件名、动态租约
+文件名和 OpenVPN management 身份均使用该 UUID；客户端名称仍作为面向人的管理标签和
+profile 文件名。生成的 profile 包含 `ovpn-client-id` 与 `ovpn-client-name` 注释，
+因此无需改变 OpenVPN 语法也能恢复两种身份。除 `create` 外，每个 `<client>` 参数均
+接受当前显示名称或不可变 UUID；UUID 形式不能用作显示名称。
 
 ### `ovpn client create`
 
@@ -142,14 +155,17 @@ ovpn config apply
 ovpn client create <name> [--dynamic|--ip <IPv4>]
 ```
 
-在一个事务中创建唯一的客户端证书、私钥、活跃 profile、清单记录以及 IP 分配。不带选项时，客户端获取最低的可用静态地址。`--dynamic` 创建动态分配，要求动态池容量非零。`--ip <IPv4>` 请求静态区内的特定未使用地址。`--dynamic` 与 `--ip` 不可同时使用。
+在一个事务中创建由唯一 UUID 标识的客户端证书、私钥、活跃 profile、清单记录以及
+IP 分配。不带选项时，客户端获取最低的可用静态地址。`--dynamic` 创建动态分配，
+要求动态池容量非零。`--ip <IPv4>` 请求静态区内的特定未使用地址。`--dynamic` 与
+`--ip` 不可同时使用。
 
 ### `ovpn client export`
 
 语法：
 
 ```text
-ovpn client export <name>
+ovpn client export <client>
 ```
 
 需要一个健康的活跃客户端。原子重新生成 `clients/active/<name>.ovpn`，然后将同一 profile 写入标准输出。将标准输出重定向即可保存客户端 profile。
@@ -162,16 +178,31 @@ ovpn client export <name>
 ovpn client list [--detail]
 ```
 
-不带 `--detail` 时，打印带 `CLIENT` 和 `STATE` 表头的两列表格，列宽按最长名称自适应。带 `--detail` 时，打印对齐的列：`CLIENT`、`STATE`、`MODE`、`IP`、`IP STATE` 和 `CONNECTION`。
+不带 `--detail` 时，打印对齐的 `CLIENT`、`ID` 和 `STATE` 列。带 `--detail` 时，
+额外打印 `MODE`、`IP`、`IP STATE` 和 `CONNECTION`；两种视图都显示不可变 `ID`。
 
 在 IP 视图下，静态分配为 `configured`，或撤销后为 `retained`。动态地址在有当前租约时显示为 `connected`，在有持久化租约记录时显示为 `last-known`，否则为 `unavailable`。`CONNECTION` 根据管理套接字可用性和当前路由显示为 `online`、`offline` 或 `unknown`。该视图读取的是已应用的清单，而非未应用的草稿。
+
+### `ovpn client rename`
+
+语法：
+
+```text
+ovpn client rename <client> <new-name>
+```
+
+原子修改面向人的显示名称，同时保持 UUID、证书、私钥、IP 分配、CCD、租约以及当前
+OpenVPN 连接不变。身份目录、IP 草稿与已应用清单、profile 文件名及其中的名称注释
+会一同更新。源客户端可使用当前名称或 UUID；新名称必须合法且未被当前客户端占用。
+客户端改名或删除后，旧名称可由新的 UUID 复用；已删除 UUID 的 tombstone 仍作为
+权威历史保留。
 
 ### `ovpn client revoke`
 
 语法：
 
 ```text
-ovpn client revoke <name> [--release-ip]
+ovpn client revoke <client> [--release-ip]
 ```
 
 撤销活跃证书，重新生成 CRL，将其活跃 profile 移至 `clients/revoked/`，记录该客户端为已撤销状态，并在管理套接字可用时断开其连接。默认情况下，静态分配会保持保留。`--release-ip` 作为同一操作的一部分释放该静态保留。
@@ -181,7 +212,7 @@ ovpn client revoke <name> [--release-ip]
 语法：
 
 ```text
-ovpn client reissue <name> [--dynamic|--ip <IPv4>]
+ovpn client reissue <client> [--dynamic|--ip <IPv4>]
 ```
 
 为已有的客户端名称签发新密钥和新证书。对于活跃客户端，它首先撤销旧证书并将其 profile 移至已撤销集合。在修改线上 PKI 之前，会探测所搭载的 Easy-RSA 运行时是否支持同一 CN 重新签发，因此校验失败的请求不会造成任何变更。
@@ -196,21 +227,23 @@ ovpn client reissue <name> [--dynamic|--ip <IPv4>]
 语法：
 
 ```text
-ovpn client delete <name>
+ovpn client delete <client>
 ```
 
-不可逆地移除客户端。活跃客户端会先被撤销；然后命令移除其清单记录、活跃或已撤销 profile、私钥、已签发证书和请求文件。旧私钥仅能从安全备份中恢复。
+不可逆地移除客户端。活跃客户端会先被撤销；然后命令移除其 IP 记录、活跃或已撤销
+profile、私钥、已签发证书和请求文件，同时在身份目录中保留 UUID tombstone。已删除
+客户端的显示名称可供新的 UUID 复用。旧私钥仅能从安全备份中恢复。
 
 ## 客户端 IP 管理
 
-草稿清单为 `data/client-ip.csv`；最近一次已接受的清单为 `meta/client-ip.applied.csv`。两者均使用 `client,ip` 行格式。非空 IP 为静态分配；空 IP 为动态分配。可选的第一个整行内容恰好为 `# client,ip`。名称和静态地址必须唯一，静态地址必须落在静态区域内，且清单必须包含每一个逻辑 PKI 客户端。
+草稿清单为 `data/client-ip.csv`；最近一次已接受的清单为 `meta/client-ip.applied.csv`。两者都必须以 `# id,name,ip` 为首行，后续使用 `id,name,ip` 行，其中 `id` 是客户端不可变的 UUID。非空 IP 为静态分配；空 IP 为动态分配。UUID、名称和静态地址必须唯一，静态地址必须落在静态区域内，且清单必须包含权威身份目录中的每一个活跃或已撤销客户端。
 
 ### `ovpn client ip release`
 
 语法：
 
 ```text
-ovpn client ip release <name>
+ovpn client ip release <client>
 ```
 
 释放已撤销客户端的保留静态分配。客户端必须已撤销且仍持有静态保留。已撤销的 profile、私钥、证书历史和审计历史均会保留。
@@ -280,7 +313,17 @@ ovpn repair plan [--json]
 
 只读。扫描实例并打印符合条件的自动操作与受阻问题。文本报告中以 `SAFE` 或 `RECOVER` 标记操作；`--json` 将状态、操作和受阻条目以 JSON 输出。关键和不可恢复状态在报告后以退出状态 `78` 退出。
 
-符合条件的操作包括：恢复派生配置或元数据、重新生成 CRL、渲染缺失的活跃 profile、恢复已验证的证书或密钥副本，以及创建运行时目录。
+符合条件的操作包括：恢复派生配置或元数据、重新生成 CRL、渲染缺失的活跃 profile、
+恢复已验证的证书或密钥副本、恢复当前客户端身份/IP 清单，以及创建运行时目录。
+
+当 `meta/client-state.csv` 缺失或无效时，恢复以当前 PKI 中 UUID 形式的客户端条目为
+起点。显示名称只有在当前格式的草稿/已应用 IP 清单、profile 身份注释及最后一条适用
+的 rename 审计记录相互一致时才会采用。证据冲突会进入 `CRITICAL`，需要使用备份或
+人工检查。若名称证据全部丢失，repair 会分配确定性的临时名称
+`client-<去掉连字符的 UUID>`；修复后应将其改名。当前 runtime 不解析历史清单或
+历史审计格式。由于 PKI 只能记录证书处于 active 还是 revoked，权威身份清单丢失后
+无法区分 deleted tombstone 与 revoked 客户端；repair 会让该 UUID 保持 revoked，
+不会将其恢复为 active。
 
 ### `ovpn repair apply`
 
@@ -329,10 +372,69 @@ ovpn render server [--stdout|--output <path>]
 语法：
 
 ```text
-ovpn render client <name> [--stdout|--output <path>]
+ovpn render client <client> [--stdout|--output <path>]
 ```
 
-根据已配置的端点、CA 证书、指定客户端证书和私钥以及 tls-crypt 密钥构建客户端 `.ovpn` profile。输出默认为标准输出；`--output` 写入一个原子替换的 mode-`0600` 文件。
+根据已配置的端点、CA 证书、指定客户端证书和私钥以及 tls-crypt 密钥构建客户端
+`.ovpn` profile。`<client>` 可使用当前名称或 UUID。输出默认为标准输出；`--output`
+写入一个原子替换的 mode-`0600` 文件。
+
+## 管理代码在线更新
+
+### `ovpn upgrade`
+
+语法：
+
+```text
+ovpn upgrade [--check] [--version VERSION] [--json] [--yes]
+ovpn upgrade --rollback [--yes]
+```
+
+未指定 `--version` 时，选择 GitHub 稳定 Release 中高于当前版本、且与镜像
+platform API、OpenVPN runtime 及能力、当前数据 schema 兼容的最高版本。
+`--check` 只下载并验证签名清单。目标 schema 不同时拒绝在线更新，并提示通过
+maintenance 中的 `ovpn migrate` 处理。
+
+实际更新会验证 Ed25519 签名、SHA-256、归档路径和类型、bundle 内兼容 contract，
+通过隔离自检后原子切换 active 管理 bundle。active 和 previous 资产保存在
+`repair/.scripts`，不会重载 OpenVPN；非 TTY 必须提供 `--yes`。`--rollback` 切换到
+仍兼容的 previous bundle 或镜像内 embedded fallback。下载遵循标准代理变量，并支持
+可选的 `OVPN_GITHUB_TOKEN`。
+项目提供的 Compose 会把这些变量传给在线和 maintenance 服务；两者均使用 host 网络，
+因此 `http://127.0.0.1:7890` 指向 Docker 宿主机代理。镜像内稳定的 CLI 和 hook
+launcher 每次调用时解析 active bundle，后续命令与连接 hook 可直接切换版本，而不会
+向 OpenVPN 发送信号。
+退出状态 `64` 表示参数或非交互确认错误，`69` 表示 GitHub/API/下载不可用，`74`
+表示验证或安装事务失败，`78` 表示目标或回滚版本不兼容；成功及目标已是当前版本时
+返回 `0`。
+
+## 持久化数据迁移
+
+### `ovpn migrate`
+
+语法：
+
+```text
+ovpn migrate plan [--to-version VERSION] [--json]
+ovpn migrate apply [--to-version VERSION] [--yes]
+```
+
+此命令只能通过已停止服务的 `openvpn-maintenance` 使用。`plan` 为只读操作，报告
+源/目标 schema、有序迁移链、客户端数量、阻塞项和可选目标管理版本。`apply`
+要求交互确认；非 TTY 必须传 `--yes`。已经是当前 schema 时幂等成功。
+
+不传 `--to-version` 时，使用当前 active 管理代码迁移到其当前 schema。传入目标版本时，
+命令先验证兼容的已签名 bundle，再共同 staging 目标代码和数据。apply 获取独占
+运行锁、创建持久化快照、只迁移 staging 副本，验证 schema、PKI、清单、profile
+和目标代码后再同时提交。失败或中断时恢复数据与 active 代码指针。schema 1 执行
+`1→2→3`，schema 2 执行 `2→3`；两者都会把名称 CN 凭据替换为 UUID CN 凭据，
+成功后报告的所有活跃 profile 都必须重新分发。
+
+读取数据的命令对旧、冲突、非法或更新 schema 返回 `78`；只有 `migrate` 可以读取
+历史格式。不解析实例数据的 help、version 和 capabilities 仍可使用。platform API
+或 OpenVPN 不兼容同样返回 `78`，此时必须升级镜像。
+快照和报告保存在 `repair/migrations` 下。数据迁移后若要运行旧镜像，必须恢复与其
+匹配的迁移前快照；仅回滚镜像不等于回滚数据。
 
 ## 运行时检查
 
@@ -374,7 +476,34 @@ ovpn runtime capabilities
 ovpn runtime version
 ```
 
-打印 `/usr/local/share/openvpn-container/build-info.json` 中的构建信息 JSON，其中 Easy-RSA 版本为运行时检测的实际版本。如果该文件缺失，则从运行时获取 Easy-RSA 版本，其余字段打印 `unknown`。
+打印 `/usr/local/share/openvpn-container/build-info.json` 中的构建信息 JSON，其中
+Easy-RSA 版本为运行时检测值。输出包含 active 管理版本及来源（`embedded` 或
+`online`）、镜像版本、platform API、数据 schema、OpenVPN、Easy-RSA 和支持的
+OpenVPN 范围。若构建信息缺失，则检测 Easy-RSA，其余不可用字段打印 `unknown`。
+
+### `ovpn runtime logs`
+
+语法：
+
+```text
+ovpn runtime logs [--lines N] [--follow] [--raw]
+```
+
+读取持久化轮转的 OpenVPN 日志，默认最近 100 行。已知 UUID 显示为
+`名称 [uuid]`，未知身份保持原样；`--raw` 禁用翻译。`--follow` 可跨追加、轮转和
+原子替换持续跟随，且不会占用或阻塞 OpenVPN management socket。
+
+### `ovpn runtime events`
+
+语法：
+
+```text
+ovpn runtime events [--lines N] [--follow] [--json]
+```
+
+读取最近 100 条结构化连接、断开、客户端生命周期、IP、rename、网络迁移、管理更新
+和数据迁移事件。默认输出便于阅读的文本；`--json` 每行输出一个 JSON 对象。
+`--follow` 持续输出新记录且不阻塞 management 命令。
 
 ## 示例
 

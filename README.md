@@ -172,8 +172,10 @@ management updates never replace the OpenVPN kernel or migrate persistent data.
 
 - [v1 command reference](docs/en/v1/commands.md) — release commit `6619921e5257e604f5df2c63d2fa10505b680d84`.
   - [v1 operations guide](docs/en/v1/operations.md) — workflow-oriented command combinations.
-- [v2 command reference](docs/en/v2/commands.md) — the current CLI.
+- [v2 command reference](docs/en/v2/commands.md) — releases `2.0.0` through `2.1.1`.
   - [v2 operations guide](docs/en/v2/operations.md) — workflow-oriented command combinations.
+- [v3 command reference](docs/en/v3/commands.md) — the current CLI.
+  - [v3 operations guide](docs/en/v3/operations.md) — workflow-oriented command combinations.
 
 ## Updates, migrations, and logs
 

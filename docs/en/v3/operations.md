@@ -1,7 +1,12 @@
 # OpenVPN Operations Guide
 
 A workflow-oriented guide for operators. For complete command syntax and options,
-see the [v2 command reference](commands.md).
+see the [v3 command reference](commands.md).
+
+Persistent format changes follow the version-independent
+[data schema upgrade policy](../data-schema-upgrade-policy.md).
+Management-code and image responsibilities follow the permanent
+[management code update policy](../management-update-policy.md).
 
 ## Runtime conventions
 
@@ -28,8 +33,16 @@ If your compose file does not include the maintenance service, add it under
   openvpn-maintenance:
     image: szcq/openvpn:2.7.5
     restart: "no"
+    network_mode: host
     volumes:
       - ./openvpn-data:/etc/openvpn
+    environment:
+      OVPN_MAINTENANCE: "true"
+      OVPN_GITHUB_TOKEN: ${OVPN_GITHUB_TOKEN:-}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      ALL_PROXY: ${ALL_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-}
     profiles:
       - maintenance
     command:
@@ -39,13 +52,18 @@ If your compose file does not include the maintenance service, add it under
 ```
 
 It mounts the same persistent data but does not request TUN, `NET_ADMIN`, or
-exposed ports.
+exposed ports. Host networking lets standard proxy variables refer to a proxy
+on the Docker host, including `http://127.0.0.1:7890`.
 
 ---
 
 ## Day-to-day operations
 
 ### Create and distribute clients
+
+The displayed name is a management label and profile filename. OpenVPN uses
+the immutable UUID stored in the generated profile comments as the certificate
+CN and runtime identity.
 
 ```bash
 # create with default static IP
@@ -64,12 +82,23 @@ docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
 ### View client status
 
 ```bash
-# compact view (name + state)
+# compact view (name + immutable ID + state)
 docker compose exec openvpn ovpn client list
 
-# detailed view (six-column table with IP and connection state)
+# detailed view (seven-column table with ID, IP, and connection state)
 docker compose exec openvpn ovpn client list --detail
 ```
+
+### Rename a client
+
+```bash
+# accepts the current name or immutable UUID
+docker compose exec openvpn ovpn client rename laptop office-laptop
+```
+
+Rename does not replace the certificate or disconnect the client. Redistribute
+the renamed profile only when you want users to receive the new filename or
+embedded display-name comment.
 
 ### Revoke and release IPs
 
@@ -115,8 +144,9 @@ Re-export and distribute the profile afterward.
 docker compose exec openvpn ovpn client delete laptop
 ```
 
-Irreversible. Active clients are revoked first, then the registry record,
-profile, and private key are removed.
+Irreversible. Active clients are revoked first, then the IP record, profile,
+and private key are removed. The UUID tombstone remains and the old display
+name becomes reusable.
 
 ---
 
@@ -235,6 +265,101 @@ networks must also have public IPv6 connectivity.
 
 ---
 
+## Management code updates
+
+Management code, the image/platform, OpenVPN, and persistent data schema are
+independent. Check the active values before an update:
+
+```bash
+docker compose exec openvpn ovpn --version
+docker compose exec openvpn ovpn runtime version
+docker compose exec openvpn ovpn upgrade --check --json
+```
+
+Install the newest compatible stable management bundle:
+
+```bash
+docker compose exec openvpn ovpn upgrade --yes
+```
+
+Use `--version X.Y.Z` to select a specific newer stable release. Download,
+signature verification, extraction, and self-test happen before the active
+selector changes. The command does not modify instance data, reload OpenVPN,
+or disconnect clients. If the newest release is incompatible, automatic
+selection may choose the highest compatible newer release and report skipped
+targets. A platform API or OpenVPN mismatch requires a newer image. A schema
+mismatch requires the stopped maintenance migration below.
+
+Only the retained compatible previous bundle can be restored:
+
+```bash
+docker compose exec openvpn ovpn upgrade --rollback --yes
+```
+
+Rollback changes management code only. It cannot undo configuration changes or
+data migration.
+
+---
+
+## Persistent data-schema migration
+
+After replacing an image, an old schema prevents OpenVPN startup and all normal
+data commands. Do not run repair or `config apply` to bypass this gate.
+
+1. Keep the live service stopped:
+
+   ```bash
+   docker compose stop openvpn
+   ```
+
+2. Inspect the migration without changing code or data:
+
+   ```bash
+   docker compose run --rm openvpn-maintenance migrate plan
+   docker compose run --rm openvpn-maintenance migrate plan --json
+   ```
+
+   To migrate with a newer signed management release in the same transaction,
+   add `--to-version X.Y.Z` to both plan and apply. If that target needs a newer
+   platform API or OpenVPN runtime, update the image first.
+
+   ```bash
+   docker compose run --rm openvpn-maintenance migrate plan \
+     --to-version X.Y.Z
+   docker compose run --rm openvpn-maintenance migrate apply \
+     --to-version X.Y.Z --yes
+   ```
+
+3. Apply from maintenance:
+
+   ```bash
+   docker compose run --rm openvpn-maintenance migrate apply --yes
+   ```
+
+   Apply requires the server to remain stopped and obtains an exclusive lock.
+   It snapshots the data directory (excluding the internal
+   `repair/.scripts` bundle store), stages migration separately, validates the
+   target, then commits code and data together. Failures restore both
+   selectors; an interrupted transaction is recovered by the next apply.
+   Reports and snapshots remain under `openvpn-data/repair/migrations/`.
+
+4. Check the migrated instance and restart:
+
+   ```bash
+   docker compose run --rm openvpn-maintenance state doctor
+   docker compose up -d openvpn
+   ```
+
+5. Redistribute every active profile printed by apply. Schema 1/2 migration to
+   schema 3 replaces name-CN certificates with UUID-CN certificates, so old
+   profiles no longer authenticate.
+
+Keep the pre-migration snapshot until the new server and profiles are verified.
+Running an older image against migrated data is unsupported; restore the
+matching snapshot before an image rollback.
+
+---
+
 ## Network migration
 
 Changing the tunnel subnet or dynamic pool size requires migration commands,
@@ -290,10 +415,18 @@ docker compose run --rm openvpn-maintenance repair apply
 ```
 
 `repair plan` lists `SAFE` actions (rebuild derived files) and `RECOVER` actions
-(restore certificates/keys from backup paths). `repair apply` stages, snapshots,
-and atomically applies allowed repairs. `CRITICAL` states refuse repair by
-default (exit code 78); set `OVPN_CRITICAL_MODE=maintenance` only to preserve
-a broken container for inspection.
+(restore verified identity material or registries). `repair apply` stages,
+snapshots, and atomically applies allowed repairs. If the client identity
+registry is lost, current-schema IP registries, profile identity comments, and
+the latest rename audit record must agree. Conflicts are `CRITICAL`; a client
+with only a recoverable PKI UUID receives a temporary
+`client-<uuid-without-dashes>` name that should be renamed after repair.
+Deleted tombstone status cannot be reconstructed from PKI alone; such an
+identity remains revoked and cannot connect.
+
+`CRITICAL` states refuse repair by default (exit code 78); set
+`OVPN_CRITICAL_MODE=maintenance` only to preserve a broken container for
+inspection.
 
 ### Runtime inspection
 
@@ -302,7 +435,15 @@ docker compose exec openvpn ovpn runtime status       # runtime state JSON
 docker compose exec openvpn ovpn runtime health       # container health check
 docker compose exec openvpn ovpn runtime capabilities # compatibility info
 docker compose exec openvpn ovpn runtime version      # build information
+docker compose exec openvpn ovpn runtime logs --lines 100
+docker compose exec openvpn ovpn runtime events --lines 100 --json
 ```
+
+`runtime logs` translates known certificate UUIDs to `name [uuid]`; use
+`--raw` when comparing exact OpenVPN output. `runtime events` exposes
+connection, lifecycle, rename, IP, network, upgrade, and migration records.
+Both accept `--follow` and continue without blocking status, disconnect, or
+reload operations through the management broker.
 
 ---
 
