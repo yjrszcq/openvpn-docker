@@ -141,7 +141,16 @@ export OVPN_RUNTIME_MANAGEMENT_ROOT="$TMP_DIR/runtime"
 mkdir -p "$OVPN_DATA_DIR/config"
 printf 'OVPN_CONFIG_VERSION=2\n' >"$OVPN_DATA_DIR/config/project.env"
 printf '2\n' >"$OVPN_DATA_DIR/config/schema-version"
-config_checksum="$(sha256sum "$OVPN_DATA_DIR/config/project.env" "$OVPN_DATA_DIR/config/schema-version")"
+mkdir -p "$OVPN_DATA_DIR/pki/private" "$OVPN_DATA_DIR/clients/active" "$OVPN_DATA_DIR/server"
+printf 'credential sentinel\n' >"$OVPN_DATA_DIR/pki/private/client.key"
+printf 'profile sentinel\n' >"$OVPN_DATA_DIR/clients/active/client.ovpn"
+printf 'server sentinel\n' >"$OVPN_DATA_DIR/server/server.conf"
+
+business_state_checksum() {
+  find "$OVPN_DATA_DIR" -path "$OVPN_DATA_DIR/repair/.scripts" -prune -o -type f -print0 |
+    sort -z | xargs -0 sha256sum
+}
+business_checksum="$(business_state_checksum)"
 
 "$OVPN" upgrade --check --json >"$TMP_DIR/check.json"
 jq -e '.current_version == "2.1.1" and .target_version == "2.1.2" and
@@ -188,7 +197,7 @@ grep -Fqx '2.1.2' "$TMP_DIR/data/repair/.scripts/active"
 grep -Fqx 'embedded' "$TMP_DIR/data/repair/.scripts/previous"
 test -f "$TMP_DIR/data/repair/.scripts/releases/2.1.2/management-release.env.sig"
 test ! -e "$TMP_DIR/data/repair/.scripts/releases/1.9.0"
-[ "$(sha256sum "$OVPN_DATA_DIR/config/project.env" "$OVPN_DATA_DIR/config/schema-version")" = "$config_checksum" ]
+[ "$(business_state_checksum)" = "$business_checksum" ]
 case "$(readlink "$TMP_DIR/runtime/current")" in
 *'/online-2.1.2-'*) ;;
 *)
@@ -221,6 +230,7 @@ run_bootstrapped upgrade --rollback --yes >"$TMP_DIR/rollback.out"
 grep -Fqx embedded "$TMP_DIR/data/repair/.scripts/active"
 grep -Fqx 2.1.2 "$TMP_DIR/data/repair/.scripts/previous"
 grep -Fq 'rolled back to embedded' "$TMP_DIR/rollback.out"
+[ "$(business_state_checksum)" = "$business_checksum" ]
 
 exec {test_lock_fd}>"$TMP_DIR/data/repair/.scripts/.management.lock"
 flock -x "$test_lock_fd"
