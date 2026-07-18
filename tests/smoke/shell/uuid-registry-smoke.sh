@@ -78,6 +78,19 @@ ovpn_client_ip_parse_file "$TMP_DIR/client-ip.csv"
 [ "${OVPN_CLIENT_IP_IDS[0]}" = 22222222-2222-4222-8222-222222222222 ]
 [ "${OVPN_CLIENT_IP_NAMES[1]}" = phone ]
 
+mkdir -p "$OVPN_DATA_DIR/pki"
+cat >"$OVPN_DATA_DIR/pki/index.txt" <<'EOF'
+V	30000101000000Z		01	unknown	/CN=22222222-2222-4222-8222-222222222222
+R	30000101000000Z	260101000000Z	02	unknown	/CN=33333333-3333-4333-8333-333333333333
+R	30000101000000Z	260101000000Z	03	unknown	/CN=legacy-revoked-cn
+EOF
+ovpn_client_ip_collect_pki_clients
+[ "${OVPN_CLIENT_IP_PKI_STATES[laptop]}" = active ]
+[ "${OVPN_CLIENT_IP_PKI_STATES[phone]}" = revoked ]
+printf 'V\t30000101000000Z\t\t04\tunknown\t/CN=legacy-active-cn\n' >>"$OVPN_DATA_DIR/pki/index.txt"
+assert_rejected ovpn_client_ip_collect_pki_clients
+sed -i '$d' "$OVPN_DATA_DIR/pki/index.txt"
+
 cat >"$TMP_DIR/invalid-client-ip.csv" <<'EOF'
 # id,name,ip
 550e8400-e29b-11d4-a716-446655440000,laptop,

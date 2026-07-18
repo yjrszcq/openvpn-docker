@@ -138,6 +138,7 @@ ovpn_recovery_collect_client_pki() {
     id="${id%%/*}"
     [ "$id" = "$OVPN_SERVER_NAME" ] && continue
     ovpn_registry_uuid_valid "$id" || {
+      [ "$status" = R ] && continue
       OVPN_RECOVERY_STATUS=invalid
       return 1
     }

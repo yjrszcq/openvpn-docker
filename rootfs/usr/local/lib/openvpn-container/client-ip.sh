@@ -129,6 +129,7 @@ ovpn_client_ip_collect_pki_clients() {
     }
     [ "$id" = "$OVPN_SERVER_NAME" ] && continue
     ovpn_registry_uuid_valid "$id" || {
+      [ "$status" = R ] && continue
       ovpn_client_ip_error "PKI index contains an invalid client UUID '$id'"
       return 1
     }

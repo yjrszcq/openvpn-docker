@@ -47,15 +47,11 @@ printf '%s\n' \
   >"$OVPN_DATA_DIR/pki/index.txt"
 printf '1\n' >"$OVPN_DATA_DIR/config/schema-version"
 
-set +e
 OVPN_LIB_DIR="$LIB_DIR" OVPN_MAINTENANCE=true "$OVPN" migrate plan --json >"$TMP_DIR/plan.json"
-status=$?
-set -e
-[ "$status" -eq 78 ]
 grep -Fq '"target_schema":3' "$TMP_DIR/plan.json"
-grep -Fq '"chain":"1-to-2;2-to-3 unavailable"' "$TMP_DIR/plan.json"
-grep -Fq '"blocked":true' "$TMP_DIR/plan.json"
-grep -Fq 'deleted tombstones cannot be recovered' "$TMP_DIR/plan.json"
+grep -Fq '"chain":"1-to-2;2-to-3"' "$TMP_DIR/plan.json"
+grep -Fq '"blocked":false' "$TMP_DIR/plan.json"
+grep -Fq 'schema 1 deleted tombstones cannot be recovered' "$TMP_DIR/plan.json"
 grep -Fq '"clients":2' "$TMP_DIR/plan.json"
 
 # shellcheck source=/dev/null

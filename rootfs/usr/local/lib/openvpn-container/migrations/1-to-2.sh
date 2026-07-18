@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 
 OVPN_MIGRATION_1_TO_2_LOADED=true
 
@@ -15,7 +16,7 @@ ovpn_migration_1_to_2_collect_clients() {
   [ -r "$index" ] || ovpn_die "cannot migrate schema 1 without PKI index: $index"
   while IFS= read -r line || [ -n "$line" ]; do
     status="${line%%$'\t'*}"
-    case "$status" in V|R) ;; *) continue ;; esac
+    case "$status" in V | R) ;; *) continue ;; esac
     subject="${line##*$'\t'}"
     [[ "$subject" == */CN=* ]] ||
       ovpn_die 'schema 1 PKI index contains a client entry without a CN'
@@ -62,7 +63,7 @@ ovpn_migration_1_to_2_load_legacy_config() {
   [ "$(ovpn_migration_1_to_2_read_project_version "$project_env")" = 1 ] ||
     ovpn_die 'expected schema 1 configuration'
   while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in ''|'#'*) continue ;; esac
+    case "$line" in '' | '#'*) continue ;; esac
     [[ "$line" == *=* ]] ||
       ovpn_die "invalid schema 1 config line: $line"
     key="${line%%=*}"
@@ -71,10 +72,10 @@ ovpn_migration_1_to_2_load_legacy_config() {
       ovpn_die "duplicate schema 1 config key: $key"
     seen["$key"]=1
     case "$key" in
-      OVPN_CONFIG_VERSION|OVPN_ENDPOINT|OVPN_PROTO|OVPN_PORT|OVPN_NETWORK|OVPN_NAT|OVPN_NAT_INTERFACE|OVPN_REDIRECT_GATEWAY|OVPN_CLIENT_TO_CLIENT|OVPN_DNS|OVPN_ROUTES)
-        printf -v "$key" '%s' "$value"
-        ;;
-      *) ovpn_die "unsupported schema 1 config key: $key" ;;
+    OVPN_CONFIG_VERSION | OVPN_ENDPOINT | OVPN_PROTO | OVPN_PORT | OVPN_NETWORK | OVPN_NAT | OVPN_NAT_INTERFACE | OVPN_REDIRECT_GATEWAY | OVPN_CLIENT_TO_CLIENT | OVPN_DNS | OVPN_ROUTES)
+      printf -v "$key" '%s' "$value"
+      ;;
+    *) ovpn_die "unsupported schema 1 config key: $key" ;;
     esac
   done <"$project_env"
   [ "$OVPN_CONFIG_VERSION" = 1 ] || ovpn_die 'expected schema 1 configuration'
@@ -163,14 +164,16 @@ ovpn_migration_1_to_2_validate_staged() {
   local project_env="$data_dir/config/project.env"
   local schema_file="$data_dir/config/schema-version"
 
-  [ "$(ovpn_migration_1_to_2_read_project_version "$project_env")" = 2 ] &&
-    [ "$(ovpn_migration_1_to_2_read_schema_file "$schema_file")" = 2 ] ||
+  if [ "$(ovpn_migration_1_to_2_read_project_version "$project_env")" != 2 ] ||
+    [ "$(ovpn_migration_1_to_2_read_schema_file "$schema_file")" != 2 ]; then
     ovpn_die 'schema 1 to 2 migration did not write schema 2 metadata'
-  [ -r "$data_dir/data/client-ip.csv" ] &&
-    [ -r "$data_dir/meta/client-ip.applied.csv" ] &&
-    [ -r "$data_dir/meta/client-state.csv" ] &&
-    [ -r "$data_dir/meta/audit.jsonl" ] ||
+  fi
+  if [ ! -r "$data_dir/data/client-ip.csv" ] ||
+    [ ! -r "$data_dir/meta/client-ip.applied.csv" ] ||
+    [ ! -r "$data_dir/meta/client-state.csv" ] ||
+    [ ! -r "$data_dir/meta/audit.jsonl" ]; then
     ovpn_die 'schema 1 to 2 migration did not write the complete registry'
+  fi
   cmp "$data_dir/data/client-ip.csv" "$data_dir/meta/client-ip.applied.csv" >/dev/null ||
     ovpn_die 'schema 2 client IP snapshot does not match its draft'
   grep -Fqx '# client,ip' "$data_dir/data/client-ip.csv" ||

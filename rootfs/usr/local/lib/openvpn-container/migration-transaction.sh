@@ -38,10 +38,10 @@ ovpn_migration_transaction_marker_value() {
   [ -r "$file" ] || return 1
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
-      "$key="*)
-        [ -z "$found" ] || return 1
-        found="${line#*=}"
-        ;;
+    "$key="*)
+      [ -z "$found" ] || return 1
+      found="${line#*=}"
+      ;;
     esac
   done <"$file"
   [ -n "$found" ] || return 1
@@ -54,7 +54,7 @@ ovpn_migration_transaction_restore() {
 
   [ -r "$snapshot" ] || ovpn_die "migration snapshot is unavailable: $snapshot"
   while IFS= read -r entry; do
-    rm -rf "$OVPN_DATA_DIR/$entry"
+    rm -rf "${OVPN_DATA_DIR:?}/$entry"
   done < <(ovpn_migration_business_entries)
   tar -C "$OVPN_DATA_DIR" -xzf "$snapshot" ||
     ovpn_die 'failed to restore the migration snapshot'
@@ -73,32 +73,34 @@ ovpn_migration_transaction_recover_interrupted() {
   transaction_id="$(ovpn_migration_transaction_marker_value TRANSACTION_ID)" ||
     ovpn_die 'migration transaction marker has no transaction ID; manual recovery is required'
   case "$transaction_id" in
-    ''|*/*|*[!A-Za-z0-9._-]*|.*)
-      ovpn_die 'migration transaction ID is invalid; manual recovery is required'
-      ;;
+  '' | */* | *[!A-Za-z0-9._-]* | .*)
+    ovpn_die 'migration transaction ID is invalid; manual recovery is required'
+    ;;
   esac
   source_schema="$(ovpn_migration_transaction_marker_value SOURCE_SCHEMA)" ||
     ovpn_die 'migration transaction marker has no source schema; manual recovery is required'
   target_schema="$(ovpn_migration_transaction_marker_value TARGET_SCHEMA)" ||
     ovpn_die 'migration transaction marker has no target schema; manual recovery is required'
-  [[ "$source_schema" =~ ^[1-9][0-9]*$ ]] && [[ "$target_schema" =~ ^[1-9][0-9]*$ ]] ||
+  if ! [[ "$source_schema" =~ ^[1-9][0-9]*$ ]] ||
+    ! [[ "$target_schema" =~ ^[1-9][0-9]*$ ]]; then
     ovpn_die 'migration transaction schema metadata is invalid; manual recovery is required'
+  fi
   snapshot="$(ovpn_migration_transaction_marker_value SNAPSHOT)" ||
     ovpn_die 'migration transaction marker is invalid; manual recovery is required'
   snapshot_sha256="$(ovpn_migration_transaction_marker_value SNAPSHOT_SHA256)" ||
     ovpn_die 'migration transaction marker has no snapshot checksum; manual recovery is required'
   expected_prefix="$OVPN_MIGRATION_TRANSACTION_ROOT/snapshots/"
   case "$snapshot" in
-    "$expected_prefix"*) ;;
-    *) ovpn_die 'migration transaction snapshot path is invalid; manual recovery is required' ;;
+  "$expected_prefix"*) ;;
+  *) ovpn_die 'migration transaction snapshot path is invalid; manual recovery is required' ;;
   esac
   relative="${snapshot#"$expected_prefix"}"
   case "$relative" in
-    ''|*/*|*[!A-Za-z0-9._-]*|.*)
-      ovpn_die 'migration transaction snapshot name is invalid; manual recovery is required'
-      ;;
-    *.tar.gz) ;;
-    *) ovpn_die 'migration transaction snapshot name is invalid; manual recovery is required' ;;
+  '' | */* | *[!A-Za-z0-9._-]* | .*)
+    ovpn_die 'migration transaction snapshot name is invalid; manual recovery is required'
+    ;;
+  *.tar.gz) ;;
+  *) ovpn_die 'migration transaction snapshot name is invalid; manual recovery is required' ;;
   esac
   [[ "$snapshot_sha256" =~ ^[0-9a-f]{64}$ ]] ||
     ovpn_die 'migration transaction snapshot checksum is invalid; manual recovery is required'
@@ -123,7 +125,7 @@ ovpn_migration_transaction_start() {
   local target_schema="$2"
   local entry
 
-  OVPN_MIGRATION_TRANSACTION_ID="$(date -u +%Y%m%dT%H%M%S%NZ)-$$-$(ovpn_instance_id)"
+  OVPN_MIGRATION_TRANSACTION_ID="$(date -u +%Y%m%dT%H%M%S%NZ)-$$-$RANDOM$RANDOM"
   OVPN_MIGRATION_TRANSACTION_STAGE="$OVPN_MIGRATION_TRANSACTION_ROOT/staging/$OVPN_MIGRATION_TRANSACTION_ID/data"
   OVPN_MIGRATION_TRANSACTION_SNAPSHOT="$OVPN_MIGRATION_TRANSACTION_ROOT/snapshots/$OVPN_MIGRATION_TRANSACTION_ID.tar.gz"
   OVPN_MIGRATION_TRANSACTION_REPORT="$OVPN_MIGRATION_TRANSACTION_ROOT/reports/$OVPN_MIGRATION_TRANSACTION_ID.json"
@@ -174,7 +176,7 @@ ovpn_migration_transaction_commit() {
   local entry
 
   while IFS= read -r entry; do
-    rm -rf "$OVPN_DATA_DIR/$entry"
+    rm -rf "${OVPN_DATA_DIR:?}/$entry"
     if [ -e "$OVPN_MIGRATION_TRANSACTION_STAGE/$entry" ]; then
       mv "$OVPN_MIGRATION_TRANSACTION_STAGE/$entry" "$OVPN_DATA_DIR/$entry"
     fi

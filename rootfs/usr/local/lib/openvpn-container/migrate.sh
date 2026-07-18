@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 OVPN_MIGRATION_DIR="${OVPN_MIGRATION_DIR:-$LIB_DIR/migrations}"
+OVPN_MIGRATE_APPLY_SOURCE=''
 # shellcheck source=/usr/local/lib/openvpn-container/migration-transaction.sh
 . "$LIB_DIR/migration-transaction.sh"
 
@@ -67,31 +68,69 @@ ovpn_migrate_plan() {
 
   ovpn_schema_probe
   case "$OVPN_SCHEMA_STATUS" in
-    CURRENT)
-      ovpn_migrate_print_plan "$json" "$OVPN_CURRENT_DATA_SCHEMA" "$OVPN_CURRENT_DATA_SCHEMA" none 0 false ''
-      ;;
-    OLD)
-      if [ "$OVPN_SCHEMA_PROJECT_VERSION" = 1 ] && [ "$OVPN_SCHEMA_FILE_VERSION" = 1 ]; then
-        ovpn_migrate_load_step 1 2 || return $?
-        if [ "$OVPN_CURRENT_DATA_SCHEMA" = 2 ]; then
-          ovpn_migrate_print_plan "$json" 1 2 1-to-2 "$(ovpn_migration_1_to_2_client_count)" false \
-            'deleted tombstones did not exist in schema 1 and cannot be recovered'
-        else
-          ovpn_migrate_print_plan "$json" 1 "$OVPN_CURRENT_DATA_SCHEMA" '1-to-2;2-to-3 unavailable' \
-            "$(ovpn_migration_1_to_2_client_count)" true \
-            'schema 1 deleted tombstones cannot be recovered; no complete migration chain is registered'
-          return 78
-        fi
-      else
-        ovpn_migrate_print_plan "$json" "${OVPN_SCHEMA_PROJECT_VERSION:-0}" "$OVPN_CURRENT_DATA_SCHEMA" unavailable 0 true 'no registered migration chain'
-        return 78
-      fi
-      ;;
-    *)
-      ovpn_migrate_print_plan "$json" "${OVPN_SCHEMA_PROJECT_VERSION:-0}" "$OVPN_CURRENT_DATA_SCHEMA" unavailable 0 true "schema status is $OVPN_SCHEMA_STATUS"
+  CURRENT)
+    ovpn_migrate_print_plan "$json" "$OVPN_CURRENT_DATA_SCHEMA" "$OVPN_CURRENT_DATA_SCHEMA" none 0 false ''
+    ;;
+  OLD)
+    if [ "$OVPN_SCHEMA_PROJECT_VERSION" = 1 ] && [ "$OVPN_SCHEMA_FILE_VERSION" = 1 ]; then
+      ovpn_migrate_load_step 1 2 || return $?
+      ovpn_migrate_load_step 2 3 || return $?
+      ovpn_migrate_print_plan "$json" 1 3 '1-to-2;2-to-3' \
+        "$(ovpn_migration_1_to_2_client_count)" false \
+        'all active profiles will be replaced; schema 1 deleted tombstones cannot be recovered'
+    elif [ "$OVPN_SCHEMA_PROJECT_VERSION" = 2 ] && [ "$OVPN_SCHEMA_FILE_VERSION" = 2 ]; then
+      ovpn_migrate_load_step 2 3 || return $?
+      ovpn_migrate_print_plan "$json" 2 3 2-to-3 \
+        "$(ovpn_migration_2_to_3_client_count)" false \
+        'all active profiles will be replaced and must be redistributed'
+    else
+      ovpn_migrate_print_plan "$json" "${OVPN_SCHEMA_PROJECT_VERSION:-0}" "$OVPN_CURRENT_DATA_SCHEMA" unavailable 0 true 'no registered migration chain'
       return 78
-      ;;
+    fi
+    ;;
+  *)
+    ovpn_migrate_print_plan "$json" "${OVPN_SCHEMA_PROJECT_VERSION:-0}" "$OVPN_CURRENT_DATA_SCHEMA" unavailable 0 true "schema status is $OVPN_SCHEMA_STATUS"
+    return 78
+    ;;
   esac
+}
+
+ovpn_migrate_apply_stage() {
+  local stage="$1"
+
+  if [ "$OVPN_MIGRATE_APPLY_SOURCE" = 1 ]; then
+    ovpn_migration_1_to_2_apply_staged "$stage"
+    ovpn_migration_1_to_2_validate_staged "$stage"
+  fi
+  ovpn_migration_2_to_3_apply_staged "$stage" "$OVPN_DATA_DIR"
+}
+
+ovpn_migrate_validate_current() {
+  ovpn_migration_2_to_3_validate_staged "$1"
+}
+
+ovpn_migrate_confirm_apply() {
+  local answer
+
+  if [ ! -t 0 ]; then
+    ovpn_log 'migrate apply requires --yes in non-interactive mode'
+    return 64
+  fi
+  printf 'Migrate persistent data to schema %s? [y/N] ' "$OVPN_CURRENT_DATA_SCHEMA" >&2
+  IFS= read -r answer || return 64
+  case "$answer" in y | Y | yes | YES) return 0 ;; esac
+  ovpn_log 'migration cancelled'
+  return 64
+}
+
+ovpn_migrate_report_profiles() {
+  local id name state
+
+  while IFS=, read -r id name state; do
+    [ "$id" = '# id' ] && continue
+    [ "$state" = active ] || continue
+    printf 'redistribute profile: %s\n' "$OVPN_DATA_DIR/clients/active/$name.ovpn"
+  done <"$OVPN_DATA_DIR/meta/client-state.csv"
 }
 
 ovpn_migrate_command() {
@@ -106,32 +145,55 @@ ovpn_migrate_command() {
   shift
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --json) json=true ;;
-      --yes) yes=true ;;
-      --to-version)
-        shift
-        [ "$#" -gt 0 ] || ovpn_die 'missing value for --to-version'
-        target_version="$1"
-        ;;
-      *) ovpn_die "unknown migrate option '$1'" ;;
+    --json) json=true ;;
+    --yes) yes=true ;;
+    --to-version)
+      shift
+      [ "$#" -gt 0 ] || ovpn_die 'missing value for --to-version'
+      target_version="$1"
+      ;;
+    *) ovpn_die "unknown migrate option '$1'" ;;
     esac
     shift
   done
   [ -z "$target_version" ] || ovpn_die 'target management release selection is not available until signed bundles are enabled'
   ovpn_migrate_require_maintenance || return $?
   case "$subcommand" in
-    plan)
-      [ "$yes" = false ] || ovpn_die '--yes is valid only with migrate apply'
-      ovpn_migrate_plan "$json"
+  plan)
+    [ "$yes" = false ] || ovpn_die '--yes is valid only with migrate apply'
+    ovpn_migrate_plan "$json"
+    ;;
+  apply)
+    [ "$json" = false ] || ovpn_die '--json is valid only with migrate plan'
+    ovpn_schema_probe
+    [ "$OVPN_SCHEMA_STATUS" = CURRENT ] && return 0
+    [ "$OVPN_SCHEMA_STATUS" = OLD ] || {
+      ovpn_log "cannot migrate while schema status is $OVPN_SCHEMA_STATUS"
+      return 78
+    }
+    [ "$OVPN_SCHEMA_PROJECT_VERSION" = "$OVPN_SCHEMA_FILE_VERSION" ] || {
+      ovpn_log 'schema metadata conflicts; refusing migration'
+      return 78
+    }
+    OVPN_MIGRATE_APPLY_SOURCE="$OVPN_SCHEMA_PROJECT_VERSION"
+    case "$OVPN_MIGRATE_APPLY_SOURCE" in
+    1)
+      ovpn_migrate_load_step 1 2 || return $?
+      ovpn_migrate_load_step 2 3 || return $?
       ;;
-    apply)
-      [ "$json" = false ] || ovpn_die '--json is valid only with migrate plan'
-      ovpn_schema_probe
-      [ "$OVPN_SCHEMA_STATUS" = CURRENT ] && return 0
-      [ "$yes" = true ] || ovpn_die 'migrate apply requires --yes when transaction support is enabled'
-      ovpn_log "migrate apply is blocked until a complete migration chain to schema $OVPN_CURRENT_DATA_SCHEMA is registered"
+    2)
+      ovpn_migrate_load_step 2 3 || return $?
+      ;;
+    *)
+      ovpn_log "no migration chain from schema $OVPN_MIGRATE_APPLY_SOURCE"
       return 78
       ;;
-    *) ovpn_die 'usage: ovpn migrate <plan|apply>' ;;
+    esac
+    [ "$yes" = true ] || ovpn_migrate_confirm_apply || return $?
+    ovpn_migration_transaction_run "$OVPN_MIGRATE_APPLY_SOURCE" \
+      "$OVPN_CURRENT_DATA_SCHEMA" ovpn_migrate_apply_stage ovpn_migrate_validate_current
+    ovpn_migrate_report_profiles
+    ;;
+  *) ovpn_die 'usage: ovpn migrate <plan|apply>' ;;
   esac
 }
