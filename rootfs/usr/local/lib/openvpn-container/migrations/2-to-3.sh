@@ -60,6 +60,8 @@ ovpn_migration_2_to_3_load_config() {
   OVPN_CLIENT_TO_CLIENT=true
   OVPN_DNS=''
   OVPN_ROUTES=''
+  OVPN_LOG_MAX_BYTES=10485760
+  OVPN_LOG_BACKUPS=5
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in '' | '#'*) continue ;; esac
     [[ "$line" == *=* ]] || ovpn_die "invalid schema 2 config line: $line"

@@ -38,6 +38,7 @@ grep -Fqx 'REQUIRED_FEATURES=tls-crypt,data-ciphers,crl-verify,topology-subnet' 
 tar -tzf "$TMP_DIR/first/management-bundle.tar.gz" >"$TMP_DIR/files"
 grep -Fqx './management.env' "$TMP_DIR/files"
 grep -Fqx './lib/cli.sh' "$TMP_DIR/files"
+grep -Fqx './lib/runtime-logs.py' "$TMP_DIR/files"
 grep -Fqx './lib/migrations/1-to-2.sh' "$TMP_DIR/files"
 grep -Fqx './templates/openvpn-2.7/server.conf.tpl' "$TMP_DIR/files"
 grep -Fqx './compatibility/contract.env' "$TMP_DIR/files"

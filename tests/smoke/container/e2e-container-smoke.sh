@@ -252,6 +252,22 @@ wait_for_log() {
   exit 1
 }
 
+wait_for_runtime_log() {
+  local container_name="$1"
+  local pattern="$2"
+  local log_path="$3"
+  local deadline=$((SECONDS + WAIT_SECONDS))
+
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    docker exec "$container_name" ovpn runtime logs --lines 300 >"$log_path"
+    grep -Fq "$pattern" "$log_path" && return 0
+    sleep 1
+  done
+  cat "$log_path" >&2
+  echo "persistent runtime log did not contain: $pattern" >&2
+  exit 1
+}
+
 run_client_until_timeout() {
   local network_name="$1"
   local profile_path="$2"
@@ -396,6 +412,15 @@ for proto in udp tcp; do
   grep -E "^client-${proto}[[:space:]]+[0-9a-f-]{36}[[:space:]]+active$" <(run_control "$data_dir" "$endpoint" ovpn client list)
 
   assert_client_connects "$network_name" "$profile_path" "$WORK_DIR/client-$proto-active.log"
+  wait_for_runtime_log "$server_name" "client-$proto [$client_id]" \
+    "$WORK_DIR/runtime-$proto.log"
+  docker exec "$server_name" ovpn runtime logs --lines 300 --raw \
+    >"$WORK_DIR/runtime-$proto-raw.log"
+  grep -Fq "$client_id" "$WORK_DIR/runtime-$proto-raw.log"
+  if grep -Fq "client-$proto [$client_id]" "$WORK_DIR/runtime-$proto-raw.log"; then
+    echo 'raw runtime log unexpectedly contained translated identity' >&2
+    exit 1
+  fi
 
   if [ "$proto" = udp ]; then
     concurrent_pids=()
@@ -422,6 +447,8 @@ for proto in udp tcp; do
     docker exec "$rename_client" ip -4 address show dev tun0 | grep -Fq 'inet '
     grep -E "^renamed-udp[[:space:]]+${client_id}[[:space:]]+active.*online$" \
       <(docker exec "$server_name" ovpn client list --detail)
+    wait_for_runtime_log "$server_name" "renamed-udp [$client_id]" \
+      "$WORK_DIR/runtime-renamed-udp.log"
     docker rm -f "$rename_client" >/dev/null
   fi
 

@@ -12,17 +12,19 @@ ovpn_auto_init_if_empty() {
 }
 
 ovpn_start_management_broker() {
-  local python_bin broker_log broker_pid
+  local python_bin raw_log broker_pid
 
   python_bin="${OVPN_PYTHON_BIN:-python3}"
-  broker_log="${OVPN_MANAGEMENT_ASYNC_LOG:-$OVPN_RUNTIME_DIR/management-async.log}"
+  raw_log="${OVPN_RAW_LOG_FILE:-$OVPN_DATA_DIR/logs/openvpn.log}"
   command -v "$python_bin" >/dev/null 2>&1 ||
     ovpn_die 'python3 is required for the OpenVPN management broker'
   rm -f "$OVPN_MANAGEMENT_SOCKET" "$OVPN_OPENVPN_MANAGEMENT_SOCKET"
   "$python_bin" "$LIB_DIR/management-broker.py" \
     --listen "$OVPN_MANAGEMENT_SOCKET" \
     --backend "$OVPN_OPENVPN_MANAGEMENT_SOCKET" \
-    --async-log "$broker_log" &
+    --raw-log "$raw_log" \
+    --max-bytes "$OVPN_LOG_MAX_BYTES" \
+    --backups "$OVPN_LOG_BACKUPS" &
   broker_pid=$!
   OVPN_MANAGEMENT_BROKER_PID="$broker_pid"
   printf '%s\n' "$broker_pid" >"$OVPN_RUNTIME_DIR/management-broker.pid"

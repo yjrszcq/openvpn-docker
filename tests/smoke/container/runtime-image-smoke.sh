@@ -58,6 +58,7 @@ docker run --rm --entrypoint sh "$IMAGE" -ec '
   command -v openssl >/dev/null
   command -v python3 >/dev/null
   python3 -m py_compile /usr/local/lib/openvpn-container/management-broker.py
+  python3 -m py_compile /usr/local/lib/openvpn-container/runtime-logs.py
   test -d /usr/local/share/openvpn-container/trusted-management-keys
   test -r /usr/local/share/openvpn-container/trusted-management-keys/release.pem ||
     test -r /usr/local/share/openvpn-container/trusted-management-keys/UNCONFIGURED

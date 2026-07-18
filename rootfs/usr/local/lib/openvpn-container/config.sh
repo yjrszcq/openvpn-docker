@@ -19,6 +19,8 @@ ovpn_config_defaults() {
   OVPN_CLIENT_TO_CLIENT="${OVPN_CLIENT_TO_CLIENT:-true}"
   OVPN_DNS="${OVPN_DNS:-}"
   OVPN_ROUTES="${OVPN_ROUTES:-}"
+  OVPN_LOG_MAX_BYTES="${OVPN_LOG_MAX_BYTES:-10485760}"
+  OVPN_LOG_BACKUPS="${OVPN_LOG_BACKUPS:-5}"
 }
 
 ovpn_validate_single_line() {
@@ -47,7 +49,7 @@ ovpn_config_set_key() {
   local value="$2"
 
   case "$key" in
-    OVPN_CONFIG_VERSION|OVPN_ENDPOINT|OVPN_PROTO|OVPN_TRANSPORT_FAMILY|OVPN_PORT|OVPN_NETWORK|OVPN_TOPOLOGY|OVPN_DYNAMIC_POOL_SIZE|OVPN_NAT|OVPN_NAT_INTERFACE|OVPN_REDIRECT_GATEWAY|OVPN_CLIENT_TO_CLIENT|OVPN_DNS|OVPN_ROUTES)
+    OVPN_CONFIG_VERSION|OVPN_ENDPOINT|OVPN_PROTO|OVPN_TRANSPORT_FAMILY|OVPN_PORT|OVPN_NETWORK|OVPN_TOPOLOGY|OVPN_DYNAMIC_POOL_SIZE|OVPN_NAT|OVPN_NAT_INTERFACE|OVPN_REDIRECT_GATEWAY|OVPN_CLIENT_TO_CLIENT|OVPN_DNS|OVPN_ROUTES|OVPN_LOG_MAX_BYTES|OVPN_LOG_BACKUPS)
       printf -v "$key" '%s' "$value"
       ;;
     ''|'#'*)
@@ -104,6 +106,13 @@ ovpn_validate_transport_family() {
     auto|ipv4|ipv6) ;;
     *) ovpn_die "OVPN_TRANSPORT_FAMILY must be auto, ipv4, or ipv6" ;;
   esac
+}
+
+ovpn_validate_log_rotation() {
+  [[ "$OVPN_LOG_MAX_BYTES" =~ ^[1-9][0-9]*$ ]] ||
+    ovpn_die "OVPN_LOG_MAX_BYTES must be a positive integer"
+  [[ "$OVPN_LOG_BACKUPS" =~ ^[0-9]+$ ]] ||
+    ovpn_die "OVPN_LOG_BACKUPS must be a non-negative integer"
 }
 
 ovpn_validate_cidr() {
@@ -194,6 +203,7 @@ ovpn_config_validate() {
   ovpn_validate_single_line OVPN_ROUTES "$OVPN_ROUTES"
   ovpn_validate_proto
   ovpn_validate_transport_family
+  ovpn_validate_log_rotation
   ovpn_validate_port
   case "$OVPN_TOPOLOGY" in
     subnet) ;;
@@ -234,6 +244,8 @@ OVPN_REDIRECT_GATEWAY=$OVPN_REDIRECT_GATEWAY
 OVPN_CLIENT_TO_CLIENT=$OVPN_CLIENT_TO_CLIENT
 OVPN_DNS=$OVPN_DNS
 OVPN_ROUTES=$OVPN_ROUTES
+OVPN_LOG_MAX_BYTES=$OVPN_LOG_MAX_BYTES
+OVPN_LOG_BACKUPS=$OVPN_LOG_BACKUPS
 EOF
 }
 
@@ -255,6 +267,8 @@ OVPN_REDIRECT_GATEWAY=$OVPN_REDIRECT_GATEWAY
 OVPN_CLIENT_TO_CLIENT=$OVPN_CLIENT_TO_CLIENT
 OVPN_DNS=$OVPN_DNS
 OVPN_ROUTES=$OVPN_ROUTES
+OVPN_LOG_MAX_BYTES=$OVPN_LOG_MAX_BYTES
+OVPN_LOG_BACKUPS=$OVPN_LOG_BACKUPS
 EOF
   mv "$OVPN_PROJECT_ENV.tmp" "$OVPN_PROJECT_ENV"
   printf '%s\n' "$OVPN_CONFIG_VERSION" >"$OVPN_SCHEMA_VERSION_FILE.tmp"

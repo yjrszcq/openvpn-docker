@@ -40,6 +40,8 @@ if ! grep -q '^OVPN_NETWORK=10.88.0.0/24$' "$TMP_DIR/project.env.out"; then
   exit 1
 fi
 grep -Fqx 'OVPN_TRANSPORT_FAMILY=auto' "$TMP_DIR/project.env.out"
+grep -Fqx 'OVPN_LOG_MAX_BYTES=10485760' "$TMP_DIR/project.env.out"
+grep -Fqx 'OVPN_LOG_BACKUPS=5' "$TMP_DIR/project.env.out"
 
 "$OVPN" render server --stdout >"$TMP_DIR/server.conf"
 grep -q '^server 10.88.0.0 255.255.255.0 nopool$' "$TMP_DIR/server.conf"
@@ -116,10 +118,29 @@ fi
 grep -Fq 'OVPN_TRANSPORT_FAMILY must be auto, ipv4, or ipv6' "$TMP_DIR/invalid-family.err"
 [ "$config_before" = "$(sha256sum "$OVPN_DATA_DIR/config/project.env")" ]
 
-grep -v '^OVPN_TRANSPORT_FAMILY=' "$OVPN_DATA_DIR/config/project.env" >"$OVPN_DATA_DIR/config/project.env.legacy"
+OVPN_LOG_MAX_BYTES=4096 OVPN_LOG_BACKUPS=2 "$OVPN" config apply
+grep -Fqx 'OVPN_LOG_MAX_BYTES=4096' "$OVPN_DATA_DIR/config/project.env"
+grep -Fqx 'OVPN_LOG_BACKUPS=2' "$OVPN_DATA_DIR/config/project.env"
+config_before="$(sha256sum "$OVPN_DATA_DIR/config/project.env")"
+if OVPN_LOG_MAX_BYTES=0 "$OVPN" config apply >"$TMP_DIR/invalid-log-size.out" 2>"$TMP_DIR/invalid-log-size.err"; then
+  echo 'invalid log size unexpectedly applied' >&2
+  exit 1
+fi
+grep -Fq 'OVPN_LOG_MAX_BYTES must be a positive integer' "$TMP_DIR/invalid-log-size.err"
+if OVPN_LOG_BACKUPS=-1 "$OVPN" config apply >"$TMP_DIR/invalid-log-backups.out" 2>"$TMP_DIR/invalid-log-backups.err"; then
+  echo 'invalid log backup count unexpectedly applied' >&2
+  exit 1
+fi
+grep -Fq 'OVPN_LOG_BACKUPS must be a non-negative integer' "$TMP_DIR/invalid-log-backups.err"
+[ "$config_before" = "$(sha256sum "$OVPN_DATA_DIR/config/project.env")" ]
+
+grep -Ev '^(OVPN_TRANSPORT_FAMILY|OVPN_LOG_MAX_BYTES|OVPN_LOG_BACKUPS)=' \
+  "$OVPN_DATA_DIR/config/project.env" >"$OVPN_DATA_DIR/config/project.env.legacy"
 mv "$OVPN_DATA_DIR/config/project.env.legacy" "$OVPN_DATA_DIR/config/project.env"
 "$OVPN" config show >"$TMP_DIR/legacy-project.env.out"
 grep -Fqx 'OVPN_TRANSPORT_FAMILY=auto' "$TMP_DIR/legacy-project.env.out"
+grep -Fqx 'OVPN_LOG_MAX_BYTES=10485760' "$TMP_DIR/legacy-project.env.out"
+grep -Fqx 'OVPN_LOG_BACKUPS=5' "$TMP_DIR/legacy-project.env.out"
 
 OVPN_DATA_DIR="$TMP_DIR/static" OVPN_DYNAMIC_POOL_SIZE=0 "$OVPN" config apply
 OVPN_DATA_DIR="$TMP_DIR/static" "$OVPN" render server --stdout >"$TMP_DIR/static-server.conf"

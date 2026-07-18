@@ -83,6 +83,8 @@ ovpn_migration_1_to_2_load_legacy_config() {
   OVPN_TRANSPORT_FAMILY=auto
   OVPN_TOPOLOGY=subnet
   OVPN_DYNAMIC_POOL_SIZE=''
+  OVPN_LOG_MAX_BYTES=10485760
+  OVPN_LOG_BACKUPS=5
   OVPN_CONFIG_VERSION=3
   ovpn_config_validate
   OVPN_CONFIG_VERSION=2

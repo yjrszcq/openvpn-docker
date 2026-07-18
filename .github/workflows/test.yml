@@ -48,6 +48,7 @@ jobs:
             tests/smoke/shell/management-hook-smoke.sh \
             tests/smoke/shell/network-migration-smoke.sh \
             tests/smoke/shell/render-smoke.sh \
+            tests/smoke/shell/runtime-logs-smoke.sh \
             tests/smoke/shell/schema2-uuid-migration-smoke.sh \
             tests/smoke/shell/uuid-registry-smoke.sh \
             tests/helpers/create-management-release-fixture.sh \
@@ -55,7 +56,7 @@ jobs:
             tests/smoke/container/upgrade-state-smoke.sh \
             tests/smoke/shell/workflow-smoke.sh \
             tests/smoke/shell/license-smoke.sh
-          docker run --rm -v "$PWD:/work:ro" -w /work mvdan/shfmt:v3.10.0 -i 2 -d scripts/update-openvpn.sh scripts/release-policy.sh scripts/package-management-release.sh scripts/verify-management-release.sh rootfs/usr/local/bin/ovpn-hook rootfs/usr/local/lib/openvpn-bootstrap.sh rootfs/usr/local/lib/openvpn-verify-management-release.sh rootfs/usr/local/lib/openvpn-container/maintenance.sh rootfs/usr/local/lib/openvpn-container/render-ipam.sh rootfs/usr/local/lib/openvpn-container/render.sh rootfs/usr/local/lib/openvpn-container/start.sh rootfs/usr/local/lib/openvpn-container/upgrade.sh tests/helpers/create-management-release-fixture.sh tests/helpers/fake-release-curl.sh tests/smoke/container/e2e-container-smoke.sh tests/smoke/container/runtime-image-smoke.sh tests/smoke/shell/init-start-smoke.sh tests/smoke/shell/management-broker-smoke.sh tests/smoke/shell/update-openvpn-smoke.sh tests/smoke/shell/release-policy-smoke.sh tests/smoke/shell/management-release-smoke.sh tests/smoke/shell/management-upgrade-smoke.sh tests/smoke/shell/management-hook-smoke.sh tests/smoke/shell/network-migration-smoke.sh tests/smoke/shell/render-smoke.sh tests/smoke/shell/schema2-uuid-migration-smoke.sh tests/smoke/container/upgrade-state-smoke.sh tests/smoke/shell/workflow-smoke.sh tests/smoke/shell/license-smoke.sh
+          docker run --rm -v "$PWD:/work:ro" -w /work mvdan/shfmt:v3.10.0 -i 2 -d scripts/update-openvpn.sh scripts/release-policy.sh scripts/package-management-release.sh scripts/verify-management-release.sh rootfs/usr/local/bin/ovpn-hook rootfs/usr/local/lib/openvpn-bootstrap.sh rootfs/usr/local/lib/openvpn-verify-management-release.sh rootfs/usr/local/lib/openvpn-container/maintenance.sh rootfs/usr/local/lib/openvpn-container/render-ipam.sh rootfs/usr/local/lib/openvpn-container/render.sh rootfs/usr/local/lib/openvpn-container/start.sh rootfs/usr/local/lib/openvpn-container/upgrade.sh tests/helpers/create-management-release-fixture.sh tests/helpers/fake-release-curl.sh tests/smoke/container/e2e-container-smoke.sh tests/smoke/container/runtime-image-smoke.sh tests/smoke/shell/init-start-smoke.sh tests/smoke/shell/management-broker-smoke.sh tests/smoke/shell/update-openvpn-smoke.sh tests/smoke/shell/release-policy-smoke.sh tests/smoke/shell/management-release-smoke.sh tests/smoke/shell/management-upgrade-smoke.sh tests/smoke/shell/management-hook-smoke.sh tests/smoke/shell/network-migration-smoke.sh tests/smoke/shell/render-smoke.sh tests/smoke/shell/runtime-logs-smoke.sh tests/smoke/shell/schema2-uuid-migration-smoke.sh tests/smoke/container/upgrade-state-smoke.sh tests/smoke/shell/workflow-smoke.sh tests/smoke/shell/license-smoke.sh
       - name: Run shell and control-plane smoke tests
         run: |
           run_smoke() {
@@ -81,6 +82,7 @@ jobs:
             tests/smoke/shell/ipam-layout-smoke.sh \
             tests/smoke/shell/management-bootstrap-smoke.sh \
             tests/smoke/shell/management-broker-smoke.sh \
+            tests/smoke/shell/runtime-logs-smoke.sh \
             tests/smoke/shell/management-hook-smoke.sh \
             tests/smoke/shell/schema-gate-smoke.sh \
             tests/smoke/shell/migration-isolation-smoke.sh \

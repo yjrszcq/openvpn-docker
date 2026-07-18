@@ -11,6 +11,62 @@ import threading
 from dataclasses import dataclass, field
 
 
+class RotatingLog:
+    def __init__(self, path: str, max_bytes: int, backups: int) -> None:
+        self.path = path
+        self.max_bytes = max_bytes
+        self.backups = backups
+        self.lock = threading.Lock()
+        os.makedirs(os.path.dirname(path), mode=0o750, exist_ok=True)
+        os.chmod(os.path.dirname(path), 0o750)
+
+    def _rotate(self) -> None:
+        if self.backups == 0:
+            try:
+                os.unlink(self.path)
+            except FileNotFoundError:
+                pass
+            return
+        for index in range(self.backups, 1, -1):
+            source = f"{self.path}.{index - 1}"
+            destination = f"{self.path}.{index}"
+            try:
+                os.replace(source, destination)
+                os.chmod(destination, 0o600)
+            except FileNotFoundError:
+                pass
+        try:
+            os.replace(self.path, f"{self.path}.1")
+            os.chmod(f"{self.path}.1", 0o600)
+        except FileNotFoundError:
+            pass
+
+    def write(self, line: str) -> None:
+        payload = f"{line}\n".encode()
+        with self.lock:
+            try:
+                size = os.path.getsize(self.path)
+            except FileNotFoundError:
+                size = 0
+            if size > 0 and size + len(payload) > self.max_bytes:
+                self._rotate()
+            descriptor = os.open(
+                self.path,
+                os.O_WRONLY | os.O_CREAT | os.O_APPEND,
+                0o600,
+            )
+            try:
+                remaining = memoryview(payload)
+                while remaining:
+                    written = os.write(descriptor, remaining)
+                    if written == 0:
+                        raise OSError("persistent OpenVPN log write returned zero bytes")
+                    remaining = remaining[written:]
+                os.fchmod(descriptor, 0o600)
+            finally:
+                os.close(descriptor)
+
+
 @dataclass
 class PendingResponse:
     command: str
@@ -29,20 +85,17 @@ class PendingResponse:
 
 
 class OpenVPNBackend:
-    def __init__(self, path: str, async_log: str, timeout: float) -> None:
+    def __init__(self, path: str, raw_log: RotatingLog, timeout: float) -> None:
         self.path = path
-        self.async_log = async_log
+        self.raw_log = raw_log
         self.timeout = timeout
         self.command_lock = threading.Lock()
         self.state_lock = threading.Lock()
-        self.async_lock = threading.Lock()
         self.connection: socket.socket | None = None
         self.pending: PendingResponse | None = None
 
     def _record_async(self, line: str) -> None:
-        with self.async_lock:
-            with open(self.async_log, "a", encoding="utf-8") as stream:
-                stream.write(f"{line}\n")
+        self.raw_log.write(line)
 
     def _disconnect(self, connection: socket.socket, error: str) -> None:
         with self.state_lock:
@@ -94,8 +147,6 @@ class OpenVPNBackend:
                 connection.close()
                 raise ConnectionError("OpenVPN management greeting is too large")
         connection.settimeout(None)
-        for line in greeting.decode("utf-8", errors="replace").splitlines():
-            self._record_async(line)
         with self.state_lock:
             self.connection = connection
         threading.Thread(
@@ -138,6 +189,13 @@ class OpenVPNBackend:
                 connection = self._connect()
             return self._exchange(connection, command)
 
+    def ensure_connected(self) -> None:
+        with self.command_lock:
+            with self.state_lock:
+                connection = self.connection
+            if connection is None:
+                self._connect()
+
     def close(self) -> None:
         with self.state_lock:
             connection = self.connection
@@ -147,10 +205,20 @@ class OpenVPNBackend:
 
 class ManagementBroker:
     def __init__(
-        self, listen: str, backend: str, async_log: str, timeout: float
+        self,
+        listen: str,
+        backend: str,
+        raw_log: str,
+        max_bytes: int,
+        backups: int,
+        timeout: float,
     ) -> None:
         self.listen = listen
-        self.backend = OpenVPNBackend(backend, async_log, timeout)
+        self.backend = OpenVPNBackend(
+            backend,
+            RotatingLog(raw_log, max_bytes, backups),
+            timeout,
+        )
         self.server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.stopping = threading.Event()
 
@@ -180,7 +248,6 @@ class ManagementBroker:
 
     def serve(self) -> None:
         os.makedirs(os.path.dirname(self.listen), mode=0o750, exist_ok=True)
-        os.makedirs(os.path.dirname(self.backend.async_log), mode=0o750, exist_ok=True)
         try:
             os.unlink(self.listen)
         except FileNotFoundError:
@@ -189,6 +256,11 @@ class ManagementBroker:
         os.chmod(self.listen, 0o600)
         self.server.listen(32)
         self.server.settimeout(1.0)
+        threading.Thread(
+            target=self._maintain_backend,
+            name="openvpn-management-connector",
+            daemon=True,
+        ).start()
         while not self.stopping.is_set():
             try:
                 client, _ = self.server.accept()
@@ -202,6 +274,14 @@ class ManagementBroker:
                 name="management-broker-client",
                 daemon=True,
             ).start()
+
+    def _maintain_backend(self) -> None:
+        while not self.stopping.is_set():
+            try:
+                self.backend.ensure_connected()
+            except (OSError, ConnectionError, TimeoutError):
+                pass
+            self.stopping.wait(0.2)
 
     def close(self) -> None:
         self.stopping.set()
@@ -217,10 +297,23 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--listen", required=True)
     parser.add_argument("--backend", required=True)
-    parser.add_argument("--async-log", required=True)
+    parser.add_argument("--raw-log", required=True)
+    parser.add_argument("--max-bytes", type=int, required=True)
+    parser.add_argument("--backups", type=int, required=True)
     parser.add_argument("--timeout", type=float, default=5.0)
     args = parser.parse_args()
-    broker = ManagementBroker(args.listen, args.backend, args.async_log, args.timeout)
+    if args.max_bytes < 1:
+        parser.error("--max-bytes must be positive")
+    if args.backups < 0:
+        parser.error("--backups must be non-negative")
+    broker = ManagementBroker(
+        args.listen,
+        args.backend,
+        args.raw_log,
+        args.max_bytes,
+        args.backups,
+        args.timeout,
+    )
 
     def stop(_signum: int, _frame: object) -> None:
         broker.close()

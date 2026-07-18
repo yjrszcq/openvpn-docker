@@ -122,7 +122,7 @@ def main() -> int:
         work = Path(temporary)
         backend_path = work / "openvpn.sock"
         broker_path = work / "broker.sock"
-        async_log = work / "async.log"
+        raw_log = work / "openvpn.log"
         fake = FakeOpenVPN(backend_path)
         fake.start()
         broker = subprocess.Popen(
@@ -133,14 +133,25 @@ def main() -> int:
                 str(broker_path),
                 "--backend",
                 str(backend_path),
-                "--async-log",
-                str(async_log),
+                "--raw-log",
+                str(raw_log),
+                "--max-bytes",
+                "240",
+                "--backups",
+                "2",
                 "--timeout",
                 "2",
             ]
         )
         try:
             wait_for_socket(broker_path)
+            for _ in range(100):
+                with fake.lock:
+                    if fake.accepted > 0:
+                        break
+                time.sleep(0.02)
+            else:
+                raise AssertionError("broker did not proactively connect to OpenVPN")
             outputs: list[str] = []
             errors: list[BaseException] = []
 
@@ -185,9 +196,20 @@ def main() -> int:
                 time.sleep(0.02)
             else:
                 raise AssertionError("broker did not reconnect to OpenVPN")
-            async_content = async_log.read_text(encoding="utf-8")
+            rotated_logs = [
+                path
+                for path in (raw_log.with_name("openvpn.log.2"), raw_log.with_name("openvpn.log.1"), raw_log)
+                if path.exists()
+            ]
+            async_content = "".join(
+                path.read_text(encoding="utf-8") for path in rotated_logs
+            )
             if "async-version-line" not in async_content:
                 raise AssertionError("async log lines were not separated")
+            if len(rotated_logs) < 2:
+                raise AssertionError("persistent OpenVPN log did not rotate")
+            if any(path.stat().st_mode & 0o077 for path in rotated_logs):
+                raise AssertionError("persistent OpenVPN logs are not private")
             if fake.max_active != 1 or fake.accepted < 2:
                 raise AssertionError("broker did not retain single-owner reconnect semantics")
         finally:
