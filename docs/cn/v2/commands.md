@@ -48,6 +48,7 @@ ovpn
 │   ├── health          仅当容器健康时返回成功。
 │   ├── capabilities    打印兼容性和特性信息。
 │   └── version         打印镜像和运行时构建信息。
+├── upgrade             检查、安装或回滚已签名的管理代码。
 ├── migrate             规划或执行离线数据 schema 迁移。
 └── help                打印此帮助。
 ```
@@ -336,6 +337,31 @@ ovpn render client <name> [--stdout|--output <path>]
 ```
 
 根据已配置的端点、CA 证书、指定客户端证书和私钥以及 tls-crypt 密钥构建客户端 `.ovpn` profile。输出默认为标准输出；`--output` 写入一个原子替换的 mode-`0600` 文件。
+
+## 管理代码在线更新
+
+### `ovpn upgrade`
+
+语法：
+
+```text
+ovpn upgrade [--check] [--version VERSION] [--json] [--yes]
+ovpn upgrade --rollback [--yes]
+```
+
+未指定 `--version` 时，选择 GitHub 稳定 Release 中高于当前版本、且与镜像
+platform API、OpenVPN runtime 及能力、当前数据 schema 兼容的最高版本。
+`--check` 只下载并验证签名清单。目标 schema 不同时拒绝在线更新，并提示通过
+maintenance 中的 `ovpn migrate` 处理。
+
+实际更新会验证 Ed25519 签名、SHA-256、归档路径和类型、bundle 内兼容 contract，
+通过隔离自检后原子切换 active 管理 bundle。active 和 previous 资产保存在
+`repair/.scripts`，不会重载 OpenVPN；非 TTY 必须提供 `--yes`。`--rollback` 切换到
+仍兼容的 previous bundle 或镜像内 embedded fallback。下载遵循标准代理变量，并支持
+可选的 `OVPN_GITHUB_TOKEN`。
+退出状态 `64` 表示参数或非交互确认错误，`69` 表示 GitHub/API/下载不可用，`74`
+表示验证或安装事务失败，`78` 表示目标或回滚版本不兼容；成功及目标已是当前版本时
+返回 `0`。
 
 ## 运行时检查
 

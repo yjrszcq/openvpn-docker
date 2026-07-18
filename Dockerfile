@@ -54,7 +54,6 @@ ARG OPENVPN_VERSION
 ARG OPENVPN_SOURCE_SHA256
 ARG EASYRSA_VERSION
 ARG OPENVPN_SUPPORTED_RANGE
-ARG MANAGEMENT_SIGNING_PUBLIC_KEY_B64=
 ARG VCS_REF=unknown
 ARG BUILD_DATE=unknown
 
@@ -99,7 +98,8 @@ RUN openvpn --version >/tmp/openvpn-version \
     && rm /tmp/openvpn-version /tmp/openvpn-ldd
 
 RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/docker-entrypoint \
-       /usr/local/lib/openvpn-bootstrap.sh /usr/local/lib/openvpn-container/cli.sh \
+       /usr/local/lib/openvpn-bootstrap.sh /usr/local/lib/openvpn-verify-management-release.sh \
+       /usr/local/lib/openvpn-container/cli.sh \
     && mkdir -p /etc/openvpn /usr/local/share/openvpn-container \
     && IMAGE_VERSION="$IMAGE_VERSION" \
        MANAGEMENT_VERSION="$MANAGEMENT_VERSION" \
@@ -126,6 +126,7 @@ RUN embedded=/usr/local/share/openvpn-container/embedded-management \
        "$MANAGEMENT_VERSION" "$PLATFORM_API" "$DATA_SCHEMA" >"$embedded/management.env" \
     && chmod 600 "$embedded/management.env"
 
+ARG MANAGEMENT_SIGNING_PUBLIC_KEY_B64=
 RUN keyring=/usr/local/share/openvpn-container/trusted-management-keys \
     && mkdir -p "$keyring" \
     && if [ -n "$MANAGEMENT_SIGNING_PUBLIC_KEY_B64" ]; then \

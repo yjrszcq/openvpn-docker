@@ -54,6 +54,7 @@ ovpn
 │   ├── health          Return success only when the container is healthy.
 │   ├── capabilities    Print compatibility and feature information.
 │   └── version         Print image and runtime build information.
+├── upgrade             Check, install, or roll back signed management code.
 ├── migrate             Plan or apply an offline data-schema migration.
 └── help                Print this help message.
 ```
@@ -440,6 +441,33 @@ ovpn render client <name> [--stdout|--output <path>]
 Builds a client `.ovpn` profile from the configured endpoint, CA certificate,
 named client certificate and key, and tls-crypt key. Output defaults to standard
 output; `--output` writes an atomically replaced mode-`0600` file.
+
+## Management code updates
+
+### `ovpn upgrade`
+
+Syntax:
+
+```text
+ovpn upgrade [--check] [--version VERSION] [--json] [--yes]
+ovpn upgrade --rollback [--yes]
+```
+
+Without `--version`, selects the highest newer stable GitHub Release compatible
+with the image platform API, OpenVPN runtime and capabilities, and current data
+schema. `--check` downloads and verifies only signed manifests. A target using a
+different schema is rejected with a maintenance `ovpn migrate` instruction.
+
+An update verifies Ed25519 signature, SHA-256, archive paths and types, and the
+inner compatibility contract before self-testing and atomically switching the
+active management bundle. It preserves active and previous assets under
+`repair/.scripts`, does not reload OpenVPN, and requires `--yes` outside a TTY.
+`--rollback` swaps to the retained compatible previous bundle or embedded
+fallback. Standard proxy variables and optional `OVPN_GITHUB_TOKEN` are honored.
+Exit status `64` reports invalid arguments or missing non-interactive
+confirmation, `69` reports GitHub/download unavailability, `74` reports
+verification or installation failure, and `78` reports an incompatible target
+or rollback. Success and an already-current target return `0`.
 
 ## Runtime inspection
 

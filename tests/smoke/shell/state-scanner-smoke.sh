@@ -28,16 +28,30 @@ if [ "$("$OVPN" state show)" != EMPTY ]; then
   exit 1
 fi
 
+export OVPN_DATA_DIR="$TMP_DIR/management-only"
+mkdir -p "$OVPN_DATA_DIR/repair/.scripts/releases/2.1.2"
+: >"$OVPN_DATA_DIR/repair/.scripts/active"
+if [ "$("$OVPN" state show)" != EMPTY ]; then
+  echo 'internal repair/.scripts assets must not define the data schema state' >&2
+  exit 1
+fi
+
+mkdir -p "$OVPN_DATA_DIR/repair/snapshots/example"
+if [ "$("$OVPN" state show)" = EMPTY ]; then
+  echo 'repair business data outside .scripts was incorrectly ignored' >&2
+  exit 1
+fi
+
 for artifact in config pki meta clients server.conf unknown.key .staging-init-test; do
   export OVPN_DATA_DIR="$TMP_DIR/$artifact"
   case "$artifact" in
-    config|pki|meta|clients|.staging-init-test)
-      mkdir -p "$OVPN_DATA_DIR/$artifact"
-      ;;
-    *)
-      mkdir -p "$OVPN_DATA_DIR"
-      : >"$OVPN_DATA_DIR/$artifact"
-      ;;
+  config | pki | meta | clients | .staging-init-test)
+    mkdir -p "$OVPN_DATA_DIR/$artifact"
+    ;;
+  *)
+    mkdir -p "$OVPN_DATA_DIR"
+    : >"$OVPN_DATA_DIR/$artifact"
+    ;;
   esac
   if [ "$("$OVPN" state show)" = EMPTY ]; then
     echo "artifact $artifact was incorrectly classified as EMPTY" >&2

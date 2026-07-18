@@ -112,6 +112,7 @@ bootstrap environment variables do not rewrite an existing instance.
 | `OVPN_ROUTES` | empty | empty | Comma-separated IPv4 CIDRs pushed to clients. |
 | `OVPN_CRITICAL_MODE` | `exit` | `exit` | Use `maintenance` only to hold a critical container for inspection. |
 | `OVPN_EDITOR` | `EDITOR`, otherwise `nano` | unset | Editor used by interactive client-IP workflows. |
+| `OVPN_GITHUB_TOKEN` | unset | unset | Optional read-only GitHub token for management-release checks and downloads. Standard proxy variables are honored. |
 
 Runtime defaults apply only when the environment omits a value. The quick-start
 values are the deliberately opinionated values in

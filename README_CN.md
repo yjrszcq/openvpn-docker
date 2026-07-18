@@ -104,6 +104,7 @@ docker compose logs -f openvpn
 | `OVPN_ROUTES` | 空 | 空 | 推送给客户端的逗号分隔 IPv4 CIDR。 |
 | `OVPN_CRITICAL_MODE` | `exit` | `exit` | 仅在需要保留关键状态容器进行排障时使用 `maintenance`。 |
 | `OVPN_EDITOR` | `EDITOR`，否则 `nano` | 未设置 | 交互式 client-IP 操作使用的编辑器。 |
+| `OVPN_GITHUB_TOKEN` | 未设置 | 未设置 | 管理 Release 检查和下载使用的可选只读 GitHub token；遵循标准代理变量。 |
 
 运行时默认值只在环境未提供相应值时生效。快速开始值是
 `docker-compose.yaml` 与 `.env.example` 中有意选择的值，并不是另一套

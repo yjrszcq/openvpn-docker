@@ -17,7 +17,7 @@ ovpn_empty_dir_entry_is_ignored() {
 }
 
 ovpn_data_dir_first_nonempty_entry() (
-  local entry name
+  local entry name repair_entry repair_name repair_has_business_data
 
   if [ ! -e "$OVPN_DATA_DIR" ]; then
     return 0
@@ -30,6 +30,17 @@ ovpn_data_dir_first_nonempty_entry() (
   shopt -s dotglob nullglob
   for entry in "$OVPN_DATA_DIR"/*; do
     name="${entry##*/}"
+    if [ "$name" = repair ] && [ -d "$entry" ]; then
+      repair_has_business_data=false
+      for repair_entry in "$entry"/*; do
+        repair_name="${repair_entry##*/}"
+        if [ "$repair_name" != .scripts ]; then
+          repair_has_business_data=true
+          break
+        fi
+      done
+      [ "$repair_has_business_data" = false ] && continue
+    fi
     if ! ovpn_empty_dir_entry_is_ignored "$name"; then
       printf '%s\n' "$entry"
       return 0

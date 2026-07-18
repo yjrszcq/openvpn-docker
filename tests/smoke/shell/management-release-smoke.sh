@@ -33,6 +33,7 @@ grep -Fqx 'PLATFORM_API_MIN=1' "$TMP_DIR/first/management-release.env"
 grep -Fqx 'PLATFORM_API_MAX=1' "$TMP_DIR/first/management-release.env"
 grep -Fqx 'OPENVPN_MIN=2.7.0' "$TMP_DIR/first/management-release.env"
 grep -Fqx 'OPENVPN_MAX_EXCLUSIVE=2.8.0' "$TMP_DIR/first/management-release.env"
+grep -Fqx 'REQUIRED_FEATURES=tls-crypt,data-ciphers,crl-verify,topology-subnet' "$TMP_DIR/first/management-release.env"
 
 tar -tzf "$TMP_DIR/first/management-bundle.tar.gz" >"$TMP_DIR/files"
 grep -Fqx './management.env' "$TMP_DIR/files"
