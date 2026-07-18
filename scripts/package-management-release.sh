@@ -21,6 +21,23 @@ die() {
   exit 64
 }
 
+validate_supported_versions() {
+  local list="$1" version sorted
+  local -a versions
+
+  case "$list" in
+  '' | ,* | *, | *,,*) return 1 ;;
+  esac
+  IFS=, read -ra versions <<<"$list"
+  [ "${#versions[@]}" -gt 0 ] || return 1
+  for version in "${versions[@]}"; do
+    [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] ||
+      return 1
+  done
+  sorted="$(printf '%s\n' "${versions[@]}" | sort -Vu | paste -sd, -)"
+  [ "$sorted" = "$list" ]
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
   --output-dir)
@@ -59,8 +76,8 @@ done
 [[ "$MANAGEMENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die 'MANAGEMENT_VERSION must use numeric major.minor.patch form'
 [[ "$PLATFORM_API" =~ ^[1-9][0-9]*$ ]] || die 'PLATFORM_API must be a positive integer'
 [[ "$DATA_SCHEMA" =~ ^[1-9][0-9]*$ ]] || die 'DATA_SCHEMA must be a positive integer'
-[[ "$OPENVPN_SUPPORTED_MIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die 'OPENVPN_SUPPORTED_MIN is invalid'
-[[ "$OPENVPN_SUPPORTED_MAX_EXCLUSIVE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die 'OPENVPN_SUPPORTED_MAX_EXCLUSIVE is invalid'
+validate_supported_versions "$OPENVPN_SUPPORTED_VERSIONS" ||
+  die 'OPENVPN_SUPPORTED_VERSIONS is invalid'
 
 openssl pkey -in "$SIGNING_KEY" -text_pub -noout 2>/dev/null | grep -Fq 'ED25519' ||
   die 'signing key must be an Ed25519 private key'
@@ -81,8 +98,7 @@ VCS_REF=$VCS_REF
 DATA_SCHEMA=$DATA_SCHEMA
 PLATFORM_API_MIN=$PLATFORM_API
 PLATFORM_API_MAX=$PLATFORM_API
-OPENVPN_MIN=$OPENVPN_SUPPORTED_MIN
-OPENVPN_MAX_EXCLUSIVE=$OPENVPN_SUPPORTED_MAX_EXCLUSIVE
+OPENVPN_SUPPORTED_VERSIONS=$OPENVPN_SUPPORTED_VERSIONS
 REQUIRED_FEATURES=$OPENVPN_REQUIRED_FEATURES
 EOF
 
@@ -109,8 +125,7 @@ VCS_REF=$VCS_REF
 DATA_SCHEMA=$DATA_SCHEMA
 PLATFORM_API_MIN=$PLATFORM_API
 PLATFORM_API_MAX=$PLATFORM_API
-OPENVPN_MIN=$OPENVPN_SUPPORTED_MIN
-OPENVPN_MAX_EXCLUSIVE=$OPENVPN_SUPPORTED_MAX_EXCLUSIVE
+OPENVPN_SUPPORTED_VERSIONS=$OPENVPN_SUPPORTED_VERSIONS
 REQUIRED_FEATURES=$OPENVPN_REQUIRED_FEATURES
 ASSET_NAME=$ASSET_NAME
 ASSET_SHA256=$ASSET_SHA256

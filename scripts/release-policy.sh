@@ -2,13 +2,13 @@
 set -euo pipefail
 
 usage() {
-  echo 'usage: release-policy.sh --previous-version VERSION --target-version VERSION --supported-range RANGE --image-version VERSION [--github-output PATH]' >&2
+  echo 'usage: release-policy.sh --previous-version VERSION --target-version VERSION --candidate-range RANGE --image-version VERSION [--github-output PATH]' >&2
   exit 64
 }
 
 previous_version=''
 target_version=''
-supported_range=''
+candidate_range=''
 image_version=''
 github_output=''
 while [ "$#" -gt 0 ]; do
@@ -23,10 +23,10 @@ while [ "$#" -gt 0 ]; do
     [ "$#" -gt 0 ] || usage
     target_version="$1"
     ;;
-  --supported-range)
+  --candidate-range)
     shift
     [ "$#" -gt 0 ] || usage
-    supported_range="$1"
+    candidate_range="$1"
     ;;
   --image-version)
     shift
@@ -91,7 +91,7 @@ range_contains_target() {
   local -a clauses
 
   RANGE_VALID=true
-  IFS=' ' read -ra clauses <<<"$supported_range"
+  IFS=' ' read -ra clauses <<<"$candidate_range"
   [ "${#clauses[@]}" -gt 0 ] || {
     RANGE_VALID=false
     return 1
@@ -126,7 +126,7 @@ emit() {
 
 [ -n "$previous_version" ] || usage
 [ -n "$target_version" ] || usage
-[ -n "$supported_range" ] || usage
+[ -n "$candidate_range" ] || usage
 [ -n "$image_version" ] || usage
 validate_runtime_version 'previous version' "$previous_version"
 validate_runtime_version 'target version' "$target_version"
@@ -145,7 +145,7 @@ if range_contains_target; then
   in_range=true
 else
   [ "$RANGE_VALID" = true ] || {
-    echo 'supported range must contain space-separated comparison clauses' >&2
+    echo 'candidate range must contain space-separated comparison clauses' >&2
     exit 64
   }
   in_range=false

@@ -587,9 +587,10 @@ Syntax:
 ovpn runtime capabilities
 ```
 
-Prints JSON for the detected OpenVPN version, support-range result, selected
-compatibility adapter, and required runtime features. It returns nonzero when
-the version, adapter, or any required feature is unsupported.
+Prints JSON for the detected OpenVPN version, exact-version support result,
+verified version list, selected compatibility adapter, and required runtime
+features. It returns nonzero when the version, adapter, or any required feature
+is unsupported.
 
 ### `ovpn runtime version`
 
@@ -603,8 +604,9 @@ Prints build-information JSON from
 `/usr/local/share/openvpn-container/build-info.json`, with the Easy-RSA version
 detected at runtime. It reports the active management version and source
 (`embedded` or `online`), image version, platform API, data schema, OpenVPN,
-Easy-RSA, and the supported OpenVPN range. If build information is missing, it
-detects Easy-RSA and prints `unknown` for unavailable fields.
+Easy-RSA, and the OpenVPN candidate range used by update automation. The
+candidate range is not a runtime compatibility claim. If build information is
+missing, it detects Easy-RSA and prints `unknown` for unavailable fields.
 
 ### `ovpn runtime logs`
 

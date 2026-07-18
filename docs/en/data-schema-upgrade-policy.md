@@ -11,7 +11,7 @@ increasing integer and changes only for incompatible persisted-state changes.
 Multiple management and image releases may use the same schema.
 
 Published management versions, exact source commits, schemas, distribution
-type, platform API range, and OpenVPN range are recorded in
+type, platform API range, and exactly verified OpenVPN versions are recorded in
 `compatibility/data-schema-releases.jsonl`. Every release must be registered.
 Historical `legacy-image` rows explicitly have no online platform range;
 online-capable releases use `signed-bundle`.
@@ -20,7 +20,7 @@ types are rejected so registry-format changes require an explicit validator
 update.
 
 ```json
-{"management_version":"3.0.0","commit":"<40-character commit>","data_schema":3,"distribution":"signed-bundle","platform_api":{"min":2,"max":2},"openvpn":{"min":"2.7.0","max_exclusive":"2.8.0"}}
+{"management_version":"3.0.0","commit":"<40-character commit>","data_schema":3,"distribution":"signed-bundle","platform_api":{"min":2,"max":2},"openvpn":{"supported":["2.7.5"]}}
 ```
 
 `legacy-image` entries use `null` for `platform_api`.
@@ -64,4 +64,4 @@ A schema-changing release is incomplete without migration, fixtures,
 documentation, and tests. CI must exercise every published release baseline in
 the manifest to the current schema. Every management release must register its
 version, exact source commit, schema, distribution type, platform range, and
-OpenVPN range even when the schema is unchanged.
+exactly verified OpenVPN versions even when the schema is unchanged.

@@ -35,17 +35,31 @@ if ovpn_semver_normalize 2.7 >/dev/null; then
 fi
 
 ovpn_compatibility_load_contract
-test "$OPENVPN_SUPPORTED_MIN" = 2.7.0
-test "$OPENVPN_SUPPORTED_MAX_EXCLUSIVE" = 2.8.0
+test "$OPENVPN_SUPPORTED_VERSIONS" = 2.7.5
 
-for version in 2.7.0 2.7.5; do
-  FAKE_OPENVPN_VERSION="$version" ovpn_compatibility_runtime_supported
-done
-for version in 2.6.9 2.8.0 3.0.0 invalid; do
+FAKE_OPENVPN_VERSION=2.7.5 ovpn_compatibility_runtime_supported
+for version in 2.6.9 2.7.0 2.7.4 2.7.6 2.8.0 3.0.0 invalid; do
   if FAKE_OPENVPN_VERSION="$version" ovpn_compatibility_runtime_supported; then
     echo "unsupported runtime unexpectedly accepted: $version" >&2
     exit 1
   fi
 done
+
+multi_contract="$TMP_DIR/multi-contract.env"
+sed 's/^OPENVPN_SUPPORTED_VERSIONS=.*/OPENVPN_SUPPORTED_VERSIONS=2.7.4,2.7.5/' \
+  "$ROOT_DIR/compatibility/contract.env" >"$multi_contract"
+OVPN_COMPATIBILITY_CONTRACT="$multi_contract"
+for version in 2.7.4 2.7.5; do
+  FAKE_OPENVPN_VERSION="$version" ovpn_compatibility_runtime_supported
+done
+
+invalid_contract="$TMP_DIR/invalid-contract.env"
+sed 's/^OPENVPN_SUPPORTED_VERSIONS=.*/OPENVPN_SUPPORTED_VERSIONS=2.7.5,2.7.4/' \
+  "$ROOT_DIR/compatibility/contract.env" >"$invalid_contract"
+OVPN_COMPATIBILITY_CONTRACT="$invalid_contract"
+if ovpn_compatibility_load_contract; then
+  echo 'unordered verified versions unexpectedly accepted' >&2
+  exit 1
+fi
 
 printf 'compatibility contract smoke passed\n'

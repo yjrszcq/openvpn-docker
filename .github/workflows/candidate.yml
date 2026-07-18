@@ -33,7 +33,7 @@ jobs:
         with:
           fetch-depth: 2
       - id: policy
-        name: Evaluate branch and supported range
+        name: Evaluate branch and candidate range
         run: |
           set -a
           . ./versions.env
@@ -49,13 +49,13 @@ jobs:
           scripts/release-policy.sh \
             --previous-version "$previous" \
             --target-version "$OPENVPN_VERSION" \
-            --supported-range "$OPENVPN_SUPPORTED_RANGE" \
+            --candidate-range "$OPENVPN_CANDIDATE_RANGE" \
             --image-version "$IMAGE_VERSION" \
             --github-output "$GITHUB_OUTPUT" > candidate-policy.env
           cat candidate-policy.env >> "$GITHUB_STEP_SUMMARY"
 
   verify:
-    name: Run supported-range compatibility gate
+    name: Run candidate-range compatibility gate
     needs: policy
     if: >-
       needs.policy.outputs.in_range == 'true' &&
@@ -112,7 +112,7 @@ jobs:
             --build-arg "OPENVPN_VERSION=$OPENVPN_VERSION" \
             --build-arg "OPENVPN_SOURCE_SHA256=$OPENVPN_SOURCE_SHA256" \
             --build-arg "EASYRSA_VERSION=$EASYRSA_VERSION" \
-            --build-arg "OPENVPN_SUPPORTED_RANGE=$OPENVPN_SUPPORTED_RANGE" \
+            --build-arg "OPENVPN_CANDIDATE_RANGE=$OPENVPN_CANDIDATE_RANGE" \
             --build-arg "MANAGEMENT_SIGNING_PUBLIC_KEY_B64=$MANAGEMENT_SIGNING_PUBLIC_KEY_B64" \
             --build-arg "VCS_REF=$GITHUB_SHA" \
             --build-arg "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -127,7 +127,7 @@ jobs:
           scripts/release-policy.sh \
             --previous-version "$previous" \
             --target-version "$OPENVPN_VERSION" \
-            --supported-range "$OPENVPN_SUPPORTED_RANGE" \
+            --candidate-range "$OPENVPN_CANDIDATE_RANGE" \
             --image-version "$IMAGE_VERSION" > artifacts/release-policy.env
           printf 'candidate=%s:candidate-ovpn%s\npolicy=%s\n' "$image" "$OPENVPN_VERSION" "${{ needs.policy.outputs.decision }}" > artifacts/candidate-summary.txt
       - name: Upload candidate report

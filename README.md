@@ -245,6 +245,11 @@ CI validates the OpenVPN version, source checksum, support matrix, and project
 image version. Tests use `OVPN_NETWORK=10.88.0.0/24`. Some checks require Docker
 and `/dev/net/tun`.
 
+`OPENVPN_CANDIDATE_RANGE` in `versions.env` limits which upstream versions
+automation may propose; it does not claim runtime compatibility. Exact OpenVPN
+versions verified for the current management code are listed in
+`compatibility/contract.env` and signed into each management release.
+
 ## Build & Release
 
 Docker Hub stable images use the OpenVPN runtime version as the sole tag:
@@ -285,11 +290,12 @@ change does not publish an image. Platform API, OpenVPN, base-system, or
 immutable-bootstrap changes must include an image-version change.
 
 A weekly (or manually triggered) Upstream Check watches for new official
-OpenVPN releases. When one is found it pushes an `automation/openvpn-<version>`
-branch and opens a PR targeting `dev`. Review and merge that PR into `dev` to
-run PR checks; Candidate is never published from `dev`. Promote reviewed
-changes from `dev` to `main` to trigger Candidate and the subsequent Image Release.
-When triggering Candidate manually, select `main`.
+OpenVPN releases within `OPENVPN_CANDIDATE_RANGE`. When one is found it pushes
+an `automation/openvpn-<version>` branch and opens a PR targeting `dev`. Review
+and merge that PR into `dev` to run PR checks; Candidate is never published
+from `dev`. Promote reviewed changes from `dev` to `main` to trigger Candidate
+and the subsequent Image Release. When triggering Candidate manually, select
+`main`.
 
 Maintainer note: if `DOCKER_TOKEN` expires, update it in
 `Settings → Secrets and variables → Actions`, then manually trigger a

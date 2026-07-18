@@ -10,10 +10,10 @@ schema are independent. Stable GitHub `vX.Y.Z` releases identify management
 code. Images provide the operating-system environment, OpenVPN kernel, and a
 platform API consumed by management bundles.
 
-Every management release declares its supported platform API, OpenVPN version
-range, and exact data schema. Online update must reject an incompatible target
-and direct the operator to update the image when the platform or OpenVPN kernel
-is outside that declaration.
+Every management release declares its supported platform API, exactly verified
+OpenVPN versions, and exact data schema. Online update must reject an
+incompatible target and direct the operator to update the image when the
+platform or OpenVPN kernel is outside that declaration.
 
 The release registry distinguishes historical `legacy-image` versions, which
 cannot be installed online, from `signed-bundle` versions. Since a source commit
@@ -21,6 +21,11 @@ cannot contain its own hash, a signed release is prepared as a source commit,
 then registered by exact hash on the default branch before that source commit
 is tagged. The release workflow reads the default-branch registry and refuses
 an unregistered tag or any schema/platform/OpenVPN mismatch.
+
+`OPENVPN_CANDIDATE_RANGE` in `versions.env` is only an automation policy: it
+limits which upstream OpenVPN versions update workflows may propose. It is not
+a compatibility claim. A runtime is supported only when its exact version is
+listed in the signed release manifest and compatibility registry.
 
 ## Online update boundary
 

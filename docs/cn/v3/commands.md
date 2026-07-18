@@ -466,7 +466,7 @@ ovpn runtime health
 ovpn runtime capabilities
 ```
 
-打印 JSON，描述检测到的 OpenVPN 版本、支持范围判定结果、选定的兼容适配器以及必需的运行时特性。当版本、适配器或任何必需特性不受支持时，返回非零值。
+打印 JSON，描述检测到的 OpenVPN 版本、精确版本支持判定、已验证版本列表、选定的兼容适配器以及必需的运行时特性。当版本、适配器或任何必需特性不受支持时，返回非零值。
 
 ### `ovpn runtime version`
 
@@ -478,8 +478,9 @@ ovpn runtime version
 
 打印 `/usr/local/share/openvpn-container/build-info.json` 中的构建信息 JSON，其中
 Easy-RSA 版本为运行时检测值。输出包含 active 管理版本及来源（`embedded` 或
-`online`）、镜像版本、platform API、数据 schema、OpenVPN、Easy-RSA 和支持的
-OpenVPN 范围。若构建信息缺失，则检测 Easy-RSA，其余不可用字段打印 `unknown`。
+`online`）、镜像版本、platform API、数据 schema、OpenVPN、Easy-RSA 和更新自动化
+使用的 OpenVPN 候选范围。候选范围不是 runtime 兼容性声明。若构建信息缺失，则检测
+Easy-RSA，其余不可用字段打印 `unknown`。
 
 ### `ovpn runtime logs`
 

@@ -42,7 +42,7 @@ BASE_IMAGE=debian:test
 OPENVPN_VERSION=2.7.5
 OPENVPN_SOURCE_SHA256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 EASYRSA_VERSION=system
-OPENVPN_SUPPORTED_RANGE=">=2.7.0 <2.8.0"
+OPENVPN_CANDIDATE_RANGE=">=2.7.0 <2.8.0"
 EOF_VERSIONS
 
 OVPN_VERSIONS_ENV="$VERSIONS_ENV" \

@@ -38,6 +38,17 @@ jobs:
             echo "no newer official OpenVPN release than $OPENVPN_VERSION"
             exit 0
           fi
+          policy="$(
+            scripts/release-policy.sh \
+              --previous-version "$OPENVPN_VERSION" \
+              --target-version "$target" \
+              --candidate-range "$OPENVPN_CANDIDATE_RANGE" \
+              --image-version "$IMAGE_VERSION"
+          )"
+          if ! grep -Fqx 'in_range=true' <<<"$policy"; then
+            echo "latest OpenVPN $target is outside candidate range $OPENVPN_CANDIDATE_RANGE"
+            exit 0
+          fi
           branch="automation/openvpn-$target"
           if [ "$(gh pr list --head "$branch" --state open --json url --jq length)" -gt 0 ]; then
             echo "open update pull request already exists for $target"

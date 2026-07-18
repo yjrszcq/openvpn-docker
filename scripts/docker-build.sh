@@ -17,7 +17,7 @@ for name in \
   OPENVPN_VERSION \
   OPENVPN_SOURCE_SHA256 \
   EASYRSA_VERSION \
-  OPENVPN_SUPPORTED_RANGE; do
+  OPENVPN_CANDIDATE_RANGE; do
   if [ -z "${!name:-}" ]; then
     printf 'missing required version input: %s\n' "$name" >&2
     exit 64
@@ -65,7 +65,7 @@ exec docker build \
   --build-arg "OPENVPN_VERSION=$OPENVPN_VERSION" \
   --build-arg "OPENVPN_SOURCE_SHA256=$OPENVPN_SOURCE_SHA256" \
   --build-arg "EASYRSA_VERSION=$EASYRSA_VERSION" \
-  --build-arg "OPENVPN_SUPPORTED_RANGE=$OPENVPN_SUPPORTED_RANGE" \
+  --build-arg "OPENVPN_CANDIDATE_RANGE=$OPENVPN_CANDIDATE_RANGE" \
   --build-arg "VCS_REF=$vcs_ref" \
   --build-arg "BUILD_DATE=$build_date" \
   "$@"

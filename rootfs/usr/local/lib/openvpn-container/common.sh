@@ -205,7 +205,7 @@ ovpn_version() {
   "runtime_strategy": "unknown",
   "openvpn_version": "unknown",
   "easy_rsa_version": "$easyrsa_ver",
-  "supported_openvpn_range": "unknown"
+  "openvpn_candidate_range": "unknown"
 }
 JSON
   fi

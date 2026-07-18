@@ -25,16 +25,29 @@ grep -Fq 'must not claim online platform compatibility' "$TMP_DIR/platform.err"
 
 jq -c '
   if .management_version == "1.0.0"
-  then .openvpn = {"min": "2.8.0", "max_exclusive": "2.7.0"}
+  then .openvpn = {"supported": ["2.7.4"]}
   else .
   end
-' "$REGISTRY" >"$TMP_DIR/invalid-range.jsonl"
-if "$VALIDATOR" --registry "$TMP_DIR/invalid-range.jsonl" \
-  >"$TMP_DIR/range.out" 2>"$TMP_DIR/range.err"; then
-  echo 'empty OpenVPN range unexpectedly passed' >&2
+' "$REGISTRY" >"$TMP_DIR/unverified-runtime.jsonl"
+if "$VALIDATOR" --registry "$TMP_DIR/unverified-runtime.jsonl" \
+  >"$TMP_DIR/unverified-runtime.out" 2>"$TMP_DIR/unverified-runtime.err"; then
+  echo 'release source outside its verified OpenVPN set unexpectedly passed' >&2
   exit 1
 fi
-grep -Fq 'empty OpenVPN range' "$TMP_DIR/range.err"
+grep -Fq 'not in its registered verified set' "$TMP_DIR/unverified-runtime.err"
+
+jq -c '
+  if .management_version == "1.0.0"
+  then .openvpn = {"supported": ["2.7.5", "2.7.5"]}
+  else .
+  end
+' "$REGISTRY" >"$TMP_DIR/duplicate-versions.jsonl"
+if "$VALIDATOR" --registry "$TMP_DIR/duplicate-versions.jsonl" \
+  >"$TMP_DIR/duplicate-versions.out" 2>"$TMP_DIR/duplicate-versions.err"; then
+  echo 'duplicate verified OpenVPN versions unexpectedly passed' >&2
+  exit 1
+fi
+grep -Fq 'must be unique and increasing' "$TMP_DIR/duplicate-versions.err"
 
 cp "$REGISTRY" "$TMP_DIR/release.jsonl"
 release_commit="$(git -C "$ROOT_DIR" rev-parse HEAD)"
@@ -44,7 +57,7 @@ jq -nc --arg commit "$release_commit" '{
   data_schema: 3,
   distribution: "signed-bundle",
   platform_api: {"min": 2, "max": 2},
-  openvpn: {"min": "2.7.0", "max_exclusive": "2.8.0"}
+  openvpn: {"supported": ["2.7.5"]}
 }' >>"$TMP_DIR/release.jsonl"
 "$VALIDATOR" --registry "$TMP_DIR/release.jsonl" \
   --release-tag v3.0.0 --release-commit "$release_commit" \

@@ -51,8 +51,8 @@ EOF
 chmod +x "$TMP_DIR/bin/openvpn" "$TMP_DIR/bin/curl"
 
 create_release() {
-  local version="$1" schema="$2" minimum="$3" maximum="$4"
-  local platform_min="${5:-$PLATFORM_API}" platform_max="${6:-$PLATFORM_API}"
+  local version="$1" schema="$2" supported_versions="$3"
+  local platform_min="${4:-$PLATFORM_API}" platform_max="${5:-$PLATFORM_API}"
   local release="$TMP_DIR/fixtures/$version" bundle="$TMP_DIR/bundle-$version"
   local sha
   mkdir -p "$release" "$bundle/lib" "$bundle/templates" "$bundle/compatibility"
@@ -66,8 +66,7 @@ VCS_REF=0123456789abcdef0123456789abcdef01234567
 DATA_SCHEMA=$schema
 PLATFORM_API_MIN=$platform_min
 PLATFORM_API_MAX=$platform_max
-OPENVPN_MIN=$minimum
-OPENVPN_MAX_EXCLUSIVE=$maximum
+OPENVPN_SUPPORTED_VERSIONS=$supported_versions
 REQUIRED_FEATURES=tls-crypt,data-ciphers,crl-verify,topology-subnet
 EOF
   find "$bundle" -type d -exec chmod 0755 {} +
@@ -83,8 +82,7 @@ VCS_REF=0123456789abcdef0123456789abcdef01234567
 DATA_SCHEMA=$schema
 PLATFORM_API_MIN=$platform_min
 PLATFORM_API_MAX=$platform_max
-OPENVPN_MIN=$minimum
-OPENVPN_MAX_EXCLUSIVE=$maximum
+OPENVPN_SUPPORTED_VERSIONS=$supported_versions
 REQUIRED_FEATURES=tls-crypt,data-ciphers,crl-verify,topology-subnet
 ASSET_NAME=management-bundle.tar.gz
 ASSET_SHA256=$sha
@@ -93,11 +91,11 @@ EOF
     -in "$release/management-release.env" -out "$release/management-release.env.sig"
 }
 
-create_release 2.1.2 3 2.7.0 2.8.0
-create_release 2.1.3 4 2.7.0 2.8.0
-create_release 2.1.4 3 2.8.0 2.9.0
-create_release 2.1.5 3 2.7.0 2.8.0 3 3
-create_release 2.1.6 3 2.7.0 2.8.0 1 1
+create_release 2.1.2 3 2.7.5
+create_release 2.1.3 4 2.7.5
+create_release 2.1.4 3 2.7.6
+create_release 2.1.5 3 2.7.5 3 3
+create_release 2.1.6 3 2.7.5 1 1
 
 jq -n --arg root "file://$TMP_DIR/fixtures" '[
   {tag_name:"v2.1.6",draft:false,prerelease:false,assets:[

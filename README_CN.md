@@ -215,6 +215,10 @@ tests/smoke/shell/workflow-smoke.sh  # 工作流逻辑验证
 CI 会校验 OpenVPN 版本、源码校验和、支持矩阵和项目镜像版本。测试使用
 `OVPN_NETWORK=10.88.0.0/24`。部分检查需要 Docker 和 `/dev/net/tun`。
 
+`versions.env` 中的 `OPENVPN_CANDIDATE_RANGE` 只限制自动化可以提出哪些上游版本，
+不代表 runtime 兼容性。当前管理代码实际验证过的 OpenVPN 精确版本列在
+`compatibility/contract.env` 中，并会写入每个管理版本的签名清单。
+
 ## 镜像、构建与发布
 
 Docker Hub 稳定镜像仅使用 OpenVPN runtime 版本作为 tag：
@@ -249,11 +253,12 @@ schema、platform、OpenVPN 不匹配的发布。
 仅修改管理版本不会发布镜像；platform API、OpenVPN、基础系统或不可变 bootstrap
 变化时必须同时更新镜像版本。
 
-每周运行（也可手动运行）的 Upstream Check 会检查官方 OpenVPN 是否有新版本。
-发现新版时，它会推送 `automation/openvpn-<版本>` 分支，并创建指向 `dev` 的 PR。
-审阅并合并该 PR 到 `dev` 后会运行 PR 检查，但 Candidate 不会从 `dev` 发布；将
-已审阅的变更从 `dev` 提升到 `main` 才会触发 Candidate 和随后 Image Release。手动启动
-Candidate 时也应选择 `main`。
+每周运行（也可手动触发）的 Upstream Check 只关注
+`OPENVPN_CANDIDATE_RANGE` 内的新 OpenVPN 官方版本。发现新版时，它会推送
+`automation/openvpn-<版本>` 分支，并创建指向 `dev` 的 PR。审阅并合并该 PR 到
+`dev` 后会运行 PR 检查，但 Candidate 不会从 `dev` 发布；将已审阅的变更从 `dev`
+提升到 `main` 才会触发 Candidate 和随后 Image Release。手动启动 Candidate 时也应
+选择 `main`。
 
 维护者注意：若 `DOCKER_TOKEN` 过期，在 `Settings → Secrets and variables →
 Actions` 更新它，然后手动启动一个默认分支的 Candidate。Candidate 成功会排队一个

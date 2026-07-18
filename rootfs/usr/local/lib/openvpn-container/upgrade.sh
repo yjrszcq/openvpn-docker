@@ -50,16 +50,15 @@ ovpn_upgrade_runtime_facts() {
 
 ovpn_upgrade_manifest_compatible() {
   local manifest="$1" tag_version="$2"
-  local version schema platform_min platform_max openvpn_min openvpn_max features
-  local feature help_output comparison
-  local -a target_features
+  local version schema platform_min platform_max openvpn_versions features
+  local feature help_output supported=false supported_version
+  local -a target_features target_openvpn_versions
 
   version="$(ovpn_upgrade_manifest_value "$manifest" MANAGEMENT_VERSION)"
   schema="$(ovpn_upgrade_manifest_value "$manifest" DATA_SCHEMA)"
   platform_min="$(ovpn_upgrade_manifest_value "$manifest" PLATFORM_API_MIN)"
   platform_max="$(ovpn_upgrade_manifest_value "$manifest" PLATFORM_API_MAX)"
-  openvpn_min="$(ovpn_upgrade_manifest_value "$manifest" OPENVPN_MIN)"
-  openvpn_max="$(ovpn_upgrade_manifest_value "$manifest" OPENVPN_MAX_EXCLUSIVE)"
+  openvpn_versions="$(ovpn_upgrade_manifest_value "$manifest" OPENVPN_SUPPORTED_VERSIONS)"
   features="$(ovpn_upgrade_manifest_value "$manifest" REQUIRED_FEATURES)"
   OVPN_UPGRADE_REJECTION=''
 
@@ -78,14 +77,15 @@ ovpn_upgrade_manifest_compatible() {
     OVPN_UPGRADE_REJECTION="platform API $OVPN_UPGRADE_PLATFORM_API is outside [$platform_min,$platform_max]"
     return 1
   fi
-  comparison="$(ovpn_semver_compare "$OVPN_UPGRADE_RUNTIME_VERSION" "$openvpn_min")" || return 1
-  if [ "$comparison" = -1 ]; then
-    OVPN_UPGRADE_REJECTION="OpenVPN $OVPN_UPGRADE_RUNTIME_VERSION is below $openvpn_min"
-    return 1
-  fi
-  comparison="$(ovpn_semver_compare "$OVPN_UPGRADE_RUNTIME_VERSION" "$openvpn_max")" || return 1
-  if [ "$comparison" != -1 ]; then
-    OVPN_UPGRADE_REJECTION="OpenVPN $OVPN_UPGRADE_RUNTIME_VERSION is not below $openvpn_max"
+  IFS=, read -ra target_openvpn_versions <<<"$openvpn_versions"
+  for supported_version in "${target_openvpn_versions[@]}"; do
+    if [ "$OVPN_UPGRADE_RUNTIME_VERSION" = "$supported_version" ]; then
+      supported=true
+      break
+    fi
+  done
+  if [ "$supported" != true ]; then
+    OVPN_UPGRADE_REJECTION="OpenVPN $OVPN_UPGRADE_RUNTIME_VERSION is not in verified set [$openvpn_versions]"
     return 1
   fi
   help_output="$(ovpn_compatibility_runtime_help)"

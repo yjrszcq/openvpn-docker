@@ -11,6 +11,23 @@ die() {
   exit 74
 }
 
+validate_supported_versions() {
+  local list="$1" version sorted
+  local -a versions
+
+  case "$list" in
+  '' | ,* | *, | *,,*) return 1 ;;
+  esac
+  IFS=, read -ra versions <<<"$list"
+  [ "${#versions[@]}" -gt 0 ] || return 1
+  for version in "${versions[@]}"; do
+    [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] ||
+      return 1
+  done
+  sorted="$(printf '%s\n' "${versions[@]}" | sort -Vu | paste -sd, -)"
+  [ "$sorted" = "$list" ]
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
   --release-dir)
@@ -53,10 +70,10 @@ SIGNATURE="$RELEASE_DIR/management-release.env.sig"
 [ -f "$MANIFEST" ] || die 'manifest is missing'
 [ -f "$SIGNATURE" ] || die 'manifest signature is missing'
 
-expected_keys='FORMAT_VERSION MANAGEMENT_VERSION VCS_REF DATA_SCHEMA PLATFORM_API_MIN PLATFORM_API_MAX OPENVPN_MIN OPENVPN_MAX_EXCLUSIVE REQUIRED_FEATURES ASSET_NAME ASSET_SHA256'
+expected_keys='FORMAT_VERSION MANAGEMENT_VERSION VCS_REF DATA_SCHEMA PLATFORM_API_MIN PLATFORM_API_MAX OPENVPN_SUPPORTED_VERSIONS REQUIRED_FEATURES ASSET_NAME ASSET_SHA256'
 actual_keys="$(awk -F= 'NF == 2 && $1 ~ /^[A-Z][A-Z0-9_]*$/ { print $1 }' "$MANIFEST" | paste -sd' ' -)"
 [ "$actual_keys" = "$expected_keys" ] || die 'manifest keys or ordering are invalid'
-[ "$(wc -l <"$MANIFEST" | tr -d ' ')" -eq 11 ] || die 'manifest must contain exactly eleven lines'
+[ "$(wc -l <"$MANIFEST" | tr -d ' ')" -eq 10 ] || die 'manifest must contain exactly ten lines'
 
 while IFS='=' read -r key value; do
   [ -n "$value" ] || die "manifest value is empty: $key"
@@ -72,14 +89,10 @@ done <"$MANIFEST"
 [[ "$DATA_SCHEMA" =~ ^[1-9][0-9]*$ ]] || die 'invalid data schema'
 [[ "$PLATFORM_API_MIN" =~ ^[1-9][0-9]*$ ]] || die 'invalid platform API minimum'
 [[ "$PLATFORM_API_MAX" =~ ^[1-9][0-9]*$ ]] || die 'invalid platform API maximum'
-[[ "$OPENVPN_MIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die 'invalid OpenVPN minimum'
-[[ "$OPENVPN_MAX_EXCLUSIVE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die 'invalid OpenVPN maximum'
+validate_supported_versions "$OPENVPN_SUPPORTED_VERSIONS" ||
+  die 'invalid supported OpenVPN versions'
 [[ "$REQUIRED_FEATURES" =~ ^[A-Za-z0-9][A-Za-z0-9,-]*$ ]] || die 'invalid required features'
 [ "$PLATFORM_API_MIN" -le "$PLATFORM_API_MAX" ] || die 'platform API range is empty'
-if [ "$OPENVPN_MIN" = "$OPENVPN_MAX_EXCLUSIVE" ] ||
-  [ "$(printf '%s\n%s\n' "$OPENVPN_MIN" "$OPENVPN_MAX_EXCLUSIVE" | sort -V | head -1)" != "$OPENVPN_MIN" ]; then
-  die 'OpenVPN range is empty or reversed'
-fi
 [ "$ASSET_NAME" = management-bundle.tar.gz ] || die 'unexpected asset name'
 [[ "$ASSET_SHA256" =~ ^[0-9a-f]{64}$ ]] || die 'invalid asset SHA-256'
 
@@ -121,8 +134,7 @@ VCS_REF=$VCS_REF
 DATA_SCHEMA=$DATA_SCHEMA
 PLATFORM_API_MIN=$PLATFORM_API_MIN
 PLATFORM_API_MAX=$PLATFORM_API_MAX
-OPENVPN_MIN=$OPENVPN_MIN
-OPENVPN_MAX_EXCLUSIVE=$OPENVPN_MAX_EXCLUSIVE
+OPENVPN_SUPPORTED_VERSIONS=$OPENVPN_SUPPORTED_VERSIONS
 REQUIRED_FEATURES=$REQUIRED_FEATURES
 EOF
 )"

@@ -35,7 +35,7 @@ docker run --rm \
   --entrypoint /bin/bash \
   "$IMAGE" \
   -ec 'ovpn runtime capabilities >/tmp/capabilities.json
-       grep -Fq "\"supported_range\": true" /tmp/capabilities.json
+       grep -Fq "\"supported_version\": true" /tmp/capabilities.json
        grep -Fq "\"adapter\": \"openvpn-2.7\"" /tmp/capabilities.json
        grep -Fq "\"tls_crypt\": true" /tmp/capabilities.json
        grep -Fq "\"data_ciphers\": true" /tmp/capabilities.json

@@ -9,7 +9,8 @@
 相互独立。GitHub 稳定版 `vX.Y.Z` Release 表示管理代码版本；镜像提供操作系统环境、
 OpenVPN 内核以及管理 bundle 使用的 platform API。
 
-每个管理版本必须声明支持的 platform API、OpenVPN 版本范围和精确数据 schema。
+每个管理版本必须声明支持的 platform API、经过精确验证的 OpenVPN 版本和精确数据
+schema。
 在线更新遇到不兼容目标时必须拒绝；platform 或 OpenVPN 不满足要求时，应提示用户
 先升级镜像。
 
@@ -17,6 +18,10 @@ OpenVPN 内核以及管理 bundle 使用的 platform API。
 由于源码提交无法包含自身的提交哈希，签名发布先形成候选源码提交，再由默认分支上的
 后续提交登记其精确哈希，最后给候选源码提交打 tag。发布 workflow 从默认分支读取
 登记表；未登记 tag 或 schema、platform、OpenVPN 任一不匹配时都必须拒绝。
+
+`versions.env` 中的 `OPENVPN_CANDIDATE_RANGE` 仅是自动化策略，用来限制工作流可以提出
+哪些上游 OpenVPN 版本更新；它不是兼容性声明。只有精确版本同时列入签名 Release
+清单和兼容性登记表时，runtime 才属于受支持版本。
 
 ## 在线更新边界
 

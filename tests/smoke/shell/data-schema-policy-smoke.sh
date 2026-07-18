@@ -32,7 +32,7 @@ jq -s -e '
     .commit == "11bdee954b2e875621f83a21564d048593adb68a" and
     .data_schema == 2 and .distribution == "legacy-image" and
     .platform_api == null) and
-  all(.[].openvpn; . == {"min": "2.7.0", "max_exclusive": "2.8.0"})
+  all(.[].openvpn; . == {"supported": ["2.7.5"]})
 ' "$MANIFEST" >/dev/null
 
 grep -Fq 'runs only its current schema' "$ROOT_DIR/docs/en/data-schema-upgrade-policy.md"

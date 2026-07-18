@@ -45,15 +45,27 @@ ovpn_semver_compare() {
 ovpn_compatibility_load_contract() {
   [ -r "$OVPN_COMPATIBILITY_CONTRACT" ] || return 1
 
-  unset OPENVPN_SUPPORTED_MIN OPENVPN_SUPPORTED_MAX_EXCLUSIVE OPENVPN_ADAPTER OPENVPN_TEMPLATE_FAMILY OPENVPN_REQUIRED_FEATURES
+  local version normalized previous=
+  local -a versions
+
+  unset OPENVPN_SUPPORTED_VERSIONS OPENVPN_ADAPTER OPENVPN_TEMPLATE_FAMILY OPENVPN_REQUIRED_FEATURES
   # shellcheck source=/usr/local/share/openvpn-container/compatibility/contract.env
   . "$OVPN_COMPATIBILITY_CONTRACT"
 
-  [ -n "${OPENVPN_SUPPORTED_MIN:-}" ] || return 1
-  [ -n "${OPENVPN_SUPPORTED_MAX_EXCLUSIVE:-}" ] || return 1
-  ovpn_semver_normalize "$OPENVPN_SUPPORTED_MIN" >/dev/null || return 1
-  ovpn_semver_normalize "$OPENVPN_SUPPORTED_MAX_EXCLUSIVE" >/dev/null || return 1
-  [ "$(ovpn_semver_compare "$OPENVPN_SUPPORTED_MIN" "$OPENVPN_SUPPORTED_MAX_EXCLUSIVE")" = -1 ]
+  [ -n "${OPENVPN_SUPPORTED_VERSIONS:-}" ] || return 1
+  case "$OPENVPN_SUPPORTED_VERSIONS" in
+  ,* | *, | *,,*) return 1 ;;
+  esac
+  IFS=, read -ra versions <<<"$OPENVPN_SUPPORTED_VERSIONS"
+  [ "${#versions[@]}" -gt 0 ] || return 1
+  for version in "${versions[@]}"; do
+    normalized="$(ovpn_semver_normalize "$version")" || return 1
+    [ "$normalized" = "$version" ] || return 1
+    if [ -n "$previous" ] && [ "$(ovpn_semver_compare "$previous" "$version")" -ge 0 ]; then
+      return 1
+    fi
+    previous="$version"
+  done
 }
 
 ovpn_runtime_version() {
@@ -69,13 +81,16 @@ ovpn_runtime_version() {
 }
 
 ovpn_compatibility_runtime_supported() {
-  local runtime minimum maximum
+  local runtime version
+  local -a versions
 
   ovpn_compatibility_load_contract || return 1
   runtime="$(ovpn_runtime_version)" || return 1
-  minimum="$(ovpn_semver_compare "$runtime" "$OPENVPN_SUPPORTED_MIN")" || return 1
-  maximum="$(ovpn_semver_compare "$runtime" "$OPENVPN_SUPPORTED_MAX_EXCLUSIVE")" || return 1
-  [ "$minimum" != -1 ] && [ "$maximum" = -1 ]
+  IFS=, read -ra versions <<<"$OPENVPN_SUPPORTED_VERSIONS"
+  for version in "${versions[@]}"; do
+    [ "$runtime" = "$version" ] && return 0
+  done
+  return 1
 }
 
 ovpn_compatibility_require_supported() {
@@ -84,7 +99,7 @@ ovpn_compatibility_require_supported() {
   ovpn_compatibility_load_contract || ovpn_die "invalid compatibility contract: $OVPN_COMPATIBILITY_CONTRACT"
   runtime="$(ovpn_runtime_version)" || ovpn_die "unable to parse OpenVPN runtime version"
   if ! ovpn_compatibility_runtime_supported; then
-    ovpn_die "OpenVPN runtime $runtime is outside supported range [$OPENVPN_SUPPORTED_MIN, $OPENVPN_SUPPORTED_MAX_EXCLUSIVE)"
+    ovpn_die "OpenVPN runtime $runtime is not in the verified set [$OPENVPN_SUPPORTED_VERSIONS]"
   fi
   if ! ovpn_compatibility_required_features_supported; then
     ovpn_die "OpenVPN runtime $runtime lacks required capabilities"
@@ -173,8 +188,9 @@ ovpn_compatibility_validate_config() {
 }
 
 ovpn_capabilities_command() {
-  local runtime adapter help_output feature_output feature key status range_supported
-  local -a features feature_values
+  local runtime adapter help_output feature_output feature key status version_supported
+  local version index
+  local -a features feature_values supported_versions
 
   ovpn_compatibility_load_contract || ovpn_die "invalid compatibility contract: $OVPN_COMPATIBILITY_CONTRACT"
   runtime="$(ovpn_runtime_version)" || ovpn_die "unable to parse OpenVPN runtime version"
@@ -183,22 +199,22 @@ ovpn_capabilities_command() {
   mapfile -t features <<<"$feature_output"
 
   adapter=""
-  range_supported=false
+  version_supported=false
   status=0
   if ovpn_compatibility_runtime_supported; then
-    range_supported=true
+    version_supported=true
     adapter="$(ovpn_compatibility_adapter_name)" || status=1
   else
     status=1
   fi
 
   help_output=""
-  if [ "$range_supported" = true ] && [ -n "$adapter" ]; then
+  if [ "$version_supported" = true ] && [ -n "$adapter" ]; then
     help_output="$(ovpn_compatibility_runtime_help)"
   fi
 
   for feature in "${features[@]}"; do
-    if [ "$range_supported" = true ] && [ -n "$adapter" ] && ovpn_compatibility_probe_feature "$feature" "$help_output"; then
+    if [ "$version_supported" = true ] && [ -n "$adapter" ] && ovpn_compatibility_probe_feature "$feature" "$help_output"; then
       feature_values+=(true)
     else
       feature_values+=(false)
@@ -208,7 +224,15 @@ ovpn_capabilities_command() {
 
   printf '{\n'
   printf '  "openvpn_version": "%s",\n' "$runtime"
-  printf '  "supported_range": %s,\n' "$range_supported"
+  printf '  "supported_version": %s,\n' "$version_supported"
+  IFS=, read -ra supported_versions <<<"$OPENVPN_SUPPORTED_VERSIONS"
+  printf '  "supported_versions": ['
+  for ((index = 0; index < ${#supported_versions[@]}; index++)); do
+    version="${supported_versions[index]}"
+    [ "$index" -eq 0 ] || printf ', '
+    printf '"%s"' "$version"
+  done
+  printf '],\n'
   if [ -n "$adapter" ]; then
     printf '  "adapter": "%s",\n' "$adapter"
   else

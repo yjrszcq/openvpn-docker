@@ -30,7 +30,7 @@ for name in \
   OPENVPN_VERSION \
   OPENVPN_SOURCE_SHA256 \
   EASYRSA_VERSION \
-  OPENVPN_SUPPORTED_RANGE; do
+  OPENVPN_CANDIDATE_RANGE; do
   require_value "$name"
 done
 
@@ -65,7 +65,7 @@ mkdir -p "$(dirname "$output_path")"
   printf '  "openvpn_source_version": %s,\n' "$(json_string "$OPENVPN_VERSION")"
   printf '  "openvpn_source_sha256": %s,\n' "$(json_string "$OPENVPN_SOURCE_SHA256")"
   printf '  "easy_rsa_version": %s,\n' "$(json_string "$EASYRSA_VERSION")"
-  printf '  "supported_openvpn_range": %s,\n' "$(json_string "$OPENVPN_SUPPORTED_RANGE")"
+  printf '  "openvpn_candidate_range": %s,\n' "$(json_string "$OPENVPN_CANDIDATE_RANGE")"
   printf '  "base_image": %s,\n' "$(json_string "$BASE_IMAGE")"
   printf '  "vcs_revision": %s,\n' "$(json_string "$vcs_ref")"
   printf '  "build_date": %s\n' "$(json_string "$build_date")"

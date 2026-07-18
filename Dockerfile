@@ -53,7 +53,7 @@ ARG DATA_SCHEMA
 ARG OPENVPN_VERSION
 ARG OPENVPN_SOURCE_SHA256
 ARG EASYRSA_VERSION
-ARG OPENVPN_SUPPORTED_RANGE
+ARG OPENVPN_CANDIDATE_RANGE
 ARG VCS_REF=unknown
 ARG BUILD_DATE=unknown
 
@@ -64,7 +64,7 @@ RUN test -n "$IMAGE_VERSION" \
     && test -n "$OPENVPN_VERSION" \
     && test -n "$OPENVPN_SOURCE_SHA256" \
     && test -n "$EASYRSA_VERSION" \
-    && test -n "$OPENVPN_SUPPORTED_RANGE"
+    && test -n "$OPENVPN_CANDIDATE_RANGE"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -110,7 +110,7 @@ RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/ovpn-hook /usr/local/bin/docker-
        OPENVPN_VERSION="$OPENVPN_VERSION" \
        OPENVPN_SOURCE_SHA256="$OPENVPN_SOURCE_SHA256" \
        EASYRSA_VERSION="$EASYRSA_VERSION" \
-       OPENVPN_SUPPORTED_RANGE="$OPENVPN_SUPPORTED_RANGE" \
+       OPENVPN_CANDIDATE_RANGE="$OPENVPN_CANDIDATE_RANGE" \
        OVPN_RUNTIME_STRATEGY=source-build \
        OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION" \
        OVPN_VCS_REF="$VCS_REF" \

@@ -164,14 +164,14 @@ test -f "$OVPN_DATA_DIR/secrets/tls-crypt.key"
 "$OVPN" start >"$TMP_DIR/start.out" 2>"$TMP_DIR/start.err"
 grep -q -- "--config $OVPN_DATA_DIR/server/server.conf" "$TMP_DIR/start.out"
 set +e
-FAKE_OPENVPN_VERSION=2.8.0 "$OVPN" start >"$TMP_DIR/unsupported-start.out" 2>"$TMP_DIR/unsupported-start.err"
+FAKE_OPENVPN_VERSION=2.7.6 "$OVPN" start >"$TMP_DIR/unsupported-start.out" 2>"$TMP_DIR/unsupported-start.err"
 status=$?
 set -e
 if [ "$status" -eq 0 ]; then
   echo 'start unexpectedly accepted an unsupported runtime' >&2
   exit 1
 fi
-grep -q 'outside supported range' "$TMP_DIR/unsupported-start.err"
+grep -q 'not in the verified set' "$TMP_DIR/unsupported-start.err"
 
 export OVPN_DATA_DIR="$TMP_DIR/concurrent"
 export FAKE_EASYRSA_LOG="$TMP_DIR/concurrent-easyrsa.log"

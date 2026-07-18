@@ -45,13 +45,6 @@ semver_compare() {
   printf '%s\n' 0
 }
 
-version_in_range() {
-  local version="$1" minimum="$2" maximum="$3"
-
-  [ "$(semver_compare "$version" "$minimum")" -ge 0 ] &&
-    [ "$(semver_compare "$version" "$maximum")" -lt 0 ]
-}
-
 while [ "$#" -gt 0 ]; do
   case "$1" in
   --registry)
@@ -97,14 +90,26 @@ command -v jq >/dev/null 2>&1 || die 'jq is required'
 [[ "$PLATFORM_API" =~ ^[1-9][0-9]*$ ]] || die 'current PLATFORM_API is invalid'
 [[ "$OPENVPN_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
   die 'current OPENVPN_VERSION is invalid'
-if ! [[ "$OPENVPN_SUPPORTED_MIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
-  ! [[ "$OPENVPN_SUPPORTED_MAX_EXCLUSIVE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
-  [ "$(semver_compare "$OPENVPN_SUPPORTED_MIN" "$OPENVPN_SUPPORTED_MAX_EXCLUSIVE")" -ge 0 ]; then
-  die 'current OpenVPN compatibility range is invalid'
-fi
-version_in_range "$OPENVPN_VERSION" \
-  "$OPENVPN_SUPPORTED_MIN" "$OPENVPN_SUPPORTED_MAX_EXCLUSIVE" ||
-  die 'current OpenVPN version is outside the compatibility contract'
+previous_supported=''
+case "$OPENVPN_SUPPORTED_VERSIONS" in
+'' | ,* | *, | *,,*) die 'current supported OpenVPN versions are invalid' ;;
+esac
+IFS=, read -ra current_supported_versions <<<"$OPENVPN_SUPPORTED_VERSIONS"
+[ "${#current_supported_versions[@]}" -gt 0 ] ||
+  die 'current supported OpenVPN versions are invalid'
+for supported_version in "${current_supported_versions[@]}"; do
+  [[ "$supported_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] ||
+    die 'current supported OpenVPN versions are invalid'
+  if [ -n "$previous_supported" ] &&
+    [ "$(semver_compare "$previous_supported" "$supported_version")" -ge 0 ]; then
+    die 'current supported OpenVPN versions must be unique and increasing'
+  fi
+  previous_supported="$supported_version"
+done
+case ",$OPENVPN_SUPPORTED_VERSIONS," in
+*",$OPENVPN_VERSION,"*) ;;
+*) die 'current OpenVPN version is not verified by the compatibility contract' ;;
+esac
 grep -Fqx "OVPN_CURRENT_DATA_SCHEMA=$DATA_SCHEMA" \
   "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/schema.sh" ||
   die 'versions.env DATA_SCHEMA differs from the runtime schema constant'
@@ -137,9 +142,9 @@ while IFS= read -r release || [ -n "$release" ]; do
       (.platform_api.max | type == "number" and . > 0 and floor == .)
     )) and
     (.openvpn | type == "object") and
-    (.openvpn | keys == ["max_exclusive", "min"]) and
-    (.openvpn.min | type == "string") and
-    (.openvpn.max_exclusive | type == "string")
+    (.openvpn | keys == ["supported"]) and
+    (.openvpn.supported | type == "array" and length > 0) and
+    all(.openvpn.supported[]; type == "string")
   ' <<<"$release" >/dev/null 2>&1 ||
     die "registry line $line_number is not a valid release object"
   row="$(jq -r '
@@ -150,12 +155,11 @@ while IFS= read -r release || [ -n "$release" ]; do
       .distribution,
       (if .platform_api == null then "-" else (.platform_api.min | tostring) end),
       (if .platform_api == null then "-" else (.platform_api.max | tostring) end),
-      .openvpn.min,
-      .openvpn.max_exclusive
+      (.openvpn.supported | join(","))
     ] | @tsv
   ' <<<"$release")"
   IFS=$'\t' read -r version commit schema distribution \
-    platform_min platform_max openvpn_min openvpn_max <<<"$row"
+    platform_min platform_max openvpn_supported <<<"$row"
   [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
     die "registry line $line_number has an invalid management version"
   [[ "$commit" =~ ^[0-9a-f]{40}$ ]] ||
@@ -170,12 +174,22 @@ while IFS= read -r release || [ -n "$release" ]; do
   [ -z "${seen_commits[$commit]:-}" ] ||
     die "registered commit is reused by multiple releases: $commit"
   seen_commits["$commit"]=true
-  [[ "$openvpn_min" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
-    die "registry line $line_number has an invalid OpenVPN minimum"
-  [[ "$openvpn_max" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
-    die "registry line $line_number has an invalid OpenVPN maximum"
-  [ "$(semver_compare "$openvpn_min" "$openvpn_max")" -lt 0 ] ||
-    die "registry line $line_number has an empty OpenVPN range"
+  previous_supported=''
+  case "$openvpn_supported" in
+  '' | ,* | *, | *,,*)
+    die "registry line $line_number has invalid supported OpenVPN versions"
+    ;;
+  esac
+  IFS=, read -ra supported_versions <<<"$openvpn_supported"
+  for supported_version in "${supported_versions[@]}"; do
+    [[ "$supported_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] ||
+      die "registry line $line_number has invalid supported OpenVPN versions"
+    if [ -n "$previous_supported" ] &&
+      [ "$(semver_compare "$previous_supported" "$supported_version")" -ge 0 ]; then
+      die "registry line $line_number supported OpenVPN versions must be unique and increasing"
+    fi
+    previous_supported="$supported_version"
+  done
   if [ -n "$previous_version" ]; then
     [ "$(semver_compare "$previous_version" "$version")" -lt 0 ] ||
       die 'release registry versions must be unique and strictly increasing'
@@ -214,8 +228,10 @@ while IFS= read -r release || [ -n "$release" ]; do
   historical_openvpn="$(sed -n 's/^OPENVPN_VERSION=//p' <<<"$historical_versions")"
   [[ "$historical_openvpn" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
     die "release $version source has an invalid OpenVPN version"
-  version_in_range "$historical_openvpn" "$openvpn_min" "$openvpn_max" ||
-    die "release $version OpenVPN version is outside its registered range"
+  case ",$openvpn_supported," in
+  *",$historical_openvpn,"*) ;;
+  *) die "release $version OpenVPN version is not in its registered verified set" ;;
+  esac
 
   if [ -n "$RELEASE_TAG" ] && [ "$version" = "${RELEASE_TAG#v}" ]; then
     release_found=true
@@ -229,10 +245,8 @@ while IFS= read -r release || [ -n "$release" ]; do
       [ "$PLATFORM_API" -gt "$platform_max" ]; then
       die 'release bundle does not support its build image platform API'
     fi
-    if [ "$openvpn_min" != "$OPENVPN_SUPPORTED_MIN" ] ||
-      [ "$openvpn_max" != "$OPENVPN_SUPPORTED_MAX_EXCLUSIVE" ]; then
-      die 'release registry OpenVPN range differs from the compatibility contract'
-    fi
+    [ "$openvpn_supported" = "$OPENVPN_SUPPORTED_VERSIONS" ] ||
+      die 'release registry verified OpenVPN versions differ from the compatibility contract'
   fi
 done <"$REGISTRY"
 

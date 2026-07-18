@@ -52,7 +52,7 @@ jobs:
           scripts/release-policy.sh \
             --previous-version "$previous" \
             --target-version "$OPENVPN_VERSION" \
-            --supported-range "$OPENVPN_SUPPORTED_RANGE" \
+            --candidate-range "$OPENVPN_CANDIDATE_RANGE" \
             --image-version "$IMAGE_VERSION" \
             --github-output "$GITHUB_OUTPUT" > release-policy.env
           cat release-policy.env >> "$GITHUB_STEP_SUMMARY"
@@ -110,7 +110,7 @@ jobs:
             echo "- Image version: $IMAGE_VERSION"
             echo "- OpenVPN version: $OPENVPN_VERSION"
             echo "- Easy-RSA version: $EASYRSA_VERSION"
-            echo "- Supported range: $OPENVPN_SUPPORTED_RANGE"
+            echo "- Candidate range: $OPENVPN_CANDIDATE_RANGE"
             echo "- Schema version: $DATA_SCHEMA"
             echo '- Branch transition: same branch'
             echo '- Approval: not required'
@@ -168,7 +168,7 @@ jobs:
             echo "- Image version: $IMAGE_VERSION"
             echo "- OpenVPN version: $OPENVPN_VERSION"
             echo "- Easy-RSA version: $EASYRSA_VERSION"
-            echo "- Supported range: $OPENVPN_SUPPORTED_RANGE"
+            echo "- Candidate range: $OPENVPN_CANDIDATE_RANGE"
             echo "- Schema version: $DATA_SCHEMA"
             echo '- Branch transition: cross branch'
             echo '- Approval: stable-cross-branch Environment approved'

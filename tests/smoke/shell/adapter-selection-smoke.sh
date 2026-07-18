@@ -30,8 +30,8 @@ test "$(ovpn_compatibility_template_family)" = openvpn-2.7
 test -r "$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates/$(ovpn_compatibility_template_family)/server.conf.tpl"
 test -r "$ROOT_DIR/rootfs/usr/local/share/openvpn-container/templates/$(ovpn_compatibility_template_family)/client.ovpn.tpl"
 
-if FAKE_OPENVPN_VERSION=2.8.0 ovpn_compatibility_template_family >/dev/null; then
-  echo 'out-of-range runtime unexpectedly selected a template family' >&2
+if FAKE_OPENVPN_VERSION=2.7.6 ovpn_compatibility_template_family >/dev/null; then
+  echo 'unverified runtime unexpectedly selected a template family' >&2
   exit 1
 fi
 

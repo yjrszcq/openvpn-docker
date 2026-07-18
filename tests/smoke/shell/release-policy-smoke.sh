@@ -18,7 +18,7 @@ assert_policy() {
   "$POLICY" \
     --previous-version "$previous" \
     --target-version "$target" \
-    --supported-range "$range" \
+    --candidate-range "$range" \
     --image-version "$image" >"$output"
   while [ "$#" -gt 0 ]; do
     grep -Fqx "$1" "$output"
@@ -47,7 +47,7 @@ github_output="$TMP_DIR/github-output"
 "$POLICY" \
   --previous-version 2.7.5 \
   --target-version 2.7.6 \
-  --supported-range '>=2.7.0 <2.8.0' \
+  --candidate-range '>=2.7.0 <2.8.0' \
   --image-version 1.2.3 \
   --github-output "$github_output" >/dev/null
 grep -Fqx 'decision=READY_SAME_BRANCH' "$github_output"
@@ -56,7 +56,7 @@ set +e
 "$POLICY" \
   --previous-version invalid \
   --target-version 2.7.6 \
-  --supported-range '>=2.7.0 <2.8.0' \
+  --candidate-range '>=2.7.0 <2.8.0' \
   --image-version 1.2.3 >"$TMP_DIR/invalid.out" 2>"$TMP_DIR/invalid.err"
 status=$?
 set -e

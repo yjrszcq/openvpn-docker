@@ -55,7 +55,8 @@ ovpn_compatibility_validate_config "$TMP_DIR/generated.conf"
 
 "$OVPN" runtime capabilities >"$TMP_DIR/supported.json"
 grep -Fq '"openvpn_version": "2.7.5"' "$TMP_DIR/supported.json"
-grep -Fq '"supported_range": true' "$TMP_DIR/supported.json"
+grep -Fq '"supported_version": true' "$TMP_DIR/supported.json"
+grep -Fq '"supported_versions": ["2.7.5"]' "$TMP_DIR/supported.json"
 grep -Fq '"adapter": "openvpn-2.7"' "$TMP_DIR/supported.json"
 grep -Fq '"tls_crypt": true' "$TMP_DIR/supported.json"
 grep -Fq '"data_ciphers": true' "$TMP_DIR/supported.json"
@@ -70,20 +71,21 @@ if [ "$status" -eq 0 ]; then
   echo 'missing required feature unexpectedly passed capabilities' >&2
   exit 1
 fi
-grep -Fq '"supported_range": true' "$TMP_DIR/missing-feature.json"
+grep -Fq '"supported_version": true' "$TMP_DIR/missing-feature.json"
 grep -Fq '"adapter": "openvpn-2.7"' "$TMP_DIR/missing-feature.json"
 grep -Fq '"tls_crypt": false' "$TMP_DIR/missing-feature.json"
 
 set +e
-FAKE_OPENVPN_VERSION=2.8.0 "$OVPN" runtime capabilities >"$TMP_DIR/unsupported-runtime.json" 2>"$TMP_DIR/unsupported-runtime.err"
+FAKE_OPENVPN_VERSION=2.7.6 "$OVPN" runtime capabilities >"$TMP_DIR/unsupported-runtime.json" 2>"$TMP_DIR/unsupported-runtime.err"
 status=$?
 set -e
 if [ "$status" -eq 0 ]; then
   echo 'unsupported runtime unexpectedly passed capabilities' >&2
   exit 1
 fi
-grep -Fq '"openvpn_version": "2.8.0"' "$TMP_DIR/unsupported-runtime.json"
-grep -Fq '"supported_range": false' "$TMP_DIR/unsupported-runtime.json"
+grep -Fq '"openvpn_version": "2.7.6"' "$TMP_DIR/unsupported-runtime.json"
+grep -Fq '"supported_version": false' "$TMP_DIR/unsupported-runtime.json"
+grep -Fq '"supported_versions": ["2.7.5"]' "$TMP_DIR/unsupported-runtime.json"
 grep -Fq '"adapter": null' "$TMP_DIR/unsupported-runtime.json"
 grep -Fq '"tls_crypt": false' "$TMP_DIR/unsupported-runtime.json"
 
