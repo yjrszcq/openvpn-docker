@@ -157,6 +157,11 @@ Choose the routing model deliberately:
 This README intentionally does not duplicate the command manual. Select the
 reference that matches the image version you operate:
 
+Persistent compatibility follows the version-independent
+[data schema upgrade policy](docs/en/data-schema-upgrade-policy.md). Its
+maintenance-only migration and release requirements remain in force across
+command-documentation versions.
+
 - [v1 command reference](docs/en/v1/commands.md) — release commit `6619921e5257e604f5df2c63d2fa10505b680d84`.
   - [v1 operations guide](docs/en/v1/operations.md) — workflow-oriented command combinations.
 - [v2 command reference](docs/en/v2/commands.md) — the current CLI.

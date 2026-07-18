@@ -3,6 +3,9 @@
 A workflow-oriented guide for operators. For complete command syntax and options,
 see the [v2 command reference](commands.md).
 
+Persistent format changes follow the version-independent
+[data schema upgrade policy](../data-schema-upgrade-policy.md).
+
 ## Runtime conventions
 
 - **openvpn container** — the live server with a management socket. Run
