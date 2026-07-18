@@ -63,6 +63,8 @@ printf '%s\n' 'TEST TLS CRYPT KEY' >"$OVPN_DATA_DIR/secrets/tls-crypt.key"
 printf '%s\n' '# id,name,state' "$client_id,laptop,active" >"$OVPN_DATA_DIR/meta/client-state.csv"
 
 "$OVPN" render client laptop --stdout >"$TMP_DIR/laptop.ovpn"
+"$OVPN" render client "$client_id" --stdout >"$TMP_DIR/laptop-by-id.ovpn"
+cmp "$TMP_DIR/laptop.ovpn" "$TMP_DIR/laptop-by-id.ovpn"
 grep -q '^remote vpn.example.test 1194$' "$TMP_DIR/laptop.ovpn"
 grep -q '^proto udp$' "$TMP_DIR/laptop.ovpn"
 grep -Fqx "# ovpn-client-id: $client_id" "$TMP_DIR/laptop.ovpn"

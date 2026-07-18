@@ -88,6 +88,26 @@ ovpn_registry_name_by_id() {
   printf '%s\n' "${OVPN_REGISTRY_NAME_BY_ID[$id]}"
 }
 
+ovpn_registry_resolve_current() {
+  local reference="$1"
+  local id name state
+
+  ovpn_registry_load_identities || return 1
+  if ovpn_registry_uuid_valid "$reference"; then
+    id="$reference"
+    name="${OVPN_REGISTRY_NAME_BY_ID[$id]:-}"
+    state="${OVPN_REGISTRY_STATE_BY_ID[$id]:-}"
+    [ -n "$name" ] && [ "$state" != deleted ] || return 1
+  else
+    ovpn_registry_client_name_valid "$reference" || return 1
+    name="$reference"
+    id="${OVPN_REGISTRY_CURRENT_ID_BY_NAME[$name]:-}"
+    [ -n "$id" ] || return 1
+    state="${OVPN_REGISTRY_STATE_BY_ID[$id]}"
+  fi
+  printf '%s,%s,%s\n' "$id" "$name" "$state"
+}
+
 ovpn_registry_dir() {
   printf '%s/data\n' "$OVPN_DATA_DIR"
 }

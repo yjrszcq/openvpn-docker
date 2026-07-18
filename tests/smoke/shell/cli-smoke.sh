@@ -52,19 +52,19 @@ assert_help "Usage: ovpn repair plan [--json]" repair plan -h
 assert_help "Usage: ovpn state <command>" state --help
 assert_help "Usage: ovpn state doctor [--json]" state doctor -h
 assert_help "Usage: ovpn render <target> [options]" render --help
-assert_help "Usage: ovpn render client <name> [--stdout|--output <path>]" render client -h
+assert_help "Usage: ovpn render client <client> [--stdout|--output <path>]" render client -h
 assert_help "Usage: ovpn runtime <command>" runtime --help
 assert_help "Usage: ovpn runtime version" runtime version -h
 assert_help "Usage: ovpn upgrade" upgrade --help
 assert_help "Usage: ovpn migrate <command> [options]" migrate --help
 
 assert_help "Usage: ovpn config show" config show --help
-assert_help "Usage: ovpn client export <name>" client export -h
+assert_help "Usage: ovpn client export <client>" client export -h
 assert_help "Usage: ovpn client list [--detail]" client list --help
-assert_help "Usage: ovpn client revoke <name> [--release-ip]" client revoke -h
-assert_help "Usage: ovpn client ip release <name>" client ip release --help
-assert_help "Usage: ovpn client reissue <name>" client reissue -h
-assert_help "Usage: ovpn client delete <name>" client delete --help
+assert_help "Usage: ovpn client revoke <client> [--release-ip]" client revoke -h
+assert_help "Usage: ovpn client ip release <client>" client ip release --help
+assert_help "Usage: ovpn client reissue <client>" client reissue -h
+assert_help "Usage: ovpn client delete <client>" client delete --help
 assert_help "Usage: ovpn network plan [--network <CIDR>] [--dynamic-pool-size <N>]" network plan --help
 assert_help "Usage: ovpn repair apply" repair apply -h
 assert_help "Usage: ovpn state show" state show --help

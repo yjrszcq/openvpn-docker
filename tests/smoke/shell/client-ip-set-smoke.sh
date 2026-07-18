@@ -53,7 +53,7 @@ cat >"$canonical" <<'EOF'
 EOF
 
 # Test: set triggers apply transaction, canonical ordering, CCD generation
-"$OVPN" client ip set bravo --ip 10.88.0.3 >"$TMP_DIR/apply.out" 2>&1
+"$OVPN" client ip set "$bravo_id" --ip 10.88.0.3 >"$TMP_DIR/apply.out" 2>&1
 grep -Fq 'set client' "$TMP_DIR/apply.out"
 cmp "$canonical" "$OVPN_DATA_DIR/data/client-ip.csv"
 cmp "$canonical" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
@@ -133,5 +133,11 @@ cmp "$TMP_DIR/before-failure.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 [ "$ccd_before" = "$(sha256sum "$OVPN_DATA_DIR/ccd/$bravo_id")" ]
 [ "$lease_before" = "$(find "$OVPN_LEASE_DIR" -type f -exec sha256sum {} + | sort -k2 | sha256sum)" ]
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/$bravo_id"
+
+if "$OVPN" client ip set alpha "$alpha_id" >"$TMP_DIR/duplicate-client.out" 2>&1; then
+  echo 'duplicate name/UUID client selection unexpectedly succeeded' >&2
+  exit 1
+fi
+grep -Fq "client 'alpha' was specified more than once" "$TMP_DIR/duplicate-client.out"
 
 printf 'client-ip set smoke passed\n'

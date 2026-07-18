@@ -174,7 +174,8 @@ entity, CCD filename, dynamic-lease filename, and OpenVPN management identity
 use that UUID; the client name remains the human-facing label and profile
 filename. Generated profiles include `ovpn-client-id` and `ovpn-client-name`
 comments so both identities can be recovered without changing OpenVPN syntax.
-The commands in this section currently accept the client name.
+Except for `create`, each `<client>` argument accepts either the current display
+name or the immutable UUID. A UUID cannot be used as a display name.
 
 ### `ovpn client create`
 
@@ -196,7 +197,7 @@ cannot be combined.
 Syntax:
 
 ```text
-ovpn client export <name>
+ovpn client export <client>
 ```
 
 Requires a healthy active client. Regenerates
@@ -211,9 +212,9 @@ Syntax:
 ovpn client list [--detail]
 ```
 
-Without `--detail`, prints a two-column table with `CLIENT` and `STATE` headers,
-auto-sized to the widest name. With `--detail`, prints the aligned columns
-`CLIENT`, `STATE`, `MODE`, `IP`, `IP STATE`, and `CONNECTION`.
+Without `--detail`, prints the aligned columns `CLIENT`, `ID`, and `STATE`.
+With `--detail`, it additionally prints `MODE`, `IP`, `IP STATE`, and
+`CONNECTION`. The immutable `ID` is shown in both views.
 
 For the IP view, static assignments are `configured` or `retained` after
 revocation. Dynamic addresses are `connected` when the management socket has a
@@ -227,7 +228,7 @@ unapplied draft.
 Syntax:
 
 ```text
-ovpn client revoke <name> [--release-ip]
+ovpn client revoke <client> [--release-ip]
 ```
 
 Revokes an active certificate, regenerates the CRL, moves its active profile to
@@ -241,7 +242,7 @@ operation.
 Syntax:
 
 ```text
-ovpn client reissue <name> [--dynamic|--ip <IPv4>]
+ovpn client reissue <client> [--dynamic|--ip <IPv4>]
 ```
 
 Issues a new key and certificate for an existing client name. For an active
@@ -263,7 +264,7 @@ static IP; reissue is refused when the static region has no free capacity. Optio
 Syntax:
 
 ```text
-ovpn client delete <name>
+ovpn client delete <client>
 ```
 
 Irreversibly removes a client. An active client is revoked first; the command
@@ -286,7 +287,7 @@ identity registry.
 Syntax:
 
 ```text
-ovpn client ip release <name>
+ovpn client ip release <client>
 ```
 
 Releases the retained static assignment of a revoked client. The client must be
@@ -443,12 +444,13 @@ standard output; `--output <path>` writes a mode-`0600` file at that path.
 Syntax:
 
 ```text
-ovpn render client <name> [--stdout|--output <path>]
+ovpn render client <client> [--stdout|--output <path>]
 ```
 
 Builds a client `.ovpn` profile from the configured endpoint, CA certificate,
-named client certificate and key, and tls-crypt key. Output defaults to standard
-output; `--output` writes an atomically replaced mode-`0600` file.
+selected client certificate and key, and tls-crypt key. `<client>` may be the
+current name or UUID. Output defaults to standard output; `--output` writes an
+atomically replaced mode-`0600` file.
 
 ## Management code updates
 

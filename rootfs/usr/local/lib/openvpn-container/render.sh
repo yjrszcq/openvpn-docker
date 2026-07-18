@@ -230,9 +230,10 @@ ovpn_render_server() {
 }
 
 ovpn_render_client() {
-  local client_name="${1:-}"
+  local client_reference="${1:-}"
+  local client_name
   local output_path='-'
-  [ -n "$client_name" ] || ovpn_die "usage: ovpn render client <name> [--stdout|--output path]"
+  [ -n "$client_reference" ] || ovpn_die "usage: ovpn render client <client> [--stdout|--output path]"
   shift
 
   while [ "$#" -gt 0 ]; do
@@ -251,6 +252,8 @@ ovpn_render_client() {
     esac
     shift
   done
+  ovpn_client_resolve_ref_or_die "$client_reference"
+  client_name="$OVPN_CLIENT_RESOLVED_NAME"
   ovpn_write_or_print "$output_path" "$(ovpn_render_client_content "$client_name")"
 }
 
@@ -275,7 +278,7 @@ ovpn_render_command() {
       ;;
     client)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn render client <name> [--stdout|--output <path>]" "Render a client profile."
+        ovpn_command_usage "ovpn render client <client> [--stdout|--output <path>]" "Render a client profile."
       else
         ovpn_render_client "$@"
       fi

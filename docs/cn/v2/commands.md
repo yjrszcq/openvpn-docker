@@ -141,7 +141,8 @@ ovpn config apply
 每个客户端都有不可变的 UUID 身份。证书 CN、Easy-RSA 实体、CCD 文件名、动态租约
 文件名和 OpenVPN management 身份均使用该 UUID；客户端名称仍作为面向人的管理标签和
 profile 文件名。生成的 profile 包含 `ovpn-client-id` 与 `ovpn-client-name` 注释，
-因此无需改变 OpenVPN 语法也能恢复两种身份。本节命令目前仍接收客户端名称。
+因此无需改变 OpenVPN 语法也能恢复两种身份。除 `create` 外，每个 `<client>` 参数均
+接受当前显示名称或不可变 UUID；UUID 形式不能用作显示名称。
 
 ### `ovpn client create`
 
@@ -161,7 +162,7 @@ IP 分配。不带选项时，客户端获取最低的可用静态地址。`--dy
 语法：
 
 ```text
-ovpn client export <name>
+ovpn client export <client>
 ```
 
 需要一个健康的活跃客户端。原子重新生成 `clients/active/<name>.ovpn`，然后将同一 profile 写入标准输出。将标准输出重定向即可保存客户端 profile。
@@ -174,7 +175,8 @@ ovpn client export <name>
 ovpn client list [--detail]
 ```
 
-不带 `--detail` 时，打印带 `CLIENT` 和 `STATE` 表头的两列表格，列宽按最长名称自适应。带 `--detail` 时，打印对齐的列：`CLIENT`、`STATE`、`MODE`、`IP`、`IP STATE` 和 `CONNECTION`。
+不带 `--detail` 时，打印对齐的 `CLIENT`、`ID` 和 `STATE` 列。带 `--detail` 时，
+额外打印 `MODE`、`IP`、`IP STATE` 和 `CONNECTION`；两种视图都显示不可变 `ID`。
 
 在 IP 视图下，静态分配为 `configured`，或撤销后为 `retained`。动态地址在有当前租约时显示为 `connected`，在有持久化租约记录时显示为 `last-known`，否则为 `unavailable`。`CONNECTION` 根据管理套接字可用性和当前路由显示为 `online`、`offline` 或 `unknown`。该视图读取的是已应用的清单，而非未应用的草稿。
 
@@ -183,7 +185,7 @@ ovpn client list [--detail]
 语法：
 
 ```text
-ovpn client revoke <name> [--release-ip]
+ovpn client revoke <client> [--release-ip]
 ```
 
 撤销活跃证书，重新生成 CRL，将其活跃 profile 移至 `clients/revoked/`，记录该客户端为已撤销状态，并在管理套接字可用时断开其连接。默认情况下，静态分配会保持保留。`--release-ip` 作为同一操作的一部分释放该静态保留。
@@ -193,7 +195,7 @@ ovpn client revoke <name> [--release-ip]
 语法：
 
 ```text
-ovpn client reissue <name> [--dynamic|--ip <IPv4>]
+ovpn client reissue <client> [--dynamic|--ip <IPv4>]
 ```
 
 为已有的客户端名称签发新密钥和新证书。对于活跃客户端，它首先撤销旧证书并将其 profile 移至已撤销集合。在修改线上 PKI 之前，会探测所搭载的 Easy-RSA 运行时是否支持同一 CN 重新签发，因此校验失败的请求不会造成任何变更。
@@ -208,7 +210,7 @@ ovpn client reissue <name> [--dynamic|--ip <IPv4>]
 语法：
 
 ```text
-ovpn client delete <name>
+ovpn client delete <client>
 ```
 
 不可逆地移除客户端。活跃客户端会先被撤销；然后命令移除其清单记录、活跃或已撤销 profile、私钥、已签发证书和请求文件。旧私钥仅能从安全备份中恢复。
@@ -222,7 +224,7 @@ ovpn client delete <name>
 语法：
 
 ```text
-ovpn client ip release <name>
+ovpn client ip release <client>
 ```
 
 释放已撤销客户端的保留静态分配。客户端必须已撤销且仍持有静态保留。已撤销的 profile、私钥、证书历史和审计历史均会保留。
@@ -341,10 +343,12 @@ ovpn render server [--stdout|--output <path>]
 语法：
 
 ```text
-ovpn render client <name> [--stdout|--output <path>]
+ovpn render client <client> [--stdout|--output <path>]
 ```
 
-根据已配置的端点、CA 证书、指定客户端证书和私钥以及 tls-crypt 密钥构建客户端 `.ovpn` profile。输出默认为标准输出；`--output` 写入一个原子替换的 mode-`0600` 文件。
+根据已配置的端点、CA 证书、指定客户端证书和私钥以及 tls-crypt 密钥构建客户端
+`.ovpn` profile。`<client>` 可使用当前名称或 UUID。输出默认为标准输出；`--output`
+写入一个原子替换的 mode-`0600` 文件。
 
 ## 管理代码在线更新
 

@@ -231,12 +231,13 @@ ovpn_client_collect_active_targets() {
 }
 
 ovpn_client_collect_named_targets() {
-  local name
+  local reference name
   local -A seen=()
 
   OVPN_CLIENT_MUTATION_TARGETS=()
-  for name in "$@"; do
-    ovpn_client_name_or_die "$name"
+  for reference in "$@"; do
+    ovpn_client_resolve_ref_or_die "$reference"
+    name="$OVPN_CLIENT_RESOLVED_NAME"
     [ -z "${seen[$name]+present}" ] || ovpn_die "client '$name' was specified more than once"
     seen["$name"]=1
     ovpn_client_require_registry_active "$name"

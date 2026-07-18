@@ -49,6 +49,11 @@ deleted_id=11111111-1111-4111-8111-111111111111
 assert_rejected ovpn_registry_client_is_deleted laptop
 assert_rejected ovpn_registry_client_is_deleted phone
 ovpn_registry_client_is_deleted retired
+[ "$(ovpn_registry_resolve_current laptop)" = '22222222-2222-4222-8222-222222222222,laptop,active' ]
+[ "$(ovpn_registry_resolve_current 22222222-2222-4222-8222-222222222222)" = '22222222-2222-4222-8222-222222222222,laptop,active' ]
+[ "$(ovpn_registry_resolve_current phone)" = '33333333-3333-4333-8333-333333333333,phone,revoked' ]
+assert_rejected ovpn_registry_resolve_current "$deleted_id"
+assert_rejected ovpn_registry_resolve_current retired
 
 cat >"$TMP_DIR/duplicate-current.csv" <<'EOF'
 # id,name,state
