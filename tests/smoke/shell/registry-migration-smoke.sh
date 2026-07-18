@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 TMP_DIR="$(mktemp -d)"
 LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
+OVPN="$ROOT_DIR/rootfs/usr/local/bin/ovpn"
 
 cleanup() {
   rm -rf "$TMP_DIR"
@@ -19,6 +20,11 @@ export OVPN_NETWORK="10.88.0.0/24"
 . "$LIB_DIR/ipam.sh"
 . "$LIB_DIR/config.sh"
 . "$LIB_DIR/registry.sh"
+
+if declare -F ovpn_migration_1_to_2_apply_staged >/dev/null; then
+  echo 'historical migration was loaded by current runtime modules' >&2
+  exit 1
+fi
 
 mkdir -p "$OVPN_DATA_DIR/config" "$OVPN_DATA_DIR/pki"
 cat >"$OVPN_DATA_DIR/config/project.env" <<'EOF'
@@ -39,8 +45,15 @@ printf '%s\n' \
   $'R\t30000101000000Z\t260101000000Z\t02\tunknown\t/CN=phone' \
   $'V\t30000101000000Z\t\t03\tunknown\t/CN=openvpn-server' \
   >"$OVPN_DATA_DIR/pki/index.txt"
+printf '1\n' >"$OVPN_DATA_DIR/config/schema-version"
 
-ovpn_registry_upgrade_v1_inner
+OVPN_LIB_DIR="$LIB_DIR" OVPN_MAINTENANCE=true "$OVPN" migrate plan --json >"$TMP_DIR/plan.json"
+grep -Fq '"chain":"1-to-2"' "$TMP_DIR/plan.json"
+grep -Fq '"clients":2' "$TMP_DIR/plan.json"
+
+# shellcheck source=/dev/null
+. "$LIB_DIR/migrations/1-to-2.sh"
+ovpn_migration_1_to_2_apply_staged
 
 grep -Fqx 'OVPN_CONFIG_VERSION=2' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'OVPN_TOPOLOGY=subnet' "$OVPN_DATA_DIR/config/project.env"
@@ -52,8 +65,6 @@ grep -Fqx 'phone,' "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx 'laptop,active' "$OVPN_DATA_DIR/meta/client-state.csv"
 grep -Fqx 'phone,revoked' "$OVPN_DATA_DIR/meta/client-state.csv"
 test ! -s "$OVPN_DATA_DIR/meta/audit.jsonl"
-
-ovpn_registry_upgrade_v1_inner
 
 if (
   export OVPN_DATA_DIR="$TMP_DIR/incomplete-v2"
@@ -80,11 +91,13 @@ OVPN_CLIENT_TO_CLIENT=false
 OVPN_DNS=
 OVPN_ROUTES=
 EOF
-  ovpn_registry_upgrade_v1_inner
+  # shellcheck source=/dev/null
+  . "$LIB_DIR/migrations/1-to-2.sh"
+  ovpn_migration_1_to_2_apply_staged
 ) >"$TMP_DIR/incomplete-v2.out" 2>"$TMP_DIR/incomplete-v2.err"; then
   echo 'incomplete V2 registry unexpectedly migrated' >&2
   exit 1
 fi
-grep -Fq 'V2 client registry is incomplete' "$TMP_DIR/incomplete-v2.err"
+grep -Fq 'expected schema 1 configuration' "$TMP_DIR/incomplete-v2.err"
 
 printf 'registry migration smoke passed\n'

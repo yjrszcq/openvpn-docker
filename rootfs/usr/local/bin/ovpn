@@ -83,6 +83,11 @@ case "$command" in
   runtime)
     ovpn_runtime_command "$@"
     ;;
+  migrate)
+    # Historical parsers are lazy-loaded only by the migration dispatcher.
+    . "$LIB_DIR/migrate.sh"
+    ovpn_migrate_command "$@"
+    ;;
   *)
     ovpn_log "unknown command '$command'"
     ovpn_usage >&2

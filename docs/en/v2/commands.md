@@ -54,6 +54,7 @@ ovpn
 │   ├── health          Return success only when the container is healthy.
 │   ├── capabilities    Print compatibility and feature information.
 │   └── version         Print image and runtime build information.
+├── migrate             Plan or apply an offline data-schema migration.
 └── help                Print this help message.
 ```
 

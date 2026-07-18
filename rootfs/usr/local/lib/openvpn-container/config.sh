@@ -185,7 +185,7 @@ ovpn_validate_nat_interface() {
 
 ovpn_config_validate() {
   case "$OVPN_CONFIG_VERSION" in
-    1|2) ;;
+    2) ;;
     *) ovpn_die "unsupported OVPN_CONFIG_VERSION: $OVPN_CONFIG_VERSION" ;;
   esac
   ovpn_validate_single_line OVPN_ENDPOINT "$OVPN_ENDPOINT"

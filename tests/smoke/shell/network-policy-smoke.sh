@@ -168,11 +168,14 @@ make_project_env() {
 
   mkdir -p "$data_dir/config"
   cat >"$data_dir/config/project.env" <<EOF_PROJECT
-OVPN_CONFIG_VERSION=1
+OVPN_CONFIG_VERSION=2
 OVPN_ENDPOINT=vpn.example.test
 OVPN_PROTO=udp
+OVPN_TRANSPORT_FAMILY=auto
 OVPN_PORT=1194
 OVPN_NETWORK=10.88.0.0/24
+OVPN_TOPOLOGY=subnet
+OVPN_DYNAMIC_POOL_SIZE=126
 OVPN_NAT=$nat
 OVPN_NAT_INTERFACE=$nat_interface
 OVPN_REDIRECT_GATEWAY=$redirect

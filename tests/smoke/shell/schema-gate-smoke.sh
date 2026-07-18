@@ -46,8 +46,8 @@ set +e
 OVPN_DATA_DIR="$old" "$OVPN" migrate plan >"$TMP_DIR/migrate.out" 2>"$TMP_DIR/migrate.err"
 status=$?
 set -e
-[ "$status" -eq 64 ]
-grep -Fq "unknown command 'migrate'" "$TMP_DIR/migrate.err"
+[ "$status" -eq 78 ]
+grep -Fq 'only through the openvpn-maintenance service' "$TMP_DIR/migrate.err"
 
 current_incomplete="$TMP_DIR/current-incomplete"
 mkdir -p "$current_incomplete/config"

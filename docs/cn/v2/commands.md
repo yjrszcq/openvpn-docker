@@ -48,6 +48,7 @@ ovpn
 │   ├── health          仅当容器健康时返回成功。
 │   ├── capabilities    打印兼容性和特性信息。
 │   └── version         打印镜像和运行时构建信息。
+├── migrate             规划或执行离线数据 schema 迁移。
 └── help                打印此帮助。
 ```
 

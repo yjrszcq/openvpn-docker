@@ -37,6 +37,9 @@ services:
     image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
     restart: "no"
 
+    environment:
+      OVPN_MAINTENANCE: "true"
+
     <<: *openvpn-data
 
     profiles:

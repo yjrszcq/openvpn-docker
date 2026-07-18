@@ -35,6 +35,7 @@ printf '%s\n' "$maintenance_service" | grep -Fq -- '- /usr/local/bin/ovpn'
 printf '%s\n' "$maintenance_service" | grep -Fq 'command:'
 printf '%s\n' "$maintenance_service" | grep -Fq -- '- doctor'
 printf '%s\n' "$maintenance_service" | grep -Fq 'restart: "no"'
+printf '%s\n' "$maintenance_service" | grep -Fq 'OVPN_MAINTENANCE: "true"'
 if printf '%s\n' "$maintenance_service" | grep -Eq '^[[:space:]]+(cap_add|devices|ports|privileged):'; then
   echo 'maintenance service must not request VPN runtime privileges' >&2
   exit 1

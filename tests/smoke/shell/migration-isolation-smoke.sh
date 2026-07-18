@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
+OVPN="$ROOT_DIR/rootfs/usr/local/bin/ovpn"
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+export OVPN_LIB_DIR="$LIB_DIR"
+export OVPN_DATA_DIR="$TMP_DIR/current"
+mkdir -p "$OVPN_DATA_DIR/config"
+printf 'OVPN_CONFIG_VERSION=2\n' >"$OVPN_DATA_DIR/config/project.env"
+printf '2\n' >"$OVPN_DATA_DIR/config/schema-version"
+
+trace="$TMP_DIR/help.trace"
+BASH_XTRACEFD=3 bash -x "$OVPN" help 3>"$trace" >/dev/null 2>&1
+if grep -Fq '/migrations/' "$trace" || grep -Fq '/migrate.sh' "$trace"; then
+  echo 'normal CLI startup sourced migration code' >&2
+  exit 1
+fi
+
+OVPN_MAINTENANCE=true "$OVPN" migrate plan --json >"$TMP_DIR/current.json"
+grep -Fq '"source_schema":2' "$TMP_DIR/current.json"
+grep -Fq '"chain":"none"' "$TMP_DIR/current.json"
+
+set +e
+"$OVPN" migrate plan >"$TMP_DIR/live.out" 2>"$TMP_DIR/live.err"
+status=$?
+set -e
+[ "$status" -eq 78 ]
+grep -Fq 'only through the openvpn-maintenance service' "$TMP_DIR/live.err"
+
+printf 'migration isolation smoke passed\n'
