@@ -179,10 +179,18 @@ ovpn_easyrsa_version() {
 }
 
 ovpn_version() {
-  local easyrsa_ver
+  local easyrsa_ver management_ver management_source
   easyrsa_ver="$(ovpn_easyrsa_version)"
+  management_ver="${OVPN_ACTIVE_MANAGEMENT_VERSION:-unknown}"
+  management_source="${OVPN_MANAGEMENT_SOURCE:-unknown}"
   if [ -r "$OVPN_BUILD_INFO" ]; then
-    awk -v ver="$easyrsa_ver" 'BEGIN { OFS = "" } /"easy_rsa_version"/ { sub(/: *"[^"]*"/, ": \"" ver "\"") } 1' "$OVPN_BUILD_INFO"
+    awk -v easyrsa="$easyrsa_ver" -v management="$management_ver" -v source="$management_source" '
+      BEGIN { OFS = "" }
+      /"easy_rsa_version"/ { sub(/: *"[^"]*"/, ": \"" easyrsa "\"") }
+      management != "unknown" && /"management_version"/ { sub(/: *"[^"]*"/, ": \"" management "\"") }
+      source != "unknown" && /"management_source"/ { sub(/: *"[^"]*"/, ": \"" source "\"") }
+      { print }
+    ' "$OVPN_BUILD_INFO"
   else
     cat <<JSON
 {
@@ -201,11 +209,16 @@ JSON
 
 ovpn_version_short() {
   local info="${OVPN_BUILD_INFO:-/usr/local/share/openvpn-container/build-info.json}"
+  if [ -n "${OVPN_ACTIVE_MANAGEMENT_VERSION:-}" ]; then
+    printf '%s\n' "$OVPN_ACTIVE_MANAGEMENT_VERSION"
+    return 0
+  fi
   if [ -r "$info" ]; then
     grep -o '"management_version": *"[^"]*"' "$info" | head -1 | sed 's/.*: *"//;s/"//'
   else
     printf 'unknown\n'
   fi
+
 }
 
 ovpn_version_summary() {
@@ -220,6 +233,9 @@ ovpn_version_summary() {
     [ -n "$management_ver" ] || management_ver=unknown
     ovpn_ver="$(grep -o '"openvpn_version": *"[^"]*"' "$info" | head -1 | sed 's/.*: *"//;s/"//')"
     [ -n "$ovpn_ver" ] || ovpn_ver=unknown
+  fi
+  if [ -n "${OVPN_ACTIVE_MANAGEMENT_VERSION:-}" ]; then
+    management_ver="$OVPN_ACTIVE_MANAGEMENT_VERSION"
   fi
 
   easyrsa_ver="$(ovpn_easyrsa_version)"

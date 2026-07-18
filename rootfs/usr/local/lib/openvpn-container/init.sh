@@ -13,8 +13,10 @@ ovpn_layout_create() {
     "$OVPN_DATA_DIR/clients/archive" \
     "$OVPN_DATA_DIR/ccd" \
     "$OVPN_DATA_DIR/repair/journal" \
-    "$OVPN_DATA_DIR/repair/snapshots"
+    "$OVPN_DATA_DIR/repair/snapshots" \
+    "$OVPN_DATA_DIR/repair/.scripts"
   chmod 750 "$OVPN_DATA_DIR" "$OVPN_DATA_DIR/config" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/data" "$OVPN_DATA_DIR/server" "$OVPN_DATA_DIR/pki" "$OVPN_DATA_DIR/secrets"
+  chmod 700 "$OVPN_DATA_DIR/repair/.scripts"
 }
 
 ovpn_init_write_transaction_marker() {

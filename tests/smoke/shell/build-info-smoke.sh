@@ -21,6 +21,7 @@ grep -Fq "\"image_version\": \"$IMAGE_VERSION\"" "$output_path"
 grep -Fq "\"management_version\": \"$MANAGEMENT_VERSION\"" "$output_path"
 grep -Fq '"management_source": "embedded"' "$output_path"
 grep -Fq "\"platform_api\": $PLATFORM_API" "$output_path"
+grep -Fq "\"data_schema\": $DATA_SCHEMA" "$output_path"
 grep -Fq '"runtime_strategy": "source-build"' "$output_path"
 grep -Fq "\"openvpn_version\": \"$OPENVPN_VERSION\"" "$output_path"
 grep -Fq "\"openvpn_source_version\": \"$OPENVPN_VERSION\"" "$output_path"
@@ -44,5 +45,10 @@ if ! [[ "$PLATFORM_API" =~ ^[1-9][0-9]*$ ]]; then
   echo 'PLATFORM_API must be a positive integer' >&2
   exit 1
 fi
+if ! [[ "$DATA_SCHEMA" =~ ^[1-9][0-9]*$ ]]; then
+  echo 'DATA_SCHEMA must be a positive integer' >&2
+  exit 1
+fi
+grep -Fqx "OVPN_CURRENT_DATA_SCHEMA=$DATA_SCHEMA" "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/schema.sh"
 
 printf 'build-info smoke passed\n'

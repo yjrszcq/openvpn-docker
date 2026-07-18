@@ -56,6 +56,7 @@ jobs:
             tests/smoke/shell/adapter-selection-smoke.sh \
             tests/smoke/shell/render-smoke.sh \
             tests/smoke/shell/ipam-layout-smoke.sh \
+            tests/smoke/shell/management-bootstrap-smoke.sh \
             tests/smoke/shell/schema-gate-smoke.sh \
             tests/smoke/shell/migration-isolation-smoke.sh \
             tests/smoke/shell/registry-migration-smoke.sh \
@@ -180,6 +181,7 @@ jobs:
             --build-arg "IMAGE_VERSION=$IMAGE_VERSION" \
             --build-arg "MANAGEMENT_VERSION=$MANAGEMENT_VERSION" \
             --build-arg "PLATFORM_API=$PLATFORM_API" \
+            --build-arg "DATA_SCHEMA=$DATA_SCHEMA" \
             --build-arg "OPENVPN_VERSION=$OPENVPN_VERSION" \
             --build-arg "OPENVPN_SOURCE_SHA256=$OPENVPN_SOURCE_SHA256" \
             --build-arg "EASYRSA_VERSION=$EASYRSA_VERSION" \

@@ -12,6 +12,8 @@ grep -Fq 'OVPN_RUNTIME_STRATEGY=source-build' "$dockerfile"
 grep -Fq 'OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION"' "$dockerfile"
 grep -Fq 'MANAGEMENT_VERSION="$MANAGEMENT_VERSION"' "$dockerfile"
 grep -Fq 'PLATFORM_API="$PLATFORM_API"' "$dockerfile"
+grep -Fq 'embedded-management' "$dockerfile"
+grep -Fq 'openvpn-bootstrap.sh' "$dockerfile"
 grep -Fq 'grep -Fq "OpenVPN $OPENVPN_VERSION" /tmp/openvpn-version' "$dockerfile"
 grep -Fq "! grep -Fq 'not found' /tmp/openvpn-ldd" "$dockerfile"
 

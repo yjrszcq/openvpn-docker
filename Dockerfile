@@ -49,6 +49,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 ARG IMAGE_VERSION
 ARG MANAGEMENT_VERSION
 ARG PLATFORM_API
+ARG DATA_SCHEMA
 ARG OPENVPN_VERSION
 ARG OPENVPN_SOURCE_SHA256
 ARG EASYRSA_VERSION
@@ -59,6 +60,7 @@ ARG BUILD_DATE=unknown
 RUN test -n "$IMAGE_VERSION" \
     && test -n "$MANAGEMENT_VERSION" \
     && test -n "$PLATFORM_API" \
+    && test -n "$DATA_SCHEMA" \
     && test -n "$OPENVPN_VERSION" \
     && test -n "$OPENVPN_SOURCE_SHA256" \
     && test -n "$EASYRSA_VERSION" \
@@ -94,10 +96,12 @@ RUN openvpn --version >/tmp/openvpn-version \
     && rm /tmp/openvpn-version /tmp/openvpn-ldd
 
 RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/docker-entrypoint \
+       /usr/local/lib/openvpn-bootstrap.sh /usr/local/lib/openvpn-container/cli.sh \
     && mkdir -p /etc/openvpn /usr/local/share/openvpn-container \
     && IMAGE_VERSION="$IMAGE_VERSION" \
        MANAGEMENT_VERSION="$MANAGEMENT_VERSION" \
        PLATFORM_API="$PLATFORM_API" \
+       DATA_SCHEMA="$DATA_SCHEMA" \
        BASE_IMAGE="$BASE_IMAGE" \
        OPENVPN_VERSION="$OPENVPN_VERSION" \
        OPENVPN_SOURCE_SHA256="$OPENVPN_SOURCE_SHA256" \
@@ -109,6 +113,15 @@ RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/docker-entrypoint \
        OVPN_BUILD_DATE="$BUILD_DATE" \
        /usr/local/bin/generate-build-info /usr/local/share/openvpn-container/build-info.json \
     && rm /usr/local/bin/generate-build-info
+
+RUN embedded=/usr/local/share/openvpn-container/embedded-management \
+    && mkdir -p "$embedded/lib" "$embedded/templates" "$embedded/compatibility" \
+    && cp -a /usr/local/lib/openvpn-container/. "$embedded/lib/" \
+    && cp -a /usr/local/share/openvpn-container/templates/. "$embedded/templates/" \
+    && cp -a /usr/local/share/openvpn-container/compatibility/. "$embedded/compatibility/" \
+    && printf 'MANAGEMENT_VERSION=%s\nPLATFORM_API=%s\nDATA_SCHEMA=%s\n' \
+       "$MANAGEMENT_VERSION" "$PLATFORM_API" "$DATA_SCHEMA" >"$embedded/management.env" \
+    && chmod 600 "$embedded/management.env"
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=1 CMD ["/usr/local/bin/ovpn", "runtime", "health"]
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint"]
