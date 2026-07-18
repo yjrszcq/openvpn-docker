@@ -71,9 +71,17 @@ ovpn_migrate_plan() {
       ovpn_migrate_print_plan "$json" "$OVPN_CURRENT_DATA_SCHEMA" "$OVPN_CURRENT_DATA_SCHEMA" none 0 false ''
       ;;
     OLD)
-      if [ "$OVPN_SCHEMA_PROJECT_VERSION" = 1 ] && [ "$OVPN_SCHEMA_FILE_VERSION" = 1 ] && [ "$OVPN_CURRENT_DATA_SCHEMA" = 2 ]; then
+      if [ "$OVPN_SCHEMA_PROJECT_VERSION" = 1 ] && [ "$OVPN_SCHEMA_FILE_VERSION" = 1 ]; then
         ovpn_migrate_load_step 1 2 || return $?
-        ovpn_migrate_print_plan "$json" 1 2 1-to-2 "$(ovpn_migration_1_to_2_client_count)" false ''
+        if [ "$OVPN_CURRENT_DATA_SCHEMA" = 2 ]; then
+          ovpn_migrate_print_plan "$json" 1 2 1-to-2 "$(ovpn_migration_1_to_2_client_count)" false \
+            'deleted tombstones did not exist in schema 1 and cannot be recovered'
+        else
+          ovpn_migrate_print_plan "$json" 1 "$OVPN_CURRENT_DATA_SCHEMA" '1-to-2;2-to-3 unavailable' \
+            "$(ovpn_migration_1_to_2_client_count)" true \
+            'schema 1 deleted tombstones cannot be recovered; no complete migration chain is registered'
+          return 78
+        fi
       else
         ovpn_migrate_print_plan "$json" "${OVPN_SCHEMA_PROJECT_VERSION:-0}" "$OVPN_CURRENT_DATA_SCHEMA" unavailable 0 true 'no registered migration chain'
         return 78

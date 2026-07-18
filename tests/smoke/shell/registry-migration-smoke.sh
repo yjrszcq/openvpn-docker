@@ -53,23 +53,40 @@ status=$?
 set -e
 [ "$status" -eq 78 ]
 grep -Fq '"target_schema":3' "$TMP_DIR/plan.json"
-grep -Fq '"chain":"unavailable"' "$TMP_DIR/plan.json"
+grep -Fq '"chain":"1-to-2;2-to-3 unavailable"' "$TMP_DIR/plan.json"
 grep -Fq '"blocked":true' "$TMP_DIR/plan.json"
+grep -Fq 'deleted tombstones cannot be recovered' "$TMP_DIR/plan.json"
+grep -Fq '"clients":2' "$TMP_DIR/plan.json"
 
 # shellcheck source=/dev/null
 . "$LIB_DIR/migrations/1-to-2.sh"
-ovpn_migration_1_to_2_apply_staged
+MIGRATED_DATA_DIR="$TMP_DIR/staged-v2"
+mkdir -p "$MIGRATED_DATA_DIR"
+cp -a "$OVPN_DATA_DIR/." "$MIGRATED_DATA_DIR/"
+ovpn_migration_1_to_2_apply_staged "$MIGRATED_DATA_DIR"
+ovpn_migration_1_to_2_validate_staged "$MIGRATED_DATA_DIR"
 
-grep -Fqx 'OVPN_CONFIG_VERSION=2' "$OVPN_DATA_DIR/config/project.env"
-grep -Fqx 'OVPN_TOPOLOGY=subnet' "$OVPN_DATA_DIR/config/project.env"
-grep -Fqx 'OVPN_DYNAMIC_POOL_SIZE=126' "$OVPN_DATA_DIR/config/project.env"
-cmp "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
-grep -Fqx '# client,ip' "$OVPN_DATA_DIR/data/client-ip.csv"
-grep -Fqx 'laptop,' "$OVPN_DATA_DIR/data/client-ip.csv"
-grep -Fqx 'phone,' "$OVPN_DATA_DIR/data/client-ip.csv"
-grep -Fqx 'laptop,active' "$OVPN_DATA_DIR/meta/client-state.csv"
-grep -Fqx 'phone,revoked' "$OVPN_DATA_DIR/meta/client-state.csv"
-test ! -s "$OVPN_DATA_DIR/meta/audit.jsonl"
+grep -Fqx 'OVPN_CONFIG_VERSION=1' "$OVPN_DATA_DIR/config/project.env"
+test ! -e "$OVPN_DATA_DIR/data/client-ip.csv"
+grep -Fqx 'OVPN_CONFIG_VERSION=2' "$MIGRATED_DATA_DIR/config/project.env"
+grep -Fqx 'OVPN_TRANSPORT_FAMILY=auto' "$MIGRATED_DATA_DIR/config/project.env"
+grep -Fqx 'OVPN_TOPOLOGY=subnet' "$MIGRATED_DATA_DIR/config/project.env"
+grep -Fqx 'OVPN_DYNAMIC_POOL_SIZE=126' "$MIGRATED_DATA_DIR/config/project.env"
+cmp "$MIGRATED_DATA_DIR/data/client-ip.csv" "$MIGRATED_DATA_DIR/meta/client-ip.applied.csv"
+grep -Fqx '# client,ip' "$MIGRATED_DATA_DIR/data/client-ip.csv"
+grep -Fqx 'laptop,' "$MIGRATED_DATA_DIR/data/client-ip.csv"
+grep -Fqx 'phone,' "$MIGRATED_DATA_DIR/data/client-ip.csv"
+grep -Fqx 'laptop,active' "$MIGRATED_DATA_DIR/meta/client-state.csv"
+grep -Fqx 'phone,revoked' "$MIGRATED_DATA_DIR/meta/client-state.csv"
+test ! -s "$MIGRATED_DATA_DIR/meta/audit.jsonl"
+
+set +e
+OVPN_DATA_DIR="$MIGRATED_DATA_DIR" OVPN_LIB_DIR="$LIB_DIR" "$OVPN" state show \
+  >"$TMP_DIR/intermediate.out" 2>"$TMP_DIR/intermediate.err"
+status=$?
+set -e
+[ "$status" -eq 78 ]
+grep -Fq 'data schema migration required' "$TMP_DIR/intermediate.err"
 
 if (
   export OVPN_DATA_DIR="$TMP_DIR/incomplete-v2"
@@ -98,7 +115,7 @@ OVPN_ROUTES=
 EOF
   # shellcheck source=/dev/null
   . "$LIB_DIR/migrations/1-to-2.sh"
-  ovpn_migration_1_to_2_apply_staged
+  ovpn_migration_1_to_2_apply_staged "$OVPN_DATA_DIR"
 ) >"$TMP_DIR/incomplete-v2.out" 2>"$TMP_DIR/incomplete-v2.err"; then
   echo 'incomplete V2 registry unexpectedly migrated' >&2
   exit 1
