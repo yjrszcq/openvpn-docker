@@ -367,6 +367,11 @@ ovpn_upgrade_rollback() {
   ovpn_upgrade_write_selector_transaction committed "$active" "$old_previous" "$previous" "$active" || return 74
   rm -f "$OVPN_MANAGEMENT_STORE/transactions/activation.env" || return 74
   flock -u "$management_lock_fd"
+  if declare -F ovpn_event_write >/dev/null 2>&1; then
+    ovpn_event_write management_upgrade rollback applied "" "" \
+      "$(jq -cn --arg from "$active" --arg to "$previous" \
+        '{from_version:$from,to_version:$to}')" || true
+  fi
   printf 'management code rolled back to %s\n' "$previous"
 }
 
@@ -477,6 +482,12 @@ ovpn_upgrade_command() {
     rm -rf "$work"
     return "$status"
   }
+  if declare -F ovpn_event_write >/dev/null 2>&1; then
+    ovpn_event_write management_upgrade apply applied "" "" \
+      "$(jq -cn --arg from "$OVPN_UPGRADE_CURRENT_VERSION" \
+        --arg to "$OVPN_UPGRADE_SELECTED_VERSION" \
+        '{from_version:$from,to_version:$to}')" || true
+  fi
   ovpn_upgrade_print_result "$json" applied
   rm -rf "$work"
 }

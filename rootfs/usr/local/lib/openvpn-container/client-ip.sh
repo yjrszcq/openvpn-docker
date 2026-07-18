@@ -281,6 +281,9 @@ ovpn_client_ip_apply_inner() (
       ovpn_client_ip_atomic_install "$backup" "$draft"
       ovpn_client_ip_atomic_install "$backup" "$snapshot"
       ovpn_client_ip_audit_event rejected || true
+      if declare -F ovpn_event_write >/dev/null 2>&1; then
+        ovpn_event_write client_ip apply rejected "" "" || true
+      fi
       ovpn_client_ip_apply_rollback || true
     fi
     rm -f "$backup" "$candidate"
@@ -298,5 +301,8 @@ ovpn_client_ip_apply_inner() (
   ovpn_client_ip_audit_event applied
   ovpn_client_ip_apply_finalize
   transaction_success=true
+  if declare -F ovpn_event_write >/dev/null 2>&1; then
+    ovpn_event_write client_ip apply applied "" "" || true
+  fi
   printf 'client-ip registry applied\n'
 )

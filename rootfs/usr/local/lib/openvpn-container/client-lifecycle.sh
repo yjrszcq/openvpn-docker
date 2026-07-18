@@ -260,6 +260,9 @@ ovpn_client_lifecycle_audit() {
   printf '{"timestamp":"%s","event":"client_lifecycle","operation":"%s","outcome":"%s","client_id":"%s","client_name":"%s","legacy":false}\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$operation" "$outcome" "$id" "$name" >>"$audit_file"
   chmod 600 "$audit_file"
+  if declare -F ovpn_event_write >/dev/null 2>&1; then
+    ovpn_event_write client_lifecycle "$operation" "$outcome" "$id" "$name" || true
+  fi
 }
 
 ovpn_client_rename_rewrite_csv() {
@@ -408,6 +411,10 @@ ovpn_client_rename_inner() (
   ovpn_client_rename_maybe_fail audit
 
   transaction_success=true
+  if declare -F ovpn_event_write >/dev/null 2>&1; then
+    ovpn_event_write client_lifecycle rename applied "$id" "$new_name" \
+      "$(jq -cn --arg old_name "$old_name" '{old_name:$old_name}')" || true
+  fi
   ovpn_log "renamed client '$old_name' to '$new_name' [$id]"
 )
 

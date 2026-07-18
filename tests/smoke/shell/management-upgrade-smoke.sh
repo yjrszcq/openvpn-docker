@@ -147,7 +147,9 @@ printf 'profile sentinel\n' >"$OVPN_DATA_DIR/clients/active/client.ovpn"
 printf 'server sentinel\n' >"$OVPN_DATA_DIR/server/server.conf"
 
 business_state_checksum() {
-  find "$OVPN_DATA_DIR" -path "$OVPN_DATA_DIR/repair/.scripts" -prune -o -type f -print0 |
+  find "$OVPN_DATA_DIR" \
+    \( -path "$OVPN_DATA_DIR/repair/.scripts" -o -path "$OVPN_DATA_DIR/logs" \) -prune \
+    -o -type f -print0 |
     sort -z | xargs -0 sha256sum
 }
 business_checksum="$(business_state_checksum)"
@@ -198,6 +200,12 @@ grep -Fqx 'embedded' "$TMP_DIR/data/repair/.scripts/previous"
 test -f "$TMP_DIR/data/repair/.scripts/releases/2.1.2/management-release.env.sig"
 test ! -e "$TMP_DIR/data/repair/.scripts/releases/1.9.0"
 [ "$(business_state_checksum)" = "$business_checksum" ]
+jq -e -s '
+  any(.[];
+    .event == "management_upgrade" and .operation == "apply" and
+    .outcome == "applied" and .from_version == "2.1.1" and
+    .to_version == "2.1.2")
+' "$OVPN_DATA_DIR/logs/events.jsonl" >/dev/null
 case "$(readlink "$TMP_DIR/runtime/current")" in
 *'/online-2.1.2-'*) ;;
 *)
@@ -231,6 +239,12 @@ grep -Fqx embedded "$TMP_DIR/data/repair/.scripts/active"
 grep -Fqx 2.1.2 "$TMP_DIR/data/repair/.scripts/previous"
 grep -Fq 'rolled back to embedded' "$TMP_DIR/rollback.out"
 [ "$(business_state_checksum)" = "$business_checksum" ]
+jq -e -s '
+  any(.[];
+    .event == "management_upgrade" and .operation == "rollback" and
+    .outcome == "applied" and .from_version == "2.1.2" and
+    .to_version == "embedded")
+' "$OVPN_DATA_DIR/logs/events.jsonl" >/dev/null
 
 exec {test_lock_fd}>"$TMP_DIR/data/repair/.scripts/.management.lock"
 flock -x "$test_lock_fd"

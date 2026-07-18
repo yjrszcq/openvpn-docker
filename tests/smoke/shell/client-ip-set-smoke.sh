@@ -58,6 +58,11 @@ grep -Fq 'set client' "$TMP_DIR/apply.out"
 cmp "$canonical" "$OVPN_DATA_DIR/data/client-ip.csv"
 cmp "$canonical" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 grep -Fq '"outcome":"applied"' "$OVPN_DATA_DIR/meta/audit.jsonl"
+jq -e -s --arg id "$bravo_id" '
+  any(.[]; .event == "client_ip" and .operation == "set" and
+    .outcome == "applied" and .client_id == $id and
+    .client_name == "bravo" and .assignment == "10.88.0.3")
+' "$OVPN_DATA_DIR/logs/events.jsonl" >/dev/null
 grep -Fqx 'ifconfig-push 10.88.0.3 255.255.255.0' "$OVPN_DATA_DIR/ccd/$bravo_id"
 grep -Fqx 'ifconfig-push 10.88.0.4 255.255.255.0' "$OVPN_DATA_DIR/ccd/$alpha_id"
 test ! -e "$OVPN_DATA_DIR/ccd/$zulu_id"
@@ -128,6 +133,10 @@ if OVPN_CLIENT_IP_APPLY_FAIL_AFTER=ccd "$OVPN" client ip set zulu --ip 10.88.0.4
   exit 1
 fi
 grep -Fq 'injected client-ip apply failure after ccd' "$TMP_DIR/derived-failure.out"
+jq -e -s '
+  any(.[]; .event == "client_ip" and .operation == "apply" and
+    .outcome == "rejected" and .client_id == null)
+' "$OVPN_DATA_DIR/logs/events.jsonl" >/dev/null
 cmp "$TMP_DIR/before-failure.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
 cmp "$TMP_DIR/before-failure.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 [ "$ccd_before" = "$(sha256sum "$OVPN_DATA_DIR/ccd/$bravo_id")" ]

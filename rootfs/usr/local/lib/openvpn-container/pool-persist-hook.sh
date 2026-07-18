@@ -9,6 +9,9 @@
 set -euo pipefail
 
 lease_dir="${OVPN_LEASE_DIR:-/etc/openvpn/data/leases}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/usr/local/lib/openvpn-container/events.sh
+. "$SCRIPT_DIR/events.sh"
 
 pool_hook_upsert() {
   local name="$1"
@@ -44,5 +47,29 @@ case "${script_type:-}" in
     # Keep the last-known entry; the file stays.
     ;;
 esac
+
+if [[ "${common_name:-}" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]; then
+  client_name="$(ovpn_event_identity_name "$common_name" || true)"
+  details="$(
+    jq -cn \
+      --arg virtual_ip "${ifconfig_pool_remote_ip:-}" \
+      --arg remote_ip "${trusted_ip:-}" \
+      --arg remote_port "${trusted_port:-}" \
+      --arg bytes_received "${bytes_received:-}" \
+      --arg bytes_sent "${bytes_sent:-}" \
+      --arg duration_seconds "${time_duration:-}" '
+        {
+          virtual_ip: (if $virtual_ip == "" then null else $virtual_ip end),
+          remote_ip: (if $remote_ip == "" then null else $remote_ip end),
+          remote_port: (if $remote_port == "" then null else $remote_port end),
+          bytes_received: (if $bytes_received == "" then null else ($bytes_received | tonumber) end),
+          bytes_sent: (if $bytes_sent == "" then null else ($bytes_sent | tonumber) end),
+          duration_seconds: (if $duration_seconds == "" then null else ($duration_seconds | tonumber) end)
+        }
+      '
+  )" || details='{}'
+  ovpn_event_write client_connection \
+    "${script_type#client-}" applied "$common_name" "$client_name" "$details" || true
+fi
 
 exit 0

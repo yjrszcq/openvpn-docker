@@ -59,6 +59,20 @@ ovpn_network_migration_audit_event() {
   printf '{"timestamp":"%s","event":"network_migration","outcome":"%s","client_id":null,"client_name":null,"legacy":false}\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$outcome" >>"$audit_file"
   chmod 600 "$audit_file"
+  if declare -F ovpn_event_write >/dev/null 2>&1; then
+    ovpn_event_write network_migration apply "$outcome" '' '' \
+      "$(jq -cn \
+        --arg from_network "${OVPN_NETWORK_MIGRATION_OLD_NETWORK:-}" \
+        --arg to_network "${OVPN_NETWORK_MIGRATION_TARGET_NETWORK:-}" \
+        --arg from_dynamic_pool "${OVPN_NETWORK_MIGRATION_OLD_POOL:-}" \
+        --arg to_dynamic_pool "${OVPN_NETWORK_MIGRATION_TARGET_POOL:-}" \
+        '{
+          from_network:$from_network,
+          to_network:$to_network,
+          from_dynamic_pool:($from_dynamic_pool | tonumber),
+          to_dynamic_pool:($to_dynamic_pool | tonumber)
+        }')" || true
+  fi
 }
 
 

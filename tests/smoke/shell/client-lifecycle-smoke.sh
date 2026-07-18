@@ -275,6 +275,11 @@ grep -Fqx "# ovpn-client-id: $rename_id" "$OVPN_DATA_DIR/clients/active/target.o
 grep -Fqx '# ovpn-client-name: target' "$OVPN_DATA_DIR/clients/active/target.ovpn"
 [ "$rename_identity_before" = "$(sha256sum "$OVPN_DATA_DIR/pki/issued/$rename_id.crt" "$OVPN_DATA_DIR/pki/private/$rename_id.key")" ]
 grep -Fq "\"event\":\"client_rename\",\"outcome\":\"applied\",\"client_id\":\"$rename_id\",\"client_name\":\"target\",\"old_name\":\"source\",\"legacy\":false" "$OVPN_DATA_DIR/meta/audit.jsonl"
+jq -e -s --arg id "$rename_id" '
+  any(.[]; .event == "client_lifecycle" and .operation == "rename" and
+    .outcome == "applied" and .client_id == $id and
+    .client_name == "target" and .old_name == "source")
+' "$OVPN_DATA_DIR/logs/events.jsonl" >/dev/null
 [ "$("$OVPN" state show)" = HEALTHY ]
 
 if "$OVPN" client rename target laptop >"$TMP_DIR/rename-conflict.out" 2>"$TMP_DIR/rename-conflict.err"; then
@@ -283,6 +288,9 @@ if "$OVPN" client rename target laptop >"$TMP_DIR/rename-conflict.out" 2>"$TMP_D
 fi
 grep -Fq 'client name already exists: laptop' "$TMP_DIR/rename-conflict.err"
 rename_before_failure="$(repair_snapshot)"
+rename_events_before_failure="$(jq -s --arg id "$rename_id" \
+  '[.[] | select(.event == "client_lifecycle" and .operation == "rename" and .client_id == $id)] | length' \
+  "$OVPN_DATA_DIR/logs/events.jsonl")"
 if OVPN_CLIENT_RENAME_FAIL_AFTER=registries "$OVPN" client rename target broken >"$TMP_DIR/rename-failure.out" 2>"$TMP_DIR/rename-failure.err"; then
   echo 'injected client rename failure unexpectedly succeeded' >&2
   exit 1
@@ -292,6 +300,9 @@ fi
   exit 1
 }
 test ! -e "$OVPN_DATA_DIR/clients/active/broken.ovpn"
+[ "$(jq -s --arg id "$rename_id" \
+  '[.[] | select(.event == "client_lifecycle" and .operation == "rename" and .client_id == $id)] | length' \
+  "$OVPN_DATA_DIR/logs/events.jsonl")" = "$rename_events_before_failure" ]
 if compgen -G "$OVPN_DATA_DIR/meta/.client-rename.*" >/dev/null; then
   echo 'failed client rename left a staging directory' >&2
   exit 1

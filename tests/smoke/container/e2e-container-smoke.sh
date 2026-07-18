@@ -268,6 +268,22 @@ wait_for_runtime_log() {
   exit 1
 }
 
+wait_for_runtime_event() {
+  local container_name="$1"
+  local expression="$2"
+  local output_path="$3"
+  local deadline=$((SECONDS + WAIT_SECONDS))
+
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    docker exec "$container_name" ovpn runtime events --lines 300 --json >"$output_path"
+    jq -e -s "$expression" "$output_path" >/dev/null && return 0
+    sleep 1
+  done
+  cat "$output_path" >&2
+  echo "persistent runtime event did not match: $expression" >&2
+  exit 1
+}
+
 run_client_until_timeout() {
   local network_name="$1"
   local profile_path="$2"
@@ -414,6 +430,9 @@ for proto in udp tcp; do
   assert_client_connects "$network_name" "$profile_path" "$WORK_DIR/client-$proto-active.log"
   wait_for_runtime_log "$server_name" "client-$proto [$client_id]" \
     "$WORK_DIR/runtime-$proto.log"
+  wait_for_runtime_event "$server_name" \
+    "any(.[]; .event == \"client_connection\" and .operation == \"connect\" and .client_id == \"$client_id\" and .client_name == \"client-$proto\")" \
+    "$WORK_DIR/events-$proto.jsonl"
   docker exec "$server_name" ovpn runtime logs --lines 300 --raw \
     >"$WORK_DIR/runtime-$proto-raw.log"
   grep -Fq "$client_id" "$WORK_DIR/runtime-$proto-raw.log"
@@ -449,6 +468,9 @@ for proto in udp tcp; do
       <(docker exec "$server_name" ovpn client list --detail)
     wait_for_runtime_log "$server_name" "renamed-udp [$client_id]" \
       "$WORK_DIR/runtime-renamed-udp.log"
+    wait_for_runtime_event "$server_name" \
+      "any(.[]; .event == \"client_lifecycle\" and .operation == \"rename\" and .client_id == \"$client_id\" and .client_name == \"renamed-udp\" and .old_name == \"client-udp\")" \
+      "$WORK_DIR/events-renamed-udp.jsonl"
     docker rm -f "$rename_client" >/dev/null
   fi
 
@@ -468,11 +490,17 @@ for proto in udp tcp; do
     docker exec "$update_client" ip -4 address show dev tun0 | grep -Fq 'inet '
     docker exec "$server_name" ovpn client list --detail >"$WORK_DIR/client-list-after-upgrade"
     grep -E "^${client_display}[[:space:]]+[0-9a-f-]{36}[[:space:]]+active.*online$" "$WORK_DIR/client-list-after-upgrade"
+    wait_for_runtime_event "$server_name" \
+      'any(.[]; .event == "management_upgrade" and .operation == "apply" and .from_version == "2.1.1" and .to_version == "2.1.2")' \
+      "$WORK_DIR/events-upgrade.jsonl"
 
     docker exec "$server_name" ovpn upgrade --rollback --yes >"$WORK_DIR/rollback.out"
     [ "$(docker exec "$server_name" ovpn -v)" = 2.1.1 ]
     [ "$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')" = "$openvpn_pid" ]
     docker ps --format '{{.Names}}' | grep -Fqx "$update_client"
+    wait_for_runtime_event "$server_name" \
+      'any(.[]; .event == "management_upgrade" and .operation == "rollback" and .from_version == "2.1.2" and .to_version == "embedded")' \
+      "$WORK_DIR/events-rollback.jsonl"
     docker rm -f "$update_client" >/dev/null
   fi
 

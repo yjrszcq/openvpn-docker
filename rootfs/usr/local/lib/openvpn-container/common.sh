@@ -145,6 +145,7 @@ Commands:
   capabilities      print runtime capability information
   version           print build information
   logs              read or follow persistent OpenVPN logs
+  events            read or follow structured runtime events
 EOF
 }
 
@@ -257,7 +258,7 @@ ovpn_runtime_command() {
     ovpn_runtime_usage
     return 0
   fi
-  [ -n "$subcommand" ] || ovpn_die "usage: ovpn runtime <status|health|capabilities|version|logs>"
+  [ -n "$subcommand" ] || ovpn_die "usage: ovpn runtime <status|health|capabilities|version|logs|events>"
   shift
   case "$subcommand" in
     status)
@@ -298,6 +299,13 @@ ovpn_runtime_command() {
         --log-file "${OVPN_RAW_LOG_FILE:-$OVPN_DATA_DIR/logs/openvpn.log}" \
         --registry "$(ovpn_registry_client_state_file)"
       ;;
-    *) ovpn_die "usage: ovpn runtime <status|health|capabilities|version|logs>" ;;
+    events)
+      command -v "${OVPN_PYTHON_BIN:-python3}" >/dev/null 2>&1 ||
+        ovpn_die "python3 is required to read runtime events"
+      "${OVPN_PYTHON_BIN:-python3}" "$LIB_DIR/runtime-events.py" \
+        "$@" \
+        --event-file "${OVPN_EVENTS_FILE:-$OVPN_DATA_DIR/logs/events.jsonl}"
+      ;;
+    *) ovpn_die "usage: ovpn runtime <status|health|capabilities|version|logs|events>" ;;
   esac
 }

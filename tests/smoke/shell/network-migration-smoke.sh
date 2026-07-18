@@ -107,6 +107,12 @@ test -z "$(ls -A "$OVPN_LEASE_DIR" 2>/dev/null)"
 grep -q '^server 10.89.0.0 255.255.255.0 nopool$' "$OVPN_DATA_DIR/server/server.conf"
 grep -Fq 'signal SIGHUP' "$OVPN_TEST_SOCAT_LOG"
 grep -Fq '"event":"network_migration","outcome":"applied"' "$OVPN_DATA_DIR/meta/audit.jsonl"
+jq -e -s '
+  any(.[]; .event == "network_migration" and .operation == "apply" and
+    .outcome == "applied" and .from_network == "10.88.0.0/24" and
+    .to_network == "10.89.0.0/24" and .from_dynamic_pool == 126 and
+    .to_dynamic_pool == 100)
+' "$OVPN_DATA_DIR/logs/events.jsonl" >/dev/null
 
 if OVPN_NETWORK_MIGRATION_FAIL_HEALTH=true "$OVPN" network apply --network 10.90.0.0/24 --yes >"$TMP_DIR/fail.out" 2>"$TMP_DIR/fail.err"; then
   echo 'failed network migration unexpectedly succeeded' >&2
@@ -116,6 +122,11 @@ grep -Fq 'network migration rollback completed; OpenVPN is healthy' "$TMP_DIR/fa
 grep -Fqx 'OVPN_NETWORK=10.89.0.0/24' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx '11111111-1111-4111-8111-111111111111,alpha,10.89.0.20' "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fq '"event":"network_migration","outcome":"rejected"' "$OVPN_DATA_DIR/meta/audit.jsonl"
+jq -e -s '
+  any(.[]; .event == "network_migration" and .operation == "apply" and
+    .outcome == "rejected" and .from_network == "10.89.0.0/24" and
+    .to_network == "10.90.0.0/24")
+' "$OVPN_DATA_DIR/logs/events.jsonl" >/dev/null
 
 kill "$SOCKET_LISTENER_PID" >/dev/null 2>&1 || true
 wait "$SOCKET_LISTENER_PID" 2>/dev/null || true

@@ -106,6 +106,22 @@ ovpn_client_ip_apply_current_mutation() {
   ovpn_client_ip_apply_inner
 }
 
+ovpn_client_ip_event_assignments() {
+  local name id index assignment
+
+  declare -F ovpn_event_write >/dev/null 2>&1 || return 0
+  ovpn_registry_load_identities "$(ovpn_registry_client_state_file)" || return 1
+  for name in "$@"; do
+    id="${OVPN_REGISTRY_CURRENT_ID_BY_NAME[$name]:-}"
+    [ -n "$id" ] || continue
+    index="$(ovpn_client_ip_assignment_index "$name")" || continue
+    assignment="${OVPN_CLIENT_IP_VALUES[index]}"
+    ovpn_event_write client_ip set applied "$id" "$name" \
+      "$(jq -cn --arg assignment "$assignment" \
+        '{assignment:(if $assignment == "" then "dynamic" else $assignment end)}')" || true
+  done
+}
+
 ovpn_client_registry_set_state() {
   local name="$1"
   local state="$2"
@@ -191,6 +207,11 @@ ovpn_client_create_inner() {
     ovpn_die "failed to apply client creation for '$name'; the certificate was revoked"
   fi
   ovpn_render_client "$name" --output "$OVPN_DATA_DIR/clients/active/$name.ovpn"
+  if declare -F ovpn_event_write >/dev/null 2>&1; then
+    ovpn_event_write client_lifecycle create applied "$id" "$name" \
+      "$(jq -cn --arg assignment "${assignment:-}" \
+        '{assignment:(if $assignment == "" then "dynamic" else $assignment end)}')" || true
+  fi
   ovpn_log "added client '$name'"
 }
 
@@ -334,6 +355,7 @@ ovpn_client_set_single_inner() {
       [ "$OVPN_IPAM_DYNAMIC_POOL_SIZE" -gt 0 ] || ovpn_die 'cannot set a client to dynamic: dynamic pool capacity is 0; enlarge the dynamic pool first'
       ovpn_client_ip_set_current_assignment "$name" ''
       ovpn_client_ip_apply_current_mutation
+      ovpn_client_ip_event_assignments "$name"
       ovpn_log "set client '$name' to dynamic assignment"
       ;;
     static)
@@ -347,6 +369,7 @@ ovpn_client_set_single_inner() {
       fi
       ovpn_client_ip_set_current_assignment "$name" "$address"
       ovpn_client_ip_apply_current_mutation
+      ovpn_client_ip_event_assignments "$name"
       ovpn_log "set client '$name' to static assignment"
       ;;
     *) ovpn_die "unsupported client assignment mode: $mode" ;;
@@ -365,6 +388,7 @@ ovpn_client_set_from_editor_inner() {
   fi
   ovpn_client_set_from_editor
   ovpn_client_ip_apply_current_mutation
+  ovpn_client_ip_event_assignments "${OVPN_CLIENT_MUTATION_TARGETS[@]}"
   ovpn_log 'applied client IP assignments from editor'
 }
 
