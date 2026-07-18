@@ -365,7 +365,7 @@ assert_critical_recovery "$conflicting_identity_data" CLIENT_IDENTITY_RECOVERY_C
 
 audit_identity_data="$TMP_DIR/audit-identity"
 make_fixture "$audit_identity_data"
-printf '{"timestamp":"2026-07-18T00:00:00Z","operation":"rename","result":"applied","client_id":"%s","old_name":"laptop","new_name":"workstation"}\n' \
+printf '{"timestamp":"2026-07-18T00:00:00Z","event":"client_rename","outcome":"applied","client_id":"%s","client_name":"workstation","old_name":"laptop","legacy":false}\n' \
   "$CLIENT_ID" >"$audit_identity_data/meta/audit.jsonl"
 chmod 600 "$audit_identity_data/meta/audit.jsonl"
 rm "$audit_identity_data/meta/client-state.csv" \

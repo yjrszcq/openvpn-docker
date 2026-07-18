@@ -249,7 +249,7 @@ ovpn_recovery_collect_profile_names() {
 
 ovpn_recovery_collect_audit_names() {
   local audit_file line id name
-  local regex='^\{"timestamp":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z","operation":"rename","result":"applied","client_id":"([0-9a-f-]{36})","old_name":"[A-Za-z0-9._-]+","new_name":"([A-Za-z0-9._-]+)"\}$'
+  local regex='^\{"timestamp":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z","event":"client_rename","outcome":"applied","client_id":"([0-9a-f-]{36})","client_name":"([A-Za-z0-9._-]+)","old_name":"[A-Za-z0-9._-]+","legacy":false\}$'
   local -A latest=()
 
   audit_file="$(ovpn_registry_audit_file)"

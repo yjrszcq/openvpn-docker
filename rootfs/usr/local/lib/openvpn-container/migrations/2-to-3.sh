@@ -228,6 +228,43 @@ ovpn_migration_2_to_3_assign_ids() {
   done
 }
 
+ovpn_migration_2_to_3_convert_audit() {
+  local data_dir="$1"
+  local audit_file="$data_dir/meta/audit.jsonl"
+  local converted="$audit_file.tmp"
+  local line line_number=0 timestamp event outcome operation
+  local timestamp_pattern='([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)'
+  local global_regex lifecycle_regex
+
+  [ -r "$audit_file" ] || ovpn_die "missing schema 2 audit log: $audit_file"
+  global_regex="^\\{\"timestamp\":\"${timestamp_pattern}\",\"event\":\"(client_ip_apply|network_migration)\",\"outcome\":\"(applied|rejected)\"\\}$"
+  lifecycle_regex="^\\{\"timestamp\":\"${timestamp_pattern}\",\"operation\":\"(revoke|reissue|delete|release_ip)\",\"result\":\"(applied|rejected|failed)\"\\}$"
+  : >"$converted"
+  while IFS= read -r line || [ -n "$line" ]; do
+    line_number=$((line_number + 1))
+    if [[ "$line" =~ $global_regex ]]; then
+      timestamp="${BASH_REMATCH[1]}"
+      event="${BASH_REMATCH[2]}"
+      outcome="${BASH_REMATCH[3]}"
+      printf '{"timestamp":"%s","event":"%s","outcome":"%s","client_id":null,"client_name":null,"legacy":true,"source_schema":2}\n' \
+        "$timestamp" "$event" "$outcome" >>"$converted"
+      continue
+    fi
+    if [[ "$line" =~ $lifecycle_regex ]]; then
+      timestamp="${BASH_REMATCH[1]}"
+      operation="${BASH_REMATCH[2]}"
+      outcome="${BASH_REMATCH[3]}"
+      printf '{"timestamp":"%s","event":"client_lifecycle","operation":"%s","outcome":"%s","client_id":null,"client_name":null,"legacy":true,"source_schema":2}\n' \
+        "$timestamp" "$operation" "$outcome" >>"$converted"
+      continue
+    fi
+    rm -f "$converted"
+    ovpn_die "unsupported schema 2 audit record at line $line_number"
+  done <"$audit_file"
+  mv "$converted" "$audit_file"
+  chmod 600 "$audit_file"
+}
+
 ovpn_migration_2_to_3_write_registries() {
   local data_dir="$1"
   local name id state
@@ -359,6 +396,7 @@ ovpn_migration_2_to_3_apply_staged() (
 
   ovpn_migration_2_to_3_load "$data_dir"
   ovpn_migration_2_to_3_assign_ids
+  ovpn_migration_2_to_3_convert_audit "$data_dir"
   ovpn_migration_2_to_3_write_registries "$data_dir"
   ovpn_migration_2_to_3_write_config "$data_dir"
   ovpn_migration_2_to_3_reissue_pki "$data_dir"
@@ -386,6 +424,8 @@ ovpn_migration_2_to_3_validate_staged() (
     ovpn_die 'migrated schema 3 client IP draft is invalid'
   ovpn_client_ip_validate_file "$data_dir/meta/client-ip.applied.csv" ||
     ovpn_die 'migrated schema 3 applied client IP registry is invalid'
+  ovpn_state_ipam_audit_is_valid "$data_dir/meta/audit.jsonl" ||
+    ovpn_die 'migrated schema 3 audit log is invalid'
   index="$data_dir/pki/index.txt"
   while IFS= read -r line || [ -n "$line" ]; do
     status="${line%%$'\t'*}"

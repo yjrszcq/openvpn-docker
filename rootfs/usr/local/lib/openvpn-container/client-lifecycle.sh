@@ -251,12 +251,14 @@ ovpn_pki_reissue_supported() {
 
 ovpn_client_lifecycle_audit() {
   local operation="$1"
-  local result="$2"
+  local outcome="$2"
+  local id="$3"
+  local name="$4"
   local audit_file
 
   audit_file="$(ovpn_registry_audit_file)"
-  printf '{"timestamp":"%s","operation":"%s","result":"%s"}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$operation" "$result" >>"$audit_file"
+  printf '{"timestamp":"%s","event":"client_lifecycle","operation":"%s","outcome":"%s","client_id":"%s","client_name":"%s","legacy":false}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$operation" "$outcome" "$id" "$name" >>"$audit_file"
   chmod 600 "$audit_file"
 }
 
@@ -310,8 +312,8 @@ ovpn_client_rename_audit() {
   local audit_file
 
   audit_file="$(ovpn_registry_audit_file)"
-  printf '{"timestamp":"%s","operation":"rename","result":"applied","client_id":"%s","old_name":"%s","new_name":"%s"}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$id" "$old_name" "$new_name" >>"$audit_file"
+  printf '{"timestamp":"%s","event":"client_rename","outcome":"applied","client_id":"%s","client_name":"%s","old_name":"%s","legacy":false}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$id" "$new_name" "$old_name" >>"$audit_file"
   chmod 600 "$audit_file"
 }
 
@@ -449,7 +451,7 @@ ovpn_client_revoke_inner() {
   index="$(ovpn_client_ip_assignment_index "$name")" || ovpn_die "client '$name' is missing from the in-memory registry"
   assignment="${OVPN_CLIENT_IP_VALUES[index]}"
   if ! ovpn_pki_try_revoke_client "$id"; then
-    ovpn_client_lifecycle_audit revoke failed || true
+    ovpn_client_lifecycle_audit revoke failed "$id" "$name" || true
     ovpn_die 'failed to revoke client certificate; no assignment changes were applied'
   fi
   ovpn_client_lifecycle_move_profile_to_revoked "$name"
@@ -461,7 +463,7 @@ ovpn_client_revoke_inner() {
     [ -n "$assignment" ] || ovpn_client_ip_clear_dynamic_lease "$id"
     ovpn_client_lifecycle_kick "$id"
   fi
-  ovpn_client_lifecycle_audit revoke applied || true
+  ovpn_client_lifecycle_audit revoke applied "$id" "$name" || true
   ovpn_log "revoked client '$name'"
 }
 
@@ -481,11 +483,12 @@ ovpn_client_revoke_command() {
 
 ovpn_client_release_ip_inner() {
   local reference="$1"
-  local name status index assignment
+  local name status index assignment id
 
   ovpn_require_healthy_state
   ovpn_client_ip_prepare_mutation
   ovpn_client_resolve_ref_or_die "$reference"
+  id="$OVPN_CLIENT_RESOLVED_ID"
   name="$OVPN_CLIENT_RESOLVED_NAME"
   status="${OVPN_CLIENT_IP_PKI_STATES[$name]:-}"
   [ "$status" = revoked ] || ovpn_die "client $name is not revoked"
@@ -494,10 +497,10 @@ ovpn_client_release_ip_inner() {
   [ -n "$assignment" ] || ovpn_die "client $name does not have a static IP reservation"
   ovpn_client_ip_set_current_assignment "$name" ""
   if ! ovpn_client_ip_apply_current_mutation; then
-    ovpn_client_lifecycle_audit release_ip failed || true
+    ovpn_client_lifecycle_audit release_ip failed "$id" "$name" || true
     ovpn_die "failed to release the client IP; the registry was restored"
   fi
-  ovpn_client_lifecycle_audit release_ip applied || true
+  ovpn_client_lifecycle_audit release_ip applied "$id" "$name" || true
   ovpn_log "released static IP for revoked client $name"
 }
 
@@ -542,13 +545,13 @@ ovpn_client_reissue_inner() {
   esac
 
   if ! ovpn_pki_reissue_supported "$id" "$status"; then
-    ovpn_client_lifecycle_audit reissue rejected || true
+    ovpn_client_lifecycle_audit reissue rejected "$id" "$name" || true
     ovpn_die 'the current Easy-RSA runtime does not support same-CN reissue; no PKI index changes were made'
   fi
 
   if [ "$status" = active ]; then
     if ! ovpn_pki_try_revoke_client "$id"; then
-      ovpn_client_lifecycle_audit reissue failed || true
+      ovpn_client_lifecycle_audit reissue failed "$id" "$name" || true
       ovpn_die 'failed to revoke the active certificate before reissue'
     fi
     ovpn_client_lifecycle_move_profile_to_revoked "$name"
@@ -556,7 +559,7 @@ ovpn_client_reissue_inner() {
   fi
   if ! ovpn_pki_try_issue_client "$id"; then
     ovpn_client_registry_set_state "$name" revoked
-    ovpn_client_lifecycle_audit reissue failed || true
+    ovpn_client_lifecycle_audit reissue failed "$id" "$name" || true
     ovpn_die 'client reissue failed; the previous certificate remains revoked and the IP assignment was retained'
   fi
   ovpn_client_registry_set_state "$name" active
@@ -580,7 +583,7 @@ ovpn_client_reissue_inner() {
 
   ovpn_render_client "$name" --output "$OVPN_DATA_DIR/clients/active/$name.ovpn"
   ovpn_client_lifecycle_kick "$id"
-  ovpn_client_lifecycle_audit reissue applied || true
+  ovpn_client_lifecycle_audit reissue applied "$id" "$name" || true
   ovpn_log "reissued client '$name'"
 }
 
@@ -645,7 +648,7 @@ ovpn_client_delete_inner() {
   index="$(ovpn_client_ip_assignment_index "$name")" || ovpn_die "client '$name' is missing from the in-memory registry"
   if [ "$status" = active ]; then
     if ! ovpn_pki_try_revoke_client "$id"; then
-      ovpn_client_lifecycle_audit delete failed || true
+      ovpn_client_lifecycle_audit delete failed "$id" "$name" || true
       ovpn_die 'failed to revoke the active certificate before deletion'
     fi
     ovpn_client_lifecycle_move_profile_to_revoked "$name"
@@ -662,13 +665,13 @@ ovpn_client_delete_inner() {
     else
       ovpn_log "CRITICAL: failed to restore client state file; backup preserved at $state_backup"
     fi
-    ovpn_client_lifecycle_audit delete failed || true
+    ovpn_client_lifecycle_audit delete failed "$id" "$name" || true
     ovpn_die 'failed to remove the client assignment; the registry was restored'
   fi
   rm -f "$state_backup"
   rm -f "$OVPN_DATA_DIR/clients/active/$name.ovpn" "$OVPN_DATA_DIR/clients/revoked/$name.ovpn"
   rm -f "$OVPN_DATA_DIR/pki/private/$id.key" "$OVPN_DATA_DIR/pki/issued/$id.crt" "$OVPN_DATA_DIR/pki/reqs/$id.req"
-  ovpn_client_lifecycle_audit delete applied || true
+  ovpn_client_lifecycle_audit delete applied "$id" "$name" || true
   ovpn_log "deleted client '$name'"
 }
 

@@ -75,7 +75,8 @@ docker run --rm \
     printf "# client,state\nalpha,active\nbeta,revoked\n" >/etc/openvpn/meta/client-state.csv
     printf "# client,ip\nalpha,10.91.0.2\nbeta,\n" >/etc/openvpn/data/client-ip.csv
     cp /etc/openvpn/data/client-ip.csv /etc/openvpn/meta/client-ip.applied.csv
-    : >/etc/openvpn/meta/audit.jsonl
+    printf '"'"'{"timestamp":"2026-01-01T00:00:00Z","operation":"revoke","result":"applied"}\n'"'"' \
+      >/etc/openvpn/meta/audit.jsonl
     openvpn --genkey secret /etc/openvpn/secrets/tls-crypt.key
     printf "old alpha profile\n" >/etc/openvpn/clients/active/alpha.ovpn
     printf "old beta profile\n" >/etc/openvpn/clients/revoked/beta.ovpn
@@ -117,6 +118,8 @@ docker run --rm \
   "$IMAGE" -ec '
     grep -Fqx "$ALPHA_ID,alpha,10.91.0.2" /etc/openvpn/data/client-ip.csv
     grep -Fqx "$BETA_ID,beta," /etc/openvpn/data/client-ip.csv
+    grep -Fqx '"'"'{"timestamp":"2026-01-01T00:00:00Z","event":"client_lifecycle","operation":"revoke","outcome":"applied","client_id":null,"client_name":null,"legacy":true,"source_schema":2}'"'"' \
+      /etc/openvpn/meta/audit.jsonl
     grep -Fqx "# ovpn-client-id: $ALPHA_ID" /etc/openvpn/clients/active/alpha.ovpn
     grep -Fqx "# ovpn-client-id: $BETA_ID" /etc/openvpn/clients/revoked/beta.ovpn
     awk "/<cert>/{capture=1;next} /<\\/cert>/{capture=0} capture" \

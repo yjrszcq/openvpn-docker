@@ -56,7 +56,7 @@ ovpn_network_migration_audit_event() {
   local audit_file
 
   audit_file="$(ovpn_registry_audit_file)"
-  printf '{"timestamp":"%s","event":"network_migration","outcome":"%s"}\n' \
+  printf '{"timestamp":"%s","event":"network_migration","outcome":"%s","client_id":null,"client_name":null,"legacy":false}\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$outcome" >>"$audit_file"
   chmod 600 "$audit_file"
 }

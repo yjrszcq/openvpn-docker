@@ -274,7 +274,7 @@ test ! -e "$OVPN_DATA_DIR/clients/active/source.ovpn"
 grep -Fqx "# ovpn-client-id: $rename_id" "$OVPN_DATA_DIR/clients/active/target.ovpn"
 grep -Fqx '# ovpn-client-name: target' "$OVPN_DATA_DIR/clients/active/target.ovpn"
 [ "$rename_identity_before" = "$(sha256sum "$OVPN_DATA_DIR/pki/issued/$rename_id.crt" "$OVPN_DATA_DIR/pki/private/$rename_id.key")" ]
-grep -Fq "\"client_id\":\"$rename_id\",\"old_name\":\"source\",\"new_name\":\"target\"" "$OVPN_DATA_DIR/meta/audit.jsonl"
+grep -Fq "\"event\":\"client_rename\",\"outcome\":\"applied\",\"client_id\":\"$rename_id\",\"client_name\":\"target\",\"old_name\":\"source\",\"legacy\":false" "$OVPN_DATA_DIR/meta/audit.jsonl"
 [ "$("$OVPN" state show)" = HEALTHY ]
 
 if "$OVPN" client rename target laptop >"$TMP_DIR/rename-conflict.out" 2>"$TMP_DIR/rename-conflict.err"; then
@@ -468,6 +468,7 @@ fi
 grep -Fq "is not revoked" "$TMP_DIR/active-release-ip.err"
 
 "$OVPN" client revoke "$laptop_id" >"$TMP_DIR/revoke.out" 2>"$TMP_DIR/revoke.err"
+grep -Fq "\"event\":\"client_lifecycle\",\"operation\":\"revoke\",\"outcome\":\"applied\",\"client_id\":\"$laptop_id\",\"client_name\":\"laptop\",\"legacy\":false" "$OVPN_DATA_DIR/meta/audit.jsonl"
 grep -E "^laptop[[:space:]]+${laptop_id}[[:space:]]+revoked$" <("$OVPN" client list)
 grep -Fqx "$laptop_id,laptop,10.88.0.2" "$OVPN_DATA_DIR/data/client-ip.csv"
 test -f "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
@@ -480,6 +481,7 @@ test ! -e "$OVPN_DATA_DIR/ccd/$laptop_id"
 test -f "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
 test -f "$OVPN_DATA_DIR/pki/private/$laptop_id.key"
 grep -Fq release_ip "$OVPN_DATA_DIR/meta/audit.jsonl"
+grep -Fq "\"event\":\"client_lifecycle\",\"operation\":\"release_ip\",\"outcome\":\"applied\",\"client_id\":\"$laptop_id\",\"client_name\":\"laptop\",\"legacy\":false" "$OVPN_DATA_DIR/meta/audit.jsonl"
 if "$OVPN" client ip release laptop >"$TMP_DIR/repeated-release-ip.out" 2>"$TMP_DIR/repeated-release-ip.err"; then
   echo "repeated client IP release unexpectedly succeeded" >&2
   exit 1

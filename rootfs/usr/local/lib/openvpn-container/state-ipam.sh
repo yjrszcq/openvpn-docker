@@ -59,17 +59,21 @@ ovpn_state_ipam_deleted_client_has_active_certificate() {
 
 ovpn_state_ipam_audit_is_valid() {
   local audit_file="$1"
-  local line timestamp regex
+  local line timestamp uuid name regex
   timestamp='[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z'
+  uuid='[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
+  name='[A-Za-z0-9][A-Za-z0-9._-]{0,63}'
 
   while IFS= read -r line || [ -n "$line" ]; do
-    regex="^\\{\"timestamp\":\"${timestamp}\",\"event\":\"client_ip_apply\",\"outcome\":\"(applied|rejected)\"\\}$"
+    regex="^\\{\"timestamp\":\"${timestamp}\",\"event\":\"(client_ip_apply|network_migration)\",\"outcome\":\"(applied|rejected)\",\"client_id\":null,\"client_name\":null,\"legacy\":false\\}$"
     [[ "$line" =~ $regex ]] && continue
-    regex="^\\{\"timestamp\":\"${timestamp}\",\"event\":\"network_migration\",\"outcome\":\"(applied|rejected)\"\\}$"
+    regex="^\\{\"timestamp\":\"${timestamp}\",\"event\":\"(client_ip_apply|network_migration)\",\"outcome\":\"(applied|rejected)\",\"client_id\":null,\"client_name\":null,\"legacy\":true,\"source_schema\":2\\}$"
     [[ "$line" =~ $regex ]] && continue
-    regex="^\\{\"timestamp\":\"${timestamp}\",\"operation\":\"(revoke|reissue|delete|release_ip)\",\"result\":\"(applied|rejected|failed)\"\\}$"
+    regex="^\\{\"timestamp\":\"${timestamp}\",\"event\":\"client_lifecycle\",\"operation\":\"(revoke|reissue|delete|release_ip)\",\"outcome\":\"(applied|rejected|failed)\",\"client_id\":\"${uuid}\",\"client_name\":\"${name}\",\"legacy\":false\\}$"
     [[ "$line" =~ $regex ]] && continue
-    regex="^\\{\"timestamp\":\"${timestamp}\",\"operation\":\"rename\",\"result\":\"applied\",\"client_id\":\"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\",\"old_name\":\"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\",\"new_name\":\"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\"\\}$"
+    regex="^\\{\"timestamp\":\"${timestamp}\",\"event\":\"client_lifecycle\",\"operation\":\"(revoke|reissue|delete|release_ip)\",\"outcome\":\"(applied|rejected|failed)\",\"client_id\":null,\"client_name\":null,\"legacy\":true,\"source_schema\":2\\}$"
+    [[ "$line" =~ $regex ]] && continue
+    regex="^\\{\"timestamp\":\"${timestamp}\",\"event\":\"client_rename\",\"outcome\":\"applied\",\"client_id\":\"${uuid}\",\"client_name\":\"${name}\",\"old_name\":\"${name}\",\"legacy\":false\\}$"
     [[ "$line" =~ $regex ]] && continue
     return 1
   done <"$audit_file"

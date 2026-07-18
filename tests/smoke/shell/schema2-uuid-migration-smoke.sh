@@ -124,7 +124,14 @@ cat >"$OVPN_DATA_DIR/meta/client-ip.applied.csv" <<'APPLIED'
 alpha,10.88.0.3
 beta,
 APPLIED
-: >"$OVPN_DATA_DIR/meta/audit.jsonl"
+cat >"$OVPN_DATA_DIR/meta/audit.jsonl" <<'AUDIT'
+{"timestamp":"2026-01-01T00:00:00Z","event":"client_ip_apply","outcome":"applied"}
+{"timestamp":"2026-01-02T00:00:00Z","event":"network_migration","outcome":"rejected"}
+{"timestamp":"2026-01-03T00:00:00Z","operation":"revoke","result":"applied"}
+{"timestamp":"2026-01-04T00:00:00Z","operation":"reissue","result":"rejected"}
+{"timestamp":"2026-01-05T00:00:00Z","operation":"delete","result":"failed"}
+{"timestamp":"2026-01-06T00:00:00Z","operation":"release_ip","result":"applied"}
+AUDIT
 cat >"$OVPN_DATA_DIR/pki/index.txt" <<'INDEX'
 V	30000101000000Z		01	unknown	/CN=openvpn-server
 V	30000101000000Z		02	unknown	/CN=alpha
@@ -157,6 +164,21 @@ grep -Fq '"chain":"2-to-3"' "$TMP_DIR/plan.json"
 grep -Fq '"clients":3' "$TMP_DIR/plan.json"
 grep -Fq '"blocked":false' "$TMP_DIR/plan.json"
 grep -Fq 'must be redistributed' "$TMP_DIR/plan.json"
+
+cp "$OVPN_DATA_DIR/meta/audit.jsonl" "$TMP_DIR/valid-schema2-audit.jsonl"
+printf '{"timestamp":"2026-01-07T00:00:00Z","event":"unknown","outcome":"applied"}\n' \
+  >>"$OVPN_DATA_DIR/meta/audit.jsonl"
+invalid_audit_before="$(sha256sum "$OVPN_DATA_DIR/meta/audit.jsonl")"
+set +e
+"$OVPN" migrate apply --yes >"$TMP_DIR/invalid-audit.out" 2>"$TMP_DIR/invalid-audit.err"
+status=$?
+set -e
+[ "$status" -eq 1 ]
+grep -Fq 'unsupported schema 2 audit record at line 7' "$TMP_DIR/invalid-audit.err"
+[ "$invalid_audit_before" = "$(sha256sum "$OVPN_DATA_DIR/meta/audit.jsonl")" ]
+grep -Fqx '2' "$OVPN_DATA_DIR/config/schema-version"
+mv "$TMP_DIR/valid-schema2-audit.jsonl" "$OVPN_DATA_DIR/meta/audit.jsonl"
+chmod 600 "$OVPN_DATA_DIR/meta/audit.jsonl"
 
 set +e
 "$OVPN" migrate apply >"$TMP_DIR/confirm.out" 2>"$TMP_DIR/confirm.err"
@@ -225,7 +247,22 @@ test ! -e "$OVPN_DATA_DIR/ccd/alpha"
 grep -Fqx '10.88.0.200' "$OVPN_DATA_DIR/data/leases/$alpha_id"
 test ! -e "$OVPN_DATA_DIR/data/leases/alpha"
 grep -Fqx 'trusted management bundle' "$OVPN_DATA_DIR/repair/.scripts/sentinel"
-grep -Fq '"result":"success"' "$OVPN_DATA_DIR"/repair/migrations/reports/*.json
+grep -Fqx '{"timestamp":"2026-01-01T00:00:00Z","event":"client_ip_apply","outcome":"applied","client_id":null,"client_name":null,"legacy":true,"source_schema":2}' "$OVPN_DATA_DIR/meta/audit.jsonl"
+grep -Fqx '{"timestamp":"2026-01-02T00:00:00Z","event":"network_migration","outcome":"rejected","client_id":null,"client_name":null,"legacy":true,"source_schema":2}' "$OVPN_DATA_DIR/meta/audit.jsonl"
+grep -Fqx '{"timestamp":"2026-01-03T00:00:00Z","event":"client_lifecycle","operation":"revoke","outcome":"applied","client_id":null,"client_name":null,"legacy":true,"source_schema":2}' "$OVPN_DATA_DIR/meta/audit.jsonl"
+grep -Fqx '{"timestamp":"2026-01-04T00:00:00Z","event":"client_lifecycle","operation":"reissue","outcome":"rejected","client_id":null,"client_name":null,"legacy":true,"source_schema":2}' "$OVPN_DATA_DIR/meta/audit.jsonl"
+grep -Fqx '{"timestamp":"2026-01-05T00:00:00Z","event":"client_lifecycle","operation":"delete","outcome":"failed","client_id":null,"client_name":null,"legacy":true,"source_schema":2}' "$OVPN_DATA_DIR/meta/audit.jsonl"
+grep -Fqx '{"timestamp":"2026-01-06T00:00:00Z","event":"client_lifecycle","operation":"release_ip","outcome":"applied","client_id":null,"client_name":null,"legacy":true,"source_schema":2}' "$OVPN_DATA_DIR/meta/audit.jsonl"
+if grep -Eq '"result":|,"legacy":false' "$OVPN_DATA_DIR/meta/audit.jsonl"; then
+  exit 1
+fi
+success_report="$(grep -l '"result":"success"' "$OVPN_DATA_DIR"/repair/migrations/reports/*.json)"
+snapshot="$(sed -n 's/.*"snapshot":"\([^"]*\)".*/\1/p' "$success_report")"
+tar -xOzf "$snapshot" meta/audit.jsonl >"$TMP_DIR/snapshot-audit.jsonl"
+grep -Fqx '{"timestamp":"2026-01-03T00:00:00Z","operation":"revoke","result":"applied"}' "$TMP_DIR/snapshot-audit.jsonl"
+if grep -Fq '"legacy":true' "$TMP_DIR/snapshot-audit.jsonl"; then
+  exit 1
+fi
 grep -Fq 'redistribute profile:' "$TMP_DIR/apply.out"
 
 "$OVPN" migrate apply --yes
