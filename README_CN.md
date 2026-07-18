@@ -105,6 +105,7 @@ docker compose logs -f openvpn
 | `OVPN_CRITICAL_MODE` | `exit` | `exit` | 仅在需要保留关键状态容器进行排障时使用 `maintenance`。 |
 | `OVPN_EDITOR` | `EDITOR`，否则 `nano` | 未设置 | 交互式 client-IP 操作使用的编辑器。 |
 | `OVPN_GITHUB_TOKEN` | 未设置 | 未设置 | 管理 Release 检查和下载使用的可选只读 GitHub token；遵循标准代理变量。 |
+| `HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY`、`NO_PROXY` | 继承/空 | 空 | 在线管理更新使用的标准出站代理变量。Compose 会将它们传给两个服务；host 网络使 `http://127.0.0.1:7890` 这类宿主机代理可达。 |
 
 运行时默认值只在环境未提供相应值时生效。快速开始值是
 `docker-compose.yaml` 与 `.env.example` 中有意选择的值，并不是另一套

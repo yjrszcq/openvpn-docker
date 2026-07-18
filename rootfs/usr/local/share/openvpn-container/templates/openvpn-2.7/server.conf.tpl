@@ -8,8 +8,8 @@ server {{OVPN_NETWORK_ADDRESS}} {{OVPN_NETWORK_NETMASK}} nopool
 {{OVPN_DYNAMIC_POOL_DIRECTIVE}}
 client-config-dir {{OVPN_CCD_DIR}}
 script-security 2
-client-connect /usr/local/lib/openvpn-container/pool-persist-hook.sh
-client-disconnect /usr/local/lib/openvpn-container/pool-persist-hook.sh
+client-connect "/usr/local/bin/ovpn-hook pool-persist"
+client-disconnect "/usr/local/bin/ovpn-hook pool-persist"
 management {{OVPN_MANAGEMENT_SOCKET}} unix
 management-client-user root
 

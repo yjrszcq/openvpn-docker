@@ -28,6 +28,12 @@ persisted under `/etc/openvpn/repair/.scripts`; executable runtime copies are
 hydrated separately. Drafts, prereleases, downgrades, unsigned assets, and
 incompatible releases are rejected.
 
+Image-owned CLI and hook launchers resolve the active bundle at each invocation.
+Switching the active selector therefore affects new management commands and hook
+events without signaling, reloading, or replacing the OpenVPN process. Standard
+HTTP proxy variables and an optional read-only GitHub token are the only network
+configuration consumed by the updater.
+
 ## Migration and image updates
 
 A schema-changing target is installed only by `ovpn migrate` in the stopped

@@ -97,7 +97,7 @@ RUN openvpn --version >/tmp/openvpn-version \
     && ! grep -Fq 'not found' /tmp/openvpn-ldd \
     && rm /tmp/openvpn-version /tmp/openvpn-ldd
 
-RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/docker-entrypoint \
+RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/ovpn-hook /usr/local/bin/docker-entrypoint \
        /usr/local/lib/openvpn-bootstrap.sh /usr/local/lib/openvpn-verify-management-release.sh \
        /usr/local/lib/openvpn-container/cli.sh \
     && mkdir -p /etc/openvpn /usr/local/share/openvpn-container \

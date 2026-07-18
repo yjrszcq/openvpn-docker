@@ -113,6 +113,7 @@ bootstrap environment variables do not rewrite an existing instance.
 | `OVPN_CRITICAL_MODE` | `exit` | `exit` | Use `maintenance` only to hold a critical container for inspection. |
 | `OVPN_EDITOR` | `EDITOR`, otherwise `nano` | unset | Editor used by interactive client-IP workflows. |
 | `OVPN_GITHUB_TOKEN` | unset | unset | Optional read-only GitHub token for management-release checks and downloads. Standard proxy variables are honored. |
+| `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` | inherited/empty | empty | Standard outbound proxy controls used by online management updates. Compose passes them to both services; host networking makes a host proxy such as `http://127.0.0.1:7890` reachable. |
 
 Runtime defaults apply only when the environment omits a value. The quick-start
 values are the deliberately opinionated values in

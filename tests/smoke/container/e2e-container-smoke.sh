@@ -9,6 +9,8 @@ CONNECT_TIMEOUT="${OVPN_E2E_CONNECT_TIMEOUT:-20s}"
 WAIT_SECONDS="${OVPN_E2E_WAIT_SECONDS:-30}"
 REQUIRED="${OVPN_E2E_REQUIRED:-0}"
 SKIP_BUILD="${OVPN_E2E_SKIP_BUILD:-0}"
+UPGRADE_REQUIRED="${OVPN_E2E_UPGRADE_REQUIRED:-0}"
+UPGRADE_SIGNING_KEY="${OVPN_E2E_MANAGEMENT_SIGNING_KEY:-}"
 RUN_ID="ovpn-e2e-$$-$(date +%s)"
 CONTROL_RUNTIME_DIR="/tmp/openvpn-container-$RUN_ID"
 POLICY_NAT=true
@@ -18,6 +20,7 @@ POLICY_CLIENT_TO_CLIENT=false
 POLICY_DNS=''
 POLICY_ROUTES=''
 transport_family=auto
+UPDATE_FIXTURES=''
 
 containers=()
 networks=()
@@ -61,11 +64,43 @@ if [ ! -c /dev/net/tun ]; then
   skip_or_fail "host /dev/net/tun is not available"
 fi
 
-if [ "$SKIP_BUILD" != 1 ]; then
-  "$ROOT_DIR/scripts/docker-build.sh" -t "$IMAGE" "$ROOT_DIR"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ovpn-e2e.XXXXXX")"
+
+if [ -z "$UPGRADE_SIGNING_KEY" ] && [ "$SKIP_BUILD" != 1 ]; then
+  UPGRADE_SIGNING_KEY="$WORK_DIR/management-signing-key.pem"
+  openssl genpkey -algorithm ED25519 -out "$UPGRADE_SIGNING_KEY" >/dev/null 2>&1
 fi
 
-WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ovpn-e2e.XXXXXX")"
+if [ "$SKIP_BUILD" != 1 ]; then
+  build_arguments=()
+  if [ -n "$UPGRADE_SIGNING_KEY" ]; then
+    public_key="$WORK_DIR/management-signing-public.pem"
+    openssl pkey -in "$UPGRADE_SIGNING_KEY" -pubout -out "$public_key" >/dev/null 2>&1
+    public_key_b64="$(base64 -w 0 "$public_key")"
+    build_arguments+=(--build-arg "MANAGEMENT_SIGNING_PUBLIC_KEY_B64=$public_key_b64")
+  fi
+  "$ROOT_DIR/scripts/docker-build.sh" "${build_arguments[@]}" -t "$IMAGE" "$ROOT_DIR"
+fi
+
+if [ -n "$UPGRADE_SIGNING_KEY" ]; then
+  UPDATE_FIXTURES="$WORK_DIR/update-fixtures"
+  mkdir -p "$UPDATE_FIXTURES/2.1.2"
+  "$ROOT_DIR/tests/helpers/create-management-release-fixture.sh" \
+    --output-dir "$UPDATE_FIXTURES/2.1.2" \
+    --signing-key "$UPGRADE_SIGNING_KEY" \
+    --version 2.1.2
+  cp "$ROOT_DIR/tests/helpers/fake-release-curl.sh" "$UPDATE_FIXTURES/fake-release-curl"
+  chmod +x "$UPDATE_FIXTURES/fake-release-curl"
+  jq -n ' [{
+    tag_name:"v2.1.2", draft:false, prerelease:false, assets:[
+      {name:"management-release.env",browser_download_url:"file:///update-fixtures/2.1.2/management-release.env"},
+      {name:"management-release.env.sig",browser_download_url:"file:///update-fixtures/2.1.2/management-release.env.sig"},
+      {name:"management-bundle.tar.gz",browser_download_url:"file:///update-fixtures/2.1.2/management-bundle.tar.gz"}
+    ]
+  }] ' >"$UPDATE_FIXTURES/releases.json"
+elif [ "$UPGRADE_REQUIRED" = 1 ]; then
+  skip_or_fail 'online-update E2E requires OVPN_E2E_MANAGEMENT_SIGNING_KEY for the prebuilt image'
+fi
 
 run_control() {
   local data_dir="$1"
@@ -145,6 +180,16 @@ start_server() {
   local network_name="$4"
 
   docker rm -f "$server_name" >/dev/null 2>&1 || true
+  local -a update_arguments=()
+  if [ -n "$UPDATE_FIXTURES" ]; then
+    update_arguments+=(
+      -e OVPN_CURL_BIN=/update-fixtures/fake-release-curl
+      -e OVPN_GITHUB_API_URL=mock://repository
+      -e UPGRADE_FIXTURES=/update-fixtures
+      -v "$UPDATE_FIXTURES:/update-fixtures:ro"
+    )
+  fi
+
   docker run -d \
     --name "$server_name" \
     --network "$network_name" \
@@ -161,9 +206,26 @@ start_server() {
     -e "OVPN_CLIENT_TO_CLIENT=$POLICY_CLIENT_TO_CLIENT" \
     -e "OVPN_DNS=$POLICY_DNS" \
     -e "OVPN_ROUTES=$POLICY_ROUTES" \
+    "${update_arguments[@]}" \
     -v "$data_dir:/etc/openvpn" \
     "$IMAGE" \
     ovpn start >/dev/null
+}
+
+start_persistent_client() {
+  local network_name="$1"
+  local profile_path="$2"
+  local client_name="$3"
+
+  docker run -d \
+    --name "$client_name" \
+    --network "$network_name" \
+    --cap-add NET_ADMIN \
+    --device /dev/net/tun:/dev/net/tun \
+    -v "$profile_path:/client.ovpn:ro" \
+    --entrypoint /usr/local/sbin/openvpn \
+    "$IMAGE" \
+    --config /client.ovpn --auth-nocache >/dev/null
 }
 
 wait_for_log() {
@@ -322,13 +384,37 @@ for proto in udp tcp; do
   run_control "$data_dir" "$endpoint" ovpn client export "client-$proto" >"$profile_path"
   grep -q "^remote $endpoint $PORT$" "$profile_path"
   grep -q "^proto $proto$" "$profile_path"
-  grep -E "^client-$proto[[:space:]]+active$" <(run_control "$data_dir" "$endpoint" ovpn client list)
+  grep -E "^client-${proto}[[:space:]]+active$" <(run_control "$data_dir" "$endpoint" ovpn client list)
 
   assert_client_connects "$network_name" "$profile_path" "$WORK_DIR/client-$proto-active.log"
 
+  if [ "$proto" = udp ] && [ -n "$UPDATE_FIXTURES" ]; then
+    update_client="$RUN_ID-upgrade-client"
+    containers+=("$update_client")
+    start_persistent_client "$network_name" "$profile_path" "$update_client"
+    wait_for_log "$update_client" 'Initialization Sequence Completed' "$WORK_DIR/client-upgrade-active.log"
+    openvpn_pid="$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')"
+    docker exec "$server_name" ovpn client list --detail >"$WORK_DIR/client-list-before-upgrade"
+    grep -E '^client-udp[[:space:]]+active.*online$' "$WORK_DIR/client-list-before-upgrade"
+
+    docker exec "$server_name" ovpn upgrade --yes >"$WORK_DIR/upgrade.out"
+    [ "$(docker exec "$server_name" ovpn -v)" = 2.1.2 ]
+    [ "$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')" = "$openvpn_pid" ]
+    docker ps --format '{{.Names}}' | grep -Fqx "$update_client"
+    docker exec "$update_client" ip -4 address show dev tun0 | grep -Fq 'inet '
+    docker exec "$server_name" ovpn client list --detail >"$WORK_DIR/client-list-after-upgrade"
+    grep -E '^client-udp[[:space:]]+active.*online$' "$WORK_DIR/client-list-after-upgrade"
+
+    docker exec "$server_name" ovpn upgrade --rollback --yes >"$WORK_DIR/rollback.out"
+    [ "$(docker exec "$server_name" ovpn -v)" = 2.1.1 ]
+    [ "$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')" = "$openvpn_pid" ]
+    docker ps --format '{{.Names}}' | grep -Fqx "$update_client"
+    docker rm -f "$update_client" >/dev/null
+  fi
+
   docker rm -f "$server_name" >/dev/null
   run_control "$data_dir" "$endpoint" ovpn client revoke "client-$proto"
-  grep -E "^client-$proto[[:space:]]+revoked$" <(run_control "$data_dir" "$endpoint" ovpn client list)
+  grep -E "^client-${proto}[[:space:]]+revoked$" <(run_control "$data_dir" "$endpoint" ovpn client list)
 
   start_server "$data_dir" "$endpoint" "$server_name" "$network_name"
   wait_for_log "$server_name" 'Initialization Sequence Completed' "$WORK_DIR/server-$proto-revoked-start.log"

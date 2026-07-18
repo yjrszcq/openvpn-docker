@@ -32,13 +32,24 @@ services:
       OVPN_DNS: ${OVPN_DNS:-}
       OVPN_ROUTES: ${OVPN_ROUTES:-}
       OVPN_CRITICAL_MODE: ${OVPN_CRITICAL_MODE:-exit}
+      OVPN_GITHUB_TOKEN: ${OVPN_GITHUB_TOKEN:-}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      ALL_PROXY: ${ALL_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-}
 
   openvpn-maintenance:
     image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
     restart: "no"
+    network_mode: host
 
     environment:
       OVPN_MAINTENANCE: "true"
+      OVPN_GITHUB_TOKEN: ${OVPN_GITHUB_TOKEN:-}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      ALL_PROXY: ${ALL_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-}
 
     <<: *openvpn-data
 

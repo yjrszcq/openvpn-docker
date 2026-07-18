@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BOOTSTRAP="${OVPN_BOOTSTRAP_LIB:-/usr/local/lib/openvpn-bootstrap.sh}"
+[ "$#" -ge 1 ] || exit 64
+hook="$1"
+shift
+
+case "$hook" in
+pool-persist) relative_target='lib/pool-persist-hook.sh' ;;
+*)
+  printf 'ovpn hook: unknown hook %s\n' "$hook" >&2
+  exit 64
+  ;;
+esac
+
+# shellcheck source=/usr/local/lib/openvpn-bootstrap.sh
+. "$BOOTSTRAP"
+ovpn_bootstrap_select_management || exit $?
+target="$OVPN_BOOTSTRAP_SELECTED_ROOT/$relative_target"
+[ -x "$target" ] || {
+  printf 'ovpn hook: active management bundle does not provide %s\n' "$hook" >&2
+  exit 78
+}
+exec "$target" "$@"

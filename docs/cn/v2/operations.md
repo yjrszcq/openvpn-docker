@@ -32,8 +32,13 @@ docker compose run --rm openvpn-maintenance <command>
   openvpn-maintenance:
     image: szcq/openvpn:2.7.5
     restart: "no"
+    network_mode: host
     volumes:
       - ./openvpn-data:/etc/openvpn
+    environment:
+      OVPN_MAINTENANCE: "true"
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-}
     profiles:
       - maintenance
     command:
@@ -42,7 +47,8 @@ docker compose run --rm openvpn-maintenance <command>
       - /usr/local/bin/ovpn
 ```
 
-它挂载同一份持久化数据，但不申请 TUN、`NET_ADMIN` 或公开端口。
+它挂载同一份持久化数据，但不申请 TUN、`NET_ADMIN` 或公开端口。host 网络也允许
+标准代理变量直接使用宿主机代理，包括 `http://127.0.0.1:7890`。
 
 ---
 

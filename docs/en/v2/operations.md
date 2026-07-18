@@ -33,8 +33,13 @@ If your compose file does not include the maintenance service, add it under
   openvpn-maintenance:
     image: szcq/openvpn:2.7.5
     restart: "no"
+    network_mode: host
     volumes:
       - ./openvpn-data:/etc/openvpn
+    environment:
+      OVPN_MAINTENANCE: "true"
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-}
     profiles:
       - maintenance
     command:
@@ -44,7 +49,8 @@ If your compose file does not include the maintenance service, add it under
 ```
 
 It mounts the same persistent data but does not request TUN, `NET_ADMIN`, or
-exposed ports.
+exposed ports. Host networking lets standard proxy variables refer to a proxy
+on the Docker host, including `http://127.0.0.1:7890`.
 
 ---
 

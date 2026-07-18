@@ -464,6 +464,11 @@ active management bundle. It preserves active and previous assets under
 `repair/.scripts`, does not reload OpenVPN, and requires `--yes` outside a TTY.
 `--rollback` swaps to the retained compatible previous bundle or embedded
 fallback. Standard proxy variables and optional `OVPN_GITHUB_TOKEN` are honored.
+The supplied Compose file passes these values to both live and maintenance
+services; because both use host networking, `http://127.0.0.1:7890` addresses a
+proxy on the Docker host. Stable image-owned CLI and hook launchers resolve the
+active bundle per invocation, so later commands and connection hooks change
+versions without signaling OpenVPN.
 Exit status `64` reports invalid arguments or missing non-interactive
 confirmation, `69` reports GitHub/download unavailability, `74` reports
 verification or installation failure, and `78` reports an incompatible target

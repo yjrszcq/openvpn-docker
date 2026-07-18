@@ -359,6 +359,10 @@ maintenance 中的 `ovpn migrate` 处理。
 `repair/.scripts`，不会重载 OpenVPN；非 TTY 必须提供 `--yes`。`--rollback` 切换到
 仍兼容的 previous bundle 或镜像内 embedded fallback。下载遵循标准代理变量，并支持
 可选的 `OVPN_GITHUB_TOKEN`。
+项目提供的 Compose 会把这些变量传给在线和 maintenance 服务；两者均使用 host 网络，
+因此 `http://127.0.0.1:7890` 指向 Docker 宿主机代理。镜像内稳定的 CLI 和 hook
+launcher 每次调用时解析 active bundle，后续命令与连接 hook 可直接切换版本，而不会
+向 OpenVPN 发送信号。
 退出状态 `64` 表示参数或非交互确认错误，`69` 表示 GitHub/API/下载不可用，`74`
 表示验证或安装事务失败，`78` 表示目标或回滚版本不兼容；成功及目标已是当前版本时
 返回 `0`。

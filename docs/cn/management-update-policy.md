@@ -22,6 +22,11 @@ Release 资产解包前必须通过镜像内置公钥签名和 SHA-256 校验。
 active/previous 指针持久化在 `/etc/openvpn/repair/.scripts`，实际执行副本另行还原。
 draft、prerelease、降级、未签名资产及不兼容版本必须拒绝。
 
+镜像内置的 CLI 与 hook launcher 在每次调用时解析 active bundle。因此切换 active
+指针后，新管理命令和后续 hook 事件立即使用新代码，无需向 OpenVPN 进程发送信号、
+重载配置或替换进程。更新器的网络配置只使用标准 HTTP 代理变量和可选的只读 GitHub
+token。
+
 ## 数据迁移与镜像更新
 
 改变 schema 的目标只能在停止服务后，通过 `openvpn-maintenance` 中的

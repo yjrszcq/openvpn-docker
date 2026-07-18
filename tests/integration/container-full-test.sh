@@ -112,7 +112,7 @@ check $? "render client static01"
 ovpn render server --stdout >$OUT 2>&1
 check $? "render server --stdout"
 grep -q "server 10.213.0.0" $OUT; check $? "rendered conf has server"
-grep -q "pool-persist-hook.sh" $OUT; check $? "rendered conf has hook"
+grep -q 'client-connect "/usr/local/bin/ovpn-hook pool-persist"' $OUT; check $? "rendered conf has hook"
 check_not_out $OUT "ifconfig-pool-persist" "rendered conf has NO ifconfig-pool-persist"
 
 # ============================================================
@@ -259,24 +259,24 @@ mkdir -p "$LEASE_DIR"
 
 # simulate client connect
 script_type=client-connect common_name=dynamic01 ifconfig_pool_remote_ip=10.213.0.200 \
-  /usr/local/lib/openvpn-container/pool-persist-hook.sh
+  /usr/local/bin/ovpn-hook pool-persist
 check $? "hook client-connect dynamic01"
 [ -f "$LEASE_DIR/dynamic01" ]; check $? "lease file exists"
 [ "$(cat "$LEASE_DIR/dynamic01")" = "10.213.0.200" ]; check $? "lease file content correct"
 
 # reconnect with new IP
 script_type=client-connect common_name=dynamic01 ifconfig_pool_remote_ip=10.213.0.201 \
-  /usr/local/lib/openvpn-container/pool-persist-hook.sh
+  /usr/local/bin/ovpn-hook pool-persist
 [ "$(cat "$LEASE_DIR/dynamic01")" = "10.213.0.201" ]; check $? "lease updated on reconnect"
 
 # another client gets recycled IP
 script_type=client-connect common_name=dynamic02 ifconfig_pool_remote_ip=10.213.0.200 \
-  /usr/local/lib/openvpn-container/pool-persist-hook.sh
+  /usr/local/bin/ovpn-hook pool-persist
 [ -f "$LEASE_DIR/dynamic02" ]; check $? "recycled IP attributed to new client"
 
 # disconnect is no-op
 script_type=client-disconnect common_name=dynamic01 \
-  /usr/local/lib/openvpn-container/pool-persist-hook.sh
+  /usr/local/bin/ovpn-hook pool-persist
 [ -f "$LEASE_DIR/dynamic01" ]; check $? "lease preserved after disconnect"
 
 # verify no duplicate IP files
