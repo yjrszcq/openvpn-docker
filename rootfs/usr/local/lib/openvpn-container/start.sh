@@ -11,7 +11,7 @@ ovpn_auto_init_if_empty() {
   ovpn_with_data_lock init ovpn_auto_init_if_empty_inner
 }
 
-ovpn_start_command() {
+ovpn_start_inner() {
   local state openvpn_bin config_path critical_mode
 
   critical_mode="$(ovpn_critical_mode)"
@@ -51,4 +51,8 @@ ovpn_start_command() {
   ovpn_runtime_write_state HEALTHY running false
   ovpn_log "starting OpenVPN with $config_path"
   exec "$openvpn_bin" --config "$config_path"
+}
+
+ovpn_start_command() {
+  ovpn_with_runtime_shared_lock ovpn_start_inner "$@"
 }

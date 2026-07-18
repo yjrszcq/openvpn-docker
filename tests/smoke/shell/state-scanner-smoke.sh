@@ -22,7 +22,7 @@ fi
 
 export OVPN_DATA_DIR="$TMP_DIR/ignored"
 mkdir -p "$OVPN_DATA_DIR"
-touch "$OVPN_DATA_DIR/lost+found" "$OVPN_DATA_DIR/.DS_Store"
+touch "$OVPN_DATA_DIR/lost+found" "$OVPN_DATA_DIR/.DS_Store" "$OVPN_DATA_DIR/.ovpn-runtime.lock"
 if [ "$("$OVPN" state show)" != EMPTY ]; then
   echo 'whitelisted data directory entries should remain EMPTY' >&2
   exit 1

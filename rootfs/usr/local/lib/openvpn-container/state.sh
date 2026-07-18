@@ -8,7 +8,7 @@ OVPN_STATE_CLIENT_REGISTRY_RECOVERY_PENDING=false
 
 ovpn_empty_dir_entry_is_ignored() {
   case "$1" in
-    lost+found|.DS_Store|.ovpn-init.lock|.ovpn-data.lock)
+    lost+found|.DS_Store|.ovpn-init.lock|.ovpn-data.lock|.ovpn-runtime.lock)
       return 0
       ;;
     *)

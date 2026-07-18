@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 OVPN_MIGRATION_DIR="${OVPN_MIGRATION_DIR:-$LIB_DIR/migrations}"
+# shellcheck source=/usr/local/lib/openvpn-container/migration-transaction.sh
+. "$LIB_DIR/migration-transaction.sh"
 
 ovpn_migrate_usage() {
   cat <<'EOF'
@@ -119,7 +121,7 @@ ovpn_migrate_command() {
       ovpn_schema_probe
       [ "$OVPN_SCHEMA_STATUS" = CURRENT ] && return 0
       [ "$yes" = true ] || ovpn_die 'migrate apply requires --yes when transaction support is enabled'
-      ovpn_log 'migrate apply is blocked until the offline transaction engine is enabled'
+      ovpn_log "migrate apply is blocked until a complete migration chain to schema $OVPN_CURRENT_DATA_SCHEMA is registered"
       return 78
       ;;
     *) ovpn_die 'usage: ovpn migrate <plan|apply>' ;;

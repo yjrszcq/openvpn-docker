@@ -166,7 +166,7 @@ CRL_CONFIG
 
 snapshot_data_dir() (
   cd "$1"
-  find . -type f ! -name .ovpn-data.lock -printf '%P\n' | LC_ALL=C sort | while IFS= read -r path; do
+  find . -type f ! -name .ovpn-data.lock ! -name .ovpn-runtime.lock -printf '%P\n' | LC_ALL=C sort | while IFS= read -r path; do
     [ -n "$path" ] || continue
     printf '%s %s ' "$(stat -c '%a' "$path")" "$path"
     sha256sum "$path"
