@@ -162,6 +162,10 @@ Persistent compatibility follows the version-independent
 maintenance-only migration and release requirements remain in force across
 command-documentation versions.
 
+Management code, images, OpenVPN, and data schemas follow the independent
+[management code update policy](docs/en/management-update-policy.md). Online
+management updates never replace the OpenVPN kernel or migrate persistent data.
+
 - [v1 command reference](docs/en/v1/commands.md) — release commit `6619921e5257e604f5df2c63d2fa10505b680d84`.
   - [v1 operations guide](docs/en/v1/operations.md) — workflow-oriented command combinations.
 - [v2 command reference](docs/en/v2/commands.md) — the current CLI.

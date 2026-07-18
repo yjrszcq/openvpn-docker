@@ -80,13 +80,15 @@ ovpn -v
 ovpn --version
 ```
 
-`-v` prints only the image version (e.g. `2.1.1`). `--version` prints a
-three-line summary with image, OpenVPN, and Easy-RSA versions:
+`-v` prints only the active management-code version (e.g. `2.1.1`).
+`--version` prints a four-line summary with management, image, OpenVPN, and
+Easy-RSA versions:
 
 ```text
-image:     2.1.1
-openvpn:   2.7.5
-easy-rsa:  3.2.2
+management:   2.1.1
+image:        2.1.1
+openvpn:      2.7.5
+easy-rsa:     3.2.2
 ```
 
 Use `ovpn runtime version` for the complete build-information JSON.

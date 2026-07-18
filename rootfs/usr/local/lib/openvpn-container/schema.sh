@@ -132,7 +132,8 @@ ovpn_schema_command_uses_data() {
     case "$argument" in -h|--help) return 1 ;; esac
   done
   case "$command" in
-    help|-h|--help|-v|--version|upgrade) return 1 ;;
+    help|-h|--help|-v|--version|migrate) return 1 ;;
+    upgrade) return 0 ;;
     runtime)
       case "${1:-}" in
         version|capabilities) return 1 ;;
@@ -164,7 +165,7 @@ ovpn_schema_gate_command() {
       return 78
       ;;
     OLD)
-      ovpn_log "data schema upgrade required; run 'docker compose run --rm openvpn-maintenance upgrade plan'"
+      ovpn_log "data schema migration required; run 'docker compose run --rm openvpn-maintenance migrate plan'"
       return 78
       ;;
     NEWER)

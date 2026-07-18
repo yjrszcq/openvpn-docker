@@ -23,6 +23,8 @@ json_string() {
 
 for name in \
   IMAGE_VERSION \
+  MANAGEMENT_VERSION \
+  PLATFORM_API \
   BASE_IMAGE \
   OPENVPN_VERSION \
   OPENVPN_SOURCE_SHA256 \
@@ -30,6 +32,15 @@ for name in \
   OPENVPN_SUPPORTED_RANGE; do
   require_value "$name"
 done
+
+if ! [[ "$MANAGEMENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+  printf 'MANAGEMENT_VERSION must use SemVer form\n' >&2
+  exit 64
+fi
+if ! [[ "$PLATFORM_API" =~ ^[1-9][0-9]*$ ]]; then
+  printf 'PLATFORM_API must be a positive integer\n' >&2
+  exit 64
+fi
 
 runtime_strategy="${OVPN_RUNTIME_STRATEGY:-unknown}"
 runtime_openvpn_version="${OVPN_RUNTIME_OPENVPN_VERSION:-unknown}"
@@ -40,6 +51,9 @@ mkdir -p "$(dirname "$output_path")"
 {
   printf '{\n'
   printf '  "image_version": %s,\n' "$(json_string "$IMAGE_VERSION")"
+  printf '  "management_version": %s,\n' "$(json_string "$MANAGEMENT_VERSION")"
+  printf '  "management_source": "embedded",\n'
+  printf '  "platform_api": %s,\n' "$PLATFORM_API"
   printf '  "runtime_strategy": %s,\n' "$(json_string "$runtime_strategy")"
   printf '  "openvpn_version": %s,\n' "$(json_string "$runtime_openvpn_version")"
   printf '  "openvpn_source_version": %s,\n' "$(json_string "$OPENVPN_VERSION")"

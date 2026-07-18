@@ -2,6 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+set -a
+# shellcheck source=../../../versions.env
+. "$ROOT_DIR/versions.env"
+set +a
 TMP_DIR="$(mktemp -d)"
 FAKE_BIN="$TMP_DIR/bin"
 ARGS_FILE="$TMP_DIR/docker-args"
@@ -31,6 +35,12 @@ assert_proxy_args() {
   grep -Fxq "no_proxy=$no_proxy" "$ARGS_FILE"
 }
 
+assert_version_args() {
+  grep -Fxq "IMAGE_VERSION=$IMAGE_VERSION" "$ARGS_FILE"
+  grep -Fxq "MANAGEMENT_VERSION=$MANAGEMENT_VERSION" "$ARGS_FILE"
+  grep -Fxq "PLATFORM_API=$PLATFORM_API" "$ARGS_FILE"
+}
+
 PATH="$FAKE_BIN:$PATH" \
 OVPN_TEST_DOCKER_ARGS="$ARGS_FILE" \
 HTTP_PROXY=http://standard-http.example:8080 \
@@ -38,6 +48,7 @@ HTTPS_PROXY=http://standard-https.example:8443 \
 NO_PROXY=localhost,127.0.0.1 \
 "$ROOT_DIR/scripts/docker-build.sh" -t test/openvpn:wrapper "$ROOT_DIR"
 assert_proxy_args http://standard-http.example:8080 http://standard-https.example:8443 localhost,127.0.0.1
+assert_version_args
 
 PATH="$FAKE_BIN:$PATH" \
 OVPN_TEST_DOCKER_ARGS="$ARGS_FILE" \

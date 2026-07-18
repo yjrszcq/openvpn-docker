@@ -10,6 +10,8 @@ set +a
 
 for name in \
   IMAGE_VERSION \
+  MANAGEMENT_VERSION \
+  PLATFORM_API \
   BASE_IMAGE \
   OPENVPN_VERSION \
   OPENVPN_SOURCE_SHA256 \
@@ -56,6 +58,8 @@ exec docker build \
   --build-arg "no_proxy=$build_no_proxy" \
   --build-arg "BASE_IMAGE=$BASE_IMAGE" \
   --build-arg "IMAGE_VERSION=$IMAGE_VERSION" \
+  --build-arg "MANAGEMENT_VERSION=$MANAGEMENT_VERSION" \
+  --build-arg "PLATFORM_API=$PLATFORM_API" \
   --build-arg "OPENVPN_VERSION=$OPENVPN_VERSION" \
   --build-arg "OPENVPN_SOURCE_SHA256=$OPENVPN_SOURCE_SHA256" \
   --build-arg "EASYRSA_VERSION=$EASYRSA_VERSION" \

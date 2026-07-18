@@ -74,12 +74,14 @@ ovpn -v
 ovpn --version
 ```
 
-`-v` 仅打印镜像版本号（如 `2.1.1`）。`--version` 打印三行摘要，包含镜像、OpenVPN 和 Easy-RSA 版本：
+`-v` 仅打印当前管理代码版本（如 `2.1.1`）。`--version` 打印四行摘要，包含
+管理代码、镜像、OpenVPN 和 Easy-RSA 版本：
 
 ```text
-image:     2.1.1
-openvpn:   2.7.5
-easy-rsa:  3.2.2
+management:   2.1.1
+image:        2.1.1
+openvpn:      2.7.5
+easy-rsa:     3.2.2
 ```
 
 完整的构建信息 JSON 可通过 `ovpn runtime version` 获取。

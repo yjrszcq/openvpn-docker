@@ -76,6 +76,14 @@ if ! grep -Fq "\"image_version\": \"$IMAGE_VERSION\"" /tmp/ovpn-version.out; the
   echo 'version output missing image_version' >&2
   exit 1
 fi
+if ! grep -Fq "\"management_version\": \"$MANAGEMENT_VERSION\"" /tmp/ovpn-version.out; then
+  echo 'version output missing management_version' >&2
+  exit 1
+fi
+if [ "$("$OVPN" -v)" != "$MANAGEMENT_VERSION" ]; then
+  echo 'short version output does not report management version' >&2
+  exit 1
+fi
 if ! grep -Fq "\"openvpn_source_version\": \"$OPENVPN_VERSION\"" /tmp/ovpn-version.out; then
   echo 'version output missing openvpn_source_version' >&2
   exit 1

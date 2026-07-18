@@ -47,6 +47,8 @@ FROM ${BASE_IMAGE}
 ARG BASE_IMAGE
 ARG DEBIAN_FRONTEND=noninteractive
 ARG IMAGE_VERSION
+ARG MANAGEMENT_VERSION
+ARG PLATFORM_API
 ARG OPENVPN_VERSION
 ARG OPENVPN_SOURCE_SHA256
 ARG EASYRSA_VERSION
@@ -55,6 +57,8 @@ ARG VCS_REF=unknown
 ARG BUILD_DATE=unknown
 
 RUN test -n "$IMAGE_VERSION" \
+    && test -n "$MANAGEMENT_VERSION" \
+    && test -n "$PLATFORM_API" \
     && test -n "$OPENVPN_VERSION" \
     && test -n "$OPENVPN_SOURCE_SHA256" \
     && test -n "$EASYRSA_VERSION" \
@@ -92,6 +96,8 @@ RUN openvpn --version >/tmp/openvpn-version \
 RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/docker-entrypoint \
     && mkdir -p /etc/openvpn /usr/local/share/openvpn-container \
     && IMAGE_VERSION="$IMAGE_VERSION" \
+       MANAGEMENT_VERSION="$MANAGEMENT_VERSION" \
+       PLATFORM_API="$PLATFORM_API" \
        BASE_IMAGE="$BASE_IMAGE" \
        OPENVPN_VERSION="$OPENVPN_VERSION" \
        OPENVPN_SOURCE_SHA256="$OPENVPN_SOURCE_SHA256" \

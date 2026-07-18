@@ -5,6 +5,8 @@
 
 持久化格式变更遵循独立于命令版本的
 [数据 schema 升级政策](../data-schema-upgrade-policy.md)。
+管理代码与镜像的更新职责遵循长期有效的
+[管理代码在线更新政策](../management-update-policy.md)。
 
 ## 运行环境约定
 

@@ -5,6 +5,8 @@ see the [v2 command reference](commands.md).
 
 Persistent format changes follow the version-independent
 [data schema upgrade policy](../data-schema-upgrade-policy.md).
+Management-code and image responsibilities follow the permanent
+[management code update policy](../management-update-policy.md).
 
 ## Runtime conventions
 
