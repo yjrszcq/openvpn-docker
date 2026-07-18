@@ -25,6 +25,7 @@ ovpn_init_write_transaction_marker() {
   umask 077
   cat >"$transaction_tmp" <<EOF
 transaction_id=$transaction_id
+target_schema=$OVPN_CURRENT_DATA_SCHEMA
 started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
   mv "$transaction_tmp" "$transaction_file"

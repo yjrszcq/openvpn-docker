@@ -4,6 +4,7 @@ set -euo pipefail
 LIB_DIR="${OVPN_LIB_DIR:-/usr/local/lib/openvpn-container}"
 # shellcheck source=/usr/local/lib/openvpn-container/common.sh
 . "$LIB_DIR/common.sh"
+. "$LIB_DIR/schema.sh"
 . "$LIB_DIR/ipam.sh"
 . "$LIB_DIR/config.sh"
 . "$LIB_DIR/registry.sh"
@@ -32,6 +33,8 @@ command="${1:-help}"
 if [ "$#" -gt 0 ]; then
   shift
 fi
+
+ovpn_schema_gate_command "$command" "$@" || exit $?
 
 case "$command" in
   help|-h|--help)

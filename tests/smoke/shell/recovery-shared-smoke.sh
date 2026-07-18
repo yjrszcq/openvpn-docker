@@ -89,20 +89,27 @@ make_fixture() {
   local data_dir="$1"
   local fingerprint
 
-  mkdir -p "$data_dir/config" "$data_dir/meta" "$data_dir/server" "$data_dir/pki/private" "$data_dir/pki/issued" "$data_dir/secrets" "$data_dir/clients/active" "$data_dir/ca-db/newcerts"
+  mkdir -p "$data_dir/config" "$data_dir/data" "$data_dir/meta" "$data_dir/server" "$data_dir/pki/private" "$data_dir/pki/issued" "$data_dir/secrets" "$data_dir/clients/active" "$data_dir/ca-db/newcerts"
   printf '%s\n' \
-    'OVPN_CONFIG_VERSION=1' \
+    'OVPN_CONFIG_VERSION=2' \
     'OVPN_ENDPOINT=vpn.example.test' \
     'OVPN_PROTO=udp' \
     'OVPN_PORT=1194' \
     'OVPN_NETWORK=10.88.0.0/24' \
+    'OVPN_TOPOLOGY=subnet' \
+    'OVPN_DYNAMIC_POOL_SIZE=126' \
     'OVPN_NAT=false' \
     'OVPN_NAT_INTERFACE=auto' \
     'OVPN_REDIRECT_GATEWAY=false' \
     'OVPN_CLIENT_TO_CLIENT=false' \
     'OVPN_DNS=' \
     'OVPN_ROUTES=' >"$data_dir/config/project.env"
-  printf '1\n' >"$data_dir/config/schema-version"
+  printf '2\n' >"$data_dir/config/schema-version"
+  printf '%s\n' '# client,ip' 'laptop,' >"$data_dir/data/client-ip.csv"
+  cp "$data_dir/data/client-ip.csv" "$data_dir/meta/client-ip.applied.csv"
+  printf '%s\n' '# client,state' 'laptop,active' >"$data_dir/meta/client-state.csv"
+  : >"$data_dir/meta/audit.jsonl"
+  chmod 600 "$data_dir/data/client-ip.csv" "$data_dir/meta/client-ip.applied.csv" "$data_dir/meta/client-state.csv" "$data_dir/meta/audit.jsonl"
   : >"$data_dir/pki/index.txt"
   printf '01\n' >"$data_dir/pki/serial"
   printf '1000\n' >"$data_dir/ca-db/serial"

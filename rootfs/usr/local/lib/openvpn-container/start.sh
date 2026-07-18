@@ -39,8 +39,6 @@ ovpn_start_command() {
     done < <(ovpn_missing_required_files)
     ovpn_exit_for_state "$state"
   fi
-  ovpn_registry_upgrade_v1
-
   ovpn_compatibility_require_supported
   ovpn_network_configure
   config_path="$OVPN_DATA_DIR/server/server.conf"
