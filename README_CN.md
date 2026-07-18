@@ -240,7 +240,7 @@ GitHub Actions 将管理代码发布与镜像发布分开。推送稳定的
 私钥保存在仓库 secret `MANAGEMENT_SIGNING_KEY` 中，绝不会写入镜像。
 
 由于提交无法包含自身哈希，应先形成发布源码提交，再在默认分支的
-`compatibility/data-schema-releases.tsv` 中将该精确哈希登记为 `signed-bundle`，
+`compatibility/data-schema-releases.jsonl` 中将该精确哈希登记为 `signed-bundle`，
 最后给源码提交打 tag。发布 workflow 会读取默认分支登记表，并拒绝未登记 tag 或
 schema、platform、OpenVPN 不匹配的发布。
 

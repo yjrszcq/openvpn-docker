@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-MANIFEST="$ROOT_DIR/compatibility/data-schema-releases.tsv"
+MANIFEST="$ROOT_DIR/compatibility/data-schema-releases.jsonl"
 
 test -r "$ROOT_DIR/docs/en/data-schema-upgrade-policy.md"
 test -r "$ROOT_DIR/docs/cn/data-schema-upgrade-policy.md"
@@ -10,29 +10,30 @@ test -r "$ROOT_DIR/docs/en/management-update-policy.md"
 test -r "$ROOT_DIR/docs/cn/management-update-policy.md"
 test -r "$MANIFEST"
 
-awk -F '\t' '
-  NR == 1 {
-    if ($0 != "# management_version\tcommit\tdata_schema\tdistribution\tplatform_api_min\tplatform_api_max\topenvpn_min\topenvpn_max_exclusive") exit 1
-    next
-  }
-  NF != 8 { exit 1 }
-  $1 !~ /^[0-9]+\.[0-9]+\.[0-9]+$/ { exit 1 }
-  $2 !~ /^[0-9a-f]{40}$/ { exit 1 }
-  $3 !~ /^[1-9][0-9]*$/ { exit 1 }
-  $4 == "legacy-image" && ($5 != "-" || $6 != "-") { exit 1 }
-  $4 == "signed-bundle" && ($5 !~ /^[1-9][0-9]*$/ || $6 !~ /^[1-9][0-9]*$/ || $5 > $6) { exit 1 }
-  $4 != "legacy-image" && $4 != "signed-bundle" { exit 1 }
-  $7 !~ /^[0-9]+\.[0-9]+\.[0-9]+$/ { exit 1 }
-  $8 !~ /^[0-9]+\.[0-9]+\.[0-9]+$/ { exit 1 }
-  seen_version[$1]++ { if (seen_version[$1] != 1) exit 1 }
-  seen_commit[$2]++ { if (seen_commit[$2] != 1) exit 1 }
-  END { if (NR < 5) exit 1 }
-' "$MANIFEST"
-
-grep -Fqx $'1.0.0\t6619921e5257e604f5df2c63d2fa10505b680d84\t1\tlegacy-image\t-\t-\t2.7.0\t2.8.0' "$MANIFEST"
-grep -Fqx $'2.0.0\t6f8b77dfe58087fe66073929d70d89d8c92e6cac\t2\tlegacy-image\t-\t-\t2.7.0\t2.8.0' "$MANIFEST"
-grep -Fqx $'2.1.0\ta8ddaca5345a9cc75cf04b56d07b0072a9d44019\t2\tlegacy-image\t-\t-\t2.7.0\t2.8.0' "$MANIFEST"
-grep -Fqx $'2.1.1\t11bdee954b2e875621f83a21564d048593adb68a\t2\tlegacy-image\t-\t-\t2.7.0\t2.8.0' "$MANIFEST"
+"$ROOT_DIR/scripts/validate-management-matrix.sh" >/dev/null
+cmp <(jq -c . "$MANIFEST") "$MANIFEST"
+jq -s -e '
+  length == 4 and
+  ([.[].management_version] | unique | length) == 4 and
+  ([.[].commit] | unique | length) == 4 and
+  any(.[]; .management_version == "1.0.0" and
+    .commit == "6619921e5257e604f5df2c63d2fa10505b680d84" and
+    .data_schema == 1 and .distribution == "legacy-image" and
+    .platform_api == null) and
+  any(.[]; .management_version == "2.0.0" and
+    .commit == "6f8b77dfe58087fe66073929d70d89d8c92e6cac" and
+    .data_schema == 2 and .distribution == "legacy-image" and
+    .platform_api == null) and
+  any(.[]; .management_version == "2.1.0" and
+    .commit == "a8ddaca5345a9cc75cf04b56d07b0072a9d44019" and
+    .data_schema == 2 and .distribution == "legacy-image" and
+    .platform_api == null) and
+  any(.[]; .management_version == "2.1.1" and
+    .commit == "11bdee954b2e875621f83a21564d048593adb68a" and
+    .data_schema == 2 and .distribution == "legacy-image" and
+    .platform_api == null) and
+  all(.[].openvpn; . == {"min": "2.7.0", "max_exclusive": "2.8.0"})
+' "$MANIFEST" >/dev/null
 
 grep -Fq 'runs only its current schema' "$ROOT_DIR/docs/en/data-schema-upgrade-policy.md"
 grep -Fq '支持旧版本是指支持其迁移' "$ROOT_DIR/docs/cn/data-schema-upgrade-policy.md"

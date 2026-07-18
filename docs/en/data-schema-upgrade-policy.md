@@ -12,9 +12,18 @@ Multiple management and image releases may use the same schema.
 
 Published management versions, exact source commits, schemas, distribution
 type, platform API range, and OpenVPN range are recorded in
-`compatibility/data-schema-releases.tsv`. Every release must be registered.
+`compatibility/data-schema-releases.jsonl`. Every release must be registered.
 Historical `legacy-image` rows explicitly have no online platform range;
 online-capable releases use `signed-bundle`.
+The registry uses one strict JSON object per line. Unknown fields and invalid
+types are rejected so registry-format changes require an explicit validator
+update.
+
+```json
+{"management_version":"3.0.0","commit":"<40-character commit>","data_schema":3,"distribution":"signed-bundle","platform_api":{"min":2,"max":2},"openvpn":{"min":"2.7.0","max_exclusive":"2.8.0"}}
+```
+
+`legacy-image` entries use `null` for `platform_api`.
 
 ## Runtime boundary
 

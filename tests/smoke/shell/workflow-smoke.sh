@@ -77,7 +77,7 @@ grep -Fq 'secrets.MANAGEMENT_SIGNING_KEY' "$WORKFLOWS/management-release.yml"
 grep -Fq 'scripts/package-management-release.sh' "$WORKFLOWS/management-release.yml"
 grep -Fq 'scripts/validate-management-matrix.sh' "$WORKFLOWS/management-release.yml"
 # shellcheck disable=SC2016 # Assert the literal default-branch registry lookup.
-grep -Fq 'origin/$DEFAULT_BRANCH:compatibility/data-schema-releases.tsv' "$WORKFLOWS/management-release.yml"
+grep -Fq 'origin/$DEFAULT_BRANCH:compatibility/data-schema-releases.jsonl' "$WORKFLOWS/management-release.yml"
 grep -Fq 'scripts/verify-management-release.sh' "$WORKFLOWS/management-release.yml"
 grep -Fq 'management-bundle.tar.gz' "$WORKFLOWS/management-release.yml"
 grep -Fq 'management-release.env.sig' "$WORKFLOWS/management-release.yml"

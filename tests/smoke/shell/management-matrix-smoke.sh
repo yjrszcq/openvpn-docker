@@ -3,52 +3,93 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 VALIDATOR="$ROOT_DIR/scripts/validate-management-matrix.sh"
-REGISTRY="$ROOT_DIR/compatibility/data-schema-releases.tsv"
+REGISTRY="$ROOT_DIR/compatibility/data-schema-releases.jsonl"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 "$VALIDATOR" >"$TMP_DIR/valid.out"
 grep -Fqx 'management compatibility matrix passed' "$TMP_DIR/valid.out"
 
-cp "$REGISTRY" "$TMP_DIR/invalid-platform.tsv"
-sed -i '2s/legacy-image\t-\t-/legacy-image\t1\t1/' "$TMP_DIR/invalid-platform.tsv"
-if "$VALIDATOR" --registry "$TMP_DIR/invalid-platform.tsv" \
+jq -c '
+  if .management_version == "1.0.0"
+  then .platform_api = {"min": 1, "max": 1}
+  else .
+  end
+' "$REGISTRY" >"$TMP_DIR/invalid-platform.jsonl"
+if "$VALIDATOR" --registry "$TMP_DIR/invalid-platform.jsonl" \
   >"$TMP_DIR/platform.out" 2>"$TMP_DIR/platform.err"; then
   echo 'legacy release unexpectedly claimed online platform compatibility' >&2
   exit 1
 fi
 grep -Fq 'must not claim online platform compatibility' "$TMP_DIR/platform.err"
 
-cp "$REGISTRY" "$TMP_DIR/invalid-range.tsv"
-sed -i '2s/2\.7\.0\t2\.8\.0/2.8.0\t2.7.0/' "$TMP_DIR/invalid-range.tsv"
-if "$VALIDATOR" --registry "$TMP_DIR/invalid-range.tsv" \
+jq -c '
+  if .management_version == "1.0.0"
+  then .openvpn = {"min": "2.8.0", "max_exclusive": "2.7.0"}
+  else .
+  end
+' "$REGISTRY" >"$TMP_DIR/invalid-range.jsonl"
+if "$VALIDATOR" --registry "$TMP_DIR/invalid-range.jsonl" \
   >"$TMP_DIR/range.out" 2>"$TMP_DIR/range.err"; then
   echo 'empty OpenVPN range unexpectedly passed' >&2
   exit 1
 fi
 grep -Fq 'empty OpenVPN range' "$TMP_DIR/range.err"
 
-cp "$REGISTRY" "$TMP_DIR/release.tsv"
-release_commit="$(git -C "$ROOT_DIR" stash create)"
-if [ -z "$release_commit" ]; then
-  release_commit="$(git -C "$ROOT_DIR" rev-parse HEAD)"
-fi
-printf '3.0.0\t%s\t3\tsigned-bundle\t2\t2\t2.7.0\t2.8.0\n' \
-  "$release_commit" >>"$TMP_DIR/release.tsv"
-"$VALIDATOR" --registry "$TMP_DIR/release.tsv" \
+cp "$REGISTRY" "$TMP_DIR/release.jsonl"
+release_commit="$(git -C "$ROOT_DIR" rev-parse HEAD)"
+jq -nc --arg commit "$release_commit" '{
+  management_version: "3.0.0",
+  commit: $commit,
+  data_schema: 3,
+  distribution: "signed-bundle",
+  platform_api: {"min": 2, "max": 2},
+  openvpn: {"min": "2.7.0", "max_exclusive": "2.8.0"}
+}' >>"$TMP_DIR/release.jsonl"
+"$VALIDATOR" --registry "$TMP_DIR/release.jsonl" \
   --release-tag v3.0.0 --release-commit "$release_commit" \
   >"$TMP_DIR/release.out"
 grep -Fqx 'management compatibility matrix passed' "$TMP_DIR/release.out"
 
-cp "$TMP_DIR/release.tsv" "$TMP_DIR/incompatible-release.tsv"
-sed -i '$s/signed-bundle\t2\t2/signed-bundle\t3\t3/' "$TMP_DIR/incompatible-release.tsv"
-if "$VALIDATOR" --registry "$TMP_DIR/incompatible-release.tsv" \
+jq -c '
+  if .management_version == "3.0.0"
+  then .platform_api = {"min": 3, "max": 3}
+  else .
+  end
+' "$TMP_DIR/release.jsonl" >"$TMP_DIR/incompatible-release.jsonl"
+if "$VALIDATOR" --registry "$TMP_DIR/incompatible-release.jsonl" \
   --release-tag v3.0.0 --release-commit "$release_commit" \
   >"$TMP_DIR/incompatible-release.out" 2>"$TMP_DIR/incompatible-release.err"; then
   echo 'release incompatible with its image platform unexpectedly passed' >&2
   exit 1
 fi
 grep -Fq 'does not support its build image platform API' "$TMP_DIR/incompatible-release.err"
+
+jq -c '
+  if .management_version == "1.0.0"
+  then .unexpected = true
+  else .
+  end
+' "$REGISTRY" >"$TMP_DIR/unknown-field.jsonl"
+if "$VALIDATOR" --registry "$TMP_DIR/unknown-field.jsonl" \
+  >"$TMP_DIR/unknown-field.out" 2>"$TMP_DIR/unknown-field.err"; then
+  echo 'release object with an unknown field unexpectedly passed' >&2
+  exit 1
+fi
+grep -Fq 'registry line 1 is not a valid release object' "$TMP_DIR/unknown-field.err"
+
+jq -c '
+  if .management_version == "1.0.0"
+  then .data_schema = "1"
+  else .
+  end
+' "$REGISTRY" >"$TMP_DIR/invalid-type.jsonl"
+if "$VALIDATOR" --registry "$TMP_DIR/invalid-type.jsonl" \
+  >"$TMP_DIR/invalid-type.out" 2>"$TMP_DIR/invalid-type.err"; then
+  echo 'release object with an invalid type unexpectedly passed' >&2
+  exit 1
+fi
+grep -Fq 'registry line 1 is not a valid release object' "$TMP_DIR/invalid-type.err"
 
 if "$VALIDATOR" --release-tag v9.9.9 \
   --release-commit 0123456789abcdef0123456789abcdef01234567 \

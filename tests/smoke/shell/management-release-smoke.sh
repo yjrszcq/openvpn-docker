@@ -43,6 +43,7 @@ grep -Fqx './lib/runtime-events.py' "$TMP_DIR/files"
 grep -Fqx './lib/migrations/1-to-2.sh' "$TMP_DIR/files"
 grep -Fqx './templates/openvpn-2.7/server.conf.tpl' "$TMP_DIR/files"
 grep -Fqx './compatibility/contract.env' "$TMP_DIR/files"
+grep -Fqx './compatibility/data-schema-releases.jsonl' "$TMP_DIR/files"
 
 cp -a "$TMP_DIR/first" "$TMP_DIR/tampered-manifest"
 sed -i 's/DATA_SCHEMA=3/DATA_SCHEMA=4/' "$TMP_DIR/tampered-manifest/management-release.env"

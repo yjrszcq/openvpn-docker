@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REGISTRY="${OVPN_RELEASE_REGISTRY:-$ROOT_DIR/compatibility/data-schema-releases.tsv}"
+REGISTRY="${OVPN_RELEASE_REGISTRY:-$ROOT_DIR/compatibility/data-schema-releases.jsonl}"
 RELEASE_TAG=''
 RELEASE_COMMIT=''
 
@@ -86,6 +86,7 @@ fi
 
 [ -r "$REGISTRY" ] || die 'release registry is missing'
 command -v git >/dev/null 2>&1 || die 'git is required'
+command -v jq >/dev/null 2>&1 || die 'jq is required'
 
 # shellcheck disable=SC1091
 . "$ROOT_DIR/versions.env"
@@ -108,18 +109,53 @@ grep -Fqx "OVPN_CURRENT_DATA_SCHEMA=$DATA_SCHEMA" \
   "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/schema.sh" ||
   die 'versions.env DATA_SCHEMA differs from the runtime schema constant'
 
-expected_header=$'# management_version\tcommit\tdata_schema\tdistribution\tplatform_api_min\tplatform_api_max\topenvpn_min\topenvpn_max_exclusive'
-IFS= read -r header <"$REGISTRY"
-[ "$header" = "$expected_header" ] || die 'release registry header is invalid'
-
 previous_version=''
 previous_schema=0
 release_found=false
-line_number=1
+line_number=0
 declare -A seen_commits=()
-while IFS=$'\t' read -r version commit schema distribution platform_min platform_max openvpn_min openvpn_max extra; do
+while IFS= read -r release || [ -n "$release" ]; do
   line_number=$((line_number + 1))
-  [ -z "$extra" ] || die "registry line $line_number has extra fields"
+  jq -e '
+    type == "object" and
+    keys == [
+      "commit",
+      "data_schema",
+      "distribution",
+      "management_version",
+      "openvpn",
+      "platform_api"
+    ] and
+    (.management_version | type == "string") and
+    (.commit | type == "string") and
+    (.data_schema | type == "number" and . > 0 and floor == .) and
+    (.distribution | type == "string") and
+    (.platform_api == null or (
+      (.platform_api | type == "object") and
+      (.platform_api | keys == ["max", "min"]) and
+      (.platform_api.min | type == "number" and . > 0 and floor == .) and
+      (.platform_api.max | type == "number" and . > 0 and floor == .)
+    )) and
+    (.openvpn | type == "object") and
+    (.openvpn | keys == ["max_exclusive", "min"]) and
+    (.openvpn.min | type == "string") and
+    (.openvpn.max_exclusive | type == "string")
+  ' <<<"$release" >/dev/null 2>&1 ||
+    die "registry line $line_number is not a valid release object"
+  row="$(jq -r '
+    [
+      .management_version,
+      .commit,
+      (.data_schema | tostring),
+      .distribution,
+      (if .platform_api == null then "-" else (.platform_api.min | tostring) end),
+      (if .platform_api == null then "-" else (.platform_api.max | tostring) end),
+      .openvpn.min,
+      .openvpn.max_exclusive
+    ] | @tsv
+  ' <<<"$release")"
+  IFS=$'\t' read -r version commit schema distribution \
+    platform_min platform_max openvpn_min openvpn_max <<<"$row"
   [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
     die "registry line $line_number has an invalid management version"
   [[ "$commit" =~ ^[0-9a-f]{40}$ ]] ||
@@ -198,9 +234,9 @@ while IFS=$'\t' read -r version commit schema distribution platform_min platform
       die 'release registry OpenVPN range differs from the compatibility contract'
     fi
   fi
-done < <(tail -n +2 "$REGISTRY")
+done <"$REGISTRY"
 
-[ "$line_number" -gt 1 ] || die 'release registry has no releases'
+[ "$line_number" -gt 0 ] || die 'release registry has no releases'
 
 for ((schema = 1; schema < DATA_SCHEMA; schema++)); do
   [ -r "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/migrations/$schema-to-$((schema + 1)).sh" ] ||

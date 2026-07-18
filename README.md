@@ -273,8 +273,8 @@ repository secret `MANAGEMENT_SIGNING_KEY` contains that private key; it is
 never embedded in an image.
 
 Because a commit cannot contain its own hash, prepare the release source commit
-first, register that exact hash as a `signed-bundle` row in
-`compatibility/data-schema-releases.tsv` on the default branch, and only then
+first, register that exact hash as a `signed-bundle` object in
+`compatibility/data-schema-releases.jsonl` on the default branch, and only then
 tag the source commit. The release workflow reads the default-branch registry
 and rejects an unregistered tag or a schema/platform/OpenVPN mismatch.
 

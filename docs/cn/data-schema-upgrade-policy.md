@@ -10,9 +10,17 @@
 和镜像版本可以共用同一个 schema。
 
 所有已发布管理代码、精确源码提交、schema、分发类型、platform API 范围及 OpenVPN
-范围记录在 `compatibility/data-schema-releases.tsv`，每次发布都必须登记。历史
+范围记录在 `compatibility/data-schema-releases.jsonl`，每次发布都必须登记。历史
 `legacy-image` 条目明确不声明在线 platform 范围；支持在线更新的版本使用
 `signed-bundle`。
+清单采用每行一个严格 JSON 对象的格式；未知字段和错误类型都会被拒绝，因此清单格式
+变化必须显式更新校验器。
+
+```json
+{"management_version":"3.0.0","commit":"<40 位 commit>","data_schema":3,"distribution":"signed-bundle","platform_api":{"min":2,"max":2},"openvpn":{"min":"2.7.0","max_exclusive":"2.8.0"}}
+```
+
+`legacy-image` 条目的 `platform_api` 使用 `null`。
 
 ## 运行边界
 

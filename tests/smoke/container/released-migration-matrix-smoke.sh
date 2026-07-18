@@ -6,7 +6,7 @@ TARGET_IMAGE="${OVPN_RELEASED_MIGRATION_IMAGE:-szcq/openvpn-server:released-migr
 REQUIRED="${OVPN_RELEASED_MIGRATION_REQUIRED:-0}"
 SKIP_TARGET_BUILD="${OVPN_RELEASED_MIGRATION_SKIP_TARGET_BUILD:-0}"
 BUILD_NETWORK="${OVPN_RELEASED_MIGRATION_BUILD_NETWORK:-default}"
-MANIFEST="$ROOT_DIR/compatibility/data-schema-releases.tsv"
+MANIFEST="$ROOT_DIR/compatibility/data-schema-releases.jsonl"
 WORK_DIR=''
 
 skip_or_fail() {
@@ -127,9 +127,7 @@ verify_migrated_data() {
   [ "$(docker run --rm -v "$data_dir:/etc/openvpn:ro" "$TARGET_IMAGE" state show)" = HEALTHY ]
 }
 
-while IFS=$'\t' read -r version commit schema _distribution _platform_min _platform_max _openvpn_min _openvpn_max; do
-  [ -n "$version" ] || continue
-  [[ "$version" == \#* ]] && continue
+while IFS=$'\t' read -r version commit schema; do
   image="$(build_release_image "$version" "$commit")"
   data_dir="$WORK_DIR/data-$version"
   generate_release_data "$version" "$schema" "$image" "$data_dir"
@@ -155,6 +153,6 @@ while IFS=$'\t' read -r version commit schema _distribution _platform_min _platf
     "$TARGET_IMAGE" migrate apply --yes >"$WORK_DIR/apply-$version.out"
   verify_migrated_data "$version" "$schema" "$data_dir"
   printf 'released migration passed: %s (%s -> 3)\n' "$version" "$schema"
-done <"$MANIFEST"
+done < <(jq -r '[.management_version, .commit, (.data_schema | tostring)] | @tsv' "$MANIFEST")
 
 printf 'released migration matrix passed\n'
