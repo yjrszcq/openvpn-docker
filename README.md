@@ -181,6 +181,11 @@ code delivery unit; data migrations remain a separate maintenance operation.
 Inspect them with `ovpn --version` and `ovpn runtime version`. Pull or build a
 new image and recreate the container for every project-code update.
 
+- If the target image uses the **same data schema**, stop the old container and
+  recreate it with the target image. Do not run `migrate`.
+- If the target image uses a **newer data schema**, stop the old container and
+  run the following maintenance migration before starting the target image.
+
 If a new image finds an older data schema, normal data commands and server
 startup fail with status `78`. Stop the live service and migrate only through
 maintenance:

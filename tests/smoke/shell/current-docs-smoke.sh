@@ -48,6 +48,8 @@ for operations in \
   grep -Fq 'runtime logs --lines 100' "$operations"
   grep -Fq 'runtime events --lines 100 --json' "$operations"
   grep -Fq 'image-update-policy.md' "$operations"
+  grep -Fq '**Same data schema:**' "$operations" ||
+    grep -Fq '**数据 schema 相同**' "$operations"
   if grep -Eq 'ovpn upgrade|--to-version|OVPN_GITHUB_TOKEN|PLATFORM_API|repair/\.scripts' "$operations"; then
     echo "current operations guide contains removed online-update interfaces: $operations" >&2
     exit 1
@@ -61,6 +63,8 @@ for readme in "$ROOT_DIR/README.md" "$ROOT_DIR/README_CN.md"; do
   grep -Fq 'runtime logs --lines 100' "$readme"
   grep -Fq 'runtime events --lines 100 --json' "$readme"
   grep -Fq 'image-update-policy.md' "$readme"
+  grep -Fq '**same data schema**' "$readme" ||
+    grep -Fq '**相同数据 schema**' "$readme"
   if grep -Eq 'ovpn upgrade|OVPN_GITHUB_TOKEN|MANAGEMENT_VERSION|PLATFORM_API|signed-bundle|data-schema-releases' "$readme"; then
     echo "README contains removed online-update interfaces: $readme" >&2
     exit 1

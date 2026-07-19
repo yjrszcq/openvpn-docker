@@ -259,16 +259,24 @@ docker compose pull openvpn openvpn-maintenance
 ```
 
 镜像更新可以替换项目代码、OpenVPN、系统依赖和基础系统，但不会隐式改写持久化
-数据。将已挂载数据交给目标镜像前先停止在线服务：
+数据。将已挂载数据交给目标镜像前先停止在线服务。
+
+判断规则是明确的：
+
+- **数据 schema 相同**：不需要迁移。直接用目标镜像重建已停止的服务，然后执行
+  `state doctor` 并检查健康状态。
+- **数据 schema 更新**：保持服务停止，在启动 OpenVPN 前使用目标镜像的 maintenance
+  服务完成迁移。
+
+如果无法从发布信息直接确定 schema 关系，可用下述命令只读检查：
 
 ```bash
 docker compose stop openvpn
 docker compose run --rm openvpn-maintenance migrate plan
 ```
 
-若计划显示源/目标 schema 相同，则跳过 apply，执行 `state doctor` 后用新镜像重建
-在线服务。若计划给出迁移链，则继续下述迁移流程。未完成必要迁移就启动目标镜像会
-以状态 `78` 拒绝。
+若计划显示源/目标 schema 相同，则跳过 apply；若计划给出迁移链，则继续下述迁移
+流程。未完成必要迁移就启动目标镜像会以状态 `78` 拒绝。
 
 ---
 

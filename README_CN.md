@@ -162,6 +162,11 @@ maintenance-only 迁移要求在命令文档换版后仍持续有效。
 `ovpn --version` 与 `ovpn runtime version` 查看。所有项目代码更新都应拉取或构建
 新镜像并重建容器。
 
+- 目标镜像使用**相同数据 schema**：停止旧容器后直接使用目标镜像重建，不要执行
+  `migrate`。
+- 目标镜像使用**更新的数据 schema**：停止旧容器，并在启动目标镜像前执行下述
+  maintenance 迁移。
+
 新镜像遇到旧数据 schema 时，普通数据命令和服务启动都会以状态 `78` 拒绝。停止在线
 服务后，只能通过 maintenance 迁移：
 

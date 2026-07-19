@@ -274,17 +274,27 @@ docker compose pull openvpn openvpn-maintenance
 
 An image update may replace project code, OpenVPN, system dependencies, and the
 base system. It does not implicitly rewrite persistent data. Stop the live
-service before handing the mounted directory to the target image:
+service before handing the mounted directory to the target image.
+
+The decision rule is strict:
+
+- **Same data schema:** no migration is needed. Recreate the stopped service
+  with the target image, then run `state doctor` and verify health.
+- **Newer data schema:** keep the service stopped and run migration with the
+  target image's maintenance service before starting OpenVPN.
+
+If the schema relationship is not already known from the release information,
+inspect it without changing data:
 
 ```bash
 docker compose stop openvpn
 docker compose run --rm openvpn-maintenance migrate plan
 ```
 
-If plan reports that source and target schemas are already equal, skip apply,
-run `state doctor`, and recreate the live service. If it reports a migration
-chain, continue with the migration procedure below. Starting the target image
-without the required migration fails closed with status `78`.
+If plan reports that source and target schemas are already equal, skip apply.
+If it reports a migration chain, continue with the migration procedure below.
+Starting the target image without the required migration fails closed with
+status `78`.
 
 ---
 
