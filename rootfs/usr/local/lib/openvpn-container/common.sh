@@ -165,6 +165,11 @@ Commands:
   runtime           inspect runtime status, health, capabilities, or version
   migrate           plan or apply an offline data-schema migration
   help              show this help
+
+Options:
+  -h, --help        show this help
+  -v                print only the image version
+  -V, --version     print the operator-facing version summary
 USAGE
 }
 

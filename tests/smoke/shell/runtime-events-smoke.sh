@@ -38,11 +38,11 @@ jq -e -s --arg id "$client_id" '
     .remote_ip == "2001:db8::10" and .remote_port == "1194")
 ' "$OVPN_DATA_DIR/logs/events.jsonl" >/dev/null
 
-"$ROOT_DIR/rootfs/usr/local/bin/ovpn" runtime events --lines 1 --json |
+"$ROOT_DIR/rootfs/usr/local/bin/ovpn" runtime events -l 1 -j |
   jq -e --arg id "$client_id" '.client_id == $id and .client_name == "laptop"' >/dev/null
-"$ROOT_DIR/rootfs/usr/local/bin/ovpn" runtime events --lines 1 |
+"$ROOT_DIR/rootfs/usr/local/bin/ovpn" runtime events -l 1 |
   grep -Fq 'laptop [111111111111]'
-"$ROOT_DIR/rootfs/usr/local/bin/ovpn" runtime events --lines 1 --no-trunc |
+"$ROOT_DIR/rootfs/usr/local/bin/ovpn" runtime events -l 1 -t |
   grep -Fq "laptop [$client_id]"
 "$ROOT_DIR/rootfs/usr/local/bin/ovpn" runtime events --help |
   grep -Fq 'usage: ovpn runtime events'

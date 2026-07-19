@@ -73,7 +73,7 @@ def main() -> int:
         for sequence in range(1, 4):
             append_event(event_file, event(sequence))
 
-        text = run_reader(script, event_file, "--lines", "1")
+        text = run_reader(script, event_file, "-l", "1")
         expected = (
             f"2026-01-01T00:00:03Z client_connection connect applied "
             f"laptop [{CLIENT_SHORT_ID}] sequence=3"
@@ -81,7 +81,7 @@ def main() -> int:
         if text.returncode != 0 or text.stdout.strip() != expected:
             raise AssertionError(f"unexpected text event output: {text!r}")
 
-        full_text = run_reader(script, event_file, "--lines", "1", "--no-trunc")
+        full_text = run_reader(script, event_file, "-l", "1", "-t")
         expected_full = (
             f"2026-01-01T00:00:03Z client_connection connect applied "
             f"laptop [{CLIENT_ID}] sequence=3"
@@ -90,13 +90,13 @@ def main() -> int:
             raise AssertionError(f"unexpected no-trunc event output: {full_text!r}")
 
         structured = run_reader(
-            script, event_file, "--lines", "2", "--json", "--no-trunc"
+            script, event_file, "-l", "2", "-j", "-t"
         )
         parsed = [json.loads(line) for line in structured.stdout.splitlines()]
         if structured.returncode != 0 or parsed != [event(2), event(3)]:
             raise AssertionError("JSON history did not preserve structured events")
 
-        invalid_count = run_reader(script, event_file, "--lines", "-1")
+        invalid_count = run_reader(script, event_file, "-l", "-1")
         if invalid_count.returncode != 64:
             raise AssertionError("negative event history length was accepted")
 
@@ -110,10 +110,10 @@ def main() -> int:
             [
                 sys.executable,
                 str(script),
-                "--lines",
+                "-l",
                 "0",
-                "--follow",
-                "--json",
+                "-f",
+                "-j",
                 "--event-file",
                 str(event_file),
             ],

@@ -123,7 +123,7 @@ ovpn_client_export_inner() {
 }
 
 ovpn_client_export_command() {
-  local usage='usage: ovpn client export <client>|--id <ID>|--name <NAME>'
+  local usage='usage: ovpn client export <client>|--id|-i <ID>|--name|-n <NAME>'
   local selector_mode reference consumed
 
   ovpn_client_parse_single_selector_or_die "$usage" "$@"

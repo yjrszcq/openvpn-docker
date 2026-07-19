@@ -86,7 +86,7 @@ def main() -> int:
             script,
             raw_log,
             registry,
-            "--lines",
+            "-l",
             "3",
         )
         if translated.returncode != 0:
@@ -99,17 +99,17 @@ def main() -> int:
         if translated.stdout.splitlines() != expected:
             raise AssertionError(f"unexpected translated history: {translated.stdout!r}")
 
-        full = run_reader(script, raw_log, registry, "--lines", "1", "--no-trunc")
+        full = run_reader(script, raw_log, registry, "-l", "1", "-t")
         if full.stdout.strip() != f">LOG:4,N,known laptop [{CLIENT_ID}]":
             raise AssertionError("no-trunc mode did not preserve the known client UUID")
 
         raw = run_reader(
-            script, raw_log, registry, "--lines", "1", "--raw", "--no-trunc"
+            script, raw_log, registry, "-l", "1", "-r", "-t"
         )
         if raw.stdout.strip() != f">LOG:4,N,known {CLIENT_ID}":
             raise AssertionError("raw mode changed the OpenVPN log line")
 
-        invalid = run_reader(script, raw_log, registry, "--lines", "-1")
+        invalid = run_reader(script, raw_log, registry, "-l", "-1")
         if invalid.returncode != 64 or "--lines must be non-negative" not in invalid.stderr:
             raise AssertionError("negative history length was not rejected")
 
@@ -117,9 +117,9 @@ def main() -> int:
             [
                 sys.executable,
                 str(script),
-                "--lines",
+                "-l",
                 "0",
-                "--follow",
+                "-f",
                 "--log-file",
                 str(raw_log),
                 "--registry",

@@ -155,12 +155,12 @@ def follow(
 def main() -> int:
     parser = UsageParser(
         prog="ovpn runtime logs",
-        usage="ovpn runtime logs [--lines N] [--follow] [--raw] [--no-trunc]",
+        usage="ovpn runtime logs [--lines|-l N] [--follow|-f] [--raw|-r] [--no-trunc|-t]",
     )
-    parser.add_argument("--lines", type=int, default=100)
-    parser.add_argument("--follow", action="store_true")
-    parser.add_argument("--raw", action="store_true")
-    parser.add_argument("--no-trunc", action="store_true")
+    parser.add_argument("--lines", "-l", type=int, default=100)
+    parser.add_argument("--follow", "-f", action="store_true")
+    parser.add_argument("--raw", "-r", action="store_true")
+    parser.add_argument("--no-trunc", "-t", action="store_true")
     parser.add_argument("--log-file", required=True, help=argparse.SUPPRESS)
     parser.add_argument("--registry", required=True, help=argparse.SUPPRESS)
     args = parser.parse_args()

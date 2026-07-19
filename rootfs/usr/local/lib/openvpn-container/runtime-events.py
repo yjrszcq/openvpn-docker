@@ -134,12 +134,12 @@ def follow(
 def main() -> int:
     parser = UsageParser(
         prog="ovpn runtime events",
-        usage="ovpn runtime events [--lines N] [--follow] [--json] [--no-trunc]",
+        usage="ovpn runtime events [--lines|-l N] [--follow|-f] [--json|-j] [--no-trunc|-t]",
     )
-    parser.add_argument("--lines", type=int, default=100)
-    parser.add_argument("--follow", action="store_true")
-    parser.add_argument("--json", action="store_true")
-    parser.add_argument("--no-trunc", action="store_true")
+    parser.add_argument("--lines", "-l", type=int, default=100)
+    parser.add_argument("--follow", "-f", action="store_true")
+    parser.add_argument("--json", "-j", action="store_true")
+    parser.add_argument("--no-trunc", "-t", action="store_true")
     parser.add_argument("--event-file", required=True, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.lines < 0:

@@ -379,7 +379,7 @@ ovpn_client_set_from_editor_inner() {
 }
 
 ovpn_client_set_command() {
-  local usage='usage: ovpn client ip set <client...>|--id <ID>|--name <NAME>|--all|-a [--dynamic|-d|--ip|-I <IPv4>]'
+  local usage='usage: ovpn client ip set <client...>|--id|-i <ID>|--name|-n <NAME>|--all|-a [--dynamic|-d|--ip|-I <IPv4>]'
   local mode=static requested_ip='' use_all=false
   local selector_kind=''
   local target_count

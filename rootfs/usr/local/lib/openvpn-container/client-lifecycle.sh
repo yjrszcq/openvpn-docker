@@ -518,7 +518,7 @@ ovpn_client_rename_inner() (
 )
 
 ovpn_client_rename_command() {
-  local usage='usage: ovpn client rename <client>|--id <ID>|--name <NAME> <new-name>'
+  local usage='usage: ovpn client rename <client>|--id|-i <ID>|--name|-n <NAME> <new-name>'
   local selector_mode reference consumed new_name
 
   ovpn_client_parse_single_selector_or_die "$usage" "$@"
@@ -580,7 +580,7 @@ ovpn_client_revoke_inner() {
 }
 
 ovpn_client_revoke_command() {
-  local usage='usage: ovpn client revoke <client>|--id <ID>|--name <NAME> [--release-ip|-r]'
+  local usage='usage: ovpn client revoke <client>|--id|-i <ID>|--name|-n <NAME> [--release-ip|-r]'
   local selector_mode reference consumed
   local release_ip=false
 
@@ -622,7 +622,7 @@ ovpn_client_release_ip_inner() {
 }
 
 ovpn_client_release_ip_command() {
-  local usage='usage: ovpn client ip release <client>|--id <ID>|--name <NAME>'
+  local usage='usage: ovpn client ip release <client>|--id|-i <ID>|--name|-n <NAME>'
   local selector_mode reference consumed
 
   ovpn_client_parse_single_selector_or_die "$usage" "$@"
@@ -711,7 +711,7 @@ ovpn_client_reissue_inner() {
 }
 
 ovpn_client_reissue_command() {
-  local usage='usage: ovpn client reissue <client>|--id <ID>|--name <NAME> [--dynamic|-d|--ip|-I <IPv4>]'
+  local usage='usage: ovpn client reissue <client>|--id|-i <ID>|--name|-n <NAME> [--dynamic|-d|--ip|-I <IPv4>]'
   local selector_mode reference consumed
   local mode='' requested_ip=''
 
@@ -804,7 +804,7 @@ ovpn_client_delete_inner() {
 }
 
 ovpn_client_delete_command() {
-  local usage='usage: ovpn client delete <client>|--id <ID>|--name <NAME>'
+  local usage='usage: ovpn client delete <client>|--id|-i <ID>|--name|-n <NAME>'
   local selector_mode reference consumed
 
   ovpn_client_parse_single_selector_or_die "$usage" "$@"
@@ -836,7 +836,7 @@ ovpn_client_command() {
       ;;
     export)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client export <client>|--id <ID>|--name <NAME>" "Render an active client profile to stdout."
+        ovpn_command_usage "ovpn client export <client>|--id|-i <ID>|--name|-n <NAME>" "Render an active client profile to stdout."
       else
         ovpn_client_export_command "$@"
       fi
@@ -852,14 +852,14 @@ ovpn_client_command() {
       case "$ip_subcommand" in
         set)
           if ovpn_help_requested "$@"; then
-            ovpn_command_usage "ovpn client ip set <client...>|--id <ID>|--name <NAME>|--all|-a [--dynamic|-d|--ip|-I <IPv4>]" "Assign client IP addresses."
+            ovpn_command_usage "ovpn client ip set <client...>|--id|-i <ID>|--name|-n <NAME>|--all|-a [--dynamic|-d|--ip|-I <IPv4>]" "Assign client IP addresses."
           else
             ovpn_client_set_command "$@"
           fi
           ;;
         release)
           if ovpn_help_requested "$@"; then
-            ovpn_command_usage "ovpn client ip release <client>|--id <ID>|--name <NAME>" "Release the retained static IP of a revoked client."
+            ovpn_command_usage "ovpn client ip release <client>|--id|-i <ID>|--name|-n <NAME>" "Release the retained static IP of a revoked client."
           else
             ovpn_client_release_ip_command "$@"
           fi
@@ -869,21 +869,21 @@ ovpn_client_command() {
       ;;
     revoke)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client revoke <client>|--id <ID>|--name <NAME> [--release-ip|-r]" "Revoke a client certificate and optionally release its static IP."
+        ovpn_command_usage "ovpn client revoke <client>|--id|-i <ID>|--name|-n <NAME> [--release-ip|-r]" "Revoke a client certificate and optionally release its static IP."
       else
         ovpn_client_revoke_command "$@"
       fi
       ;;
     reissue)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client reissue <client>|--id <ID>|--name <NAME> [--dynamic|-d|--ip|-I <IPv4>]" "Issue a new certificate for an existing client, optionally changing IP assignment."
+        ovpn_command_usage "ovpn client reissue <client>|--id|-i <ID>|--name|-n <NAME> [--dynamic|-d|--ip|-I <IPv4>]" "Issue a new certificate for an existing client, optionally changing IP assignment."
       else
         ovpn_client_reissue_command "$@"
       fi
       ;;
     delete)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client delete <client>|--id <ID>|--name <NAME>" "Remove a client and its local credentials."
+        ovpn_command_usage "ovpn client delete <client>|--id|-i <ID>|--name|-n <NAME>" "Remove a client and its local credentials."
       else
         ovpn_client_delete_command "$@"
       fi
@@ -897,7 +897,7 @@ ovpn_client_command() {
       ;;
     rename)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client rename <client>|--id <ID>|--name <NAME> <new-name>" "Change a client's display name without replacing its UUID or certificate."
+        ovpn_command_usage "ovpn client rename <client>|--id|-i <ID>|--name|-n <NAME> <new-name>" "Change a client's display name without replacing its UUID or certificate."
       else
         ovpn_client_rename_command "$@"
       fi
