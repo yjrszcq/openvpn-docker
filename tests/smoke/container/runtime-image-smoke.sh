@@ -57,6 +57,12 @@ if grep -Eq 'management_version|management_source|platform_api' <<<"$metadata"; 
   exit 1
 fi
 
+short_version="$(docker run --rm --entrypoint ovpn "$IMAGE" -v)"
+if [ "$short_version" != "$IMAGE_VERSION" ]; then
+  printf 'unexpected ovpn -v output: %s\n' "$short_version" >&2
+  exit 1
+fi
+
 docker run --rm --entrypoint sh "$IMAGE" -ec '
   ! command -v curl >/dev/null
   command -v jq >/dev/null
