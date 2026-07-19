@@ -2,24 +2,12 @@
 
 OVPN_CLIENT_MUTATION_TARGETS=()
 
-ovpn_client_ip_require_applied_draft() {
-  local draft applied
-
-  draft="$(ovpn_registry_client_ip_file)"
-  applied="$(ovpn_registry_applied_file)"
-  [ -r "$draft" ] && [ -r "$applied" ] || ovpn_die 'client-IP registry is unavailable; restore the current registry first'
-  if ! cmp -s "$draft" "$applied"; then
-    ovpn_log 'client-IP draft was out of sync; restoring from the applied snapshot'
-    cp "$applied" "$draft" || ovpn_die 'failed to restore client-IP draft from the applied snapshot'
-  fi
-}
-
 ovpn_client_ip_prepare_mutation() {
-  local applied
+  local registry
 
-  ovpn_client_ip_require_applied_draft
-  applied="$(ovpn_registry_applied_file)"
-  ovpn_client_ip_validate_file "$applied" || ovpn_die 'applied client-IP registry is invalid; restore it before changing clients'
+  registry="$(ovpn_registry_client_ip_file)"
+  [ -r "$registry" ] || ovpn_die 'client-IP registry is unavailable; restore it before changing clients'
+  ovpn_client_ip_validate_file "$registry" || ovpn_die 'client-IP registry is invalid; restore it before changing clients'
 }
 
 ovpn_client_ip_assignment_index() {
@@ -91,18 +79,7 @@ ovpn_client_ip_allocate_static() {
   ovpn_die 'cannot allocate a static IP: the static address region is full'
 }
 
-ovpn_client_ip_write_current_draft() {
-  local draft candidate
-
-  draft="$(ovpn_registry_client_ip_file)"
-  candidate="${draft}.mutation.$$"
-  ovpn_client_ip_write_canonical_file "$candidate"
-  ovpn_client_ip_atomic_install "$candidate" "$draft"
-  rm -f "$candidate"
-}
-
 ovpn_client_ip_apply_current_mutation() {
-  ovpn_client_ip_write_current_draft
   ovpn_client_ip_apply_inner
 }
 
@@ -283,7 +260,7 @@ ovpn_client_set_from_editor() {
   local -A requests=()
   local -A seen=()
 
-  temporary="$(mktemp "$OVPN_DATA_DIR/data/.client-ip-set.XXXXXX")" || ovpn_die "failed to create client-ip editor temporary file"
+  temporary="$(mktemp "$OVPN_DATA_DIR/meta/.client-ip-set.XXXXXX")" || ovpn_die "failed to create client-ip editor temporary file"
   umask 077
   {
     printf '%s\n' '# client,ip'

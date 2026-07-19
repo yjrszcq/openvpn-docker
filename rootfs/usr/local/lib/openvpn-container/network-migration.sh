@@ -177,7 +177,7 @@ ovpn_network_migration_print_plan() {
 }
 
 ovpn_network_migration_apply_inner() (
-  local backup config_backup schema_backup draft applied audit server lease_dir index
+  local backup config_backup schema_backup registry audit server lease_dir index
   local server_existed=false lease_dir_existed=false ccd_existed=false
   local transaction_success=false rollback_ready=false runtime_reload_attempted=false
 
@@ -186,8 +186,7 @@ ovpn_network_migration_apply_inner() (
   backup="$(mktemp -d "$OVPN_DATA_DIR/.network-migration.XXXXXX")" || ovpn_die "failed to create migration backup directory"
   config_backup="$backup/project.env"
   schema_backup="$backup/schema-version"
-  draft="$(ovpn_registry_client_ip_file)"
-  applied="$(ovpn_registry_applied_file)"
+  registry="$(ovpn_registry_client_ip_file)"
   audit="$(ovpn_registry_audit_file)"
   server="$OVPN_DATA_DIR/server/server.conf"
   lease_dir="$OVPN_LEASE_DIR"
@@ -195,8 +194,7 @@ ovpn_network_migration_apply_inner() (
   rollback() {
     cp "$config_backup" "$OVPN_PROJECT_ENV" || ovpn_log "rollback: failed to restore project env"
     cp "$schema_backup" "$OVPN_SCHEMA_VERSION_FILE" || ovpn_log "rollback: failed to restore schema version"
-    cp "$backup/draft" "$draft" || ovpn_log "rollback: failed to restore draft registry"
-    cp "$backup/applied" "$applied" || ovpn_log "rollback: failed to restore applied registry"
+    cp "$backup/registry" "$registry" || ovpn_log "rollback: failed to restore client-IP registry"
     cp "$backup/audit" "$audit" || ovpn_log "rollback: failed to restore audit log"
     rm -rf "$OVPN_DATA_DIR/ccd"
     if [ "$ccd_existed" = true ]; then
@@ -241,8 +239,7 @@ ovpn_network_migration_apply_inner() (
 
   cp "$OVPN_PROJECT_ENV" "$config_backup" || ovpn_die "migration backup failed"
   cp "$OVPN_SCHEMA_VERSION_FILE" "$schema_backup" || ovpn_die "migration backup failed"
-  cp "$draft" "$backup/draft" || ovpn_die "migration backup failed"
-  cp "$applied" "$backup/applied" || ovpn_die "migration backup failed"
+  cp "$registry" "$backup/registry" || ovpn_die "migration backup failed"
   cp "$audit" "$backup/audit" || ovpn_die "migration backup failed"
   if [ -e "$OVPN_DATA_DIR/ccd" ]; then
     cp -a "$OVPN_DATA_DIR/ccd" "$backup/ccd" || ovpn_die "migration backup failed"

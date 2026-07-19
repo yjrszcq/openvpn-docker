@@ -24,7 +24,7 @@ ovpn_client_ip_parse_file() {
   OVPN_CLIENT_IP_INTS=()
 
   [ -r "$file" ] || {
-    ovpn_client_ip_error "cannot read registry draft: $file"
+    ovpn_client_ip_error "cannot read client-IP registry: $file"
     return 1
   }
 
@@ -264,22 +264,19 @@ ovpn_client_ip_apply_rollback() {
 }
 
 ovpn_client_ip_apply_inner() (
-  local draft snapshot backup candidate transaction_success=false
+  local registry backup candidate transaction_success=false
 
-  draft="$(ovpn_registry_client_ip_file)"
-  snapshot="$(ovpn_registry_applied_file)"
-  [ -r "$draft" ] || ovpn_die "cannot read registry draft: $draft"
-  [ -r "$snapshot" ] || ovpn_die "cannot read applied registry snapshot: $snapshot"
+  registry="$(ovpn_registry_client_ip_file)"
+  [ -r "$registry" ] || ovpn_die "cannot read client-IP registry: $registry"
   backup="$(mktemp "$OVPN_DATA_DIR/meta/.client-ip.apply.XXXXXX")" || ovpn_die "failed to create client-ip apply backup file"
-  candidate="${draft}.candidate.$$"
-  cp "$snapshot" "$backup" || ovpn_die "failed to backup applied client-IP registry"
+  candidate="${registry}.candidate.$$"
+  cp "$registry" "$backup" || ovpn_die "failed to backup client-IP registry"
   trap '
     status=$?
     trap - EXIT
     set +e
     if [ "$transaction_success" != true ]; then
-      ovpn_client_ip_atomic_install "$backup" "$draft"
-      ovpn_client_ip_atomic_install "$backup" "$snapshot"
+      ovpn_client_ip_atomic_install "$backup" "$registry"
       ovpn_client_ip_audit_event rejected || true
       if declare -F ovpn_event_write >/dev/null 2>&1; then
         ovpn_event_write client_ip apply rejected "" "" || true
@@ -290,14 +287,13 @@ ovpn_client_ip_apply_inner() (
     exit "$status"
   ' EXIT
 
-  if ! ovpn_client_ip_validate_file "$draft"; then
+  ovpn_client_ip_write_canonical_file "$candidate"
+  if ! ovpn_client_ip_validate_file "$candidate"; then
     exit 1
   fi
-  ovpn_client_ip_apply_begin
-  ovpn_client_ip_write_canonical_file "$candidate"
-  ovpn_client_ip_atomic_install "$candidate" "$draft"
-  ovpn_client_ip_apply_derived
-  ovpn_client_ip_atomic_install "$candidate" "$snapshot"
+  ovpn_client_ip_apply_begin "$backup" "$candidate"
+  ovpn_client_ip_atomic_install "$candidate" "$registry"
+  ovpn_client_ip_apply_derived "$backup" "$registry"
   ovpn_client_ip_audit_event applied
   ovpn_client_ip_apply_finalize
   transaction_success=true

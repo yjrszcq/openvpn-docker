@@ -28,7 +28,7 @@ ovpn_client_ip_sync_reset() {
 
 ovpn_client_ip_sync_collect_changes() {
   local snapshot="$1"
-  local draft="$2"
+  local current="$2"
   local index id ignored_name old_ip new_ip line
   local -A old_assignments=()
   local -A new_assignments=()
@@ -153,11 +153,10 @@ ovpn_client_ip_apply_begin() {
 }
 
 ovpn_client_ip_apply_derived() {
-  local snapshot draft
+  local previous="$1"
+  local current="$2"
 
-  snapshot="$(ovpn_registry_applied_file)"
-  draft="$(ovpn_registry_client_ip_file)"
-  ovpn_client_ip_sync_collect_changes "$snapshot" "$draft"
+  ovpn_client_ip_sync_collect_changes "$previous" "$current"
   ovpn_client_ip_sync_stage_ccd
   ovpn_client_ip_sync_swap_ccd
   ovpn_client_ip_sync_maybe_fail ccd

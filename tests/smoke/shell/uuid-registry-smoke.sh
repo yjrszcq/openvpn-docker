@@ -99,7 +99,6 @@ assert_rejected ovpn_client_ip_parse_file "$TMP_DIR/invalid-client-ip.csv"
 
 ovpn_registry_initialize_empty
 grep -Fqx '# id,name,state' "$OVPN_DATA_DIR/meta/client-state.csv"
-grep -Fqx '# id,name,ip' "$OVPN_DATA_DIR/data/client-ip.csv"
-cmp "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
+grep -Fqx '# id,name,ip' "$OVPN_DATA_DIR/meta/client-ip.csv"
 
 printf 'UUID registry smoke passed\n'

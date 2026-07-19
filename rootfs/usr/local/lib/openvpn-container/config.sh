@@ -289,7 +289,7 @@ ovpn_config_regenerate_derived() {
 
   ovpn_render_server --output "$OVPN_DATA_DIR/server/server.conf" || ovpn_die "failed to regenerate server config"
 
-  client_ip_csv="$OVPN_DATA_DIR/data/client-ip.csv"
+  client_ip_csv="$(ovpn_registry_client_ip_file)"
   ovpn_client_ip_collect_pki_clients || ovpn_die "failed to collect PKI client state"
   [ -r "$client_ip_csv" ] || return 0
   while IFS=, read -r id name _; do

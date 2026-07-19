@@ -52,8 +52,7 @@ $OVPN_DATA_DIR/config/project.env
 $OVPN_DATA_DIR/config/schema-version
 $OVPN_DATA_DIR/meta/instance.json
 $OVPN_DATA_DIR/pki/ca.crt
-$OVPN_DATA_DIR/data/client-ip.csv
-$OVPN_DATA_DIR/meta/client-ip.applied.csv
+$OVPN_DATA_DIR/meta/client-ip.csv
 $OVPN_DATA_DIR/meta/client-state.csv
 $OVPN_DATA_DIR/meta/audit.jsonl
 $OVPN_DATA_DIR/pki/private/ca.key
@@ -166,17 +165,6 @@ ovpn_state_scan_client_profiles() {
       ovpn_state_classify_missing_client_identity "$name" "$id" "$serial"
     fi
   done <"$index"
-}
-
-ovpn_state_scan_client_ip_pending() {
-  local draft applied
-
-  declare -F ovpn_registry_client_ip_file >/dev/null 2>&1 || return 0
-  draft="$(ovpn_registry_client_ip_file)"
-  applied="$(ovpn_registry_applied_file)"
-  if [ -r "$draft" ] && [ -r "$applied" ] && ! cmp -s "$draft" "$applied"; then
-    ovpn_state_add_issue CLIENT_IP_PENDING_EXPLICIT_APPLY manual RUN_CLIENT_IP_APPLY
-  fi
 }
 
 ovpn_state_add_repairable_issue() {
@@ -439,7 +427,6 @@ ovpn_state_scan() {
   fi
 
   ovpn_state_validate_crypto
-  ovpn_state_scan_client_ip_pending
   if [ -e "$OVPN_DATA_DIR/pki/index.txt" ]; then
     ovpn_state_scan_client_profiles
     if [ "$OVPN_STATE_CLIENT_REGISTRY_RECOVERY_PENDING" != true ] &&
@@ -564,14 +551,10 @@ ovpn_doctor_command() {
     else
       printf 'Issues:\n'
       for ((index = 0; index < ${#OVPN_STATE_ISSUE_IDS[@]}; index++)); do
-        if [ "${OVPN_STATE_ISSUE_IDS[index]}" = CLIENT_IP_PENDING_EXPLICIT_APPLY ]; then
-          printf '  [manual] client-IP draft is out of sync with the applied registry; the next write operation will restore it automatically\n'
-        else
-          printf '  [%s] %s (action: %s)\n' \
-            "${OVPN_STATE_ISSUE_SEVERITIES[index]}" \
-            "${OVPN_STATE_ISSUE_IDS[index]}" \
-            "${OVPN_STATE_ISSUE_ACTIONS[index]}"
-        fi
+        printf '  [%s] %s (action: %s)\n' \
+          "${OVPN_STATE_ISSUE_SEVERITIES[index]}" \
+          "${OVPN_STATE_ISSUE_IDS[index]}" \
+          "${OVPN_STATE_ISSUE_ACTIONS[index]}"
       done
     fi
   fi

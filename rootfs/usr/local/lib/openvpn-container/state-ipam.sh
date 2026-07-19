@@ -87,12 +87,12 @@ ovpn_state_ipam_private_mode() {
   [ "$mode" = 600 ]
 }
 
-ovpn_state_ipam_applied_is_canonical() {
-  local applied="$1"
+ovpn_state_ipam_registry_is_canonical() {
+  local registry="$1"
   local canonical
 
   canonical="$(mktemp "${TMPDIR:-/tmp}/ovpn-client-ip-canonical.XXXXXX")" || return 1
-  if ! ovpn_client_ip_write_canonical_file "$canonical" || ! cmp -s "$applied" "$canonical"; then
+  if ! ovpn_client_ip_write_canonical_file "$canonical" || ! cmp -s "$registry" "$canonical"; then
     rm -f "$canonical"
     return 1
   fi
@@ -101,10 +101,10 @@ ovpn_state_ipam_applied_is_canonical() {
 
 ovpn_state_ipam_stage_ccd() {
   local destination="$1"
-  local applied index id ip
+  local registry index id ip
 
-  applied="$(ovpn_registry_applied_file)"
-  ovpn_client_ip_validate_file "$applied" || ovpn_die 'cannot safely rebuild CCD from an invalid applied client-IP registry'
+  registry="$(ovpn_registry_client_ip_file)"
+  ovpn_client_ip_validate_file "$registry" || ovpn_die 'cannot safely rebuild CCD from an invalid client-IP registry'
   rm -rf "$destination"
   mkdir -p "$destination"
   chmod 700 "$destination"
@@ -120,34 +120,33 @@ ovpn_state_ipam_stage_ccd() {
 
 ovpn_state_ipam_stage_canonical_registry() {
   local destination="$1"
-  local applied
+  local registry
 
-  applied="$(ovpn_registry_applied_file)"
-  ovpn_client_ip_validate_file "$applied" || ovpn_die 'cannot safely normalize an invalid applied client-IP registry'
+  registry="$(ovpn_registry_client_ip_file)"
+  ovpn_client_ip_validate_file "$registry" || ovpn_die 'cannot safely normalize an invalid client-IP registry'
   mkdir -p "$(dirname "$destination")"
   ovpn_client_ip_write_canonical_file "$destination"
 }
 
 ovpn_state_scan_ipam_consistency() {
-  local draft applied state_file audit_file ccd_dir lease_dir protected
+  local registry state_file audit_file ccd_dir lease_dir protected
   local index id name ip expected actual lease_line lease_id state expected_state
   local ccd_out_of_sync=false
-  local -A applied_ids=()
+  local -A registry_ids=()
 
-  draft="$(ovpn_registry_client_ip_file)"
-  applied="$(ovpn_registry_applied_file)"
+  registry="$(ovpn_registry_client_ip_file)"
   state_file="$(ovpn_registry_client_state_file)"
   audit_file="$(ovpn_registry_audit_file)"
   ccd_dir="$OVPN_DATA_DIR/ccd"
   lease_dir="$OVPN_LEASE_DIR"
-  if [ ! -e "$draft" ] && [ ! -e "$applied" ] && [ ! -e "$state_file" ] && [ ! -e "$audit_file" ]; then
+  if [ ! -e "$registry" ] && [ ! -e "$state_file" ] && [ ! -e "$audit_file" ]; then
     return 0
   fi
-  if [ ! -r "$draft" ] || [ ! -r "$applied" ] || [ ! -r "$state_file" ] || [ ! -r "$audit_file" ]; then
+  if [ ! -r "$registry" ] || [ ! -r "$state_file" ] || [ ! -r "$audit_file" ]; then
     ovpn_state_add_critical_issue CLIENT_IP_REGISTRY_INCOMPLETE RESTORE_CLIENT_IP_REGISTRY
     return 0
   fi
-  for protected in "$draft" "$applied" "$state_file" "$audit_file"; do
+  for protected in "$registry" "$state_file" "$audit_file"; do
     if ! ovpn_state_ipam_private_mode "$protected"; then
       ovpn_state_add_critical_issue CLIENT_IP_REGISTRY_PERMISSIONS RESTORE_CLIENT_IP_REGISTRY
       return 0
@@ -161,15 +160,15 @@ ovpn_state_scan_ipam_consistency() {
     ovpn_state_add_critical_issue CLIENT_IP_AUDIT_INVALID RESTORE_AUDIT_LOG
     return 0
   fi
-  ovpn_client_ip_validate_file "$applied" || {
-    ovpn_state_add_critical_issue CLIENT_IP_APPLIED_INVALID RESTORE_CLIENT_IP_REGISTRY
+  ovpn_client_ip_validate_file "$registry" || {
+    ovpn_state_add_critical_issue CLIENT_IP_REGISTRY_INVALID RESTORE_CLIENT_IP_REGISTRY
     return 0
   }
   for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
     id="${OVPN_CLIENT_IP_IDS[index]}"
     name="${OVPN_CLIENT_IP_NAMES[index]}"
     ip="${OVPN_CLIENT_IP_VALUES[index]}"
-    applied_ids["$id"]=1
+    registry_ids["$id"]=1
     [ "${OVPN_STATE_IPAM_CLIENT_NAMES_BY_ID[$id]:-}" = "$name" ] || {
       ovpn_state_add_critical_issue CLIENT_IP_LOGICAL_STATE_MISMATCH RESTORE_CLIENT_IP_REGISTRY
       return 0
@@ -201,11 +200,11 @@ ovpn_state_scan_ipam_consistency() {
     state="${OVPN_STATE_IPAM_CLIENT_STATES_BY_ID[$id]}"
     name="${OVPN_STATE_IPAM_CLIENT_NAMES_BY_ID[$id]}"
     if [ "$state" = deleted ]; then
-      if [ -n "${applied_ids[$id]+present}" ] || ovpn_state_ipam_deleted_client_has_active_certificate "$id"; then
+      if [ -n "${registry_ids[$id]+present}" ] || ovpn_state_ipam_deleted_client_has_active_certificate "$id"; then
         ovpn_state_add_critical_issue CLIENT_IP_LOGICAL_STATE_MISMATCH RESTORE_CLIENT_IP_REGISTRY
         return 0
       fi
-    elif [ -z "${applied_ids[$id]+present}" ]; then
+    elif [ -z "${registry_ids[$id]+present}" ]; then
       ovpn_state_add_critical_issue CLIENT_IP_LOGICAL_STATE_MISMATCH RESTORE_CLIENT_IP_REGISTRY
       return 0
     fi
@@ -216,7 +215,7 @@ ovpn_state_scan_ipam_consistency() {
     shopt -s nullglob
     for lease_line in "$ccd_dir"/*; do
       id="${lease_line##*/}"
-      [ -n "${applied_ids[$id]+present}" ] && [ -n "$(awk -F, -v client_id="$id" '$1 == client_id && $3 != "" { print; exit }' "$applied")" ] || ccd_out_of_sync=true
+      [ -n "${registry_ids[$id]+present}" ] && [ -n "$(awk -F, -v client_id="$id" '$1 == client_id && $3 != "" { print; exit }' "$registry")" ] || ccd_out_of_sync=true
     done
     eval "$_nullglob" 2>/dev/null || true
   fi
@@ -227,12 +226,12 @@ ovpn_state_scan_ipam_consistency() {
     for lease_file in "$lease_dir"/*; do
       [ -f "$lease_file" ] || continue
       lease_id="$(basename "$lease_file")"
-      [ -n "${applied_ids[$lease_id]+present}" ] || continue
-      ip="$(awk -F, -v client_id="$lease_id" '$1 == client_id { print $3; exit }' "$applied")"
+      [ -n "${registry_ids[$lease_id]+present}" ] || continue
+      ip="$(awk -F, -v client_id="$lease_id" '$1 == client_id { print $3; exit }' "$registry")"
       [ -z "$ip" ] || ovpn_state_add_issue "STATIC_CLIENT_LEASE_$lease_id" manual RUN_CLIENT_IP_APPLY
     done
   fi
-  if cmp -s "$draft" "$applied" && ! ovpn_state_ipam_applied_is_canonical "$applied"; then
+  if ! ovpn_state_ipam_registry_is_canonical "$registry"; then
     ovpn_state_add_repairable_issue CLIENT_IP_REGISTRY_NOT_CANONICAL NORMALIZE_CLIENT_IP_REGISTRY
   fi
 }

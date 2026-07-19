@@ -14,12 +14,12 @@ declare -A OVPN_CLIENT_LIST_CONNECTED_IPS=()
 declare -A OVPN_CLIENT_LIST_PERSISTED_IPS=()
 OVPN_CLIENT_LIST_MANAGEMENT_AVAILABLE=false
 
-ovpn_client_list_prepare_applied_registry() {
-  local applied
+ovpn_client_list_prepare_registry() {
+  local registry
 
-  applied="$(ovpn_registry_applied_file)"
-  [ -r "$applied" ] || ovpn_die "cannot read applied client-IP registry: $applied"
-  ovpn_client_ip_validate_file "$applied" || ovpn_die 'applied client-IP registry is invalid; restore it before listing IPs'
+  registry="$(ovpn_registry_client_ip_file)"
+  [ -r "$registry" ] || ovpn_die "cannot read client-IP registry: $registry"
+  ovpn_client_ip_validate_file "$registry" || ovpn_die 'client-IP registry is invalid; restore it before listing IPs'
 }
 
 ovpn_client_list_dynamic_ip_is_valid() {
@@ -104,7 +104,7 @@ ovpn_client_list_with_ip_command() {
   local -a rows=()
 
   ovpn_require_healthy_state
-  ovpn_client_list_prepare_applied_registry
+  ovpn_client_list_prepare_registry
   ovpn_client_list_load_persisted_dynamic_ips
   ovpn_client_list_load_connected_clients
   for ((index = 0; index < ${#OVPN_CLIENT_IP_NAMES[@]}; index++)); do
@@ -323,7 +323,7 @@ ovpn_client_rename_audit() {
 ovpn_client_rename_inner() (
   local reference="$1"
   local new_name="$2"
-  local id old_name state state_file draft applied audit_file profile_dir old_profile new_profile
+  local id old_name state state_file registry audit_file profile_dir old_profile new_profile
   local stage rollback_ok transaction_success=false
 
   ovpn_require_healthy_state
@@ -340,8 +340,7 @@ ovpn_client_rename_inner() (
   [ -z "${OVPN_REGISTRY_CURRENT_ID_BY_NAME[$new_name]:-}" ] || ovpn_die "client name already exists: $new_name"
 
   state_file="$(ovpn_registry_client_state_file)"
-  draft="$(ovpn_registry_client_ip_file)"
-  applied="$(ovpn_registry_applied_file)"
+  registry="$(ovpn_registry_client_ip_file)"
   audit_file="$(ovpn_registry_audit_file)"
   profile_dir="$OVPN_DATA_DIR/clients/$state"
   old_profile="$profile_dir/$old_name.ovpn"
@@ -355,8 +354,7 @@ ovpn_client_rename_inner() (
     ovpn_die 'failed to create client rename staging directory'
   chmod 700 "$stage"
   if ! cp "$state_file" "$stage/state.original" ||
-    ! cp "$draft" "$stage/draft.original" ||
-    ! cp "$applied" "$stage/applied.original" ||
+    ! cp "$registry" "$stage/registry.original" ||
     ! cp "$audit_file" "$stage/audit.original" ||
     ! cp "$old_profile" "$stage/profile.original"; then
     rm -rf "$stage"
@@ -371,8 +369,7 @@ ovpn_client_rename_inner() (
     if [ "$transaction_success" != true ]; then
       rollback_ok=true
       ovpn_client_ip_atomic_install "$stage/state.original" "$state_file" || rollback_ok=false
-      ovpn_client_ip_atomic_install "$stage/draft.original" "$draft" || rollback_ok=false
-      ovpn_client_ip_atomic_install "$stage/applied.original" "$applied" || rollback_ok=false
+      ovpn_client_ip_atomic_install "$stage/registry.original" "$registry" || rollback_ok=false
       ovpn_client_ip_atomic_install "$stage/audit.original" "$audit_file" || rollback_ok=false
       rm -f "$new_profile"
       ovpn_client_ip_atomic_install "$stage/profile.original" "$old_profile" || rollback_ok=false
@@ -387,22 +384,17 @@ ovpn_client_rename_inner() (
   trap ovpn_client_rename_cleanup EXIT
 
   ovpn_client_rename_rewrite_csv "$state_file" "$stage/state.candidate" "$id" "$new_name"
-  ovpn_client_rename_rewrite_csv "$draft" "$stage/draft.candidate" "$id" "$new_name"
-  ovpn_client_rename_rewrite_csv "$applied" "$stage/applied.candidate" "$id" "$new_name"
+  ovpn_client_rename_rewrite_csv "$registry" "$stage/registry.candidate" "$id" "$new_name"
   ovpn_client_rename_rewrite_profile "$old_profile" "$stage/profile.candidate" "$id" "$old_name" "$new_name"
   ovpn_registry_load_identities "$stage/state.candidate" ||
     ovpn_die 'renamed identity registry candidate is invalid'
 
   ovpn_client_ip_atomic_install "$stage/state.candidate" "$state_file"
   ovpn_client_rename_maybe_fail identity
-  ovpn_client_ip_validate_file "$stage/draft.candidate" ||
-    ovpn_die 'renamed client-IP draft candidate is invalid'
-  ovpn_client_ip_write_canonical_file "$stage/draft.canonical"
-  ovpn_client_ip_validate_file "$stage/applied.candidate" ||
-    ovpn_die 'renamed applied client-IP candidate is invalid'
-  ovpn_client_ip_write_canonical_file "$stage/applied.canonical"
-  ovpn_client_ip_atomic_install "$stage/draft.canonical" "$draft"
-  ovpn_client_ip_atomic_install "$stage/applied.canonical" "$applied"
+  ovpn_client_ip_validate_file "$stage/registry.candidate" ||
+    ovpn_die 'renamed client-IP registry candidate is invalid'
+  ovpn_client_ip_write_canonical_file "$stage/registry.canonical"
+  ovpn_client_ip_atomic_install "$stage/registry.canonical" "$registry"
   ovpn_client_rename_maybe_fail registries
   ovpn_client_ip_atomic_install "$stage/profile.candidate" "$new_profile"
   rm -f "$old_profile"

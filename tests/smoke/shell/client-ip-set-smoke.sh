@@ -21,19 +21,18 @@ bravo_id=22222222-2222-4222-8222-222222222222
 zulu_id=33333333-3333-4333-8333-333333333333
 
 "$OVPN" config apply
-mkdir -p "$OVPN_DATA_DIR/data" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/pki"
+mkdir -p "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/pki"
 printf '%s\n' \
   $'V\t30000101000000Z\t\t01\tunknown\t/CN=11111111-1111-4111-8111-111111111111' \
   $'V\t30000101000000Z\t\t02\tunknown\t/CN=22222222-2222-4222-8222-222222222222' \
   $'V\t30000101000000Z\t\t03\tunknown\t/CN=33333333-3333-4333-8333-333333333333' \
   >"$OVPN_DATA_DIR/pki/index.txt"
-cat >"$OVPN_DATA_DIR/data/client-ip.csv" <<'EOF'
+cat >"$OVPN_DATA_DIR/meta/client-ip.csv" <<'EOF'
 # id,name,ip
 22222222-2222-4222-8222-222222222222,bravo,10.88.0.3
 11111111-1111-4111-8111-111111111111,alpha,10.88.0.4
 33333333-3333-4333-8333-333333333333,zulu,
 EOF
-cp "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 printf '%s\n' '# id,name,state' \
   '11111111-1111-4111-8111-111111111111,alpha,active' \
   '22222222-2222-4222-8222-222222222222,bravo,active' \
@@ -55,8 +54,7 @@ EOF
 # Test: set triggers apply transaction, canonical ordering, CCD generation
 "$OVPN" client ip set "$bravo_id" --ip 10.88.0.3 >"$TMP_DIR/apply.out" 2>&1
 grep -Fq 'set client' "$TMP_DIR/apply.out"
-cmp "$canonical" "$OVPN_DATA_DIR/data/client-ip.csv"
-cmp "$canonical" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
+cmp "$canonical" "$OVPN_DATA_DIR/meta/client-ip.csv"
 grep -Fq '"outcome":"applied"' "$OVPN_DATA_DIR/meta/audit.jsonl"
 jq -e -s --arg id "$bravo_id" '
   any(.[]; .event == "client_ip" and .operation == "set" and
@@ -73,12 +71,11 @@ if "$OVPN" client ip set bravo --ip 10.88.0.4 >"$TMP_DIR/rejected.out" 2>&1; the
   exit 1
 fi
 grep -Fq "static IP '10.88.0.4' is already assigned" "$TMP_DIR/rejected.out"
-cmp "$canonical" "$OVPN_DATA_DIR/data/client-ip.csv"
-cmp "$canonical" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
+cmp "$canonical" "$OVPN_DATA_DIR/meta/client-ip.csv"
 
 # Test: set with same value re-applies cleanly
 "$OVPN" client ip set bravo --ip 10.88.0.3 >"$TMP_DIR/sync.out" 2>&1
-cmp "$canonical" "$OVPN_DATA_DIR/data/client-ip.csv"
+cmp "$canonical" "$OVPN_DATA_DIR/meta/client-ip.csv"
 
 # Test: boundary addresses in static region
 cat >"$TMP_DIR/boundary.csv" <<'EOF'
@@ -89,7 +86,7 @@ cat >"$TMP_DIR/boundary.csv" <<'EOF'
 EOF
 "$OVPN" client ip set bravo --ip 10.88.0.2 >"$TMP_DIR/boundary-bravo.out" 2>&1
 "$OVPN" client ip set alpha --ip 10.88.0.128 >"$TMP_DIR/boundary-alpha.out" 2>&1
-cmp "$TMP_DIR/boundary.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
+cmp "$TMP_DIR/boundary.csv" "$OVPN_DATA_DIR/meta/client-ip.csv"
 
 # Test: address in dynamic pool rejected
 cat >"$TMP_DIR/pre-overlap.csv" <<'EOF'
@@ -103,7 +100,7 @@ if "$OVPN" client ip set alpha --ip 10.88.0.129 >"$TMP_DIR/pool-overlap.out" 2>&
   exit 1
 fi
 grep -Fq 'outside the static address region' "$TMP_DIR/pool-overlap.out"
-cmp "$TMP_DIR/pre-overlap.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
+cmp "$TMP_DIR/pre-overlap.csv" "$OVPN_DATA_DIR/meta/client-ip.csv"
 
 # Test: dynamic assignment removes CCD
 "$OVPN" client ip set alpha --dynamic >"$TMP_DIR/dynamic.out" 2>&1
@@ -113,7 +110,7 @@ cat >"$TMP_DIR/dynamic.csv" <<'EOF'
 11111111-1111-4111-8111-111111111111,alpha,
 33333333-3333-4333-8333-333333333333,zulu,
 EOF
-cmp "$TMP_DIR/dynamic.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
+cmp "$TMP_DIR/dynamic.csv" "$OVPN_DATA_DIR/meta/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/$bravo_id"
 test ! -e "$OVPN_DATA_DIR/ccd/$alpha_id"
 test ! -e "$OVPN_DATA_DIR/ccd/$zulu_id"
@@ -125,8 +122,11 @@ if [ -f "$OVPN_LEASE_DIR/$alpha_id" ]; then
 fi
 
 # Test: saving an unchanged batch editor preserves static and dynamic modes.
-OVPN_EDITOR=true "$OVPN" client ip set --all >"$TMP_DIR/editor-unchanged.out" 2>&1
-cmp "$TMP_DIR/dynamic.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
+if ! OVPN_EDITOR=true "$OVPN" client ip set --all >"$TMP_DIR/editor-unchanged.out" 2>&1; then
+  cat "$TMP_DIR/editor-unchanged.out" >&2
+  exit 1
+fi
+cmp "$TMP_DIR/dynamic.csv" "$OVPN_DATA_DIR/meta/client-ip.csv"
 
 # Test: explicit assignments are reserved before editor 'auto' allocation.
 editor="$TMP_DIR/allocate-editor.sh"
@@ -143,10 +143,10 @@ cat >"$TMP_DIR/editor-auto.csv" <<'EOF'
 33333333-3333-4333-8333-333333333333,zulu,10.88.0.3
 11111111-1111-4111-8111-111111111111,alpha,
 EOF
-diff -u "$TMP_DIR/editor-auto.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
+diff -u "$TMP_DIR/editor-auto.csv" "$OVPN_DATA_DIR/meta/client-ip.csv"
 
 # Test: transaction rollback on derived-state failure
-cp "$OVPN_DATA_DIR/meta/client-ip.applied.csv" "$TMP_DIR/before-failure.csv"
+cp "$OVPN_DATA_DIR/meta/client-ip.csv" "$TMP_DIR/before-failure.csv"
 ccd_before="$(sha256sum "$OVPN_DATA_DIR/ccd/$bravo_id")"
 lease_before="$(find "$OVPN_LEASE_DIR" -type f -exec sha256sum {} + | sort -k2 | sha256sum)"
 if OVPN_CLIENT_IP_APPLY_FAIL_AFTER=ccd "$OVPN" client ip set zulu --ip 10.88.0.4 >"$TMP_DIR/derived-failure.out" 2>&1; then
@@ -158,8 +158,7 @@ jq -e -s '
   any(.[]; .event == "client_ip" and .operation == "apply" and
     .outcome == "rejected" and .client_id == null)
 ' "$OVPN_DATA_DIR/logs/events.jsonl" >/dev/null
-cmp "$TMP_DIR/before-failure.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
-cmp "$TMP_DIR/before-failure.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
+cmp "$TMP_DIR/before-failure.csv" "$OVPN_DATA_DIR/meta/client-ip.csv"
 [ "$ccd_before" = "$(sha256sum "$OVPN_DATA_DIR/ccd/$bravo_id")" ]
 [ "$lease_before" = "$(find "$OVPN_LEASE_DIR" -type f -exec sha256sum {} + | sort -k2 | sha256sum)" ]
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/$bravo_id"
