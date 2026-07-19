@@ -105,7 +105,7 @@ fi
 ovpn client create rename-old --dynamic >$OUT 2>&1
 rename_id="$(awk -F, '$2 == "rename-old" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
 ovpn client rename "$rename_id" rename-new >$OUT 2>&1
-grep -qE "${rename_id}.*rename-new.*active" <(ovpn client list)
+grep -qE "${rename_id}.*rename-new.*active" <(ovpn client list --no-trunc)
 check $? "rename preserves client UUID"
 ovpn client revoke rename-new >$OUT 2>&1
 ovpn client delete "$rename_id" >$OUT 2>&1

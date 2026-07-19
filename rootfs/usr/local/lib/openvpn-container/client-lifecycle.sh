@@ -99,7 +99,9 @@ ovpn_client_list_load_connected_clients() {
 }
 
 ovpn_client_list_with_ip_command() {
+  local no_trunc="$1"
   local index id name state assignment address ip_state connection mode row
+  local display_id
   local id_width=9 name_width=4 state_width=5 mode_width=4 ip_width=2 ip_state_width=8
   local -a rows=()
 
@@ -142,7 +144,12 @@ ovpn_client_list_with_ip_command() {
   fi
   for row in "${rows[@]}"; do
     IFS=$'\t' read -r name id state mode address ip_state connection <<<"$row"
-    if ((${#id} > id_width)); then id_width=${#id}; fi
+    if [ "$no_trunc" = true ]; then
+      display_id="$id"
+    else
+      display_id="$(ovpn_registry_uuid_abbreviate "$id")"
+    fi
+    if ((${#display_id} > id_width)); then id_width=${#display_id}; fi
     if ((${#name} > name_width)); then name_width=${#name}; fi
     if ((${#state} > state_width)); then state_width=${#state}; fi
     if ((${#mode} > mode_width)); then mode_width=${#mode}; fi
@@ -154,22 +161,33 @@ ovpn_client_list_with_ip_command() {
     "$ip_state_width" 'IP STATE' CONNECTION
   for row in "${rows[@]}"; do
     IFS=$'\t' read -r name id state mode address ip_state connection <<<"$row"
+    if [ "$no_trunc" = true ]; then
+      display_id="$id"
+    else
+      display_id="$(ovpn_registry_uuid_abbreviate "$id")"
+    fi
     printf '%-*s  %-*s  %-*s  %-*s  %-*s  %-*s  %s\n' \
-      "$id_width" "$id" "$name_width" "$name" "$state_width" "$state" "$mode_width" "$mode" "$ip_width" "$address" \
+      "$id_width" "$display_id" "$name_width" "$name" "$state_width" "$state" "$mode_width" "$mode" "$ip_width" "$address" \
       "$ip_state_width" "$ip_state" "$connection"
   done
 }
 
 ovpn_client_list_plain_command() {
-  local id name state entry
+  local no_trunc="$1"
+  local id name state entry display_id
   local id_width=9 name_width=4
   local -a entries=()
 
   ovpn_require_healthy_state
   while IFS=' ' read -r name id state; do
-    entries+=("$name"$'\t'"$id"$'\t'"$state")
+    if [ "$no_trunc" = true ]; then
+      display_id="$id"
+    else
+      display_id="$(ovpn_registry_uuid_abbreviate "$id")"
+    fi
+    entries+=("$name"$'\t'"$display_id"$'\t'"$state")
     if ((${#name} > name_width)); then name_width=${#name}; fi
-    if ((${#id} > id_width)); then id_width=${#id}; fi
+    if ((${#display_id} > id_width)); then id_width=${#display_id}; fi
   done < <(ovpn_client_records)
 
   if ((${#entries[@]})); then
@@ -182,18 +200,28 @@ ovpn_client_list_plain_command() {
 }
 
 ovpn_client_list_command() {
-  case "$#" in
-    0)
-      ovpn_client_list_plain_command
-      ;;
-    1)
-      [ "$1" = --detail ] || ovpn_die 'usage: ovpn client list [--detail]'
-      ovpn_client_list_with_ip_command
-      ;;
-    *)
-      ovpn_die 'usage: ovpn client list [--detail]'
-      ;;
-  esac
+  local detail=false no_trunc=false
+  local usage='usage: ovpn client list [--detail] [--no-trunc]'
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --detail)
+        [ "$detail" = false ] || ovpn_die '--detail may only be specified once'
+        detail=true
+        ;;
+      --no-trunc)
+        [ "$no_trunc" = false ] || ovpn_die '--no-trunc may only be specified once'
+        no_trunc=true
+        ;;
+      *) ovpn_die "$usage" ;;
+    esac
+    shift
+  done
+  if [ "$detail" = true ]; then
+    ovpn_client_list_with_ip_command "$no_trunc"
+  else
+    ovpn_client_list_plain_command "$no_trunc"
+  fi
 }
 
 ovpn_pki_stage_create() {
@@ -862,7 +890,7 @@ ovpn_client_command() {
       ;;
     list)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client list [--detail]" "List client certificate state and optional detailed IP assignment."
+        ovpn_command_usage "ovpn client list [--detail] [--no-trunc]" "List client certificate state and optional detailed IP assignment."
       else
         ovpn_client_list_command "$@"
       fi

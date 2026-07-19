@@ -15,7 +15,16 @@ cleanup() {
 }
 
 format_client_list_row() {
+  printf '%-12s  %-7s  %-7s  %-7s  %-11s  %-11s  %s\n' "$@"
+}
+
+format_client_list_full_row() {
   printf '%-36s  %-7s  %-7s  %-7s  %-11s  %-11s  %s\n' "$@"
+}
+
+short_client_id() {
+  local compact="${1//-/}"
+  printf '%s\n' "${compact:0:12}"
 }
 
 on_error() {
@@ -280,7 +289,15 @@ fi
 
 "$OVPN" client list >"$TMP_DIR/client-list.out"
 grep -Eq '^CLIENT ID[[:space:]]+NAME[[:space:]]+STATE$' "$TMP_DIR/client-list.out"
-grep -E "^${laptop_id}[[:space:]]+laptop[[:space:]]+active$" "$TMP_DIR/client-list.out"
+grep -E "^$(short_client_id "$laptop_id")[[:space:]]+laptop[[:space:]]+active$" "$TMP_DIR/client-list.out"
+grep -E "^${laptop_id}[[:space:]]+laptop[[:space:]]+active$" <("$OVPN" client list --no-trunc)
+"$OVPN" client export "$(short_client_id "$laptop_id")" >"$TMP_DIR/laptop-by-listed-id.ovpn"
+grep -Fqx "# ovpn-client-id: $laptop_id" "$TMP_DIR/laptop-by-listed-id.ovpn"
+if "$OVPN" client list --no-trunc --no-trunc >"$TMP_DIR/list-duplicate.out" 2>"$TMP_DIR/list-duplicate.err"; then
+  echo 'duplicate --no-trunc unexpectedly succeeded' >&2
+  exit 1
+fi
+grep -Fq -- '--no-trunc may only be specified once' "$TMP_DIR/list-duplicate.err"
 test -f "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 
 "$OVPN" client create source --dynamic >"$TMP_DIR/rename-create.out" 2>"$TMP_DIR/rename-create.err"
@@ -327,7 +344,7 @@ if compgen -G "$OVPN_DATA_DIR/meta/.client-rename.*" >/dev/null; then
   exit 1
 fi
 "$OVPN" client rename --name target source >"$TMP_DIR/rename-back.out" 2>"$TMP_DIR/rename-back.err"
-grep -E "^${rename_id}[[:space:]]+source[[:space:]]+active$" <("$OVPN" client list)
+grep -E "^$(short_client_id "$rename_id")[[:space:]]+source[[:space:]]+active$" <("$OVPN" client list)
 
 "$OVPN" client create phone --dynamic >"$TMP_DIR/phone-create.out" 2>"$TMP_DIR/phone-create.err"
 phone_id="$(awk -F, '$2 == "phone" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
@@ -380,22 +397,23 @@ printf '10.88.0.202\n' >"$OVPN_LEASE_DIR/$known_id"
 printf '10.88.0.203\n' >"$OVPN_LEASE_DIR/unrelated"
 "$OVPN" client list --detail >"$TMP_DIR/client-list-ip.out"
 grep -Fqx "$(format_client_list_row 'CLIENT ID' NAME STATE MODE IP 'IP STATE' CONNECTION)" "$TMP_DIR/client-list-ip.out"
-grep -Fqx "$(format_client_list_row "$laptop_id" laptop active static 10.88.0.2 configured online)" "$TMP_DIR/client-list-ip.out"
-grep -Fqx "$(format_client_list_row "$phone_id" phone active static 10.88.0.20 configured offline)" "$TMP_DIR/client-list-ip.out"
-grep -Fqx "$(format_client_list_row "$old_id" old revoked static 10.88.0.30 retained offline)" "$TMP_DIR/client-list-ip.out"
-grep -Fqx "$(format_client_list_row "$online_id" online active dynamic 10.88.0.200 connected online)" "$TMP_DIR/client-list-ip.out"
-grep -Fqx "$(format_client_list_row "$known_id" known active dynamic 10.88.0.202 last-known offline)" "$TMP_DIR/client-list-ip.out"
-grep -Fqx "$(format_client_list_row "$missing_id" missing active dynamic - unavailable offline)" "$TMP_DIR/client-list-ip.out"
+grep -Fqx "$(format_client_list_row "$(short_client_id "$laptop_id")" laptop active static 10.88.0.2 configured online)" "$TMP_DIR/client-list-ip.out"
+grep -Fqx "$(format_client_list_row "$(short_client_id "$phone_id")" phone active static 10.88.0.20 configured offline)" "$TMP_DIR/client-list-ip.out"
+grep -Fqx "$(format_client_list_row "$(short_client_id "$old_id")" old revoked static 10.88.0.30 retained offline)" "$TMP_DIR/client-list-ip.out"
+grep -Fqx "$(format_client_list_row "$(short_client_id "$online_id")" online active dynamic 10.88.0.200 connected online)" "$TMP_DIR/client-list-ip.out"
+grep -Fqx "$(format_client_list_row "$(short_client_id "$known_id")" known active dynamic 10.88.0.202 last-known offline)" "$TMP_DIR/client-list-ip.out"
+grep -Fqx "$(format_client_list_row "$(short_client_id "$missing_id")" missing active dynamic - unavailable offline)" "$TMP_DIR/client-list-ip.out"
 if grep -Fq 'unrelated' "$TMP_DIR/client-list-ip.out"; then
   echo 'client IP list included a lease for an unknown client' >&2
   exit 1
 fi
-grep -E "^${laptop_id}[[:space:]]+laptop[[:space:]]+active$" <("$OVPN" client list)
-grep -Fqx "$(format_client_list_row "$online_id" online active dynamic 10.88.0.200 connected online)" <("$OVPN" client list --detail)
+grep -E "^$(short_client_id "$laptop_id")[[:space:]]+laptop[[:space:]]+active$" <("$OVPN" client list)
+grep -Fqx "$(format_client_list_row "$(short_client_id "$online_id")" online active dynamic 10.88.0.200 connected online)" <("$OVPN" client list --detail)
+grep -Fqx "$(format_client_list_full_row "$online_id" online active dynamic 10.88.0.200 connected online)" <("$OVPN" client list --no-trunc --detail)
 rm -f "$OVPN_MANAGEMENT_SOCKET"
 "$OVPN" client list --detail >"$TMP_DIR/client-list-ip-unknown.out"
-grep -Fqx "$(format_client_list_row "$laptop_id" laptop active static 10.88.0.2 configured unknown)" "$TMP_DIR/client-list-ip-unknown.out"
-grep -Fqx "$(format_client_list_row "$online_id" online active dynamic 10.88.0.201 last-known unknown)" "$TMP_DIR/client-list-ip-unknown.out"
+grep -Fqx "$(format_client_list_row "$(short_client_id "$laptop_id")" laptop active static 10.88.0.2 configured unknown)" "$TMP_DIR/client-list-ip-unknown.out"
+grep -Fqx "$(format_client_list_row "$(short_client_id "$online_id")" online active dynamic 10.88.0.201 last-known unknown)" "$TMP_DIR/client-list-ip-unknown.out"
 
 "$OVPN" client export -i "${laptop_id%%-*}" >"$TMP_DIR/laptop.ovpn" 2>"$TMP_DIR/export.err"
 test ! -s "$TMP_DIR/export.err"
@@ -446,7 +464,7 @@ fi
 grep -q 'already exists' "$TMP_DIR/duplicate.err"
 
 "$OVPN" client revoke --id "${phone_id%%-*}" --release-ip >"$TMP_DIR/phone-revoke.out" 2>"$TMP_DIR/phone-revoke.err"
-grep -E "^${phone_id}[[:space:]]+phone[[:space:]]+revoked$" <("$OVPN" client list)
+grep -E "^$(short_client_id "$phone_id")[[:space:]]+phone[[:space:]]+revoked$" <("$OVPN" client list)
 grep -Fqx "$phone_id,phone," "$OVPN_DATA_DIR/meta/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/ccd/$phone_id"
 test -f "$OVPN_DATA_DIR/clients/revoked/phone.ovpn"
@@ -457,7 +475,7 @@ phone_key_after="$(sha256sum "$OVPN_DATA_DIR/pki/private/$phone_id.key")"
   echo 'reissue did not generate a new private key' >&2
   exit 1
 }
-grep -E "^${phone_id}[[:space:]]+phone[[:space:]]+active$" <("$OVPN" client list)
+grep -E "^$(short_client_id "$phone_id")[[:space:]]+phone[[:space:]]+active$" <("$OVPN" client list)
 grep -q "^$phone_id,phone,10\\.88\\.0\\." "$OVPN_DATA_DIR/meta/client-ip.csv" || {
   echo 'reissue did not auto-allocate a static IP for a client with no IP' >&2
   exit 1
@@ -504,14 +522,14 @@ grep -Fq "is not revoked" "$TMP_DIR/active-release-ip.err"
 
 "$OVPN" client revoke "$laptop_id" >"$TMP_DIR/revoke.out" 2>"$TMP_DIR/revoke.err"
 grep -Fq "\"event\":\"client_lifecycle\",\"operation\":\"revoke\",\"outcome\":\"applied\",\"client_id\":\"$laptop_id\",\"client_name\":\"laptop\",\"legacy\":false" "$OVPN_DATA_DIR/meta/audit.jsonl"
-grep -E "^${laptop_id}[[:space:]]+laptop[[:space:]]+revoked$" <("$OVPN" client list)
+grep -E "^$(short_client_id "$laptop_id")[[:space:]]+laptop[[:space:]]+revoked$" <("$OVPN" client list)
 grep -Fqx "$laptop_id,laptop,10.88.0.2" "$OVPN_DATA_DIR/meta/client-ip.csv"
 test -f "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
 test ! -e "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 
 "$OVPN" client ip release --name laptop >"$TMP_DIR/release-ip.out" 2>"$TMP_DIR/release-ip.err"
 grep -Fqx "$laptop_id,laptop," "$OVPN_DATA_DIR/meta/client-ip.csv"
-grep -E "^${laptop_id}[[:space:]]+laptop[[:space:]]+revoked$" <("$OVPN" client list)
+grep -E "^$(short_client_id "$laptop_id")[[:space:]]+laptop[[:space:]]+revoked$" <("$OVPN" client list)
 test ! -e "$OVPN_DATA_DIR/ccd/$laptop_id"
 test -f "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
 test -f "$OVPN_DATA_DIR/pki/private/$laptop_id.key"
@@ -530,7 +548,7 @@ fi
 
 grep -q "is revoked" "$TMP_DIR/revoked-export.err"
 "$OVPN" client rename "$laptop_id" retired-laptop >"$TMP_DIR/rename-revoked.out" 2>"$TMP_DIR/rename-revoked.err"
-grep -E "^${laptop_id}[[:space:]]+retired-laptop[[:space:]]+revoked$" <("$OVPN" client list)
+grep -E "^$(short_client_id "$laptop_id")[[:space:]]+retired-laptop[[:space:]]+revoked$" <("$OVPN" client list)
 grep -Fqx "$laptop_id,retired-laptop,revoked" "$OVPN_DATA_DIR/meta/client-state.csv"
 grep -Fqx "$laptop_id,retired-laptop," "$OVPN_DATA_DIR/meta/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
