@@ -196,30 +196,102 @@ ovpn_client_list_command() {
   esac
 }
 
+ovpn_pki_stage_create() {
+  local stage
+
+  stage="$(mktemp -d "$OVPN_DATA_DIR/.pki-operation.XXXXXX")" || return 1
+  chmod 700 "$stage" || {
+    rm -rf "$stage"
+    return 1
+  }
+  cp -a "$OVPN_DATA_DIR/pki" "$stage/pki" || {
+    rm -rf "$stage"
+    return 1
+  }
+  printf '%s\n' "$stage"
+}
+
+ovpn_pki_stage_commit() {
+  local stage="$1"
+  local current="$OVPN_DATA_DIR/pki"
+  local previous="$stage/previous"
+
+  [ -d "$stage/pki" ] || return 1
+  if ! mv "$current" "$previous"; then
+    rm -rf "$stage"
+    return 1
+  fi
+  if ! mv "$stage/pki" "$current"; then
+    if mv "$previous" "$current"; then
+      rm -rf "$stage"
+    else
+      ovpn_log "CRITICAL: failed to restore PKI after a staged commit failure; previous PKI remains at $previous"
+    fi
+    return 1
+  fi
+  rm -rf "$stage" || ovpn_log "warning: failed to remove committed PKI staging directory: $stage"
+}
+
 ovpn_pki_try_revoke_client() {
   local id="$1"
-  local bin
+  local bin stage staged_pki
 
   ovpn_registry_uuid_valid "$id" || return 1
   bin="$(ovpn_easyrsa_bin)" || return 1
-  EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" "$bin" revoke "$id" || return 1
-  EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" "$bin" gen-crl || return 1
-  [ -s "$OVPN_DATA_DIR/pki/crl.pem" ] || return 1
-  chmod 644 "$OVPN_DATA_DIR/pki/crl.pem" || return 1
+  stage="$(ovpn_pki_stage_create)" || return 1
+  staged_pki="$stage/pki"
+  EASYRSA_BATCH=1 EASYRSA_PKI="$staged_pki" "$bin" revoke "$id" || {
+    rm -rf "$stage"
+    return 1
+  }
+  EASYRSA_BATCH=1 EASYRSA_PKI="$staged_pki" "$bin" gen-crl || {
+    rm -rf "$stage"
+    return 1
+  }
+  [ -s "$staged_pki/crl.pem" ] || {
+    rm -rf "$stage"
+    return 1
+  }
+  chmod 644 "$staged_pki/crl.pem" || {
+    rm -rf "$stage"
+    return 1
+  }
+  ovpn_pki_stage_commit "$stage"
 }
 
 ovpn_pki_try_issue_client() {
   local id="$1"
-  local bin
+  local bin stage staged_pki
 
   ovpn_registry_uuid_valid "$id" || return 1
   bin="$(ovpn_easyrsa_bin)" || return 1
-  rm -f "$OVPN_DATA_DIR/pki/reqs/$id.req" "$OVPN_DATA_DIR/pki/private/$id.key" || return 1
-  EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" EASYRSA_REQ_CN="$id" "$bin" build-client-full "$id" nopass || return 1
-  [ -r "$OVPN_DATA_DIR/pki/issued/$id.crt" ] || return 1
-  [ -r "$OVPN_DATA_DIR/pki/private/$id.key" ] || return 1
-  chmod 644 "$OVPN_DATA_DIR/pki/issued/$id.crt" || return 1
-  chmod 600 "$OVPN_DATA_DIR/pki/private/$id.key" || return 1
+  stage="$(ovpn_pki_stage_create)" || return 1
+  staged_pki="$stage/pki"
+  rm -f "$staged_pki/reqs/$id.req" "$staged_pki/private/$id.key" || {
+    rm -rf "$stage"
+    return 1
+  }
+  EASYRSA_BATCH=1 EASYRSA_PKI="$staged_pki" EASYRSA_REQ_CN="$id" "$bin" build-client-full "$id" nopass || {
+    rm -rf "$stage"
+    return 1
+  }
+  [ -r "$staged_pki/issued/$id.crt" ] || {
+    rm -rf "$stage"
+    return 1
+  }
+  [ -r "$staged_pki/private/$id.key" ] || {
+    rm -rf "$stage"
+    return 1
+  }
+  chmod 644 "$staged_pki/issued/$id.crt" || {
+    rm -rf "$stage"
+    return 1
+  }
+  chmod 600 "$staged_pki/private/$id.key" || {
+    rm -rf "$stage"
+    return 1
+  }
+  ovpn_pki_stage_commit "$stage"
 }
 
 ovpn_pki_reissue_supported() {
