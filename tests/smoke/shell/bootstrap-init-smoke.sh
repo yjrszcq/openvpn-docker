@@ -71,8 +71,9 @@ export OVPN_ENDPOINT=vpn.example.test
 
 "$OVPN" init
 
-test -d "$OVPN_DATA_DIR/repair/.scripts"
-test "$(stat -c '%a' "$OVPN_DATA_DIR/repair/.scripts")" = 700
+test -d "$OVPN_DATA_DIR/repair/journal"
+test -d "$OVPN_DATA_DIR/repair/snapshots"
+test ! -e "$OVPN_DATA_DIR/repair/.scripts"
 grep -Fqx 'OVPN_ENDPOINT=vpn.example.test' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'OVPN_NETWORK=10.88.0.0/24' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'OVPN_CONFIG_VERSION=3' "$OVPN_DATA_DIR/config/project.env"

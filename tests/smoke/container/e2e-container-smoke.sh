@@ -9,8 +9,6 @@ CONNECT_TIMEOUT="${OVPN_E2E_CONNECT_TIMEOUT:-20s}"
 WAIT_SECONDS="${OVPN_E2E_WAIT_SECONDS:-30}"
 REQUIRED="${OVPN_E2E_REQUIRED:-0}"
 SKIP_BUILD="${OVPN_E2E_SKIP_BUILD:-0}"
-UPGRADE_REQUIRED="${OVPN_E2E_UPGRADE_REQUIRED:-0}"
-UPGRADE_SIGNING_KEY="${OVPN_E2E_MANAGEMENT_SIGNING_KEY:-}"
 RUN_ID="ovpn-e2e-$$-$(date +%s)"
 CONTROL_RUNTIME_DIR="/tmp/openvpn-container-$RUN_ID"
 POLICY_NAT=true
@@ -20,7 +18,6 @@ POLICY_CLIENT_TO_CLIENT=false
 POLICY_DNS=''
 POLICY_ROUTES=''
 transport_family=auto
-UPDATE_FIXTURES=''
 
 containers=()
 networks=()
@@ -66,40 +63,8 @@ fi
 
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ovpn-e2e.XXXXXX")"
 
-if [ -z "$UPGRADE_SIGNING_KEY" ] && [ "$SKIP_BUILD" != 1 ]; then
-  UPGRADE_SIGNING_KEY="$WORK_DIR/management-signing-key.pem"
-  openssl genpkey -algorithm ED25519 -out "$UPGRADE_SIGNING_KEY" >/dev/null 2>&1
-fi
-
 if [ "$SKIP_BUILD" != 1 ]; then
-  build_arguments=()
-  if [ -n "$UPGRADE_SIGNING_KEY" ]; then
-    public_key="$WORK_DIR/management-signing-public.pem"
-    openssl pkey -in "$UPGRADE_SIGNING_KEY" -pubout -out "$public_key" >/dev/null 2>&1
-    public_key_b64="$(base64 -w 0 "$public_key")"
-    build_arguments+=(--build-arg "MANAGEMENT_SIGNING_PUBLIC_KEY_B64=$public_key_b64")
-  fi
-  "$ROOT_DIR/scripts/docker-build.sh" "${build_arguments[@]}" -t "$IMAGE" "$ROOT_DIR"
-fi
-
-if [ -n "$UPGRADE_SIGNING_KEY" ]; then
-  UPDATE_FIXTURES="$WORK_DIR/update-fixtures"
-  mkdir -p "$UPDATE_FIXTURES/3.0.1"
-  "$ROOT_DIR/tests/helpers/create-management-release-fixture.sh" \
-    --output-dir "$UPDATE_FIXTURES/3.0.1" \
-    --signing-key "$UPGRADE_SIGNING_KEY" \
-    --version 3.0.1
-  cp "$ROOT_DIR/tests/helpers/fake-release-curl.sh" "$UPDATE_FIXTURES/fake-release-curl"
-  chmod +x "$UPDATE_FIXTURES/fake-release-curl"
-  jq -n ' [{
-    tag_name:"v3.0.1", draft:false, prerelease:false, assets:[
-      {name:"management-release.env",browser_download_url:"file:///update-fixtures/3.0.1/management-release.env"},
-      {name:"management-release.env.sig",browser_download_url:"file:///update-fixtures/3.0.1/management-release.env.sig"},
-      {name:"management-bundle.tar.gz",browser_download_url:"file:///update-fixtures/3.0.1/management-bundle.tar.gz"}
-    ]
-  }] ' >"$UPDATE_FIXTURES/releases.json"
-elif [ "$UPGRADE_REQUIRED" = 1 ]; then
-  skip_or_fail 'online-update E2E requires OVPN_E2E_MANAGEMENT_SIGNING_KEY for the prebuilt image'
+  "$ROOT_DIR/scripts/docker-build.sh" -t "$IMAGE" "$ROOT_DIR"
 fi
 
 run_control() {
@@ -180,16 +145,6 @@ start_server() {
   local network_name="$4"
 
   docker rm -f "$server_name" >/dev/null 2>&1 || true
-  local -a update_arguments=()
-  if [ -n "$UPDATE_FIXTURES" ]; then
-    update_arguments+=(
-      -e OVPN_CURL_BIN=/update-fixtures/fake-release-curl
-      -e OVPN_GITHUB_API_URL=mock://repository
-      -e UPGRADE_FIXTURES=/update-fixtures
-      -v "$UPDATE_FIXTURES:/update-fixtures:ro"
-    )
-  fi
-
   docker run -d \
     --name "$server_name" \
     --network "$network_name" \
@@ -206,7 +161,6 @@ start_server() {
     -e "OVPN_CLIENT_TO_CLIENT=$POLICY_CLIENT_TO_CLIENT" \
     -e "OVPN_DNS=$POLICY_DNS" \
     -e "OVPN_ROUTES=$POLICY_ROUTES" \
-    "${update_arguments[@]}" \
     -v "$data_dir:/etc/openvpn" \
     "$IMAGE" \
     ovpn start >/dev/null
@@ -472,53 +426,6 @@ for proto in udp tcp; do
       "any(.[]; .event == \"client_lifecycle\" and .operation == \"rename\" and .client_id == \"$client_id\" and .client_name == \"renamed-udp\" and .old_name == \"client-udp\")" \
       "$WORK_DIR/events-renamed-udp.jsonl"
     docker rm -f "$rename_client" >/dev/null
-  fi
-
-  if [ "$proto" = udp ] && [ -n "$UPDATE_FIXTURES" ]; then
-    update_client="$RUN_ID-upgrade-client"
-    containers+=("$update_client")
-    start_persistent_client "$network_name" "$profile_path" "$update_client"
-    wait_for_log "$update_client" 'Initialization Sequence Completed' "$WORK_DIR/client-upgrade-active.log"
-    openvpn_pid="$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')"
-    broker_pid="$(docker exec "$server_name" cat /run/openvpn-container/management-broker.pid)"
-    docker exec "$server_name" timeout 30 ovpn runtime logs --lines 0 --follow \
-      >"$WORK_DIR/log-follow-upgrade.out" &
-    log_follow_pid=$!
-    docker exec "$server_name" timeout 30 ovpn runtime events --lines 0 --follow --json \
-      >"$WORK_DIR/event-follow-upgrade.out" &
-    event_follow_pid=$!
-    docker exec "$server_name" ovpn client list --detail >"$WORK_DIR/client-list-before-upgrade"
-    grep -E "^${client_display}[[:space:]]+[0-9a-f-]{36}[[:space:]]+active.*online$" "$WORK_DIR/client-list-before-upgrade"
-
-    docker exec "$server_name" ovpn upgrade --yes >"$WORK_DIR/upgrade.out"
-    [ "$(docker exec "$server_name" ovpn -v)" = 3.0.1 ]
-    [ "$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')" = "$openvpn_pid" ]
-    [ "$(docker exec "$server_name" cat /run/openvpn-container/management-broker.pid)" = "$broker_pid" ]
-    docker exec "$server_name" sh -ec \
-      'printf "broker-health\nquit\n" | socat - UNIX-CONNECT:/run/openvpn-container/management.sock' |
-      grep -Fq 'SUCCESS: broker connected to OpenVPN'
-    docker ps --format '{{.Names}}' | grep -Fqx "$update_client"
-    docker exec "$update_client" ip -4 address show dev tun0 | grep -Fq 'inet '
-    docker exec "$server_name" ovpn client list --detail >"$WORK_DIR/client-list-after-upgrade"
-    grep -E "^${client_display}[[:space:]]+[0-9a-f-]{36}[[:space:]]+active.*online$" "$WORK_DIR/client-list-after-upgrade"
-    wait_for_runtime_event "$server_name" \
-      'any(.[]; .event == "management_upgrade" and .operation == "apply" and .from_version == "3.0.0" and .to_version == "3.0.1")' \
-      "$WORK_DIR/events-upgrade.jsonl"
-    grep -Fq '"event":"management_upgrade"' "$WORK_DIR/event-follow-upgrade.out"
-    kill -0 "$log_follow_pid"
-    kill -0 "$event_follow_pid"
-
-    docker exec "$server_name" ovpn upgrade --rollback --yes >"$WORK_DIR/rollback.out"
-    [ "$(docker exec "$server_name" ovpn -v)" = 3.0.0 ]
-    [ "$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')" = "$openvpn_pid" ]
-    [ "$(docker exec "$server_name" cat /run/openvpn-container/management-broker.pid)" = "$broker_pid" ]
-    docker ps --format '{{.Names}}' | grep -Fqx "$update_client"
-    wait_for_runtime_event "$server_name" \
-      'any(.[]; .event == "management_upgrade" and .operation == "rollback" and .from_version == "3.0.1" and .to_version == "embedded")' \
-      "$WORK_DIR/events-rollback.jsonl"
-    kill "$log_follow_pid" "$event_follow_pid" >/dev/null 2>&1 || true
-    wait "$log_follow_pid" "$event_follow_pid" 2>/dev/null || true
-    docker rm -f "$update_client" >/dev/null
   fi
 
   docker rm -f "$server_name" >/dev/null

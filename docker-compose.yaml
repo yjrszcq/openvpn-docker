@@ -34,11 +34,6 @@ services:
       OVPN_LOG_MAX_BYTES: ${OVPN_LOG_MAX_BYTES:-10485760}
       OVPN_LOG_BACKUPS: ${OVPN_LOG_BACKUPS:-5}
       OVPN_CRITICAL_MODE: ${OVPN_CRITICAL_MODE:-exit}
-      OVPN_GITHUB_TOKEN: ${OVPN_GITHUB_TOKEN:-}
-      HTTP_PROXY: ${HTTP_PROXY:-}
-      HTTPS_PROXY: ${HTTPS_PROXY:-}
-      ALL_PROXY: ${ALL_PROXY:-}
-      NO_PROXY: ${NO_PROXY:-}
 
   openvpn-maintenance:
     image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
@@ -47,11 +42,6 @@ services:
 
     environment:
       OVPN_MAINTENANCE: "true"
-      OVPN_GITHUB_TOKEN: ${OVPN_GITHUB_TOKEN:-}
-      HTTP_PROXY: ${HTTP_PROXY:-}
-      HTTPS_PROXY: ${HTTPS_PROXY:-}
-      ALL_PROXY: ${ALL_PROXY:-}
-      NO_PROXY: ${NO_PROXY:-}
 
     <<: *openvpn-data
 

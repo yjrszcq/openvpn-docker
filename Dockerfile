@@ -70,7 +70,6 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         bash \
         ca-certificates \
-        curl \
         easy-rsa \
         iproute2 \
         iptables \
@@ -99,7 +98,6 @@ RUN openvpn --version >/tmp/openvpn-version \
     && rm /tmp/openvpn-version /tmp/openvpn-ldd
 
 RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/ovpn-hook /usr/local/bin/docker-entrypoint \
-       /usr/local/lib/openvpn-bootstrap.sh /usr/local/lib/openvpn-verify-management-release.sh \
        /usr/local/lib/openvpn-container/cli.sh \
     && mkdir -p /etc/openvpn /usr/local/share/openvpn-container \
     && IMAGE_VERSION="$IMAGE_VERSION" \
@@ -117,27 +115,6 @@ RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/ovpn-hook /usr/local/bin/docker-
        OVPN_BUILD_DATE="$BUILD_DATE" \
        /usr/local/bin/generate-build-info /usr/local/share/openvpn-container/build-info.json \
     && rm /usr/local/bin/generate-build-info
-
-RUN embedded=/usr/local/share/openvpn-container/embedded-management \
-    && mkdir -p "$embedded/lib" "$embedded/templates" "$embedded/compatibility" \
-    && cp -a /usr/local/lib/openvpn-container/. "$embedded/lib/" \
-    && cp -a /usr/local/share/openvpn-container/templates/. "$embedded/templates/" \
-    && cp -a /usr/local/share/openvpn-container/compatibility/. "$embedded/compatibility/" \
-    && printf 'MANAGEMENT_VERSION=%s\nPLATFORM_API=%s\nDATA_SCHEMA=%s\n' \
-       "$MANAGEMENT_VERSION" "$PLATFORM_API" "$DATA_SCHEMA" >"$embedded/management.env" \
-    && chmod 600 "$embedded/management.env"
-
-ARG MANAGEMENT_SIGNING_PUBLIC_KEY_B64=
-RUN keyring=/usr/local/share/openvpn-container/trusted-management-keys \
-    && mkdir -p "$keyring" \
-    && if [ -n "$MANAGEMENT_SIGNING_PUBLIC_KEY_B64" ]; then \
-         printf '%s' "$MANAGEMENT_SIGNING_PUBLIC_KEY_B64" | base64 -d >"$keyring/release.pem"; \
-         openssl pkey -pubin -in "$keyring/release.pem" -noout; \
-         chmod 0444 "$keyring/release.pem"; \
-       else \
-         printf '%s\n' 'No management release key was configured for this development image.' >"$keyring/UNCONFIGURED"; \
-         chmod 0444 "$keyring/UNCONFIGURED"; \
-       fi
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=1 CMD ["/usr/local/bin/ovpn", "runtime", "health"]
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint"]

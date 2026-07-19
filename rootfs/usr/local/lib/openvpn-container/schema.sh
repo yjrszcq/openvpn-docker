@@ -133,7 +133,6 @@ ovpn_schema_command_uses_data() {
   done
   case "$command" in
     help|-h|--help|-v|--version|migrate) return 1 ;;
-    upgrade) return 0 ;;
     runtime)
       case "${1:-}" in
         version|capabilities) return 1 ;;

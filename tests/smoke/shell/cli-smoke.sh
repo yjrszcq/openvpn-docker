@@ -55,7 +55,6 @@ assert_help "Usage: ovpn render <target> [options]" render --help
 assert_help "Usage: ovpn render client <client> [--stdout|--output <path>]" render client -h
 assert_help "Usage: ovpn runtime <command>" runtime --help
 assert_help "Usage: ovpn runtime version" runtime version -h
-assert_help "Usage: ovpn upgrade" upgrade --help
 assert_help "Usage: ovpn migrate <command> [options]" migrate --help
 
 assert_help "Usage: ovpn config show" config show --help

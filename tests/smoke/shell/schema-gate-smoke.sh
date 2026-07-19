@@ -28,8 +28,7 @@ for args in \
   'repair plan' \
   'state show' \
   'render server' \
-  'runtime status' \
-  'upgrade --check'
+  'runtime status'
 do
   read -ra command_args <<<"$args"
   set +e
@@ -39,6 +38,13 @@ do
   [ "$status" -eq 78 ]
   grep -Fq 'data schema migration required' "$TMP_DIR/old.err"
 done
+
+set +e
+OVPN_DATA_DIR="$old" "$OVPN" upgrade --check >"$TMP_DIR/upgrade.out" 2>"$TMP_DIR/upgrade.err"
+status=$?
+set -e
+[ "$status" -eq 64 ]
+grep -Fq "unknown command 'upgrade'" "$TMP_DIR/upgrade.err"
 
 OVPN_DATA_DIR="$old" "$OVPN" help >/dev/null
 OVPN_DATA_DIR="$old" OVPN_BUILD_INFO="$TMP_DIR/missing-build-info" "$OVPN" --version >/dev/null

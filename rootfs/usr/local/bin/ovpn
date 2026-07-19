@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ -n "${OVPN_LIB_DIR:-}" ] && [ -x "$OVPN_LIB_DIR/cli.sh" ]; then
-  exec "$OVPN_LIB_DIR/cli.sh" "$@"
-fi
-
-BOOTSTRAP_LIB="${OVPN_BOOTSTRAP_LIB:-/usr/local/lib/openvpn-bootstrap.sh}"
-# shellcheck source=/usr/local/lib/openvpn-bootstrap.sh
-. "$BOOTSTRAP_LIB"
-ovpn_bootstrap_exec "$@"
+LIB_DIR="${OVPN_LIB_DIR:-/usr/local/lib/openvpn-container}"
+exec "$LIB_DIR/cli.sh" "$@"

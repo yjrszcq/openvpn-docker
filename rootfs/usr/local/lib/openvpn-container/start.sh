@@ -24,8 +24,7 @@ ovpn_start_management_broker() {
     --backend "$OVPN_OPENVPN_MANAGEMENT_SOCKET" \
     --raw-log "$raw_log" \
     --max-bytes "$OVPN_LOG_MAX_BYTES" \
-    --backups "$OVPN_LOG_BACKUPS" \
-    --reload-script "${OVPN_MANAGEMENT_BROKER_RELOAD_SCRIPT:-/usr/local/lib/openvpn-management-runtime/current/lib/management-broker.py}" &
+    --backups "$OVPN_LOG_BACKUPS" &
   broker_pid=$!
   OVPN_MANAGEMENT_BROKER_PID="$broker_pid"
   printf '%s\n' "$broker_pid" >"$OVPN_RUNTIME_DIR/management-broker.pid"

@@ -24,7 +24,10 @@ maintenance_service="$(awk '
 
 printf '%s\n' "$openvpn_service" | grep -Fq 'network_mode: host'
 for variable in OVPN_GITHUB_TOKEN HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY; do
-  printf '%s\n' "$openvpn_service" | grep -Fq "$variable:"
+  if printf '%s\n' "$openvpn_service" | grep -Fq "$variable:"; then
+    echo "runtime service must not expose online-update variable $variable" >&2
+    exit 1
+  fi
 done
 printf '%s\n' "$openvpn_service" | grep -Fq 'OVPN_LOG_MAX_BYTES: "10485760"'
 printf '%s\n' "$openvpn_service" | grep -Fq 'OVPN_LOG_BACKUPS: "5"'
@@ -43,7 +46,10 @@ printf '%s\n' "$maintenance_service" | grep -Fq 'restart: "no"'
 printf '%s\n' "$maintenance_service" | grep -Fq 'OVPN_MAINTENANCE: "true"'
 printf '%s\n' "$maintenance_service" | grep -Fq 'network_mode: host'
 for variable in OVPN_GITHUB_TOKEN HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY; do
-  printf '%s\n' "$maintenance_service" | grep -Fq "$variable:"
+  if printf '%s\n' "$maintenance_service" | grep -Fq "$variable:"; then
+    echo "maintenance service must not expose online-update variable $variable" >&2
+    exit 1
+  fi
 done
 if printf '%s\n' "$maintenance_service" | grep -Eq '^[[:space:]]+(cap_add|devices|ports|privileged):'; then
   echo 'maintenance service must not request VPN runtime privileges' >&2

@@ -52,7 +52,7 @@ grep -Fq "\"openvpn_version\": \"$OPENVPN_VERSION\"" <<<"$metadata"
 grep -Fq "\"openvpn_source_version\": \"$OPENVPN_VERSION\"" <<<"$metadata"
 
 docker run --rm --entrypoint sh "$IMAGE" -ec '
-  command -v curl >/dev/null
+  ! command -v curl >/dev/null
   command -v jq >/dev/null
   command -v tar >/dev/null
   command -v openssl >/dev/null
@@ -60,9 +60,12 @@ docker run --rm --entrypoint sh "$IMAGE" -ec '
   python3 -m py_compile /usr/local/lib/openvpn-container/management-broker.py
   python3 -m py_compile /usr/local/lib/openvpn-container/runtime-logs.py
   python3 -m py_compile /usr/local/lib/openvpn-container/runtime-events.py
-  test -d /usr/local/share/openvpn-container/trusted-management-keys
-  test -r /usr/local/share/openvpn-container/trusted-management-keys/release.pem ||
-    test -r /usr/local/share/openvpn-container/trusted-management-keys/UNCONFIGURED
+  test ! -e /usr/local/lib/openvpn-bootstrap.sh
+  test ! -e /usr/local/lib/openvpn-verify-management-release.sh
+  test ! -e /usr/local/lib/openvpn-container/upgrade.sh
+  test ! -e /usr/local/share/openvpn-container/embedded-management
+  test ! -e /usr/local/share/openvpn-container/trusted-management-keys
+  test ! -e /usr/local/lib/openvpn-management-runtime
   test -s /usr/local/share/licenses/openvpn-container/LICENSE
   test -s /usr/local/share/licenses/openvpn-container/NOTICE
   test -s /usr/local/share/licenses/openvpn/COPYING

@@ -163,7 +163,6 @@ Commands:
   state             show instance state or run diagnostics
   render            render derived server or client configuration
   runtime           inspect runtime status, health, capabilities, or version
-  upgrade           update signed management code without stopping OpenVPN
   migrate           plan or apply an offline data-schema migration
   help              show this help
 USAGE

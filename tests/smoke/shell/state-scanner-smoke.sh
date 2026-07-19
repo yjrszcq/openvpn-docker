@@ -28,17 +28,17 @@ if [ "$("$OVPN" state show)" != EMPTY ]; then
   exit 1
 fi
 
-export OVPN_DATA_DIR="$TMP_DIR/management-only"
+export OVPN_DATA_DIR="$TMP_DIR/obsolete-online-state"
 mkdir -p "$OVPN_DATA_DIR/repair/.scripts/releases/2.1.2"
 : >"$OVPN_DATA_DIR/repair/.scripts/active"
-if [ "$("$OVPN" state show)" != EMPTY ]; then
-  echo 'internal repair/.scripts assets must not define the data schema state' >&2
+if [ "$("$OVPN" state show 2>/dev/null || true)" = EMPTY ]; then
+  echo 'obsolete repair/.scripts assets must be removed before initialization' >&2
   exit 1
 fi
 
 mkdir -p "$OVPN_DATA_DIR/repair/snapshots/example"
 if [ "$("$OVPN" state show)" = EMPTY ]; then
-  echo 'repair business data outside .scripts was incorrectly ignored' >&2
+  echo 'repair business data was incorrectly ignored' >&2
   exit 1
 fi
 

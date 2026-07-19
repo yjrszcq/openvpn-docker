@@ -20,11 +20,11 @@ export OVPN_DATA_DIR="$TMP_DIR/data"
 export OVPN_RUNTIME_DIR="$TMP_DIR/run"
 export OVPN_MAINTENANCE=true
 export OVPN_SERVER_NAME=openvpn-server
-mkdir -p "$OVPN_DATA_DIR/config" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/repair/.scripts"
+mkdir -p "$OVPN_DATA_DIR/config" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/repair/journal"
 printf 'OVPN_CONFIG_VERSION=2\n' >"$OVPN_DATA_DIR/config/project.env"
 printf '2\n' >"$OVPN_DATA_DIR/config/schema-version"
 printf 'preserve\n' >"$OVPN_DATA_DIR/meta/value"
-printf 'trusted-bundle\n' >"$OVPN_DATA_DIR/repair/.scripts/sentinel"
+printf 'repair-state\n' >"$OVPN_DATA_DIR/repair/journal/sentinel"
 
 # shellcheck source=../../../rootfs/usr/local/lib/openvpn-container/common.sh
 . "$LIB_DIR/common.sh"
@@ -88,7 +88,7 @@ holder_pid=''
 
 ovpn_migration_transaction_run 2 3 migrate_to_3 validate_3
 validate_3 "$OVPN_DATA_DIR"
-grep -Fqx 'trusted-bundle' "$OVPN_DATA_DIR/repair/.scripts/sentinel"
+grep -Fqx 'repair-state' "$OVPN_DATA_DIR/repair/journal/sentinel"
 [ ! -e "$OVPN_DATA_DIR/repair/migrations/transaction.env" ]
 grep -Fq '"result":"success"' "$OVPN_DATA_DIR"/repair/migrations/reports/*.json
 test -s "$OVPN_DATA_DIR"/repair/migrations/snapshots/*.tar.gz
@@ -106,7 +106,7 @@ set -e
 grep -Fqx 'OVPN_CONFIG_VERSION=2' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx '2' "$OVPN_DATA_DIR/config/schema-version"
 grep -Fqx 'preserve' "$OVPN_DATA_DIR/meta/value"
-grep -Fqx 'trusted-bundle' "$OVPN_DATA_DIR/repair/.scripts/sentinel"
+grep -Fqx 'repair-state' "$OVPN_DATA_DIR/repair/journal/sentinel"
 [ ! -e "$OVPN_DATA_DIR/repair/migrations/transaction.env" ]
 grep -Fq '"result":"failed"' "$OVPN_DATA_DIR"/repair/migrations/reports/*.json
 

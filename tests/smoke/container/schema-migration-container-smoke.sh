@@ -53,7 +53,7 @@ docker run --rm \
     "$easyrsa" gen-crl
     mkdir -p /etc/openvpn/config /etc/openvpn/data/leases /etc/openvpn/meta \
       /etc/openvpn/clients/active /etc/openvpn/clients/revoked /etc/openvpn/ccd \
-      /etc/openvpn/server /etc/openvpn/secrets /etc/openvpn/repair/.scripts
+      /etc/openvpn/server /etc/openvpn/secrets /etc/openvpn/repair
     cp /etc/openvpn/pki/issued/alpha.crt /etc/openvpn/repair/old-alpha.crt
     {
       printf "OVPN_CONFIG_VERSION=2\n"
@@ -80,7 +80,6 @@ docker run --rm \
     openvpn --genkey secret /etc/openvpn/secrets/tls-crypt.key
     printf "old alpha profile\n" >/etc/openvpn/clients/active/alpha.ovpn
     printf "old beta profile\n" >/etc/openvpn/clients/revoked/beta.ovpn
-    printf "trusted bundle\n" >/etc/openvpn/repair/.scripts/sentinel
     chmod 600 /etc/openvpn/config/project.env /etc/openvpn/config/schema-version \
       /etc/openvpn/data/client-ip.csv /etc/openvpn/meta/client-ip.applied.csv \
       /etc/openvpn/meta/client-state.csv /etc/openvpn/meta/audit.jsonl \

@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import os
-import signal
 import socket
 import subprocess
 import sys
@@ -142,8 +140,6 @@ def main() -> int:
                 "2",
                 "--timeout",
                 "2",
-                "--reload-script",
-                str(broker_script),
             ]
         )
         try:
@@ -213,28 +209,6 @@ def main() -> int:
                 raise AssertionError("persistent OpenVPN log did not rotate")
             if any(path.stat().st_mode & 0o077 for path in rotated_logs):
                 raise AssertionError("persistent OpenVPN logs are not private")
-            socket_state = broker_path.stat()
-            socket_signature = (socket_state.st_ino, socket_state.st_ctime_ns)
-            os.kill(broker.pid, signal.SIGHUP)
-            for _ in range(150):
-                try:
-                    if (
-                        broker.poll() is None
-                        and (
-                            broker_path.stat().st_ino,
-                            broker_path.stat().st_ctime_ns,
-                        )
-                        != socket_signature
-                        and request(broker_path, "broker-health").startswith("SUCCESS:")
-                    ):
-                        break
-                except (ConnectionError, FileNotFoundError, OSError):
-                    pass
-                time.sleep(0.02)
-            else:
-                raise AssertionError("broker did not hot-reload through the stable script")
-            if broker.pid <= 0 or broker.poll() is not None:
-                raise AssertionError("broker hot reload did not preserve its process")
             if fake.max_active != 1 or fake.accepted < 2:
                 raise AssertionError("broker did not retain single-owner reconnect semantics")
         finally:

@@ -12,12 +12,22 @@ grep -Fq 'OVPN_RUNTIME_STRATEGY=source-build' "$dockerfile"
 grep -Fq 'OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION"' "$dockerfile"
 grep -Fq 'MANAGEMENT_VERSION="$MANAGEMENT_VERSION"' "$dockerfile"
 grep -Fq 'PLATFORM_API="$PLATFORM_API"' "$dockerfile"
-grep -Fq 'embedded-management' "$dockerfile"
-grep -Fq 'openvpn-bootstrap.sh' "$dockerfile"
-grep -Fq 'trusted-management-keys' "$dockerfile"
-grep -Fq 'MANAGEMENT_SIGNING_PUBLIC_KEY_B64' "$dockerfile"
 grep -Fq 'grep -Fq "OpenVPN $OPENVPN_VERSION" /tmp/openvpn-version' "$dockerfile"
 grep -Fq "! grep -Fq 'not found' /tmp/openvpn-ldd" "$dockerfile"
+
+for removed in embedded-management openvpn-bootstrap.sh trusted-management-keys \
+  MANAGEMENT_SIGNING_PUBLIC_KEY_B64; do
+  if grep -Fq "$removed" "$dockerfile"; then
+    echo "runtime Dockerfile still contains online-update artifact: $removed" >&2
+    exit 1
+  fi
+done
+
+runtime_packages="$(awk 'seen { print } /^FROM \\$\\{BASE_IMAGE\\}$/ { seen = 1 }' "$dockerfile")"
+if printf '%s\n' "$runtime_packages" | grep -Eq '^[[:space:]]+curl([[:space:]]|\\\\)'; then
+  echo 'runtime Dockerfile must not install curl for online updates' >&2
+  exit 1
+fi
 
 if ! grep -Eq '^[[:space:]]+nano([[:space:]]|\\\\)' "$dockerfile"; then
   echo 'runtime Dockerfile must install nano for interactive client editing' >&2

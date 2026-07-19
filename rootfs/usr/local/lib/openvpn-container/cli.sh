@@ -62,10 +62,6 @@ case "$command" in
   state) ovpn_state_command "$@" ;;
   render) ovpn_render_command "$@" ;;
   runtime) ovpn_runtime_command "$@" ;;
-  upgrade)
-    . "$LIB_DIR/upgrade.sh"
-    ovpn_upgrade_command "$@"
-    ;;
   migrate)
     # Historical parsers are lazy-loaded only by the migration dispatcher.
     . "$LIB_DIR/migrate.sh"
