@@ -74,10 +74,6 @@ ovpn_client_resolve_selector_or_die() {
   IFS=, read -r OVPN_CLIENT_RESOLVED_ID OVPN_CLIENT_RESOLVED_NAME OVPN_CLIENT_RESOLVED_STATE <<<"$resolved"
 }
 
-ovpn_client_resolve_ref_or_die() {
-  ovpn_client_resolve_selector_or_die auto "$1"
-}
-
 ovpn_client_status() {
   local wanted="$1"
   local name id state
