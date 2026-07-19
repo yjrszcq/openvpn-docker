@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
-# Full integration test — runs inside szcq/openvpn:2.7.5 with new scripts bind-mounted.
+# Full integration test — runs inside a locally built project image.
 #
 # Usage:
 #   docker run --rm --name ovpn-integration-test \
+#     --entrypoint bash \
 #     --cap-add NET_ADMIN \
 #     --device /dev/net/tun:/dev/net/tun \
-#     -v "$PWD/rootfs/usr/local/bin/ovpn:/usr/local/bin/ovpn:ro" \
-#     -v "$PWD/rootfs/usr/local/lib/openvpn-container:/usr/local/lib/openvpn-container:ro" \
-#     -v "$PWD/rootfs/usr/local/share/openvpn-container/templates:/usr/local/share/openvpn-container/templates:ro" \
-#     -v "$PWD/compatibility:/usr/local/share/openvpn-container/compatibility:ro" \
 #     -v "$PWD/tests/integration/container-full-test.sh:/test.sh:ro" \
 #     -e OVPN_ENDPOINT=vpn.example.test \
 #     -e OVPN_NETWORK=10.213.0.0/24 \
 #     -e OVPN_DYNAMIC_POOL_SIZE=64 \
-#     szcq/openvpn:2.7.5 bash /test.sh
+#     openvpn-audit:latest /test.sh
 #
 # Uses bridge networking — TUN is container-local, won't touch the host stack.
 set -euo pipefail
@@ -22,11 +19,14 @@ export OVPN_DATA_DIR="${OVPN_DATA_DIR:-/etc/openvpn}"
 export OVPN_RUNTIME_DIR="${OVPN_RUNTIME_DIR:-/run/openvpn-container}"
 export OVPN_LEASE_DIR="${OVPN_LEASE_DIR:-$OVPN_DATA_DIR/data/leases}"
 export OVPN_MANAGEMENT_SOCKET="${OVPN_MANAGEMENT_SOCKET:-$OVPN_RUNTIME_DIR/management.sock}"
+export OVPN_OPENVPN_MANAGEMENT_SOCKET="${OVPN_OPENVPN_MANAGEMENT_SOCKET:-$OVPN_RUNTIME_DIR/openvpn-management.sock}"
+BROKER_PID=''
 
 PASS=0; FAIL=0
 pass() { PASS=$((PASS+1)); printf '  PASS: %s\n' "$1"; }
 fail() { FAIL=$((FAIL+1)); printf '  FAIL: %s\n' "$1" >&2; }
 check() { if [ "${1:-1}" -eq 0 ]; then pass "$2"; else fail "$2 (${3:-})"; fi; }
+check_condition() { local description="$1"; shift; if "$@"; then pass "$description"; else fail "$description"; fi; }
 check_out() { grep -q "$2" "${3:-/dev/stdin}" 2>/dev/null; check $? "$1" "unexpected content"; }
 check_not_out() { if grep -q "$2" "$1" 2>/dev/null; then fail "$3 (unexpected match: $2)"; else pass "$3"; fi; }
 
@@ -49,7 +49,7 @@ echo "=== Phase 2: state + repair ==="
 
 s=$(ovpn state show)
 check $? "state show ($s)"
-[ "$s" = "HEALTHY" ]; check $? "state=HEALTHY"
+check_condition "state=HEALTHY" test "$s" = "HEALTHY"
 
 ovpn state doctor >$OUT
 grep -q "HEALTHY" $OUT; check $? "state doctor"
@@ -98,6 +98,15 @@ if ovpn client create bad-name --ip 10.213.0.5 --dynamic >/dev/null 2>&1; then
 else
   pass "--ip + --dynamic rejected"
 fi
+
+ovpn client create rename-old --dynamic >$OUT 2>&1
+rename_id="$(awk -F, '$2 == "rename-old" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
+ovpn client rename "$rename_id" rename-new >$OUT 2>&1
+grep -qE "rename-new.*${rename_id}.*active" <(ovpn client list)
+check $? "rename preserves client UUID"
+ovpn client revoke rename-new >$OUT 2>&1
+ovpn client delete "$rename_id" >$OUT 2>&1
+check $? "renamed client cleanup"
 
 # ============================================================
 echo "=== Phase 4: export + render ==="
@@ -263,23 +272,23 @@ dynamic02_id=22222222-2222-4222-8222-222222222222
 script_type=client-connect common_name="$dynamic01_id" ifconfig_pool_remote_ip=10.213.0.200 \
   /usr/local/bin/ovpn-hook pool-persist
 check $? "hook client-connect dynamic01"
-[ -f "$LEASE_DIR/$dynamic01_id" ]; check $? "lease file exists"
-[ "$(cat "$LEASE_DIR/$dynamic01_id")" = "10.213.0.200" ]; check $? "lease file content correct"
+check_condition "lease file exists" test -f "$LEASE_DIR/$dynamic01_id"
+check_condition "lease file content correct" test "$(cat "$LEASE_DIR/$dynamic01_id")" = "10.213.0.200"
 
 # reconnect with new IP
 script_type=client-connect common_name="$dynamic01_id" ifconfig_pool_remote_ip=10.213.0.201 \
   /usr/local/bin/ovpn-hook pool-persist
-[ "$(cat "$LEASE_DIR/$dynamic01_id")" = "10.213.0.201" ]; check $? "lease updated on reconnect"
+check_condition "lease updated on reconnect" test "$(cat "$LEASE_DIR/$dynamic01_id")" = "10.213.0.201"
 
 # another client gets recycled IP
 script_type=client-connect common_name="$dynamic02_id" ifconfig_pool_remote_ip=10.213.0.200 \
   /usr/local/bin/ovpn-hook pool-persist
-[ -f "$LEASE_DIR/$dynamic02_id" ]; check $? "recycled IP attributed to new client"
+check_condition "recycled IP attributed to new client" test -f "$LEASE_DIR/$dynamic02_id"
 
 # disconnect is no-op
 script_type=client-disconnect common_name="$dynamic01_id" \
   /usr/local/bin/ovpn-hook pool-persist
-[ -f "$LEASE_DIR/$dynamic01_id" ]; check $? "lease preserved after disconnect"
+check_condition "lease preserved after disconnect" test -f "$LEASE_DIR/$dynamic01_id"
 
 # verify no duplicate IP files
 dup_count=0
@@ -287,7 +296,7 @@ for f in "$LEASE_DIR"/*; do
   [ -f "$f" ] || continue
   [ "$(cat "$f")" = "10.213.0.200" ] && dup_count=$((dup_count+1))
 done
-[ "$dup_count" -le 1 ]; check $? "no duplicate IP files ($dup_count)"
+check_condition "no duplicate IP files ($dup_count)" test "$dup_count" -le 1
 
 # ============================================================
 echo "=== Phase 12: Start OpenVPN daemon ==="
@@ -301,13 +310,21 @@ cat >"${OVPN_RUNTIME_STATE_FILE:-$OVPN_RUNTIME_DIR/state.json}" <<'STATE'
 {"service": "openvpn", "instance_state": "HEALTHY", "daemon": "running", "maintenance": false}
 STATE
 
+python3 /usr/local/lib/openvpn-container/management-broker.py \
+  --listen "$OVPN_MANAGEMENT_SOCKET" \
+  --backend "$OVPN_OPENVPN_MANAGEMENT_SOCKET" \
+  --raw-log "$OVPN_DATA_DIR/logs/openvpn.log" \
+  --max-bytes 10485760 \
+  --backups 5 &
+BROKER_PID=$!
+
 openvpn --config "$OVPN_DATA_DIR/server/server.conf" \
   --writepid /tmp/openvpn.pid \
   --log /tmp/openvpn.log \
   --daemon 2>/dev/null
 check $? "openvpn started"
 
-for i in $(seq 1 30); do
+for _attempt in $(seq 1 30); do
   if [ -S "${OVPN_RUNTIME_DIR}/management.sock" ]; then
     break
   fi
@@ -323,6 +340,13 @@ grep -q '"daemon"' $OUT; check $? "status has daemon"
 
 ovpn runtime health >$OUT 2>&1 || true
 check $? "runtime health"
+
+ovpn runtime logs --lines 20 >$OUT 2>&1
+check $? "runtime logs"
+
+ovpn runtime events --lines 20 --json >$OUT 2>&1
+jq -e -s 'length > 0' $OUT >/dev/null
+check $? "runtime events --json"
 
 ovpn client list --detail >$OUT || true
 check $? "client list --detail (live)"
@@ -349,7 +373,9 @@ grep -q "OVPN_NETWORK=10.213.0.0" $OUT; check $? "network reverted to 10.213.0.0
 echo "=== Phase 14: Daemon mode commands ==="
 
 # revoke with daemon running (disconnects client)
-rc=0; ovpn client revoke dynamic02 >$OUT 2>&1 || rc=$?
+rc=0
+ovpn client revoke dynamic02 >/tmp/revoke-daemon.out 2>&1 || rc=$?
+[ "$rc" -eq 0 ] || sed 's/^/  revoke: /' /tmp/revoke-daemon.out >&2
 check $rc "revoke with daemon"
 
 # reissue with daemon
@@ -366,9 +392,21 @@ OVPN_CLIENT_TO_CLIENT=true ovpn config apply >$OUT 2>&1
 # ============================================================
 echo "=== Phase 15: Cleanup ==="
 
-[ -f /tmp/openvpn.pid ] && kill "$(cat /tmp/openvpn.pid)" 2>/dev/null || true
+if [ -f /tmp/openvpn.pid ]; then
+  kill "$(cat /tmp/openvpn.pid)" 2>/dev/null || true
+fi
+[ -z "$BROKER_PID" ] || kill "$BROKER_PID" 2>/dev/null || true
+[ -z "$BROKER_PID" ] || wait "$BROKER_PID" 2>/dev/null || true
+BROKER_PID=''
 sleep 1
 pass "daemon cleanup"
+
+OVPN_MAINTENANCE=true ovpn migrate plan --json >$OUT
+jq -e '.source_schema == 3 and .target_schema == 3 and .blocked == false' $OUT >/dev/null
+check $? "migrate plan --json at current schema"
+
+OVPN_MAINTENANCE=true ovpn migrate apply --yes >$OUT
+check $? "migrate apply idempotent at current schema"
 
 # ============================================================
 echo ""
