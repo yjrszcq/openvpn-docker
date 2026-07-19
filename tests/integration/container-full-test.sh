@@ -17,7 +17,7 @@ set -euo pipefail
 
 export OVPN_DATA_DIR="${OVPN_DATA_DIR:-/etc/openvpn}"
 export OVPN_RUNTIME_DIR="${OVPN_RUNTIME_DIR:-/run/openvpn-container}"
-export OVPN_LEASE_DIR="${OVPN_LEASE_DIR:-$OVPN_DATA_DIR/data/leases}"
+export OVPN_LEASE_DIR="${OVPN_LEASE_DIR:-$OVPN_DATA_DIR/cache/client-leases}"
 export OVPN_MANAGEMENT_SOCKET="${OVPN_MANAGEMENT_SOCKET:-$OVPN_RUNTIME_DIR/management.sock}"
 export OVPN_OPENVPN_MANAGEMENT_SOCKET="${OVPN_OPENVPN_MANAGEMENT_SOCKET:-$OVPN_RUNTIME_DIR/openvpn-management.sock}"
 BROKER_PID=''
@@ -39,6 +39,9 @@ echo "=== Phase 1: init + config ==="
 
 ovpn init 2>&1
 check $? "ovpn init"
+check_condition "authoritative client-IP registry initialized" \
+  test -f "$OVPN_DATA_DIR/meta/client-ip.csv"
+check_condition "obsolete data directory absent" test ! -e "$OVPN_DATA_DIR/data"
 
 ovpn config show >$OUT
 grep -q "OVPN_NETWORK" $OUT; check $? "config show contains network"
@@ -263,7 +266,7 @@ OVPN_DYNAMIC_POOL_SIZE=64 ovpn config apply >$OUT 2>&1
 # ============================================================
 echo "=== Phase 11: Dynamic lease hook ==="
 
-LEASE_DIR="${OVPN_LEASE_DIR:-/etc/openvpn/data/leases}"
+LEASE_DIR="${OVPN_LEASE_DIR:-/etc/openvpn/cache/client-leases}"
 mkdir -p "$LEASE_DIR"
 dynamic01_id=11111111-1111-4111-8111-111111111111
 dynamic02_id=22222222-2222-4222-8222-222222222222

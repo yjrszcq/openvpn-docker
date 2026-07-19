@@ -226,10 +226,10 @@ With `--detail`, it additionally prints `MODE`, `IP`, `IP STATE`, and
 
 For the IP view, static assignments are `configured` or `retained` after
 revocation. Dynamic addresses are `connected` when the management socket has a
-current lease, `last-known` when a persisted lease record exists, or `unavailable`.
+current lease, `last-known` when a cached lease record exists, or `unavailable`.
 `CONNECTION` is `online`, `offline`, or `unknown` according to management-socket
-availability and the current route. The view reads the applied registry, not an
-unapplied draft.
+availability and the current route. The view combines the authoritative IP
+registry with current connection and lease-cache state.
 
 ### `ovpn client rename`
 
@@ -241,9 +241,9 @@ ovpn client rename <client> <new-name>
 
 Atomically changes the human-facing display name while preserving the UUID,
 certificate, key, IP assignment, CCD, lease, and any current OpenVPN
-connection. The identity registry, draft and applied IP registries, profile
-filename, and embedded name comment change together. The source may be the
-current name or UUID. The new name must be valid and unused by a current client.
+connection. The identity and IP registries, profile filename, and embedded name
+comment change together. The source may be the current name or UUID. The new
+name must be valid and unused by a current client.
 Renaming or deleting a client releases its old name for reuse; deleted UUID
 tombstones remain authoritative history.
 
@@ -299,13 +299,14 @@ private key only from a secure backup.
 
 ## Client IP management
 
-The draft registry is `data/client-ip.csv`; the last accepted registry is
-`meta/client-ip.applied.csv`. Both require a `# id,name,ip` header followed by
-`id,name,ip` rows, where `id` is the client's immutable UUID. A non-empty IP is
-a static assignment; an empty IP is dynamic. UUIDs, names, and static addresses
-must be unique, static addresses must fall in the static region, and the
-registry must contain every active or revoked client from the authoritative
-identity registry.
+The authoritative registry is `meta/client-ip.csv`. It requires a
+`# id,name,ip` header followed by `id,name,ip` rows, where `id` is the client's
+immutable UUID. A non-empty IP is a static assignment; an empty IP is dynamic.
+UUIDs, names, and static addresses must be unique, static addresses must fall
+in the static region, and the registry must contain every active or revoked
+client from the authoritative identity registry. Last-known dynamic leases are
+runtime cache entries under `cache/client-leases/`; they are not configured IP
+assignments.
 
 ### `ovpn client ip release`
 
@@ -409,7 +410,7 @@ and creating the runtime directory.
 
 When `meta/client-state.csv` is missing or invalid, recovery starts from UUID
 client entries in the current PKI. A display name is accepted only when
-current-format draft/applied IP registries, profile identity comments, and the
+the current-format IP registry, profile identity comments, and the
 latest applicable rename audit record agree. Conflicting evidence is
 `CRITICAL` and requires a backup or manual review. If no name evidence remains,
 repair assigns the deterministic temporary name `client-<uuid-without-dashes>`;

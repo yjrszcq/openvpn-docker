@@ -407,7 +407,7 @@ docker compose exec openvpn ovpn runtime events --lines 100 --json
 ### 备份
 
 `./openvpn-data` 保存 CA 私钥、服务端与客户端私钥、profile、tls-crypt 密钥、
-实例元数据以及动态租约状态。备份此目录：
+实例元数据以及 `cache/client-leases/` 下的动态租约缓存。备份此目录：
 
 ```bash
 docker compose stop openvpn

@@ -403,7 +403,7 @@ docker compose run --rm openvpn-maintenance repair apply
 `repair plan` lists `SAFE` actions (rebuild derived files) and `RECOVER` actions
 (restore verified identity material or registries). `repair apply` stages,
 snapshots, and atomically applies allowed repairs. If the client identity
-registry is lost, current-schema IP registries, profile identity comments, and
+registry is lost, the current-schema IP registry, profile identity comments, and
 the latest rename audit record must agree. Conflicts are `CRITICAL`; a client
 with only a recoverable PKI UUID receives a temporary
 `client-<uuid-without-dashes>` name that should be renamed after repair.
@@ -438,7 +438,8 @@ reload operations through the management broker.
 ### Backup
 
 `./openvpn-data` stores CA, server, and client private keys, profiles, tls-crypt
-material, instance metadata, and dynamic lease state. Back it up:
+material, instance metadata, and the dynamic lease cache under
+`cache/client-leases/`. Back it up:
 
 ```bash
 docker compose stop openvpn

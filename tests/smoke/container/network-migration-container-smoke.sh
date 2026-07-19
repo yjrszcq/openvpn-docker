@@ -93,10 +93,10 @@ wait_for_health
 docker exec "$CONTAINER_NAME" ovpn runtime health
 test "$(docker exec "$CONTAINER_NAME" ovpn state show)" = HEALTHY
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec '
-  id="$(awk -F, '\''$2 == "static-client" { print $1 }'\'' /etc/openvpn/data/client-ip.csv)"
+  id="$(awk -F, '\''$2 == "static-client" { print $1 }'\'' /etc/openvpn/meta/client-ip.csv)"
   test -n "$id"
   grep -Fqx "OVPN_NETWORK=$1" /etc/openvpn/config/project.env
-  grep -Fqx "$id,static-client,10.89.0.2" /etc/openvpn/data/client-ip.csv
+  grep -Fqx "$id,static-client,10.89.0.2" /etc/openvpn/meta/client-ip.csv
   grep -Fqx "ifconfig-push 10.89.0.2 255.255.255.0" "/etc/openvpn/ccd/$id"
   grep -Fq '"'"'"event":"network_migration","outcome":"applied"'"'"' /etc/openvpn/meta/audit.jsonl
 ' sh "$MIGRATED_NETWORK"
@@ -110,10 +110,10 @@ wait_for_health
 docker exec "$CONTAINER_NAME" ovpn runtime health
 test "$(docker exec "$CONTAINER_NAME" ovpn state show)" = HEALTHY
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec '
-  id="$(awk -F, '\''$2 == "static-client" { print $1 }'\'' /etc/openvpn/data/client-ip.csv)"
+  id="$(awk -F, '\''$2 == "static-client" { print $1 }'\'' /etc/openvpn/meta/client-ip.csv)"
   test -n "$id"
   grep -Fqx "OVPN_NETWORK=$1" /etc/openvpn/config/project.env
-  grep -Fqx "$id,static-client,10.89.0.2" /etc/openvpn/data/client-ip.csv
+  grep -Fqx "$id,static-client,10.89.0.2" /etc/openvpn/meta/client-ip.csv
   grep -Fq '"'"'"event":"network_migration","outcome":"rejected"'"'"' /etc/openvpn/meta/audit.jsonl
 ' sh "$MIGRATED_NETWORK"
 

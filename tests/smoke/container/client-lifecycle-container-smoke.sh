@@ -70,7 +70,7 @@ docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec
   grep -Fqx "$1,$2,active" /etc/openvpn/meta/client-state.csv
 ' sh "$client_id" "$client" "$original_client"
 
-assignment_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, -v client="$client" '$2 == client { print; exit }' /etc/openvpn/data/client-ip.csv)"
+assignment_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, -v client="$client" '$2 == client { print; exit }' /etc/openvpn/meta/client-ip.csv)"
 [ "$assignment_before" = "$client_id,$client," ] || {
   printf 'unexpected dynamic assignment before reissue: %s\n' "$assignment_before" >&2
   exit 1
@@ -84,7 +84,7 @@ if ! run_control client reissue "$client_id" --dynamic >/tmp/ovpn-lifecycle-reis
   exit 1
 fi
 grep -E "^${client}[[:space:]]+${client_id}[[:space:]]+active$" <(run_control client list)
-assignment_after="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, -v client="$client" '$2 == client { print; exit }' /etc/openvpn/data/client-ip.csv)"
+assignment_after="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, -v client="$client" '$2 == client { print; exit }' /etc/openvpn/meta/client-ip.csv)"
 [ "$assignment_after" = "$assignment_before" ] || {
   printf 'reissue changed the IP assignment: %s\n' "$assignment_after" >&2
   exit 1
@@ -101,17 +101,17 @@ index_after="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /usr/
 }
 
 run_control client ip set "$client_id" --ip 10.88.0.2 >/tmp/ovpn-lifecycle-static.out 2>/tmp/ovpn-lifecycle-static.err
-docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/grep "$IMAGE" -Fqx "$client_id,$client,10.88.0.2" /etc/openvpn/data/client-ip.csv
+docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/grep "$IMAGE" -Fqx "$client_id,$client,10.88.0.2" /etc/openvpn/meta/client-ip.csv
 run_control client revoke "$client_id" >/tmp/ovpn-lifecycle-revoke.out 2>/tmp/ovpn-lifecycle-revoke.err
 grep -E "^${client}[[:space:]]+${client_id}[[:space:]]+revoked$" <(run_control client list)
 run_control client ip release "$client_id" >/tmp/ovpn-lifecycle-release-ip.out 2>/tmp/ovpn-lifecycle-release-ip.err
 grep -E "^${client}[[:space:]]+${client_id}[[:space:]]+revoked$" <(run_control client list)
-docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/grep "$IMAGE" -Fqx "$client_id,$client," /etc/openvpn/data/client-ip.csv
+docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/grep "$IMAGE" -Fqx "$client_id,$client," /etc/openvpn/meta/client-ip.csv
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/test "$IMAGE" -f "/etc/openvpn/clients/revoked/$client.ovpn"
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/test "$IMAGE" -f "/etc/openvpn/pki/private/$client_id.key"
 run_control client delete "$client_id" >/tmp/ovpn-lifecycle-delete.out 2>/tmp/ovpn-lifecycle-delete.err
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec '
-  ! grep -Fq "$1,$2," /etc/openvpn/data/client-ip.csv
+  ! grep -Fq "$1,$2," /etc/openvpn/meta/client-ip.csv
   grep -Fqx "$1,$2,deleted" /etc/openvpn/meta/client-state.csv
   test ! -e "/etc/openvpn/pki/private/$1.key"
   test ! -e "/etc/openvpn/clients/active/$2.ovpn"
@@ -134,7 +134,7 @@ run_control client create keep-dynamic --dynamic >/tmp/ovpn-lifecycle-create-dyn
 keep_dynamic_id="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, '$2 == "keep-dynamic" { print $1 }' /etc/openvpn/meta/client-state.csv)"
 run_control client revoke keep-dynamic --release-ip >/tmp/ovpn-lifecycle-revoke-dynamic.out 2>/tmp/ovpn-lifecycle-revoke-dynamic.err
 run_control client reissue keep-dynamic >/tmp/ovpn-lifecycle-reissue-dynamic.out 2>/tmp/ovpn-lifecycle-reissue-dynamic.err
-assignment_static="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, -v client=keep-dynamic '$2 == client { print; exit }' /etc/openvpn/data/client-ip.csv)"
+assignment_static="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/awk "$IMAGE" -F, -v client=keep-dynamic '$2 == client { print; exit }' /etc/openvpn/meta/client-ip.csv)"
 grep -q "^$keep_dynamic_id,keep-dynamic,10\\.88\\.0\\." <<<"$assignment_static" || {
   printf 'reissue without params did not auto-allocate a static IP for a no-IP client: %s\n' "$assignment_static" >&2
   exit 1
