@@ -82,12 +82,29 @@ docker compose exec openvpn ovpn client list
 
 # detailed view (seven-column table with ID, IP, and connection state)
 docker compose exec openvpn ovpn client list --detail
+
+# full UUIDs for diagnostics or machine-assisted copying
+docker compose exec openvpn ovpn client list --no-trunc
 ```
+
+The default 12-character ID can be copied directly into any client command.
+Use `--id`/`-i` to force ID-prefix matching or `--name`/`-n` to force an exact
+name match:
+
+```bash
+docker compose exec openvpn ovpn client export --id 67fe9f6dec9b
+docker compose exec openvpn ovpn client export --name laptop
+```
+
+ID prefixes must contain at least 8 hexadecimal characters and match exactly
+one active or revoked client. If a positional value could be both a name and a
+different ID prefix, the command refuses to choose and requests an explicit
+selector.
 
 ### Rename a client
 
 ```bash
-# accepts the current name or immutable UUID
+# accepts a positional reference or an explicit ID/name selector
 docker compose exec openvpn ovpn client rename laptop office-laptop
 ```
 
@@ -168,6 +185,9 @@ manifest:
 ```bash
 # named multi-client edit
 docker compose exec openvpn ovpn client ip set phone tablet laptop
+
+# batch by ID; repeat only one explicit selector type per invocation
+docker compose exec openvpn ovpn client ip set --id 67fe9f6dec9b --id a13c7e42d490
 
 # all active clients
 docker compose exec openvpn ovpn client ip set --all
@@ -423,10 +443,13 @@ docker compose exec openvpn ovpn runtime capabilities # compatibility info
 docker compose exec openvpn ovpn runtime version      # build information
 docker compose exec openvpn ovpn runtime logs --lines 100
 docker compose exec openvpn ovpn runtime events --lines 100 --json
+docker compose exec openvpn ovpn runtime logs --lines 100 --no-trunc
 ```
 
-`runtime logs` translates known certificate UUIDs to `name [uuid]`; use
-`--raw` when comparing exact OpenVPN output. `runtime events` exposes
+`runtime logs` translates known certificate UUIDs to `name [short-id]`; use
+`--no-trunc` for translated full UUIDs or `--raw` when comparing exact OpenVPN
+output. Human-readable `runtime events` follows the same short/full rule, while
+`--json` always preserves complete UUIDs. `runtime events` exposes
 connection, lifecycle, rename, IP, network, and migration records.
 Both accept `--follow` and continue without blocking status, disconnect, or
 reload operations through the management broker.

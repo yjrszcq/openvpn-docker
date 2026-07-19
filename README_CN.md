@@ -182,10 +182,17 @@ docker compose up -d openvpn
 回滚镜像不会回滚已迁移数据，必须改为恢复匹配的迁移前快照。快照和恢复步骤见
 操作手册。
 
-持久化 OpenVPN 日志会把已知 UUID 翻译回显示名称，事件流则提供结构化生命周期记录：
+客户端列表默认显示可复制的 12 位 UUID 前缀；`client list --no-trunc` 显示完整 UUID。
+客户端命令继续接受位置参数，也可用 `--id`/`-i` 明确选择 ID 前缀，或用
+`--name`/`-n` 精确选择显示名称。持久化 OpenVPN 日志使用相同的短身份显示，事件流则
+提供结构化生命周期记录：
+
+这些选择器和展示变更不修改持久化数据。计划中的 3.1.0 镜像仍使用数据 schema 3，
+因此 3.0.0 部署可以直接重建容器，无需执行 `migrate`。
 
 ```bash
 docker compose exec openvpn ovpn runtime logs --lines 100
+docker compose exec openvpn ovpn runtime logs --lines 100 --no-trunc
 docker compose exec openvpn ovpn runtime events --lines 100 --json
 ```
 

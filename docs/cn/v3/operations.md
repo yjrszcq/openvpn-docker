@@ -80,12 +80,26 @@ docker compose exec openvpn ovpn client list
 
 # 详细视图（七列表格，含 ID、IP 和连接状态）
 docker compose exec openvpn ovpn client list --detail
+
+# 诊断或辅助复制时显示完整 UUID
+docker compose exec openvpn ovpn client list --no-trunc
 ```
+
+默认的 12 位 ID 可直接复制给任意客户端命令。用 `--id`/`-i` 强制按 ID 前缀匹配，
+或用 `--name`/`-n` 强制按名称精确匹配：
+
+```bash
+docker compose exec openvpn ovpn client export --id 67fe9f6dec9b
+docker compose exec openvpn ovpn client export --name laptop
+```
+
+ID 前缀至少需要 8 个十六进制字符，且必须唯一匹配 active/revoked 客户端。如果位置
+参数既是某个名称，又是另一个客户端的 ID 前缀，命令会拒绝猜测并要求显式选择器。
 
 ### 客户端改名
 
 ```bash
-# 可使用当前名称或不可变 UUID
+# 可使用位置参数，或显式 ID/名称选择器
 docker compose exec openvpn ovpn client rename laptop office-laptop
 ```
 
@@ -161,6 +175,9 @@ docker compose exec openvpn ovpn client ip set phone --dynamic
 ```bash
 # 指定客户端批量编辑
 docker compose exec openvpn ovpn client ip set phone tablet laptop
+
+# 按 ID 批量选择；一次调用只能重复同一种显式选择器
+docker compose exec openvpn ovpn client ip set --id 67fe9f6dec9b --id a13c7e42d490
 
 # 全部活跃客户端
 docker compose exec openvpn ovpn client ip set --all
@@ -393,12 +410,14 @@ docker compose exec openvpn ovpn runtime capabilities # 兼容性信息
 docker compose exec openvpn ovpn runtime version      # 构建信息
 docker compose exec openvpn ovpn runtime logs --lines 100
 docker compose exec openvpn ovpn runtime events --lines 100 --json
+docker compose exec openvpn ovpn runtime logs --lines 100 --no-trunc
 ```
 
-`runtime logs` 将已知证书 UUID 翻译为 `名称 [uuid]`；比较 OpenVPN 原始输出时使用
-`--raw`。`runtime events` 提供连接、生命周期、rename、IP、网络和数据
-迁移记录。两者都支持 `--follow`，且不会阻塞经 management broker 执行的状态、
-断开或重载操作。
+`runtime logs` 将已知证书 UUID 翻译为 `名称 [短ID]`；需要翻译后的完整 UUID 时使用
+`--no-trunc`，比较 OpenVPN 原始输出时使用 `--raw`。人类可读的 `runtime events`
+遵循相同的短 ID/完整 ID 规则，而 `--json` 始终保留完整 UUID。`runtime events`
+提供连接、生命周期、rename、IP、网络和数据迁移记录。两者都支持 `--follow`，且不会
+阻塞经 management broker 执行的状态、断开或重载操作。
 
 `runtime events` 读取面向用户的事件流 `logs/events.jsonl`。独立的
 `meta/audit.jsonl` 是严格的持久化 schema 状态：它记录关键修改，由 `state doctor`

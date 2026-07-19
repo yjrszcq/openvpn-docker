@@ -176,8 +176,14 @@ entity, CCD filename, dynamic-lease filename, and OpenVPN management identity
 use that UUID; the client name remains the human-facing label and profile
 filename. Generated profiles include `ovpn-client-id` and `ovpn-client-name`
 comments so both identities can be recovered without changing OpenVPN syntax.
-Except for `create`, each `<client>` argument accepts either the current display
-name or the immutable UUID. A UUID cannot be used as a display name.
+Except for `create`, client-selecting commands accept a `<selector>` in one of
+these forms: a positional `<client>`, `--id <ID>`/`-i <ID>`, or
+`--name <NAME>`/`-n <NAME>`. Explicit ID selectors accept a standard UUID or a
+case-insensitive compact hexadecimal prefix of at least 8 characters. A prefix
+must identify exactly one active or revoked client. Explicit name selectors are
+case-sensitive exact matches. A positional value tries both forms and, if they
+identify different clients, requires `--id` or `--name` to disambiguate. A UUID
+cannot be used as a display name.
 
 ### `ovpn client create`
 
@@ -199,7 +205,7 @@ cannot be combined.
 Syntax:
 
 ```text
-ovpn client export <client>
+ovpn client export <selector>
 ```
 
 Requires a healthy active client. Regenerates
@@ -211,13 +217,14 @@ standard output. Redirect standard output to save the client profile.
 Syntax:
 
 ```text
-ovpn client list [--detail]
+ovpn client list [--detail] [--no-trunc]
 ```
 
 Without `--detail`, prints the aligned columns `CLIENT ID`, `NAME`, and
-`STATE`, in that order. With `--detail`, it additionally prints `MODE`, `IP`,
-`IP STATE`, and `CONNECTION`. The immutable client ID is shown first in both
-views.
+`STATE`, in that order. The ID defaults to the first 12 hexadecimal characters
+of the UUID without hyphens and can be copied into any client selector.
+`--no-trunc` displays the complete standard UUID. With `--detail`, the command
+additionally prints `MODE`, `IP`, `IP STATE`, and `CONNECTION`.
 
 For the IP view, static assignments are `configured` or `retained` after
 revocation. Dynamic addresses are `connected` when the management socket has a
@@ -231,7 +238,7 @@ registry with current connection and lease-cache state.
 Syntax:
 
 ```text
-ovpn client rename <client> <new-name>
+ovpn client rename <selector> <new-name>
 ```
 
 Atomically changes the human-facing display name while preserving the UUID,
@@ -247,7 +254,7 @@ tombstones remain authoritative history.
 Syntax:
 
 ```text
-ovpn client revoke <client> [--release-ip]
+ovpn client revoke <selector> [--release-ip]
 ```
 
 Revokes an active certificate, regenerates the CRL, moves its active profile to
@@ -261,7 +268,7 @@ operation.
 Syntax:
 
 ```text
-ovpn client reissue <client> [--dynamic|--ip <IPv4>]
+ovpn client reissue <selector> [--dynamic|--ip <IPv4>]
 ```
 
 Issues a new key and certificate for an existing client name. For an active
@@ -283,7 +290,7 @@ static IP; reissue is refused when the static region has no free capacity. Optio
 Syntax:
 
 ```text
-ovpn client delete <client>
+ovpn client delete <selector>
 ```
 
 Irreversibly removes a client. An active client is revoked first; the command
@@ -308,7 +315,7 @@ assignments.
 Syntax:
 
 ```text
-ovpn client ip release <client>
+ovpn client ip release <selector>
 ```
 
 Releases the retained static assignment of a revoked client. The client must be
@@ -320,7 +327,7 @@ key, certificate history, and audit history remain.
 Syntax:
 
 ```text
-ovpn client ip set <client...|--all> [--dynamic|--ip <IPv4>]
+ovpn client ip set <client...|(--id <ID>)...|(--name <NAME>)...|--all> [--dynamic|--ip <IPv4>]
 ```
 
 Sets active clients to the specified IP assignment and applies the transaction
@@ -331,8 +338,10 @@ Single-client mode:
 - `--ip <IPv4>` → assign an explicit static address
 - `--dynamic` → assign a dynamic address
 
-Multiple clients or `--all` → opens an editor containing `client,ip` rows with
-three assignment modes:
+Multiple positional clients, repeated `--id` selectors, repeated `--name`
+selectors, or `--all` open an editor containing `client,ip` rows. Explicit ID
+and name selectors cannot be mixed with each other, positional clients, or
+`--all`. The editor supports three assignment modes:
 
 - Enter `auto` to allocate the lowest available static address
 - Enter an explicit IPv4 address to assign a specific static IP
@@ -478,12 +487,12 @@ standard output; `--output <path>` writes a mode-`0600` file at that path.
 Syntax:
 
 ```text
-ovpn render client <client> [--stdout|--output <path>]
+ovpn render client <selector> [--stdout|--output <path>]
 ```
 
 Builds a client `.ovpn` profile from the configured endpoint, CA certificate,
-selected client certificate and key, and tls-crypt key. `<client>` may be the
-current name or UUID. Output defaults to standard output; `--output` writes an
+selected client certificate and key, and tls-crypt key. Output defaults to
+standard output; `--output` writes an
 atomically replaced mode-`0600` file.
 
 ## Persistent data migration
@@ -579,27 +588,30 @@ is missing, it detects Easy-RSA and prints `unknown` for unavailable fields.
 Syntax:
 
 ```text
-ovpn runtime logs [--lines N] [--follow] [--raw]
+ovpn runtime logs [--lines N] [--follow] [--raw] [--no-trunc]
 ```
 
 Reads persistent rotated OpenVPN logs, defaulting to the latest 100 lines.
-Known UUIDs are displayed as `name [uuid]`; unknown identities remain
-unchanged. `--raw` disables translation. `--follow` continues across append,
-rotation, and atomic replacement without owning or blocking the OpenVPN
-management socket.
+Known UUIDs are displayed as `name [short-id]`, using the same 12-character ID
+as `client list`; unknown identities remain complete and unchanged.
+`--no-trunc` displays complete known UUIDs. `--raw` disables both translation
+and truncation. `--follow` continues across append, rotation, and atomic
+replacement without owning or blocking the OpenVPN management socket.
 
 ### `ovpn runtime events`
 
 Syntax:
 
 ```text
-ovpn runtime events [--lines N] [--follow] [--json]
+ovpn runtime events [--lines N] [--follow] [--json] [--no-trunc]
 ```
 
 Reads the latest 100 structured connection, disconnection, client lifecycle,
 IP, rename, network migration, and data migration events.
-The default is human-readable text; `--json` emits one JSON object per event.
-`--follow` streams new records without blocking management commands.
+The default is human-readable text with 12-character client IDs;
+`--no-trunc` displays complete UUIDs. `--json` emits stored JSON objects with
+complete UUIDs regardless of `--no-trunc`. `--follow` streams new records
+without blocking management commands.
 
 This command reads `logs/events.jsonl`, the user-facing observability stream.
 It does not read `meta/audit.jsonl`. The latter is a strict, schema-owned

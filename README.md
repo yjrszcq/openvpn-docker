@@ -203,11 +203,19 @@ listed by `migrate apply`. An image rollback does not roll back migrated
 data—restore the matching pre-migration snapshot instead. See the operations
 guide for snapshots and recovery.
 
-Persistent OpenVPN logs translate known UUIDs back to display names, while the
-event stream provides structured lifecycle records:
+Client lists display a copyable 12-character UUID prefix by default; use
+`client list --no-trunc` for complete UUIDs. Client commands retain positional
+references and also accept `--id`/`-i` for an ID prefix or `--name`/`-n` for an
+exact display name. Persistent OpenVPN logs use the same short identity display,
+while the event stream provides structured lifecycle records:
+
+These selector and presentation changes do not alter persistent data. The
+planned 3.1.0 image remains on data schema 3, so a 3.0.0 deployment can recreate
+the container directly without running `migrate`.
 
 ```bash
 docker compose exec openvpn ovpn runtime logs --lines 100
+docker compose exec openvpn ovpn runtime logs --lines 100 --no-trunc
 docker compose exec openvpn ovpn runtime events --lines 100 --json
 ```
 
