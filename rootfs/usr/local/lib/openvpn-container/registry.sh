@@ -7,8 +7,46 @@ declare -A OVPN_REGISTRY_NAME_BY_ID=()
 declare -A OVPN_REGISTRY_STATE_BY_ID=()
 declare -A OVPN_REGISTRY_CURRENT_ID_BY_NAME=()
 
+OVPN_CLIENT_ID_MIN_PREFIX_LENGTH=8
+OVPN_CLIENT_ID_DISPLAY_LENGTH=12
+OVPN_REGISTRY_RESOLVE_NOT_FOUND=2
+OVPN_REGISTRY_RESOLVE_AMBIGUOUS=3
+OVPN_REGISTRY_RESOLVE_INVALID=4
+
 ovpn_registry_uuid_valid() {
   [[ "$1" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
+}
+
+ovpn_registry_uuid_compact() {
+  local id="$1"
+
+  ovpn_registry_uuid_valid "$id" || return 1
+  printf '%s\n' "${id//-/}"
+}
+
+ovpn_registry_uuid_abbreviate() {
+  local id="$1"
+  local length="${2:-$OVPN_CLIENT_ID_DISPLAY_LENGTH}"
+  local compact
+
+  compact="$(ovpn_registry_uuid_compact "$id")" || return 1
+  [[ "$length" =~ ^[0-9]+$ ]] || return 1
+  [ "$length" -ge "$OVPN_CLIENT_ID_MIN_PREFIX_LENGTH" ] && [ "$length" -le 32 ] || return 1
+  printf '%s\n' "${compact:0:length}"
+}
+
+ovpn_registry_uuid_reference_normalize() {
+  local reference="$1"
+  local normalized
+
+  if [[ "$reference" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-4[0-9A-Fa-f]{3}-[89AaBb][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$ ]]; then
+    normalized="${reference//-/}"
+  elif [[ "$reference" =~ ^[0-9A-Fa-f]{8,32}$ ]]; then
+    normalized="$reference"
+  else
+    return 1
+  fi
+  printf '%s\n' "${normalized,,}"
 }
 
 ovpn_registry_uuid_generate() {
@@ -88,24 +126,77 @@ ovpn_registry_name_by_id() {
   printf '%s\n' "${OVPN_REGISTRY_NAME_BY_ID[$id]}"
 }
 
+ovpn_registry_print_current_by_id() {
+  local id="$1"
+  local name="${OVPN_REGISTRY_NAME_BY_ID[$id]:-}"
+  local state="${OVPN_REGISTRY_STATE_BY_ID[$id]:-}"
+
+  [ -n "$name" ] && [ "$state" != deleted ] || return "$OVPN_REGISTRY_RESOLVE_NOT_FOUND"
+  printf '%s,%s,%s\n' "$id" "$name" "$state"
+}
+
+ovpn_registry_resolve_current_by_name() {
+  local name="$1"
+  local id
+
+  ovpn_registry_client_name_valid "$name" || return "$OVPN_REGISTRY_RESOLVE_INVALID"
+  ovpn_registry_load_identities || return 1
+  id="${OVPN_REGISTRY_CURRENT_ID_BY_NAME[$name]:-}"
+  [ -n "$id" ] || return "$OVPN_REGISTRY_RESOLVE_NOT_FOUND"
+  ovpn_registry_print_current_by_id "$id"
+}
+
+ovpn_registry_resolve_current_by_id() {
+  local reference="$1"
+  local prefix id compact match=''
+  local count=0 index
+
+  prefix="$(ovpn_registry_uuid_reference_normalize "$reference")" || return "$OVPN_REGISTRY_RESOLVE_INVALID"
+  ovpn_registry_load_identities || return 1
+  for ((index = 0; index < ${#OVPN_REGISTRY_CLIENT_IDS[@]}; index++)); do
+    [ "${OVPN_REGISTRY_CLIENT_STATES[index]}" != deleted ] || continue
+    id="${OVPN_REGISTRY_CLIENT_IDS[index]}"
+    compact="${id//-/}"
+    [[ "$compact" == "$prefix"* ]] || continue
+    match="$id"
+    count=$((count + 1))
+  done
+  [ "$count" -gt 0 ] || return "$OVPN_REGISTRY_RESOLVE_NOT_FOUND"
+  [ "$count" -eq 1 ] || return "$OVPN_REGISTRY_RESOLVE_AMBIGUOUS"
+  ovpn_registry_print_current_by_id "$match"
+}
+
 ovpn_registry_resolve_current() {
   local reference="$1"
-  local id name state
+  local prefix='' id compact
+  local name_id="" index
+  local -A matches=()
 
+  ovpn_registry_client_name_valid "$reference" || \
+    ovpn_registry_uuid_reference_normalize "$reference" >/dev/null 2>&1 || \
+    return "$OVPN_REGISTRY_RESOLVE_INVALID"
+  prefix="$(ovpn_registry_uuid_reference_normalize "$reference" 2>/dev/null || true)"
   ovpn_registry_load_identities || return 1
-  if ovpn_registry_uuid_valid "$reference"; then
-    id="$reference"
-    name="${OVPN_REGISTRY_NAME_BY_ID[$id]:-}"
-    state="${OVPN_REGISTRY_STATE_BY_ID[$id]:-}"
-    [ -n "$name" ] && [ "$state" != deleted ] || return 1
-  else
-    ovpn_registry_client_name_valid "$reference" || return 1
-    name="$reference"
-    id="${OVPN_REGISTRY_CURRENT_ID_BY_NAME[$name]:-}"
-    [ -n "$id" ] || return 1
-    state="${OVPN_REGISTRY_STATE_BY_ID[$id]}"
+
+  if ovpn_registry_client_name_valid "$reference"; then
+    name_id="${OVPN_REGISTRY_CURRENT_ID_BY_NAME[$reference]:-}"
+    [ -z "$name_id" ] || matches["$name_id"]=1
   fi
-  printf '%s,%s,%s\n' "$id" "$name" "$state"
+  if [ -n "$prefix" ]; then
+    for ((index = 0; index < ${#OVPN_REGISTRY_CLIENT_IDS[@]}; index++)); do
+      [ "${OVPN_REGISTRY_CLIENT_STATES[index]}" != deleted ] || continue
+      id="${OVPN_REGISTRY_CLIENT_IDS[index]}"
+      compact="${id//-/}"
+      [[ "$compact" == "$prefix"* ]] || continue
+      matches["$id"]=1
+    done
+  fi
+
+  [ "${#matches[@]}" -gt 0 ] || return "$OVPN_REGISTRY_RESOLVE_NOT_FOUND"
+  [ "${#matches[@]}" -eq 1 ] || return "$OVPN_REGISTRY_RESOLVE_AMBIGUOUS"
+  for id in "${!matches[@]}"; do
+    ovpn_registry_print_current_by_id "$id"
+  done
 }
 
 ovpn_registry_dir() {

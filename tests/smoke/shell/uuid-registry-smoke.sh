@@ -20,6 +20,17 @@ assert_rejected() {
   fi
 }
 
+assert_status() {
+  local expected="$1"
+  shift
+  local status=0
+  "$@" >/dev/null 2>&1 || status=$?
+  [ "$status" -eq "$expected" ] || {
+    printf 'unexpected status %s (wanted %s): %s\n' "$status" "$expected" "$*" >&2
+    exit 1
+  }
+}
+
 declare -A generated=()
 for _ in {1..100}; do
   id="$(ovpn_registry_uuid_generate)"
@@ -31,6 +42,12 @@ done
 ovpn_registry_uuid_valid '550e8400-e29b-41d4-a716-446655440000'
 assert_rejected ovpn_registry_uuid_valid '550e8400-e29b-11d4-a716-446655440000'
 assert_rejected ovpn_registry_uuid_valid '550E8400-E29B-41D4-A716-446655440000'
+[ "$(ovpn_registry_uuid_compact 550e8400-e29b-41d4-a716-446655440000)" = 550e8400e29b41d4a716446655440000 ]
+[ "$(ovpn_registry_uuid_abbreviate 550e8400-e29b-41d4-a716-446655440000)" = 550e8400e29b ]
+[ "$(ovpn_registry_uuid_reference_normalize 550E8400-E29B-41D4-A716-446655440000)" = 550e8400e29b41d4a716446655440000 ]
+[ "$(ovpn_registry_uuid_reference_normalize 550E8400)" = 550e8400 ]
+assert_rejected ovpn_registry_uuid_reference_normalize 550e840
+assert_rejected ovpn_registry_uuid_reference_normalize 550e840g
 ovpn_registry_client_name_valid laptop
 assert_rejected ovpn_registry_client_name_valid '550e8400-e29b-41d4-a716-446655440000'
 
@@ -41,6 +58,8 @@ cat >"$OVPN_DATA_DIR/meta/client-state.csv" <<'EOF'
 22222222-2222-4222-8222-222222222222,laptop,active
 33333333-3333-4333-8333-333333333333,phone,revoked
 44444444-4444-4444-8444-444444444444,retired,deleted
+22222222-aaaa-4aaa-8aaa-aaaaaaaaaaaa,22222222,revoked
+55555555-5555-4555-8555-555555555555,deleted-prefix,deleted
 EOF
 ovpn_registry_load_identities
 [ "${OVPN_REGISTRY_CURRENT_ID_BY_NAME[laptop]}" = 22222222-2222-4222-8222-222222222222 ]
@@ -52,6 +71,19 @@ ovpn_registry_client_is_deleted retired
 [ "$(ovpn_registry_resolve_current laptop)" = '22222222-2222-4222-8222-222222222222,laptop,active' ]
 [ "$(ovpn_registry_resolve_current 22222222-2222-4222-8222-222222222222)" = '22222222-2222-4222-8222-222222222222,laptop,active' ]
 [ "$(ovpn_registry_resolve_current phone)" = '33333333-3333-4333-8333-333333333333,phone,revoked' ]
+[ "$(ovpn_registry_resolve_current_by_id 222222222222)" = '22222222-2222-4222-8222-222222222222,laptop,active' ]
+[ "$(ovpn_registry_resolve_current_by_id 2222222222224222822222222222222)" = '22222222-2222-4222-8222-222222222222,laptop,active' ]
+[ "$(ovpn_registry_resolve_current_by_id 22222222222242228222222222222222)" = '22222222-2222-4222-8222-222222222222,laptop,active' ]
+[ "$(ovpn_registry_resolve_current_by_id 22222222-2222-4222-8222-222222222222)" = '22222222-2222-4222-8222-222222222222,laptop,active' ]
+[ "$(ovpn_registry_resolve_current_by_id 22222222-AAAA-4AAA-8AAA-AAAAAAAAAAAA)" = '22222222-aaaa-4aaa-8aaa-aaaaaaaaaaaa,22222222,revoked' ]
+[ "$(ovpn_registry_resolve_current_by_id 33333333)" = '33333333-3333-4333-8333-333333333333,phone,revoked' ]
+[ "$(ovpn_registry_resolve_current_by_name 22222222)" = '22222222-aaaa-4aaa-8aaa-aaaaaaaaaaaa,22222222,revoked' ]
+assert_status "$OVPN_REGISTRY_RESOLVE_AMBIGUOUS" ovpn_registry_resolve_current_by_id 22222222
+assert_status "$OVPN_REGISTRY_RESOLVE_AMBIGUOUS" ovpn_registry_resolve_current 22222222
+assert_status "$OVPN_REGISTRY_RESOLVE_INVALID" ovpn_registry_resolve_current_by_id 2222222
+assert_status "$OVPN_REGISTRY_RESOLVE_NOT_FOUND" ovpn_registry_resolve_current_by_id aaaaaaaa
+assert_status "$OVPN_REGISTRY_RESOLVE_NOT_FOUND" ovpn_registry_resolve_current_by_id 55555555
+assert_status "$OVPN_REGISTRY_RESOLVE_NOT_FOUND" ovpn_registry_resolve_current missing-client
 assert_rejected ovpn_registry_resolve_current "$deleted_id"
 assert_rejected ovpn_registry_resolve_current retired
 
@@ -83,11 +115,12 @@ cat >"$OVPN_DATA_DIR/pki/index.txt" <<'EOF'
 V	30000101000000Z		01	unknown	/CN=22222222-2222-4222-8222-222222222222
 R	30000101000000Z	260101000000Z	02	unknown	/CN=33333333-3333-4333-8333-333333333333
 R	30000101000000Z	260101000000Z	03	unknown	/CN=legacy-revoked-cn
+R	30000101000000Z	260101000000Z	04	unknown	/CN=22222222-aaaa-4aaa-8aaa-aaaaaaaaaaaa
 EOF
 ovpn_client_ip_collect_pki_clients
 [ "${OVPN_CLIENT_IP_PKI_STATES[laptop]}" = active ]
 [ "${OVPN_CLIENT_IP_PKI_STATES[phone]}" = revoked ]
-printf 'V\t30000101000000Z\t\t04\tunknown\t/CN=legacy-active-cn\n' >>"$OVPN_DATA_DIR/pki/index.txt"
+printf 'V\t30000101000000Z\t\t05\tunknown\t/CN=legacy-active-cn\n' >>"$OVPN_DATA_DIR/pki/index.txt"
 assert_rejected ovpn_client_ip_collect_pki_clients
 sed -i '$d' "$OVPN_DATA_DIR/pki/index.txt"
 
