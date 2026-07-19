@@ -186,6 +186,14 @@ def main() -> int:
                 raise AssertionError("status response was not proxied")
             if not any("OpenVPN Version:" in output for output in outputs):
                 raise AssertionError("version response was not proxied")
+            error_started = time.monotonic()
+            unsupported = request(broker_path, "unsupported-command")
+            if unsupported != "ERROR: unsupported test command":
+                raise AssertionError("single-line management error was not proxied")
+            if time.monotonic() - error_started >= 0.5:
+                raise AssertionError("single-line management error waited for timeout")
+            if not request(broker_path, "version").startswith("OpenVPN Version:"):
+                raise AssertionError("management error disconnected a healthy backend")
             if not request(broker_path, "kill client-id").startswith("SUCCESS:"):
                 raise AssertionError("kill response was not proxied")
             if not request(broker_path, "test-disconnect").startswith("ERROR:"):

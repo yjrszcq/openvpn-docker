@@ -202,10 +202,10 @@ ovpn_pki_try_revoke_client() {
 
   ovpn_registry_uuid_valid "$id" || return 1
   bin="$(ovpn_easyrsa_bin)" || return 1
-  EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" "$bin" revoke "$id"
-  EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" "$bin" gen-crl
+  EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" "$bin" revoke "$id" || return 1
+  EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" "$bin" gen-crl || return 1
   [ -s "$OVPN_DATA_DIR/pki/crl.pem" ] || return 1
-  chmod 644 "$OVPN_DATA_DIR/pki/crl.pem"
+  chmod 644 "$OVPN_DATA_DIR/pki/crl.pem" || return 1
 }
 
 ovpn_pki_try_issue_client() {
@@ -214,12 +214,12 @@ ovpn_pki_try_issue_client() {
 
   ovpn_registry_uuid_valid "$id" || return 1
   bin="$(ovpn_easyrsa_bin)" || return 1
-  rm -f "$OVPN_DATA_DIR/pki/reqs/$id.req" "$OVPN_DATA_DIR/pki/private/$id.key"
-  EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" EASYRSA_REQ_CN="$id" "$bin" build-client-full "$id" nopass
+  rm -f "$OVPN_DATA_DIR/pki/reqs/$id.req" "$OVPN_DATA_DIR/pki/private/$id.key" || return 1
+  EASYRSA_BATCH=1 EASYRSA_PKI="$OVPN_DATA_DIR/pki" EASYRSA_REQ_CN="$id" "$bin" build-client-full "$id" nopass || return 1
   [ -r "$OVPN_DATA_DIR/pki/issued/$id.crt" ] || return 1
   [ -r "$OVPN_DATA_DIR/pki/private/$id.key" ] || return 1
-  chmod 644 "$OVPN_DATA_DIR/pki/issued/$id.crt"
-  chmod 600 "$OVPN_DATA_DIR/pki/private/$id.key"
+  chmod 644 "$OVPN_DATA_DIR/pki/issued/$id.crt" || return 1
+  chmod 600 "$OVPN_DATA_DIR/pki/private/$id.key" || return 1
 }
 
 ovpn_pki_reissue_supported() {

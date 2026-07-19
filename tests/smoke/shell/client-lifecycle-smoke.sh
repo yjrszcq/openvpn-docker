@@ -65,10 +65,18 @@ case "${1:-}" in
     printf '%s\n' "$sequence" >"$sequence_file"
     printf 'FAKE CLIENT CERT %s %s\n' "$name" "$sequence" >"$EASYRSA_PKI/issued/$name.crt"
     printf 'FAKE CLIENT KEY %s %s\n' "$name" "$sequence" >"$EASYRSA_PKI/private/$name.key"
+    if [ "${FAKE_EASYRSA_FAIL_BUILD_CLIENT_AFTER_OUTPUT:-}" = "$EASYRSA_PKI:$name" ]; then
+      echo "injected Easy-RSA post-issuance failure" >&2
+      exit 1
+    fi
     printf 'V\t30000101000000Z\t\t01\tunknown\t/CN=%s\n' "$name" >>"$EASYRSA_PKI/index.txt"
     ;;
   revoke)
     name="$2"
+    if [ "${FAKE_EASYRSA_FAIL_REVOKE:-}" = "$name" ]; then
+      echo "injected Easy-RSA revoke failure" >&2
+      exit 1
+    fi
     tmp="$EASYRSA_PKI/index.txt.tmp"
     found=0
     while IFS= read -r line || [ -n "$line" ]; do
@@ -313,6 +321,17 @@ grep -E "^source[[:space:]]+${rename_id}[[:space:]]+active$" <("$OVPN" client li
 phone_id="$(awk -F, '$2 == "phone" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
 grep -Fqx "$phone_id,phone," "$OVPN_DATA_DIR/meta/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/ccd/$phone_id"
+
+"$OVPN" client create revoke-failure --dynamic >"$TMP_DIR/revoke-failure-create.out" 2>"$TMP_DIR/revoke-failure-create.err"
+revoke_failure_id="$(awk -F, '$2 == "revoke-failure" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
+if FAKE_EASYRSA_FAIL_REVOKE="$revoke_failure_id" \
+  "$OVPN" client revoke revoke-failure >"$TMP_DIR/revoke-failure.out" 2>"$TMP_DIR/revoke-failure.err"; then
+  echo 'failed Easy-RSA revoke was reported as successful' >&2
+  exit 1
+fi
+grep -Fq 'failed to revoke client certificate' "$TMP_DIR/revoke-failure.err"
+grep -Fqx "$revoke_failure_id,revoke-failure,active" "$OVPN_DATA_DIR/meta/client-state.csv"
+
 "$OVPN" client ip set "$phone_id" --ip 10.88.0.20 >"$TMP_DIR/phone-static.out" 2>"$TMP_DIR/phone-static.err"
 grep -Fqx "$phone_id,phone,10.88.0.20" "$OVPN_DATA_DIR/meta/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.20 255.255.255.0' "$OVPN_DATA_DIR/ccd/$phone_id"
@@ -514,6 +533,17 @@ grep -Fqx "$laptop_id,retired-laptop,revoked" "$OVPN_DATA_DIR/meta/client-state.
 grep -Fqx "$laptop_id,retired-laptop," "$OVPN_DATA_DIR/meta/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
 grep -Fqx '# ovpn-client-name: retired-laptop' "$OVPN_DATA_DIR/clients/revoked/retired-laptop.ovpn"
+[ "$("$OVPN" state show)" = HEALTHY ]
+
+"$OVPN" client create issuance-failure --dynamic >"$TMP_DIR/issuance-failure-create.out" 2>"$TMP_DIR/issuance-failure-create.err"
+issuance_failure_id="$(awk -F, '$2 == "issuance-failure" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
+if FAKE_EASYRSA_FAIL_BUILD_CLIENT_AFTER_OUTPUT="$OVPN_DATA_DIR/pki:$issuance_failure_id" \
+  "$OVPN" client reissue issuance-failure >"$TMP_DIR/issuance-failure.out" 2>"$TMP_DIR/issuance-failure.err"; then
+  echo 'failed Easy-RSA issuance was reported as successful' >&2
+  exit 1
+fi
+grep -Fq 'client reissue failed' "$TMP_DIR/issuance-failure.err"
+grep -Fqx "$issuance_failure_id,issuance-failure,revoked" "$OVPN_DATA_DIR/meta/client-state.csv"
 [ "$("$OVPN" state show)" = HEALTHY ]
 
 printf 'client lifecycle smoke passed\n'

@@ -70,7 +70,6 @@ class RotatingLog:
 
 @dataclass
 class PendingResponse:
-    command: str
     lines: list[str] = field(default_factory=list)
     done: threading.Event = field(default_factory=threading.Event)
     error: str | None = None
@@ -79,9 +78,7 @@ class PendingResponse:
         self.lines.append(line)
         if line == "END":
             self.done.set()
-        elif self.command.startswith(("kill ", "signal ", "log ")) and line.startswith(
-            ("SUCCESS:", "ERROR:")
-        ):
+        elif line.startswith(("SUCCESS:", "ERROR:")):
             self.done.set()
 
 
@@ -171,7 +168,7 @@ class OpenVPNBackend:
         return connection
 
     def _exchange(self, connection: socket.socket, command: str) -> list[str]:
-        pending = PendingResponse(command)
+        pending = PendingResponse()
         with self.state_lock:
             if self.connection is not connection:
                 raise ConnectionError("OpenVPN management connection changed")
