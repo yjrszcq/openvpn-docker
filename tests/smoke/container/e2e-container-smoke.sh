@@ -415,7 +415,7 @@ for proto in udp tcp; do
     start_persistent_client "$network_name" "$profile_path" "$rename_client"
     wait_for_log "$rename_client" 'Initialization Sequence Completed' "$WORK_DIR/client-rename-active.log"
     openvpn_pid="$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')"
-    run_control "$data_dir" "$endpoint" ovpn client rename "$client_id" renamed-udp
+    run_control "$data_dir" "$endpoint" ovpn client rename -i "$client_id" renamed-udp
     client_display=renamed-udp
     [ "$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')" = "$openvpn_pid" ]
     docker ps --format '{{.Names}}' | grep -Fqx "$rename_client"
@@ -431,7 +431,7 @@ for proto in udp tcp; do
   fi
 
   docker rm -f "$server_name" >/dev/null
-  run_control "$data_dir" "$endpoint" ovpn client revoke "$client_id"
+  run_control "$data_dir" "$endpoint" ovpn client revoke -i "$client_id"
   grep -E "^${client_short_id}[[:space:]]+${client_display}[[:space:]]+revoked$" <(run_control "$data_dir" "$endpoint" ovpn client list)
 
   start_server "$data_dir" "$endpoint" "$server_name" "$network_name"

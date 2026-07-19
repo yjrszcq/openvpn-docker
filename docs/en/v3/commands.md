@@ -166,7 +166,7 @@ Validates the current `OVPN_*` environment and atomically replaces `config/proje
 
 ## Client lifecycle
 
-Each client has an immutable UUID identity. The certificate CN, Easy-RSA entity, CCD filename, dynamic-lease filename, and OpenVPN management identity use that UUID; the client name remains the human-facing label and profile filename. Generated profiles include `ovpn-client-id` and `ovpn-client-name` comments so both identities can be recovered without changing OpenVPN syntax. Except for `create`, client-selecting commands accept a `<selector>` in one of these forms: a positional `<client>`, `--id <ID>`/`-i <ID>`, or `--name <NAME>`/`-n <NAME>`. Explicit ID selectors accept a standard UUID or a case-insensitive compact hexadecimal prefix of at least 8 characters. A prefix must identify exactly one active or revoked client. Explicit name selectors are case-sensitive exact matches. A positional value tries both forms and, if they identify different clients, requires `--id` or `--name` to disambiguate. A UUID cannot be used as a display name.
+Each client has an immutable UUID identity. The certificate CN, Easy-RSA entity, CCD filename, dynamic-lease filename, and OpenVPN management identity use that UUID; the client name remains the human-facing label and profile filename. Generated profiles include `ovpn-client-id` and `ovpn-client-name` comments so both identities can be recovered without changing OpenVPN syntax. Except for `create`, client-selecting commands accept a `<selector>` in one of these forms: a positional `<name>`, `--id <ID>`/`-i <ID>`, or `--name <NAME>`/`-n <NAME>`. Positional values and explicit name selectors are case-sensitive exact name matches. ID selectors accept a standard UUID or a case-insensitive compact hexadecimal prefix of at least 8 characters and must identify exactly one active or revoked client. IDs are never inferred from positional values, and a UUID cannot be used as a display name.
 
 ### `ovpn client create`
 
@@ -196,7 +196,7 @@ Syntax:
 ovpn client list [--detail|-d] [--no-trunc|-t]
 ```
 
-Without `--detail`, prints the aligned columns `CLIENT ID`, `NAME`, and `STATE`, in that order. The ID defaults to the first 12 hexadecimal characters of the UUID without hyphens and can be copied into any client selector. `--no-trunc` displays the complete standard UUID. With `--detail`, the command additionally prints `MODE`, `IP`, `IP STATE`, and `CONNECTION`.
+Without `--detail`, prints the aligned columns `CLIENT ID`, `NAME`, and `STATE`, in that order. The ID defaults to the first 12 hexadecimal characters of the UUID without hyphens and can be copied into `--id`/`-i`. `--no-trunc` displays the complete standard UUID. With `--detail`, the command additionally prints `MODE`, `IP`, `IP STATE`, and `CONNECTION`.
 
 For the IP view, static assignments are `configured` or `retained` after revocation. Dynamic addresses are `connected` when the management socket has a current lease, `last-known` when a cached lease record exists, or `unavailable`. `CONNECTION` is `online`, `offline`, or `unknown` according to management-socket availability and the current route. The view combines the authoritative IP registry with current connection and lease-cache state.
 
@@ -208,7 +208,7 @@ Syntax:
 ovpn client rename <selector> <new-name>
 ```
 
-Atomically changes the human-facing display name while preserving the UUID, certificate, key, IP assignment, CCD, lease, and any current OpenVPN connection. The identity and IP registries, profile filename, and embedded name comment change together. The source may be the current name or UUID. The new name must be valid and unused by a current client. Renaming or deleting a client releases its old name for reuse; deleted UUID tombstones remain authoritative history.
+Atomically changes the human-facing display name while preserving the UUID, certificate, key, IP assignment, CCD, lease, and any current OpenVPN connection. The identity and IP registries, profile filename, and embedded name comment change together. Supply the current name positionally or select the UUID with `--id`/`-i`. The new name must be valid and unused by a current client. Renaming or deleting a client releases its old name for reuse; deleted UUID tombstones remain authoritative history.
 
 ### `ovpn client revoke`
 
@@ -264,7 +264,7 @@ Releases the retained static assignment of a revoked client. The client must be 
 Syntax:
 
 ```text
-ovpn client ip set <client...|(--id|-i <ID>)...|(--name|-n <NAME>)...|--all|-a> [--dynamic|-d|--ip|-I <IPv4>]
+ovpn client ip set <name...|(--id|-i <ID>)...|(--name|-n <NAME>)...|--all|-a> [--dynamic|-d|--ip|-I <IPv4>]
 ```
 
 Sets active clients to the specified IP assignment and applies the transaction immediately.
@@ -274,7 +274,7 @@ Single-client mode:
 - `--ip <IPv4>` → assign an explicit static address
 - `--dynamic` → assign a dynamic address
 
-Multiple positional clients, repeated `--id` selectors, repeated `--name` selectors, or `--all` open an editor containing `client,ip` rows. Explicit ID and name selectors cannot be mixed with each other, positional clients, or `--all`. The editor supports three assignment modes:
+Multiple positional names, repeated `--id` selectors, repeated `--name` selectors, or `--all` open an editor containing `client,ip` rows. Explicit ID and name selectors cannot be mixed with each other, positional names, or `--all`. The editor supports three assignment modes:
 
 - Enter `auto` to allocate the lowest available static address
 - Enter an explicit IPv4 address to assign a specific static IP
@@ -457,7 +457,7 @@ Syntax:
 ovpn runtime events [--lines|-l N] [--follow|-f] [--json|-j] [--no-trunc|-t]
 ```
 
-Reads the latest 100 structured connection, disconnection, client lifecycle, IP, rename, network migration, and data migration events. The default is human-readable text with 12-character client IDs; `--no-trunc` displays complete UUIDs. `--json` emits stored JSON objects with complete UUIDs regardless of `--no-trunc`. `--follow` streams new records without blocking management commands.
+Reads the latest 100 structured connection, disconnection, client lifecycle, IP, rename, network migration, and data migration events. The default is human-readable text with 12-character client IDs; `--no-trunc` displays complete UUIDs. `--json` emits stored JSON objects with complete UUIDs regardless of `--no-trunc`. `--follow` streams new records without blocking management commands; malformed records in startup history or appended later are reported on standard error and skipped so following can continue. Without `--follow`, a malformed selected record remains a fatal read error.
 
 This command reads `logs/events.jsonl`, the user-facing observability stream. It does not read `meta/audit.jsonl`. The latter is a strict, schema-owned internal audit of critical persistent mutations such as IP application, client lifecycle changes, rename, and network migration. State validation checks its format, repair may use the latest rename record as identity-recovery evidence, and data migration preserves or converts it. Do not edit, truncate, or delete `meta/audit.jsonl` manually.
 

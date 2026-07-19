@@ -106,12 +106,16 @@ def main() -> int:
         if rejected.returncode != 1 or "invalid structured event" not in rejected.stderr:
             raise AssertionError("malformed structured event was accepted")
 
+        with event_file.open("a", encoding="utf-8") as stream:
+            stream.write("{bad historical json}\n")
+            stream.flush()
+
         follower = subprocess.Popen(
             [
                 sys.executable,
                 str(script),
                 "-l",
-                "0",
+                "1",
                 "-f",
                 "-j",
                 "--event-file",
@@ -122,6 +126,9 @@ def main() -> int:
             stderr=subprocess.PIPE,
         )
         try:
+            warning = read_follow_error(follower)
+            if "invalid structured event" not in warning:
+                raise AssertionError(f"unexpected historical-event warning: {warning!r}")
             time.sleep(0.3)
             append_event(event_file, event(4))
             if json.loads(read_follow_line(follower)) != event(4):

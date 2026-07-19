@@ -81,6 +81,13 @@ def emit(line: str, json_output: bool, no_trunc: bool) -> None:
         raise SystemExit(0) from None
 
 
+def emit_while_following(line: str, json_output: bool, no_trunc: bool) -> None:
+    try:
+        emit(line, json_output, no_trunc)
+    except ValueError as exc:
+        print(f"ovpn: skipped event while following: {exc}", file=sys.stderr, flush=True)
+
+
 def history(event_file: Path, count: int) -> tuple[deque[str], TextIO | None]:
     lines: deque[str] = deque(maxlen=count if count > 0 else None)
     try:
@@ -110,10 +117,7 @@ def follow(
                 continue
         line = stream.readline()
         if line:
-            try:
-                emit(line.rstrip("\r\n"), json_output, no_trunc)
-            except ValueError as exc:
-                print(f"ovpn: skipped event while following: {exc}", file=sys.stderr, flush=True)
+            emit_while_following(line.rstrip("\r\n"), json_output, no_trunc)
             continue
         try:
             current_state = event_file.stat()
@@ -149,7 +153,10 @@ def main() -> int:
     try:
         lines, stream = history(event_file, args.lines)
         for line in lines:
-            emit(line, args.json, args.no_trunc)
+            if args.follow:
+                emit_while_following(line, args.json, args.no_trunc)
+            else:
+                emit(line, args.json, args.no_trunc)
         if args.follow:
             try:
                 follow(event_file, stream, args.json, args.no_trunc)

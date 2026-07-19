@@ -38,7 +38,7 @@ ovpn_client_parse_single_selector_or_die() {
       ;;
     --*) ovpn_die "$usage" ;;
     *)
-      OVPN_CLIENT_SELECTOR_MODE=auto
+      OVPN_CLIENT_SELECTOR_MODE=name
       OVPN_CLIENT_SELECTOR_REFERENCE="$1"
       OVPN_CLIENT_SELECTOR_CONSUMED=1
       ;;
@@ -53,7 +53,6 @@ ovpn_client_resolve_selector_or_die() {
   case "$mode" in
     id) resolved="$(ovpn_registry_resolve_current_by_id "$reference")" || status=$? ;;
     name) resolved="$(ovpn_registry_resolve_current_by_name "$reference")" || status=$? ;;
-    auto) resolved="$(ovpn_registry_resolve_current "$reference")" || status=$? ;;
     *) ovpn_die "invalid client selector mode: $mode" ;;
   esac
   if [ "$status" -ne 0 ]; then
@@ -62,12 +61,9 @@ ovpn_client_resolve_selector_or_die() {
         ovpn_die "invalid client ID '$reference': use 8-32 hexadecimal characters or a full UUID"
         ;;
       "$OVPN_REGISTRY_RESOLVE_INVALID:name") ovpn_die "invalid client name: $reference" ;;
-      "$OVPN_REGISTRY_RESOLVE_INVALID:auto") ovpn_die "invalid client reference: $reference" ;;
       "$OVPN_REGISTRY_RESOLVE_AMBIGUOUS:id") ovpn_die "client ID '$reference' is ambiguous; use a longer prefix" ;;
-      "$OVPN_REGISTRY_RESOLVE_AMBIGUOUS:auto") ovpn_die "client reference '$reference' is ambiguous; use --id or --name" ;;
       "$OVPN_REGISTRY_RESOLVE_NOT_FOUND:id") ovpn_die "client ID '$reference' does not exist" ;;
       "$OVPN_REGISTRY_RESOLVE_NOT_FOUND:name") ovpn_die "client name '$reference' does not exist" ;;
-      "$OVPN_REGISTRY_RESOLVE_NOT_FOUND:auto") ovpn_die "client '$reference' does not exist" ;;
       *) ovpn_die 'failed to read the client identity registry' ;;
     esac
   fi
@@ -123,7 +119,7 @@ ovpn_client_export_inner() {
 }
 
 ovpn_client_export_command() {
-  local usage='usage: ovpn client export <client>|--id|-i <ID>|--name|-n <NAME>'
+  local usage='usage: ovpn client export <name>|--id|-i <ID>|--name|-n <NAME>'
   local selector_mode reference consumed
 
   ovpn_client_parse_single_selector_or_die "$usage" "$@"

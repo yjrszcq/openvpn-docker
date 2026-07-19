@@ -77,19 +77,19 @@ docker compose exec openvpn ovpn client list -d
 docker compose exec openvpn ovpn client list -t
 ```
 
-The default 12-character ID can be copied directly into any client command. Use `--id`/`-i` to force ID-prefix matching or `--name`/`-n` to force an exact name match:
+The default 12-character ID can be copied directly after `--id`/`-i`. Positional client arguments are exact names; `--name`/`-n` provides the explicit equivalent:
 
 ```bash
 docker compose exec openvpn ovpn client export -i 67fe9f6dec9b
 docker compose exec openvpn ovpn client export -n laptop
 ```
 
-ID prefixes must contain at least 8 hexadecimal characters and match exactly one active or revoked client. If a positional value could be both a name and a different ID prefix, the command refuses to choose and requests an explicit selector.
+ID prefixes must contain at least 8 hexadecimal characters and match exactly one active or revoked client. Positional values are never interpreted as IDs, even when they contain hexadecimal characters.
 
 ### Rename a client
 
 ```bash
-# accepts a positional reference or an explicit ID/name selector
+# accepts a positional name or an explicit ID/name selector
 docker compose exec openvpn ovpn client rename laptop office-laptop
 ```
 
@@ -368,7 +368,7 @@ docker compose exec openvpn ovpn runtime events --lines 100 --json
 docker compose exec openvpn ovpn runtime logs --lines 100 --no-trunc
 ```
 
-`runtime logs` translates known certificate UUIDs to `name [short-id]`; use `--no-trunc` for translated full UUIDs or `--raw` when comparing exact OpenVPN output. Human-readable `runtime events` follows the same short/full rule, while `--json` always preserves complete UUIDs. `runtime events` exposes connection, lifecycle, rename, IP, network, and migration records. Both accept `--follow` and continue without blocking status, disconnect, or reload operations through the management broker.
+`runtime logs` translates known certificate UUIDs to `name [short-id]`; use `--no-trunc` for translated full UUIDs or `--raw` when comparing exact OpenVPN output. Human-readable `runtime events` follows the same short/full rule, while `--json` always preserves complete UUIDs. `runtime events` exposes connection, lifecycle, rename, IP, network, and migration records. Both accept `--follow` and continue without blocking status, disconnect, or reload operations through the management broker. Event following warns and skips malformed startup-history or newly appended records; a non-follow event read remains strict and fails on malformed selected data.
 
 `runtime events` reads `logs/events.jsonl`, which is the user-facing event stream. The separate `meta/audit.jsonl` is strict persistent schema state: it records critical mutations, is validated by `state doctor`, and supplies rename evidence during identity recovery. It is included in repair, network, and migration transactions and must not be manually edited or deleted.
 

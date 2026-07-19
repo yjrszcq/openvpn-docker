@@ -138,7 +138,7 @@ docker compose up -d openvpn
 
 Migration may replace client credentials; redistribute every active profile listed by `migrate apply`. An image rollback does not roll back migrated data—restore the matching pre-migration snapshot instead. See the operations guide for snapshots and recovery.
 
-Client lists display a copyable 12-character UUID prefix by default; use `client list --no-trunc` for complete UUIDs. Client commands retain positional references and also accept `--id`/`-i` for an ID prefix or `--name`/`-n` for an exact display name. Every public multi-letter option also has a command-local single-letter form; `--ip` uses uppercase `-I` because lowercase `-i` selects a client ID. Persistent OpenVPN logs use the same short identity display, while the event stream provides structured lifecycle records.
+Client lists display a copyable 12-character UUID prefix by default; use `client list --no-trunc` for complete UUIDs. Positional client arguments are case-sensitive exact names; use `--id`/`-i` for an ID prefix or `--name`/`-n` to state the name explicitly. Every public multi-letter option also has a command-local single-letter form; `--ip` uses uppercase `-I` because lowercase `-i` selects a client ID. Persistent OpenVPN logs use the same short identity display, while the event stream provides structured lifecycle records.
 
 These selector and presentation changes do not alter persistent data. The planned 3.2.0 image remains on data schema 3, so a 3.1.0 deployment can recreate the container directly without running `migrate`.
 

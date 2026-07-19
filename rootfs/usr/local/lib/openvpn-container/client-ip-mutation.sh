@@ -379,7 +379,7 @@ ovpn_client_set_from_editor_inner() {
 }
 
 ovpn_client_set_command() {
-  local usage='usage: ovpn client ip set <client...>|--id|-i <ID>|--name|-n <NAME>|--all|-a [--dynamic|-d|--ip|-I <IPv4>]'
+  local usage='usage: ovpn client ip set <name...>|--id|-i <ID>|--name|-n <NAME>|--all|-a [--dynamic|-d|--ip|-I <IPv4>]'
   local mode=static requested_ip='' use_all=false
   local selector_kind=''
   local target_count
@@ -395,14 +395,14 @@ ovpn_client_set_command() {
         ;;
       --id|-i)
         [ "$#" -gt 1 ] || ovpn_die "$1 requires a client ID"
-        [ -z "$selector_kind" ] || [ "$selector_kind" = id ] || ovpn_die '--id cannot be mixed with names or positional client references'
+        [ -z "$selector_kind" ] || [ "$selector_kind" = id ] || ovpn_die '--id cannot be mixed with names or positional client names'
         selector_kind=id
         shift
         selectors+=(id "$1")
         ;;
       --name|-n)
         [ "$#" -gt 1 ] || ovpn_die "$1 requires a client name"
-        [ -z "$selector_kind" ] || [ "$selector_kind" = name ] || ovpn_die '--name cannot be mixed with IDs or positional client references'
+        [ -z "$selector_kind" ] || [ "$selector_kind" = name ] || ovpn_die '--name cannot be mixed with IDs or positional client names'
         selector_kind=name
         shift
         selectors+=(name "$1")
@@ -419,9 +419,9 @@ ovpn_client_set_command() {
         ;;
       --*) ovpn_die "$usage" ;;
       *)
-        [ -z "$selector_kind" ] || [ "$selector_kind" = auto ] || ovpn_die 'positional client references cannot be mixed with --id or --name'
-        selector_kind=auto
-        selectors+=(auto "$1")
+        [ -z "$selector_kind" ] || [ "$selector_kind" = positional ] || ovpn_die 'positional client names cannot be mixed with --id or --name'
+        selector_kind=positional
+        selectors+=(name "$1")
         ;;
     esac
     shift

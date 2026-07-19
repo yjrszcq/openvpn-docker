@@ -68,7 +68,7 @@ printf '%s\n' '# id,name,state' "$client_id,laptop,active" >"$OVPN_DATA_DIR/meta
 
 "$OVPN" render client laptop -s >"$TMP_DIR/laptop.ovpn"
 "$OVPN" render client laptop -o "$TMP_DIR/laptop-output.ovpn"
-"$OVPN" render client "$client_id" --stdout >"$TMP_DIR/laptop-by-id.ovpn"
+"$OVPN" render client -i "$client_id" --stdout >"$TMP_DIR/laptop-by-id.ovpn"
 "$OVPN" render client --id "${client_id%%-*}" --stdout >"$TMP_DIR/laptop-by-short-id.ovpn"
 "$OVPN" render client -n laptop --stdout >"$TMP_DIR/laptop-by-name.ovpn"
 cmp "$TMP_DIR/laptop.ovpn" "$TMP_DIR/laptop-by-id.ovpn"

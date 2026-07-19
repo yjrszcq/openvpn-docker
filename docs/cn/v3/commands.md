@@ -166,7 +166,7 @@ ovpn config apply
 
 ## 客户端生命周期
 
-每个客户端都有不可变的 UUID 身份。证书 CN、Easy-RSA 实体、CCD 文件名、动态租约文件名和 OpenVPN management 身份均使用该 UUID；客户端名称仍作为面向人的管理标签和 profile 文件名。生成的 profile 包含 `ovpn-client-id` 与 `ovpn-client-name` 注释，因此无需改变 OpenVPN 语法也能恢复两种身份。除 `create` 外，选择客户端的命令均接受 `<selector>`：位置参数 `<client>`、`--id <ID>`/`-i <ID>`，或者 `--name <NAME>`/`-n <NAME>`。显式 ID 可使用标准 UUID，或至少 8 位、不区分大小写的紧凑十六进制前缀；前缀必须唯一匹配 active/revoked 客户端。显式名称进行区分大小写的精确匹配。位置参数会同时尝试名称和 ID；若两者指向不同客户端，则必须使用 `--id` 或 `--name` 消歧。UUID 形式不能用作显示名称。
+每个客户端都有不可变的 UUID 身份。证书 CN、Easy-RSA 实体、CCD 文件名、动态租约文件名和 OpenVPN management 身份均使用该 UUID；客户端名称仍作为面向人的管理标签和 profile 文件名。生成的 profile 包含 `ovpn-client-id` 与 `ovpn-client-name` 注释，因此无需改变 OpenVPN 语法也能恢复两种身份。除 `create` 外，选择客户端的命令均接受 `<selector>`：位置参数 `<name>`、`--id <ID>`/`-i <ID>`，或者 `--name <NAME>`/`-n <NAME>`。位置参数和显式名称均进行区分大小写的精确名称匹配。ID 选择器可使用标准 UUID，或至少 8 位、不区分大小写的紧凑十六进制前缀，且必须唯一匹配 active/revoked 客户端。位置参数永远不会推断为 ID，UUID 形式也不能用作显示名称。
 
 ### `ovpn client create`
 
@@ -196,7 +196,7 @@ ovpn client export <selector>
 ovpn client list [--detail|-d] [--no-trunc|-t]
 ```
 
-不带 `--detail` 时，依次打印对齐的 `CLIENT ID`、`NAME` 和 `STATE` 列。ID 默认显示去掉连字符后 UUID 的前 12 位，可直接复制给任意客户端选择器；`--no-trunc` 显示完整标准 UUID。带 `--detail` 时，额外打印 `MODE`、`IP`、`IP STATE` 和 `CONNECTION`。
+不带 `--detail` 时，依次打印对齐的 `CLIENT ID`、`NAME` 和 `STATE` 列。ID 默认显示去掉连字符后 UUID 的前 12 位，可直接复制给 `--id`/`-i`；`--no-trunc` 显示完整标准 UUID。带 `--detail` 时，额外打印 `MODE`、`IP`、`IP STATE` 和 `CONNECTION`。
 
 在 IP 视图下，静态分配为 `configured`，或撤销后为 `retained`。动态地址在有当前租约时显示为 `connected`，在有缓存租约记录时显示为 `last-known`，否则为 `unavailable`。`CONNECTION` 根据管理套接字可用性和当前路由显示为 `online`、`offline` 或 `unknown`。该视图读取权威 IP 清单，并结合当前连接与租约缓存生成状态。
 
@@ -208,7 +208,7 @@ ovpn client list [--detail|-d] [--no-trunc|-t]
 ovpn client rename <selector> <new-name>
 ```
 
-原子修改面向人的显示名称，同时保持 UUID、证书、私钥、IP 分配、CCD、租约以及当前 OpenVPN 连接不变。身份目录、IP 清单、profile 文件名及其中的名称注释会一同更新。源客户端可使用当前名称或 UUID；新名称必须合法且未被当前客户端占用。客户端改名或删除后，旧名称可由新的 UUID 复用；已删除 UUID 的 tombstone 仍作为权威历史保留。
+原子修改面向人的显示名称，同时保持 UUID、证书、私钥、IP 分配、CCD、租约以及当前 OpenVPN 连接不变。身份目录、IP 清单、profile 文件名及其中的名称注释会一同更新。源客户端可通过位置参数使用当前名称；按 UUID 选择时必须使用 `--id`/`-i`。新名称必须合法且未被当前客户端占用。客户端改名或删除后，旧名称可由新的 UUID 复用；已删除 UUID 的 tombstone 仍作为权威历史保留。
 
 ### `ovpn client revoke`
 
@@ -264,7 +264,7 @@ ovpn client ip release <selector>
 语法：
 
 ```text
-ovpn client ip set <client...|(--id|-i <ID>)...|(--name|-n <NAME>)...|--all|-a> [--dynamic|-d|--ip|-I <IPv4>]
+ovpn client ip set <name...|(--id|-i <ID>)...|(--name|-n <NAME>)...|--all|-a> [--dynamic|-d|--ip|-I <IPv4>]
 ```
 
 将活跃客户端设为指定 IP 分配并立即应用事务。
@@ -274,7 +274,7 @@ ovpn client ip set <client...|(--id|-i <ID>)...|(--name|-n <NAME>)...|--all|-a> 
 - `--ip <IPv4>` → 显式指定静态地址
 - `--dynamic` → 设为动态分配
 
-多个位置参数、重复的 `--id`、重复的 `--name` 或 `--all` 会打开编辑器显示 `client,ip` 行。显式 ID、显式名称、位置参数和 `--all` 不能互相混用。编辑器支持三种赋值：
+多个位置名称、重复的 `--id`、重复的 `--name` 或 `--all` 会打开编辑器显示 `client,ip` 行。显式 ID、显式名称、位置名称和 `--all` 不能互相混用。编辑器支持三种赋值：
 
 - 输入 `auto` 分配最低可用静态地址
 - 输入显式 IPv4 指定静态地址
@@ -457,7 +457,7 @@ ovpn runtime logs [--lines|-l N] [--follow|-f] [--raw|-r] [--no-trunc|-t]
 ovpn runtime events [--lines|-l N] [--follow|-f] [--json|-j] [--no-trunc|-t]
 ```
 
-读取最近 100 条结构化连接、断开、客户端生命周期、IP、rename、网络迁移和数据迁移事件。默认文本使用 12 位客户端 ID；`--no-trunc` 显示完整 UUID。`--json` 每行输出磁盘中保存的完整 JSON 对象，不受 `--no-trunc` 影响。`--follow` 持续输出新记录且不阻塞 management 命令。
+读取最近 100 条结构化连接、断开、客户端生命周期、IP、rename、网络迁移和数据迁移事件。默认文本使用 12 位客户端 ID；`--no-trunc` 显示完整 UUID。`--json` 每行输出磁盘中保存的完整 JSON 对象，不受 `--no-trunc` 影响。`--follow` 持续输出新记录且不阻塞 management 命令；启动时读取的历史记录或随后追加的记录若格式损坏，会在标准错误输出警告并跳过，使跟随继续运行。不使用 `--follow` 时，选中范围内的损坏记录仍是致命读取错误。
 
 该命令读取面向用户可观察性的 `logs/events.jsonl`，不会读取 `meta/audit.jsonl`。后者是由数据 schema 管理的严格内部审计，记录 IP 应用、客户端生命周期变更、rename 和网络迁移等关键持久化修改。状态检查会校验其格式；repair 可将最后一条 rename 记录用作身份恢复证据；数据迁移会保留或转换它。请勿手动编辑、截断或删除 `meta/audit.jsonl`。
 

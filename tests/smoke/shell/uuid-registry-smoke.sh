@@ -70,9 +70,6 @@ deleted_id=11111111-1111-4111-8111-111111111111
 assert_rejected ovpn_registry_client_is_deleted laptop
 assert_rejected ovpn_registry_client_is_deleted phone
 ovpn_registry_client_is_deleted retired
-[ "$(ovpn_registry_resolve_current laptop)" = '22222222-2222-4222-8222-222222222222,laptop,active' ]
-[ "$(ovpn_registry_resolve_current 22222222-2222-4222-8222-222222222222)" = '22222222-2222-4222-8222-222222222222,laptop,active' ]
-[ "$(ovpn_registry_resolve_current phone)" = '33333333-3333-4333-8333-333333333333,phone,revoked' ]
 [ "$(ovpn_registry_resolve_current_by_id 222222222222)" = '22222222-2222-4222-8222-222222222222,laptop,active' ]
 [ "$(ovpn_registry_resolve_current_by_id 2222222222224222822222222222222)" = '22222222-2222-4222-8222-222222222222,laptop,active' ]
 [ "$(ovpn_registry_resolve_current_by_id 22222222222242228222222222222222)" = '22222222-2222-4222-8222-222222222222,laptop,active' ]
@@ -81,13 +78,12 @@ ovpn_registry_client_is_deleted retired
 [ "$(ovpn_registry_resolve_current_by_id 33333333)" = '33333333-3333-4333-8333-333333333333,phone,revoked' ]
 [ "$(ovpn_registry_resolve_current_by_name 22222222)" = '22222222-aaaa-4aaa-8aaa-aaaaaaaaaaaa,22222222,revoked' ]
 assert_status "$OVPN_REGISTRY_RESOLVE_AMBIGUOUS" ovpn_registry_resolve_current_by_id 22222222
-assert_status "$OVPN_REGISTRY_RESOLVE_AMBIGUOUS" ovpn_registry_resolve_current 22222222
 assert_status "$OVPN_REGISTRY_RESOLVE_INVALID" ovpn_registry_resolve_current_by_id 2222222
 assert_status "$OVPN_REGISTRY_RESOLVE_NOT_FOUND" ovpn_registry_resolve_current_by_id aaaaaaaa
 assert_status "$OVPN_REGISTRY_RESOLVE_NOT_FOUND" ovpn_registry_resolve_current_by_id 55555555
-assert_status "$OVPN_REGISTRY_RESOLVE_NOT_FOUND" ovpn_registry_resolve_current missing-client
-assert_rejected ovpn_registry_resolve_current "$deleted_id"
-assert_rejected ovpn_registry_resolve_current retired
+assert_status "$OVPN_REGISTRY_RESOLVE_NOT_FOUND" ovpn_registry_resolve_current_by_name missing-client
+assert_rejected ovpn_registry_resolve_current_by_id "$deleted_id"
+assert_rejected ovpn_registry_resolve_current_by_name retired
 
 ovpn_client_parse_single_selector_or_die usage -i 33333333 trailing
 [ "$OVPN_CLIENT_SELECTOR_MODE" = id ]
@@ -97,11 +93,17 @@ ovpn_client_resolve_selector_or_die id 33333333
 [ "$OVPN_CLIENT_RESOLVED_NAME" = phone ]
 ovpn_client_resolve_selector_or_die name 22222222
 [ "$OVPN_CLIENT_RESOLVED_ID" = 22222222-aaaa-4aaa-8aaa-aaaaaaaaaaaa ]
-if (ovpn_client_resolve_selector_or_die auto 22222222) 2>"$TMP_DIR/ambiguous.err"; then
-  echo 'ambiguous automatic selector unexpectedly succeeded' >&2
+ovpn_client_parse_single_selector_or_die usage 22222222 trailing
+[ "$OVPN_CLIENT_SELECTOR_MODE" = name ]
+[ "$OVPN_CLIENT_SELECTOR_REFERENCE" = 22222222 ]
+[ "$OVPN_CLIENT_SELECTOR_CONSUMED" -eq 1 ]
+ovpn_client_resolve_selector_or_die "$OVPN_CLIENT_SELECTOR_MODE" "$OVPN_CLIENT_SELECTOR_REFERENCE"
+[ "$OVPN_CLIENT_RESOLVED_ID" = 22222222-aaaa-4aaa-8aaa-aaaaaaaaaaaa ]
+if (ovpn_client_resolve_selector_or_die name 33333333) 2>"$TMP_DIR/positional-id.err"; then
+  echo 'ID-like positional name unexpectedly selected a UUID prefix' >&2
   exit 1
 fi
-grep -Fq 'use --id or --name' "$TMP_DIR/ambiguous.err"
+grep -Fq "client name '33333333' does not exist" "$TMP_DIR/positional-id.err"
 if (ovpn_client_resolve_selector_or_die id 2222222) 2>"$TMP_DIR/short-id.err"; then
   echo 'short client ID unexpectedly succeeded' >&2
   exit 1

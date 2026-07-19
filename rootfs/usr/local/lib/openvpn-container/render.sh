@@ -231,7 +231,7 @@ ovpn_render_server() {
 }
 
 ovpn_render_client() {
-  local usage='usage: ovpn render client <client>|--id|-i <ID>|--name|-n <NAME> [--stdout|-s|--output|-o <path>]'
+  local usage='usage: ovpn render client <name>|--id|-i <ID>|--name|-n <NAME> [--stdout|-s|--output|-o <path>]'
   local selector_mode client_reference consumed
   local client_name
   local output_path='-'
@@ -283,7 +283,7 @@ ovpn_render_command() {
     ;;
   client)
     if ovpn_help_requested "$@"; then
-      ovpn_command_usage "ovpn render client <client>|--id|-i <ID>|--name|-n <NAME> [--stdout|-s|--output|-o <path>]" "Render a client profile."
+      ovpn_command_usage "ovpn render client <name>|--id|-i <ID>|--name|-n <NAME> [--stdout|-s|--output|-o <path>]" "Render a client profile."
     else
       ovpn_render_client "$@"
     fi

@@ -291,7 +291,7 @@ fi
 grep -Eq '^CLIENT ID[[:space:]]+NAME[[:space:]]+STATE$' "$TMP_DIR/client-list.out"
 grep -E "^$(short_client_id "$laptop_id")[[:space:]]+laptop[[:space:]]+active$" "$TMP_DIR/client-list.out"
 grep -E "^${laptop_id}[[:space:]]+laptop[[:space:]]+active$" <("$OVPN" client list -t)
-"$OVPN" client export "$(short_client_id "$laptop_id")" >"$TMP_DIR/laptop-by-listed-id.ovpn"
+"$OVPN" client export -i "$(short_client_id "$laptop_id")" >"$TMP_DIR/laptop-by-listed-id.ovpn"
 grep -Fqx "# ovpn-client-id: $laptop_id" "$TMP_DIR/laptop-by-listed-id.ovpn"
 if "$OVPN" client list --no-trunc --no-trunc >"$TMP_DIR/list-duplicate.out" 2>"$TMP_DIR/list-duplicate.err"; then
   echo 'duplicate --no-trunc unexpectedly succeeded' >&2
@@ -360,12 +360,12 @@ test ! -e "$OVPN_DATA_DIR/ccd/$laptop_id"
 env -u OVPN_EDITOR -u EDITOR \
   OVPN_TEST_EDITOR_LOG="$TMP_DIR/editor.log" \
   PATH="$FAKE_BIN:$PATH" \
-  "$OVPN" client ip set "$laptop_id" phone >"$TMP_DIR/batch-unchanged.out" 2>"$TMP_DIR/batch-unchanged.err"
+  "$OVPN" client ip set laptop phone >"$TMP_DIR/batch-unchanged.out" 2>"$TMP_DIR/batch-unchanged.err"
 grep -Eq '^nano:\.client-ip-set\.' "$TMP_DIR/editor.log"
 grep -Fqx "$laptop_id,laptop," "$OVPN_DATA_DIR/meta/client-ip.csv"
 grep -Fqx "$phone_id,phone,10.88.0.20" "$OVPN_DATA_DIR/meta/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/ccd/$laptop_id"
-"$OVPN" client ip set "$laptop_id" >"$TMP_DIR/laptop-static.out" 2>"$TMP_DIR/laptop-static.err"
+"$OVPN" client ip set -i "$laptop_id" >"$TMP_DIR/laptop-static.out" 2>"$TMP_DIR/laptop-static.err"
 grep -Fqx "$laptop_id,laptop,10.88.0.2" "$OVPN_DATA_DIR/meta/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/$laptop_id"
 
@@ -489,11 +489,11 @@ fi
 grep -Fqx "$phone_id,phone,deleted" "$OVPN_DATA_DIR/meta/client-state.csv"
 test ! -e "$OVPN_DATA_DIR/pki/private/$phone_id.key"
 test ! -e "$OVPN_DATA_DIR/clients/active/phone.ovpn"
-if "$OVPN" client export "$phone_id" >"$TMP_DIR/deleted-export.out" 2>"$TMP_DIR/deleted-export.err"; then
+if "$OVPN" client export -i "$phone_id" >"$TMP_DIR/deleted-export.out" 2>"$TMP_DIR/deleted-export.err"; then
   echo 'deleted client UUID unexpectedly resolved' >&2
   exit 1
 fi
-grep -Fq "client '$phone_id' does not exist" "$TMP_DIR/deleted-export.err"
+grep -Fq "client ID '$phone_id' does not exist" "$TMP_DIR/deleted-export.err"
 "$OVPN" client create phone --dynamic >"$TMP_DIR/reused-name-create.out" 2>"$TMP_DIR/reused-name-create.err"
 reused_phone_id="$(awk -F, '$2 == "phone" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
 [ "$reused_phone_id" != "$phone_id" ]
@@ -520,7 +520,7 @@ if "$OVPN" client ip release laptop >"$TMP_DIR/active-release-ip.out" 2>"$TMP_DI
 fi
 grep -Fq "is not revoked" "$TMP_DIR/active-release-ip.err"
 
-"$OVPN" client revoke "$laptop_id" >"$TMP_DIR/revoke.out" 2>"$TMP_DIR/revoke.err"
+"$OVPN" client revoke -i "$laptop_id" >"$TMP_DIR/revoke.out" 2>"$TMP_DIR/revoke.err"
 grep -Fq "\"event\":\"client_lifecycle\",\"operation\":\"revoke\",\"outcome\":\"applied\",\"client_id\":\"$laptop_id\",\"client_name\":\"laptop\",\"legacy\":false" "$OVPN_DATA_DIR/meta/audit.jsonl"
 grep -E "^$(short_client_id "$laptop_id")[[:space:]]+laptop[[:space:]]+revoked$" <("$OVPN" client list)
 grep -Fqx "$laptop_id,laptop,10.88.0.2" "$OVPN_DATA_DIR/meta/client-ip.csv"
@@ -547,7 +547,7 @@ if "$OVPN" client export laptop >"$TMP_DIR/revoked-export.out" 2>"$TMP_DIR/revok
 fi
 
 grep -q "is revoked" "$TMP_DIR/revoked-export.err"
-"$OVPN" client rename "$laptop_id" retired-laptop >"$TMP_DIR/rename-revoked.out" 2>"$TMP_DIR/rename-revoked.err"
+"$OVPN" client rename -i "$laptop_id" retired-laptop >"$TMP_DIR/rename-revoked.out" 2>"$TMP_DIR/rename-revoked.err"
 grep -E "^$(short_client_id "$laptop_id")[[:space:]]+retired-laptop[[:space:]]+revoked$" <("$OVPN" client list)
 grep -Fqx "$laptop_id,retired-laptop,revoked" "$OVPN_DATA_DIR/meta/client-state.csv"
 grep -Fqx "$laptop_id,retired-laptop," "$OVPN_DATA_DIR/meta/client-ip.csv"

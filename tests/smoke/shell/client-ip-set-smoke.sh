@@ -172,8 +172,8 @@ cmp "$TMP_DIR/before-failure.csv" "$OVPN_DATA_DIR/meta/client-ip.csv"
 [ "$lease_before" = "$(find "$OVPN_LEASE_DIR" -type f -exec sha256sum {} + | sort -k2 | sha256sum)" ]
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/$bravo_id"
 
-if "$OVPN" client ip set alpha "$alpha_id" >"$TMP_DIR/duplicate-client.out" 2>&1; then
-  echo 'duplicate name/UUID client selection unexpectedly succeeded' >&2
+if "$OVPN" client ip set alpha alpha >"$TMP_DIR/duplicate-client.out" 2>&1; then
+  echo 'duplicate positional name selection unexpectedly succeeded' >&2
   exit 1
 fi
 grep -Fq "client 'alpha' was specified more than once" "$TMP_DIR/duplicate-client.out"

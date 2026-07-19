@@ -61,9 +61,15 @@ client_id="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/aw
 [[ "$client_id" =~ ^[0-9a-f-]{36}$ ]]
 client_short_id="${client_id//-/}"
 client_short_id="${client_short_id:0:12}"
+if run_control client export "$client_short_id" >/tmp/ovpn-lifecycle-positional-id.out 2>/tmp/ovpn-lifecycle-positional-id.err; then
+  echo 'positional short ID unexpectedly selected a client' >&2
+  exit 1
+fi
+grep -Fq "client name '$client_short_id' does not exist" /tmp/ovpn-lifecycle-positional-id.err
+run_control client export -i "$client_short_id" >/tmp/ovpn-lifecycle-explicit-id.ovpn
 original_client="$client"
 client='renamed-client'
-run_control client rename "$client_id" "$client" >/tmp/ovpn-lifecycle-rename.out 2>/tmp/ovpn-lifecycle-rename.err
+run_control client rename -i "$client_id" "$client" >/tmp/ovpn-lifecycle-rename.out 2>/tmp/ovpn-lifecycle-rename.err
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec '
   openssl x509 -in "/etc/openvpn/pki/issued/$1.crt" -noout -subject -nameopt RFC2253 | grep -Fq "CN=$1"
   grep -Fqx "# ovpn-client-id: $1" "/etc/openvpn/clients/active/$2.ovpn"
@@ -80,7 +86,7 @@ assignment_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint
 key_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /usr/bin/sha256sum "$IMAGE" "/etc/openvpn/pki/private/$client_id.key")"
 index_before="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /usr/bin/sha256sum "$IMAGE" /etc/openvpn/pki/index.txt)"
 
-if ! run_control client reissue "$client_id" -d >/tmp/ovpn-lifecycle-reissue.out 2>/tmp/ovpn-lifecycle-reissue.err; then
+if ! run_control client reissue -i "$client_id" -d >/tmp/ovpn-lifecycle-reissue.out 2>/tmp/ovpn-lifecycle-reissue.err; then
   echo 'same-CN reissue unexpectedly failed in the shipped Easy-RSA runtime' >&2
   sed 's/^/  | /' /tmp/ovpn-lifecycle-reissue.err >&2
   exit 1
@@ -103,16 +109,16 @@ index_after="$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /usr/
   exit 1
 }
 
-run_control client ip set "$client_id" -I 10.88.0.2 >/tmp/ovpn-lifecycle-static.out 2>/tmp/ovpn-lifecycle-static.err
+run_control client ip set -i "$client_id" -I 10.88.0.2 >/tmp/ovpn-lifecycle-static.out 2>/tmp/ovpn-lifecycle-static.err
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/grep "$IMAGE" -Fqx "$client_id,$client,10.88.0.2" /etc/openvpn/meta/client-ip.csv
-run_control client revoke "$client_id" >/tmp/ovpn-lifecycle-revoke.out 2>/tmp/ovpn-lifecycle-revoke.err
+run_control client revoke -i "$client_id" >/tmp/ovpn-lifecycle-revoke.out 2>/tmp/ovpn-lifecycle-revoke.err
 grep -E "^${client_short_id}[[:space:]]+${client}[[:space:]]+revoked$" <(run_control client list)
-run_control client ip release "$client_id" >/tmp/ovpn-lifecycle-release-ip.out 2>/tmp/ovpn-lifecycle-release-ip.err
+run_control client ip release -i "$client_id" >/tmp/ovpn-lifecycle-release-ip.out 2>/tmp/ovpn-lifecycle-release-ip.err
 grep -E "^${client_short_id}[[:space:]]+${client}[[:space:]]+revoked$" <(run_control client list)
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/grep "$IMAGE" -Fqx "$client_id,$client," /etc/openvpn/meta/client-ip.csv
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/test "$IMAGE" -f "/etc/openvpn/clients/revoked/$client.ovpn"
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/test "$IMAGE" -f "/etc/openvpn/pki/private/$client_id.key"
-run_control client delete "$client_id" >/tmp/ovpn-lifecycle-delete.out 2>/tmp/ovpn-lifecycle-delete.err
+run_control client delete -i "$client_id" >/tmp/ovpn-lifecycle-delete.out 2>/tmp/ovpn-lifecycle-delete.err
 docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /bin/sh "$IMAGE" -ec '
   ! grep -Fq "$1,$2," /etc/openvpn/meta/client-ip.csv
   grep -Fqx "$1,$2,deleted" /etc/openvpn/meta/client-state.csv
