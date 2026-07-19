@@ -77,17 +77,16 @@ cat >"$OVPN_RUNTIME_STATE_FILE" <<'EOF'
 EOF
 
 "$OVPN" config apply
-mkdir -p "$OVPN_DATA_DIR/data" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/pki" "$OVPN_LEASE_DIR"
+mkdir -p "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/pki" "$OVPN_LEASE_DIR"
 printf '%s\n' \
   $'V\t30000101000000Z\t\t01\tunknown\t/CN=11111111-1111-4111-8111-111111111111' \
   $'V\t30000101000000Z\t\t02\tunknown\t/CN=22222222-2222-4222-8222-222222222222' \
   >"$OVPN_DATA_DIR/pki/index.txt"
-cat >"$OVPN_DATA_DIR/data/client-ip.csv" <<'EOF'
+cat >"$OVPN_DATA_DIR/meta/client-ip.csv" <<'EOF'
 # id,name,ip
 11111111-1111-4111-8111-111111111111,alpha,10.88.0.20
 22222222-2222-4222-8222-222222222222,bravo,
 EOF
-cp "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 printf '%s\n' '# id,name,state' \
   '11111111-1111-4111-8111-111111111111,alpha,active' \
   '22222222-2222-4222-8222-222222222222,bravo,active' >"$OVPN_DATA_DIR/meta/client-state.csv"
@@ -102,7 +101,7 @@ grep -Fqx 'OVPN_NETWORK=10.88.0.0/24' "$OVPN_DATA_DIR/config/project.env"
 "$OVPN" network apply --network 10.89.0.0/24 --dynamic-pool-size 100 --yes >"$TMP_DIR/apply.out"
 grep -Fqx 'OVPN_NETWORK=10.89.0.0/24' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'OVPN_DYNAMIC_POOL_SIZE=100' "$OVPN_DATA_DIR/config/project.env"
-grep -Fqx '11111111-1111-4111-8111-111111111111,alpha,10.89.0.20' "$OVPN_DATA_DIR/data/client-ip.csv"
+grep -Fqx '11111111-1111-4111-8111-111111111111,alpha,10.89.0.20' "$OVPN_DATA_DIR/meta/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.89.0.20 255.255.255.0' "$OVPN_DATA_DIR/ccd/11111111-1111-4111-8111-111111111111"
 test -z "$(ls -A "$OVPN_LEASE_DIR" 2>/dev/null)"
 grep -q '^server 10.89.0.0 255.255.255.0 nopool$' "$OVPN_DATA_DIR/server/server.conf"
@@ -121,7 +120,7 @@ if OVPN_NETWORK_MIGRATION_FAIL_HEALTH=true "$OVPN" network apply --network 10.90
 fi
 grep -Fq 'network migration rollback completed; OpenVPN is healthy' "$TMP_DIR/fail.err"
 grep -Fqx 'OVPN_NETWORK=10.89.0.0/24' "$OVPN_DATA_DIR/config/project.env"
-grep -Fqx '11111111-1111-4111-8111-111111111111,alpha,10.89.0.20' "$OVPN_DATA_DIR/data/client-ip.csv"
+grep -Fqx '11111111-1111-4111-8111-111111111111,alpha,10.89.0.20' "$OVPN_DATA_DIR/meta/client-ip.csv"
 grep -Fq '"event":"network_migration","outcome":"rejected"' "$OVPN_DATA_DIR/meta/audit.jsonl"
 jq -e -s '
   any(.[]; .event == "network_migration" and .operation == "apply" and

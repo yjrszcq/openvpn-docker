@@ -20,7 +20,6 @@ static_id=22222222-2222-4222-8222-222222222222
 "$OVPN" config apply
 mkdir -p \
   "$OVPN_DATA_DIR/meta" \
-  "$OVPN_DATA_DIR/data" \
   "$OVPN_DATA_DIR/ccd" \
   "$OVPN_DATA_DIR/clients/active" \
   "$OVPN_DATA_DIR/pki/private" \
@@ -46,12 +45,11 @@ printf '%s\n' \
 : >"$OVPN_DATA_DIR/pki/private/$static_id.key"
 : >"$OVPN_DATA_DIR/clients/active/dynamic.ovpn"
 : >"$OVPN_DATA_DIR/clients/active/static.ovpn"
-cat >"$OVPN_DATA_DIR/data/client-ip.csv" <<'EOF'
+cat >"$OVPN_DATA_DIR/meta/client-ip.csv" <<'EOF'
 # id,name,ip
 11111111-1111-4111-8111-111111111111,dynamic,
 22222222-2222-4222-8222-222222222222,static,10.88.0.2
 EOF
-cp "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 cat >"$OVPN_DATA_DIR/meta/client-state.csv" <<'EOF'
 # id,name,state
 11111111-1111-4111-8111-111111111111,dynamic,active
@@ -60,47 +58,42 @@ EOF
 : >"$OVPN_DATA_DIR/meta/audit.jsonl"
 printf 'ifconfig-push 10.88.0.3 255.255.255.0\n' >"$OVPN_DATA_DIR/ccd/$static_id"
 chmod 600 \
-  "$OVPN_DATA_DIR/data/client-ip.csv" \
-  "$OVPN_DATA_DIR/meta/client-ip.applied.csv" \
+  "$OVPN_DATA_DIR/meta/client-ip.csv" \
   "$OVPN_DATA_DIR/meta/client-state.csv" \
   "$OVPN_DATA_DIR/meta/audit.jsonl" \
   "$OVPN_DATA_DIR/ccd/$static_id"
 
 "$OVPN" repair plan >"$TMP_DIR/plan.out"
 grep -Fq '[SAFE] SYNCHRONIZE_CLIENT_IP_CCD' "$TMP_DIR/plan.out"
-grep -Fq '[SAFE] NORMALIZE_CLIENT_IP_DRAFT' "$TMP_DIR/plan.out"
-grep -Fq '[SAFE] NORMALIZE_CLIENT_IP_APPLIED' "$TMP_DIR/plan.out"
+grep -Fq '[SAFE] NORMALIZE_CLIENT_IP_REGISTRY' "$TMP_DIR/plan.out"
 "$OVPN" repair apply >"$TMP_DIR/repair.out" 2>"$TMP_DIR/repair.err"
 cat >"$TMP_DIR/expected.csv" <<'EOF'
 # id,name,ip
 22222222-2222-4222-8222-222222222222,static,10.88.0.2
 11111111-1111-4111-8111-111111111111,dynamic,
 EOF
-cmp "$TMP_DIR/expected.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
-cmp "$TMP_DIR/expected.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
+cmp "$TMP_DIR/expected.csv" "$OVPN_DATA_DIR/meta/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/$static_id"
 test ! -e "$OVPN_DATA_DIR/ccd/$dynamic_id"
 [ "$("$OVPN" state show)" = HEALTHY ]
 
 ccd_before="$(sha256sum "$OVPN_DATA_DIR/ccd/$static_id")"
-cat >"$OVPN_DATA_DIR/data/client-ip.csv" <<'EOF'
+cat >"$OVPN_DATA_DIR/meta/client-ip.csv" <<'EOF'
 # id,name,ip
 22222222-2222-4222-8222-222222222222,static,10.88.0.129
 11111111-1111-4111-8111-111111111111,dynamic,
 EOF
-cp "$OVPN_DATA_DIR/data/client-ip.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 if "$OVPN" repair apply >"$TMP_DIR/invalid.out" 2>"$TMP_DIR/invalid.err"; then
   echo 'repair unexpectedly accepted an invalid static IP registry' >&2
   exit 1
 fi
-grep -Fq 'CLIENT_IP_APPLIED_INVALID' "$TMP_DIR/invalid.err"
+grep -Fq 'CLIENT_IP_REGISTRY_INVALID' "$TMP_DIR/invalid.err"
 [ "$ccd_before" = "$(sha256sum "$OVPN_DATA_DIR/ccd/$static_id")" ] || {
   echo 'repair changed derived state for an invalid registry' >&2
   exit 1
 }
 
-cp "$TMP_DIR/expected.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
-cp "$TMP_DIR/expected.csv" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
+cp "$TMP_DIR/expected.csv" "$OVPN_DATA_DIR/meta/client-ip.csv"
 printf '{"unexpected":"audit payload"}\n' >"$OVPN_DATA_DIR/meta/audit.jsonl"
 if "$OVPN" state doctor --json >"$TMP_DIR/audit.json" 2>"$TMP_DIR/audit.err"; then
   echo 'doctor unexpectedly accepted malformed audit state' >&2

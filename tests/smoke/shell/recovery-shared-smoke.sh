@@ -120,11 +120,10 @@ make_fixture() {
     'OVPN_DNS=' \
     'OVPN_ROUTES=' >"$data_dir/config/project.env"
   printf '3\n' >"$data_dir/config/schema-version"
-  printf '%s\n' '# id,name,ip' '11111111-1111-4111-8111-111111111111,laptop,' >"$data_dir/data/client-ip.csv"
-  cp "$data_dir/data/client-ip.csv" "$data_dir/meta/client-ip.applied.csv"
+  printf '%s\n' '# id,name,ip' '11111111-1111-4111-8111-111111111111,laptop,' >"$data_dir/meta/client-ip.csv"
   printf '%s\n' '# id,name,state' '11111111-1111-4111-8111-111111111111,laptop,active' >"$data_dir/meta/client-state.csv"
   : >"$data_dir/meta/audit.jsonl"
-  chmod 600 "$data_dir/data/client-ip.csv" "$data_dir/meta/client-ip.applied.csv" "$data_dir/meta/client-state.csv" "$data_dir/meta/audit.jsonl"
+  chmod 600 "$data_dir/meta/client-ip.csv" "$data_dir/meta/client-state.csv" "$data_dir/meta/audit.jsonl"
   : >"$data_dir/pki/index.txt"
   printf '01\n' >"$data_dir/pki/serial"
   printf '1000\n' >"$data_dir/ca-db/serial"
@@ -332,27 +331,23 @@ export OVPN_DATA_DIR="$identity_data"
 [ "$("$OVPN" state show)" = DEGRADED_RECOVERABLE ]
 "$OVPN" repair plan >"$TMP_DIR/identity-plan.out"
 grep -Fq '[RECOVER] RECOVER_CLIENT_IDENTITY_REGISTRY' "$TMP_DIR/identity-plan.out"
-grep -Fq '[RECOVER] RECOVER_CLIENT_IP_DRAFT' "$TMP_DIR/identity-plan.out"
-grep -Fq '[RECOVER] RECOVER_CLIENT_IP_APPLIED' "$TMP_DIR/identity-plan.out"
+grep -Fq '[RECOVER] RECOVER_CLIENT_IP_REGISTRY' "$TMP_DIR/identity-plan.out"
 grep -Fq '[RECOVER] RECOVER_CLIENT_PROFILES' "$TMP_DIR/identity-plan.out"
-identity_draft_before="$(sha256sum "$identity_data/data/client-ip.csv")"
-identity_applied_before="$(sha256sum "$identity_data/meta/client-ip.applied.csv")"
+identity_ip_before="$(sha256sum "$identity_data/meta/client-ip.csv")"
 identity_profile_before="$(sha256sum "$identity_data/clients/active/laptop.ovpn")"
-if OVPN_REPAIR_FAIL_AFTER_INSTALL=RECOVER_CLIENT_IP_DRAFT \
+if OVPN_REPAIR_FAIL_AFTER_INSTALL=RECOVER_CLIENT_IP_REGISTRY \
   "$OVPN" repair apply >"$TMP_DIR/identity-failed-repair.out" 2>"$TMP_DIR/identity-failed-repair.err"; then
   echo 'injected identity registry repair failure unexpectedly succeeded' >&2
   exit 1
 fi
 [ ! -e "$identity_data/meta/client-state.csv" ]
-[ "$(sha256sum "$identity_data/data/client-ip.csv")" = "$identity_draft_before" ]
-[ "$(sha256sum "$identity_data/meta/client-ip.applied.csv")" = "$identity_applied_before" ]
+[ "$(sha256sum "$identity_data/meta/client-ip.csv")" = "$identity_ip_before" ]
 [ "$(sha256sum "$identity_data/clients/active/laptop.ovpn")" = "$identity_profile_before" ]
 [ "$("$OVPN" state show)" = DEGRADED_RECOVERABLE ]
 "$OVPN" repair apply >"$TMP_DIR/identity-repair.out" 2>"$TMP_DIR/identity-repair.err"
 [ "$("$OVPN" state show)" = HEALTHY ]
 grep -Fqx "$CLIENT_ID,laptop,active" "$identity_data/meta/client-state.csv"
-grep -Fqx "$CLIENT_ID,laptop," "$identity_data/data/client-ip.csv"
-grep -Fqx "$CLIENT_ID,laptop," "$identity_data/meta/client-ip.applied.csv"
+grep -Fqx "$CLIENT_ID,laptop," "$identity_data/meta/client-ip.csv"
 grep -Fqx "# ovpn-client-id: $CLIENT_ID" "$identity_data/clients/active/laptop.ovpn"
 grep -Fqx '# ovpn-client-name: laptop' "$identity_data/clients/active/laptop.ovpn"
 
@@ -369,8 +364,7 @@ printf '{"timestamp":"2026-07-18T00:00:00Z","event":"client_rename","outcome":"a
   "$CLIENT_ID" >"$audit_identity_data/meta/audit.jsonl"
 chmod 600 "$audit_identity_data/meta/audit.jsonl"
 rm "$audit_identity_data/meta/client-state.csv" \
-  "$audit_identity_data/data/client-ip.csv" \
-  "$audit_identity_data/meta/client-ip.applied.csv"
+  "$audit_identity_data/meta/client-ip.csv"
 rm -rf "$audit_identity_data/clients"
 export OVPN_DATA_DIR="$audit_identity_data"
 [ "$("$OVPN" state show)" = DEGRADED_RECOVERABLE ]
@@ -382,8 +376,7 @@ grep -Fqx "# ovpn-client-name: workstation" "$audit_identity_data/clients/active
 uuid_only_data="$TMP_DIR/uuid-only"
 make_fixture "$uuid_only_data"
 rm "$uuid_only_data/meta/client-state.csv" \
-  "$uuid_only_data/data/client-ip.csv" \
-  "$uuid_only_data/meta/client-ip.applied.csv"
+  "$uuid_only_data/meta/client-ip.csv"
 rm -rf "$uuid_only_data/clients"
 export OVPN_DATA_DIR="$uuid_only_data"
 [ "$("$OVPN" state show)" = DEGRADED_RECOVERABLE ]
@@ -391,8 +384,7 @@ export OVPN_DATA_DIR="$uuid_only_data"
 [ "$("$OVPN" state show)" = HEALTHY ]
 temporary_name="client-${CLIENT_ID//-/}"
 grep -Fqx "$CLIENT_ID,$temporary_name,active" "$uuid_only_data/meta/client-state.csv"
-grep -Fqx "$CLIENT_ID,$temporary_name," "$uuid_only_data/data/client-ip.csv"
-grep -Fqx "$CLIENT_ID,$temporary_name," "$uuid_only_data/meta/client-ip.applied.csv"
+grep -Fqx "$CLIENT_ID,$temporary_name," "$uuid_only_data/meta/client-ip.csv"
 grep -Fqx "# ovpn-client-id: $CLIENT_ID" "$uuid_only_data/clients/active/$temporary_name.ovpn"
 grep -Fqx "# ovpn-client-name: $temporary_name" "$uuid_only_data/clients/active/$temporary_name.ovpn"
 

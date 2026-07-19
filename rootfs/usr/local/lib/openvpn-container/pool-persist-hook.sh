@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-lease_dir="${OVPN_LEASE_DIR:-/etc/openvpn/data/leases}"
+lease_dir="${OVPN_LEASE_DIR:-/etc/openvpn/cache/client-leases}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/usr/local/lib/openvpn-container/events.sh
 . "$SCRIPT_DIR/events.sh"

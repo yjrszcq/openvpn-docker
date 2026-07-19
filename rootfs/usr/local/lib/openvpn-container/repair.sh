@@ -57,8 +57,7 @@ ovpn_repair_plan_add_issue() {
           ovpn_repair_plan_add_action SYNCHRONIZE_CLIENT_IP_CCD ccd
           ;;
         CLIENT_IP_REGISTRY_NOT_CANONICAL)
-          ovpn_repair_plan_add_action NORMALIZE_CLIENT_IP_DRAFT data/client-ip.csv
-          ovpn_repair_plan_add_action NORMALIZE_CLIENT_IP_APPLIED meta/client-ip.applied.csv
+          ovpn_repair_plan_add_action NORMALIZE_CLIENT_IP_REGISTRY meta/client-ip.csv
           ;;
         *)
           ovpn_repair_plan_add_blocked "$id" "$severity" "$action"
@@ -69,8 +68,7 @@ ovpn_repair_plan_add_issue() {
       case "$id" in
         CLIENT_IDENTITY_REGISTRY_RECOVERABLE)
           ovpn_repair_plan_add_action RECOVER_CLIENT_IDENTITY_REGISTRY meta/client-state.csv recover
-          ovpn_repair_plan_add_action RECOVER_CLIENT_IP_DRAFT data/client-ip.csv recover
-          ovpn_repair_plan_add_action RECOVER_CLIENT_IP_APPLIED meta/client-ip.applied.csv recover
+          ovpn_repair_plan_add_action RECOVER_CLIENT_IP_REGISTRY meta/client-ip.csv recover
           ovpn_repair_plan_add_action RECOVER_CLIENT_PROFILES clients recover
           ;;
         CA_CERT_MISSING)
@@ -325,13 +323,9 @@ ovpn_repair_stage_action() {
     RECOVER_CLIENT_IDENTITY_REGISTRY)
       ovpn_recovery_stage_client_registry "$OVPN_REPAIR_STAGE_DIR/$target"
       ;;
-    RECOVER_CLIENT_IP_DRAFT)
+    RECOVER_CLIENT_IP_REGISTRY)
       ovpn_recovery_stage_client_ip_registry \
         "$(ovpn_registry_client_ip_file)" "$OVPN_REPAIR_STAGE_DIR/$target"
-      ;;
-    RECOVER_CLIENT_IP_APPLIED)
-      ovpn_recovery_stage_client_ip_registry \
-        "$(ovpn_registry_applied_file)" "$OVPN_REPAIR_STAGE_DIR/$target"
       ;;
     RECOVER_CLIENT_PROFILES)
       ovpn_recovery_stage_client_profiles "$OVPN_REPAIR_STAGE_DIR/$target"
@@ -349,7 +343,7 @@ ovpn_repair_stage_action() {
     SYNCHRONIZE_CLIENT_IP_CCD)
       ovpn_state_ipam_stage_ccd "$OVPN_REPAIR_STAGE_DIR/$target"
       ;;
-    NORMALIZE_CLIENT_IP_DRAFT|NORMALIZE_CLIENT_IP_APPLIED)
+    NORMALIZE_CLIENT_IP_REGISTRY)
       ovpn_state_ipam_stage_canonical_registry "$OVPN_REPAIR_STAGE_DIR/$target"
       ;;
     ENSURE_RUNTIME_DIRECTORY)

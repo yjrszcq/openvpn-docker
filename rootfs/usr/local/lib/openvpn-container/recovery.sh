@@ -280,7 +280,6 @@ ovpn_recovery_assess_client_registry() {
   ovpn_recovery_collect_client_pki || return 1
   ovpn_recovery_load_ipam_layout || return 1
   ovpn_recovery_collect_registry_names "$(ovpn_registry_client_ip_file)" || return 1
-  ovpn_recovery_collect_registry_names "$(ovpn_registry_applied_file)" || return 1
   ovpn_recovery_collect_profile_names || return 1
   ovpn_recovery_collect_audit_names || return 1
   for id in "${OVPN_RECOVERY_CLIENT_IDS[@]}"; do

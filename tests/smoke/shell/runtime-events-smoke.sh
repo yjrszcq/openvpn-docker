@@ -8,7 +8,7 @@ TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 export OVPN_LIB_DIR="$ROOT_DIR/rootfs/usr/local/lib/openvpn-container"
 export OVPN_DATA_DIR="$TMP_DIR/data"
-export OVPN_LEASE_DIR="$OVPN_DATA_DIR/data/leases"
+export OVPN_LEASE_DIR="$OVPN_DATA_DIR/cache/client-leases"
 export OVPN_ENDPOINT=vpn.example.test
 client_id=11111111-1111-4111-8111-111111111111
 "$ROOT_DIR/rootfs/usr/local/bin/ovpn" config apply

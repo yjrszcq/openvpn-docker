@@ -19,14 +19,13 @@ make_crypto_healthy() {
   local data_dir="$1"
   local fingerprint
 
-  mkdir -p "$data_dir/config" "$data_dir/data" "$data_dir/meta" "$data_dir/server" "$data_dir/pki/private" "$data_dir/pki/issued" "$data_dir/secrets" "$data_dir/ca-db/newcerts"
+  mkdir -p "$data_dir/config" "$data_dir/meta" "$data_dir/server" "$data_dir/pki/private" "$data_dir/pki/issued" "$data_dir/secrets" "$data_dir/ca-db/newcerts"
   printf 'OVPN_CONFIG_VERSION=3\nOVPN_ENDPOINT=vpn.example.test\nOVPN_PROTO=udp\nOVPN_PORT=1194\nOVPN_NETWORK=10.88.0.0/24\nOVPN_TOPOLOGY=subnet\nOVPN_DYNAMIC_POOL_SIZE=126\nOVPN_NAT=true\nOVPN_NAT_INTERFACE=auto\nOVPN_REDIRECT_GATEWAY=false\nOVPN_CLIENT_TO_CLIENT=false\nOVPN_DNS=\nOVPN_ROUTES=\n' >"$data_dir/config/project.env"
   printf '3\n' >"$data_dir/config/schema-version"
-  printf '# id,name,ip\n' >"$data_dir/data/client-ip.csv"
-  cp "$data_dir/data/client-ip.csv" "$data_dir/meta/client-ip.applied.csv"
+  printf '# id,name,ip\n' >"$data_dir/meta/client-ip.csv"
   printf '# id,name,state\n' >"$data_dir/meta/client-state.csv"
   : >"$data_dir/meta/audit.jsonl"
-  chmod 600 "$data_dir/data/client-ip.csv" "$data_dir/meta/client-ip.applied.csv" "$data_dir/meta/client-state.csv" "$data_dir/meta/audit.jsonl"
+  chmod 600 "$data_dir/meta/client-ip.csv" "$data_dir/meta/client-state.csv" "$data_dir/meta/audit.jsonl"
   : >"$data_dir/pki/index.txt"
   printf '01\n' >"$data_dir/pki/serial"
   printf '1000\n' >"$data_dir/ca-db/serial"
