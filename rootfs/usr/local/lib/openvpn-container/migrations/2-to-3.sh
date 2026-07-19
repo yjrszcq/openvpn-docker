@@ -285,23 +285,13 @@ ovpn_migration_2_to_3_write_registries() {
       state="${OVPN_MIGRATION_2_TO_3_STATES[$name]}"
       [ "$state" = deleted ] && continue
       id="${OVPN_MIGRATION_2_TO_3_IDS[$name]}"
-      printf '%s,%s,%s\n' "$id" "$name" "${OVPN_MIGRATION_2_TO_3_DRAFT_IPS[$name]}"
-    done | LC_ALL=C sort -t, -k2,2 -k1,1
-  } >"$data_dir/data/client-ip.csv.tmp"
-  {
-    printf '# id,name,ip\n'
-    for name in "${OVPN_MIGRATION_2_TO_3_NAMES[@]}"; do
-      state="${OVPN_MIGRATION_2_TO_3_STATES[$name]}"
-      [ "$state" = deleted ] && continue
-      id="${OVPN_MIGRATION_2_TO_3_IDS[$name]}"
       printf '%s,%s,%s\n' "$id" "$name" "${OVPN_MIGRATION_2_TO_3_APPLIED_IPS[$name]}"
     done | LC_ALL=C sort -t, -k2,2 -k1,1
-  } >"$data_dir/meta/client-ip.applied.csv.tmp"
+  } >"$data_dir/meta/client-ip.csv.tmp"
   mv "$data_dir/meta/client-state.csv.tmp" "$data_dir/meta/client-state.csv"
-  mv "$data_dir/data/client-ip.csv.tmp" "$data_dir/data/client-ip.csv"
-  mv "$data_dir/meta/client-ip.applied.csv.tmp" "$data_dir/meta/client-ip.applied.csv"
-  chmod 600 "$data_dir/meta/client-state.csv" "$data_dir/data/client-ip.csv" \
-    "$data_dir/meta/client-ip.applied.csv"
+  mv "$data_dir/meta/client-ip.csv.tmp" "$data_dir/meta/client-ip.csv"
+  rm -f "$data_dir/data/client-ip.csv" "$data_dir/meta/client-ip.applied.csv"
+  chmod 600 "$data_dir/meta/client-state.csv" "$data_dir/meta/client-ip.csv"
 }
 
 ovpn_migration_2_to_3_write_config() {
@@ -362,9 +352,10 @@ ovpn_migration_2_to_3_rebuild_derived() {
   OVPN_PROJECT_ENV="$OVPN_CONFIG_DIR/project.env"
   OVPN_SCHEMA_VERSION_FILE="$OVPN_CONFIG_DIR/schema-version"
   OVPN_RENDER_DATA_DIR="$final_data_dir"
-  OVPN_LEASE_DIR="$data_dir/data/leases"
+  OVPN_LEASE_DIR="$data_dir/cache/client-leases"
   rm -rf "$data_dir/ccd" "$data_dir/clients/active" "$data_dir/clients/revoked"
-  mkdir -p "$data_dir/ccd" "$data_dir/clients/active" "$data_dir/clients/revoked"
+  mkdir -p "$data_dir/ccd" "$data_dir/clients/active" "$data_dir/clients/revoked" \
+    "$OVPN_LEASE_DIR"
   chmod 700 "$data_dir/ccd"
   content="$(ovpn_render_server_content)" ||
     ovpn_die 'failed to render the migrated server configuration'
@@ -386,10 +377,18 @@ ovpn_migration_2_to_3_rebuild_derived() {
     fi
     old_lease="$data_dir/data/leases/$name"
     if [ -f "$old_lease" ]; then
-      mv "$old_lease" "$data_dir/data/leases/$id"
-      chmod 600 "$data_dir/data/leases/$id"
+      mv "$old_lease" "$OVPN_LEASE_DIR/$id"
+      chmod 600 "$OVPN_LEASE_DIR/$id"
     fi
   done
+  if [ -d "$data_dir/data/leases" ]; then
+    rmdir "$data_dir/data/leases" ||
+      ovpn_die 'schema 2 lease directory contains unknown entries'
+  fi
+  if [ -d "$data_dir/data" ]; then
+    rmdir "$data_dir/data" ||
+      ovpn_die 'schema 2 data directory contains unknown entries'
+  fi
 }
 
 ovpn_migration_2_to_3_apply_staged() (
@@ -422,10 +421,12 @@ ovpn_migration_2_to_3_validate_staged() (
   fi
   ovpn_config_load
   ovpn_registry_load_identities || ovpn_die 'migrated schema 3 identity registry is invalid'
-  ovpn_client_ip_validate_file "$data_dir/data/client-ip.csv" ||
-    ovpn_die 'migrated schema 3 client IP draft is invalid'
-  ovpn_client_ip_validate_file "$data_dir/meta/client-ip.applied.csv" ||
-    ovpn_die 'migrated schema 3 applied client IP registry is invalid'
+  ovpn_client_ip_validate_file "$data_dir/meta/client-ip.csv" ||
+    ovpn_die 'migrated schema 3 client IP registry is invalid'
+  [ ! -e "$data_dir/data" ] ||
+    ovpn_die 'migrated schema 3 retains the obsolete data directory'
+  [ ! -e "$data_dir/meta/client-ip.applied.csv" ] ||
+    ovpn_die 'migrated schema 3 retains the obsolete applied client IP registry'
   ovpn_state_ipam_audit_is_valid "$data_dir/meta/audit.jsonl" ||
     ovpn_die 'migrated schema 3 audit log is invalid'
   index="$data_dir/pki/index.txt"

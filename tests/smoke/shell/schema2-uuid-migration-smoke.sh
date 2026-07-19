@@ -279,12 +279,13 @@ for id in "$alpha_id" "$beta_id" "$gone_id"; do
   [[ "$id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
 done
 [ "$alpha_id" != "$beta_id" ] && [ "$alpha_id" != "$gone_id" ] && [ "$beta_id" != "$gone_id" ]
-grep -Fqx "$alpha_id,alpha,10.88.0.2" "$OVPN_DATA_DIR/data/client-ip.csv"
-grep -Fqx "$alpha_id,alpha,10.88.0.3" "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
-grep -Fqx "$beta_id,beta," "$OVPN_DATA_DIR/data/client-ip.csv"
-if grep -Fq ',gone,' "$OVPN_DATA_DIR/data/client-ip.csv"; then
+grep -Fqx "$alpha_id,alpha,10.88.0.3" "$OVPN_DATA_DIR/meta/client-ip.csv"
+grep -Fqx "$beta_id,beta," "$OVPN_DATA_DIR/meta/client-ip.csv"
+if grep -Fq ',gone,' "$OVPN_DATA_DIR/meta/client-ip.csv"; then
   exit 1
 fi
+test ! -e "$OVPN_DATA_DIR/data"
+test ! -e "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 
 grep -Fq "$alpha_id" "$OVPN_DATA_DIR/pki/index.txt"
 grep -Fq "$beta_id" "$OVPN_DATA_DIR/pki/index.txt"
@@ -303,8 +304,8 @@ grep -Fqx '# ovpn-client-name: alpha' "$OVPN_DATA_DIR/clients/active/alpha.ovpn"
 grep -Fqx "# ovpn-client-id: $beta_id" "$OVPN_DATA_DIR/clients/revoked/beta.ovpn"
 grep -Fqx 'ifconfig-push 10.88.0.3 255.255.255.0' "$OVPN_DATA_DIR/ccd/$alpha_id"
 test ! -e "$OVPN_DATA_DIR/ccd/alpha"
-grep -Fqx '10.88.0.200' "$OVPN_DATA_DIR/data/leases/$alpha_id"
-test ! -e "$OVPN_DATA_DIR/data/leases/alpha"
+grep -Fqx '10.88.0.200' "$OVPN_DATA_DIR/cache/client-leases/$alpha_id"
+test ! -e "$OVPN_DATA_DIR/cache/client-leases/alpha"
 grep -Fqx '{"timestamp":"2026-01-01T00:00:00Z","event":"client_ip_apply","outcome":"applied","client_id":null,"client_name":null,"legacy":true,"source_schema":2}' "$OVPN_DATA_DIR/meta/audit.jsonl"
 grep -Fqx '{"timestamp":"2026-01-02T00:00:00Z","event":"network_migration","outcome":"rejected","client_id":null,"client_name":null,"legacy":true,"source_schema":2}' "$OVPN_DATA_DIR/meta/audit.jsonl"
 grep -Fqx '{"timestamp":"2026-01-03T00:00:00Z","event":"client_lifecycle","operation":"revoke","outcome":"applied","client_id":null,"client_name":null,"legacy":true,"source_schema":2}' "$OVPN_DATA_DIR/meta/audit.jsonl"
@@ -380,8 +381,9 @@ v1_active_id="$(awk -F, '$2 == "v1-active" && $3 == "active" { print $1 }' "$OVP
 v1_revoked_id="$(awk -F, '$2 == "v1-revoked" && $3 == "revoked" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
 [[ "$v1_active_id" =~ ^[0-9a-f-]{36}$ ]]
 [[ "$v1_revoked_id" =~ ^[0-9a-f-]{36}$ ]]
-grep -Fqx "$v1_active_id,v1-active," "$OVPN_DATA_DIR/data/client-ip.csv"
-grep -Fqx "$v1_revoked_id,v1-revoked," "$OVPN_DATA_DIR/data/client-ip.csv"
+grep -Fqx "$v1_active_id,v1-active," "$OVPN_DATA_DIR/meta/client-ip.csv"
+grep -Fqx "$v1_revoked_id,v1-revoked," "$OVPN_DATA_DIR/meta/client-ip.csv"
+test ! -e "$OVPN_DATA_DIR/data"
 grep -Fqx "# ovpn-client-id: $v1_active_id" "$OVPN_DATA_DIR/clients/active/v1-active.ovpn"
 grep -Fqx "# ovpn-client-id: $v1_revoked_id" "$OVPN_DATA_DIR/clients/revoked/v1-revoked.ovpn"
 test ! -e "$MIGRATION_NETWORK_LOG"

@@ -115,8 +115,10 @@ docker run --rm \
   -v "$data_dir:/etc/openvpn:ro" \
   --entrypoint /bin/bash \
   "$IMAGE" -ec '
-    grep -Fqx "$ALPHA_ID,alpha,10.91.0.2" /etc/openvpn/data/client-ip.csv
-    grep -Fqx "$BETA_ID,beta," /etc/openvpn/data/client-ip.csv
+    grep -Fqx "$ALPHA_ID,alpha,10.91.0.2" /etc/openvpn/meta/client-ip.csv
+    grep -Fqx "$BETA_ID,beta," /etc/openvpn/meta/client-ip.csv
+    test ! -e /etc/openvpn/data
+    test ! -e /etc/openvpn/meta/client-ip.applied.csv
     grep -Fqx '"'"'{"timestamp":"2026-01-01T00:00:00Z","event":"client_lifecycle","operation":"revoke","outcome":"applied","client_id":null,"client_name":null,"legacy":true,"source_schema":2}'"'"' \
       /etc/openvpn/meta/audit.jsonl
     grep -Fqx "# ovpn-client-id: $ALPHA_ID" /etc/openvpn/clients/active/alpha.ovpn

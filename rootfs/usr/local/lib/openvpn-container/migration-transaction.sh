@@ -9,7 +9,7 @@ OVPN_MIGRATION_TRANSACTION_REPORT=''
 OVPN_MIGRATION_TRANSACTION_SUCCESS=false
 
 ovpn_migration_business_entries() {
-  printf '%s\n' ccd clients config data meta pki secrets server
+  printf '%s\n' cache ccd clients config data meta pki secrets server
 }
 
 ovpn_migration_transaction_write_marker() {
