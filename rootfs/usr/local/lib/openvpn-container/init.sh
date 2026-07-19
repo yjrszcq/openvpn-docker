@@ -95,8 +95,8 @@ ovpn_init_inner() {
   rm -f "$transaction_file"
   ovpn_require_healthy_state
   commit_started=false
-  trap - EXIT
   rmdir "$stage_dir"
+  trap - EXIT
   ovpn_log "initialized OpenVPN data directory at $OVPN_DATA_DIR"
 }
 

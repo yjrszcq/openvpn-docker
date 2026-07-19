@@ -41,7 +41,13 @@ RUN ldd /out/usr/local/sbin/openvpn >/tmp/openvpn-libs \
     && awk '$1 ~ /^\// { print $1 } $3 ~ /^\// { print $3 }' /tmp/openvpn-libs >/tmp/openvpn-lib-paths \
     && sort -u /tmp/openvpn-lib-paths -o /tmp/openvpn-lib-paths \
     && test -s /tmp/openvpn-lib-paths \
-    && while IFS= read -r library; do resolved="$(readlink -f "$library")"; cp --parents "$resolved" /out; if [ "$(basename "$library")" != "$(basename "$resolved")" ]; then ln -sf "$(basename "$resolved")" "/out$(dirname "$resolved")/$(basename "$library")"; fi; done </tmp/openvpn-lib-paths
+    && while IFS= read -r library; do \
+         resolved="$(readlink -f "$library")" || exit 1; \
+         cp --parents "$resolved" /out || exit 1; \
+         if [ "$(basename "$library")" != "$(basename "$resolved")" ]; then \
+           ln -sf "$(basename "$resolved")" "/out$(dirname "$resolved")/$(basename "$library")" || exit 1; \
+         fi; \
+       done </tmp/openvpn-lib-paths
 
 FROM ${BASE_IMAGE}
 ARG BASE_IMAGE

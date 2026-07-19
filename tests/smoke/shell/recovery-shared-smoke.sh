@@ -44,6 +44,16 @@ export OVPN_ENDPOINT=vpn.example.test
 export OVPN_NETWORK=10.88.0.0/24
 unset OVPN_OPENSSL_BIN
 
+(
+  # shellcheck source=../../../rootfs/usr/local/lib/openvpn-container/recovery.sh
+  . "$OVPN_LIB_DIR/recovery.sh"
+  OVPN_RECOVERY_CLIENT_CERTIFICATE=stale-certificate
+  OVPN_RECOVERY_CLIENT_KEY=stale-key
+  ovpn_recovery_reset
+  [ -z "$OVPN_RECOVERY_CLIENT_CERTIFICATE" ]
+  [ -z "$OVPN_RECOVERY_CLIENT_KEY" ]
+)
+
 write_tls_crypt_key() {
   local path="$1"
   local offset="${2:-0}"

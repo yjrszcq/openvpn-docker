@@ -51,5 +51,9 @@ if ! grep -Fq 'readlink -f "$library"' "$dockerfile" || ! grep -Fq 'ln -sf "$(ba
   echo 'builder must preserve resolved runtime libraries and their SONAME links' >&2
   exit 1
 fi
+if [ "$(grep -cF '|| exit 1;' "$dockerfile")" -lt 3 ]; then
+  echo 'builder must propagate every runtime library copy failure' >&2
+  exit 1
+fi
 
 printf 'source build layout smoke passed\n'

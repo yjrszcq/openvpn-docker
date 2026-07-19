@@ -291,9 +291,9 @@ ovpn_client_ip_apply_inner() (
   if ! ovpn_client_ip_validate_file "$candidate"; then
     exit 1
   fi
-  ovpn_client_ip_apply_begin "$backup" "$candidate"
+  ovpn_client_ip_apply_begin
   ovpn_client_ip_atomic_install "$candidate" "$registry"
-  ovpn_client_ip_apply_derived "$backup" "$registry"
+  ovpn_client_ip_apply_derived "$backup"
   ovpn_client_ip_audit_event applied
   ovpn_client_ip_apply_finalize
   transaction_success=true

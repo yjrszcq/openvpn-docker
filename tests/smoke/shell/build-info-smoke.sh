@@ -44,4 +44,12 @@ if ! [[ "$DATA_SCHEMA" =~ ^[1-9][0-9]*$ ]]; then
 fi
 grep -Fqx "OVPN_CURRENT_DATA_SCHEMA=$DATA_SCHEMA" "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/schema.sh"
 
+control_revision=$'control\b\f\x01revision'
+OVPN_RUNTIME_STRATEGY=source-build \
+OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION" \
+OVPN_VCS_REF="$control_revision" \
+OVPN_BUILD_DATE=1970-01-01T00:00:00Z \
+"$GENERATOR" "$output_path"
+jq -e --arg expected "$control_revision" '.vcs_revision == $expected' "$output_path" >/dev/null
+
 printf 'build-info smoke passed\n'

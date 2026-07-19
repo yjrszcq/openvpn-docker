@@ -13,12 +13,12 @@ require_value() {
 
 json_string() {
   local value="$1"
-  value=${value//\\/\\\\}
-  value=${value//\"/\\\"}
-  value=${value//$'\n'/\\n}
-  value=${value//$'\r'/\\r}
-  value=${value//$'\t'/\\t}
-  printf '"%s"' "$value"
+  jq -Rn --arg value "$value" '$value'
+}
+
+command -v jq >/dev/null 2>&1 || {
+  printf 'jq is required to generate build metadata\n' >&2
+  exit 69
 }
 
 for name in \
