@@ -24,6 +24,7 @@ EOF
 cat >"$FAKE_BIN/socat" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+[ "${3:-}" = '-,ignoreeof' ]
 request="$(cat)"
 printf '%s\n' "$request" >>"$OVPN_TEST_SOCAT_LOG"
 case "$request" in

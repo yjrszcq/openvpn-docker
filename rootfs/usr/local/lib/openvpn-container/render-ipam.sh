@@ -22,7 +22,7 @@ ovpn_management_socket_request() {
       printf '%s\n' "$request"
       sleep "$delay"
       printf 'quit\n'
-    } | "$socat_bin" -T 5 - "UNIX-CONNECT:$socket" 2>&1
+    } | "$socat_bin" -T 5 -,ignoreeof "UNIX-CONNECT:$socket" 2>&1
   )" || return 1
   printf '%s\n' "$response"
 }

@@ -69,9 +69,14 @@ class FakeOpenVPN:
                     )
                 elif command.startswith("kill "):
                     connection.sendall(b"SUCCESS: client killed\n")
+                elif command == "test-disconnect":
+                    return
                 elif command == "signal SIGHUP":
                     connection.sendall(b"SUCCESS: signal SIGHUP thrown\n")
-                    return
+                    time.sleep(0.1)
+                    connection.sendall(
+                        b">LOG:3,I,Initialization Sequence Completed\n"
+                    )
                 else:
                     connection.sendall(b"ERROR: unsupported test command\n")
 
@@ -183,8 +188,8 @@ def main() -> int:
                 raise AssertionError("version response was not proxied")
             if not request(broker_path, "kill client-id").startswith("SUCCESS:"):
                 raise AssertionError("kill response was not proxied")
-            if not request(broker_path, "signal SIGHUP").startswith("SUCCESS:"):
-                raise AssertionError("SIGHUP response was not proxied")
+            if not request(broker_path, "test-disconnect").startswith("ERROR:"):
+                raise AssertionError("backend disconnect was not reported")
             for _ in range(100):
                 try:
                     reconnected = request(broker_path, "broker-health")
@@ -195,6 +200,15 @@ def main() -> int:
                 time.sleep(0.02)
             else:
                 raise AssertionError("broker did not reconnect to OpenVPN")
+            reload_started = time.monotonic()
+            if not request(broker_path, "signal SIGHUP").startswith("SUCCESS:"):
+                raise AssertionError("SIGHUP response was not proxied")
+            if time.monotonic() - reload_started < 0.08:
+                raise AssertionError("SIGHUP returned before initialization completed")
+            if not request(broker_path, "kill post-reload-client").startswith(
+                "SUCCESS:"
+            ):
+                raise AssertionError("SIGHUP returned before initialization completed")
             rotated_logs = [
                 path
                 for path in (raw_log.with_name("openvpn.log.2"), raw_log.with_name("openvpn.log.1"), raw_log)

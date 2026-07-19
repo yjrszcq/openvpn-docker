@@ -8,6 +8,7 @@ import os
 import signal
 import socket
 import threading
+import time
 from dataclasses import dataclass, field
 
 
@@ -91,19 +92,27 @@ class OpenVPNBackend:
         self.timeout = timeout
         self.command_lock = threading.Lock()
         self.state_lock = threading.Lock()
+        self.connection_condition = threading.Condition(self.state_lock)
         self.connection: socket.socket | None = None
+        self.initialization_generation = 0
+        self.reload_in_progress = False
         self.pending: PendingResponse | None = None
 
     def _record_async(self, line: str) -> None:
         self.raw_log.write(line)
+        if line.endswith(",Initialization Sequence Completed"):
+            with self.connection_condition:
+                self.initialization_generation += 1
+                self.connection_condition.notify_all()
 
     def _disconnect(self, connection: socket.socket, error: str) -> None:
-        with self.state_lock:
+        with self.connection_condition:
             if self.connection is not connection:
                 return
             self.connection = None
             pending = self.pending
             self.pending = None
+            self.connection_condition.notify_all()
         try:
             connection.close()
         except OSError:
@@ -182,12 +191,61 @@ class OpenVPNBackend:
         return pending.lines
 
     def request(self, command: str) -> list[str]:
-        with self.command_lock:
-            with self.state_lock:
-                connection = self.connection
-            if connection is None:
-                connection = self._connect()
-            return self._exchange(connection, command)
+        while True:
+            self.wait_for_reload()
+            with self.command_lock:
+                with self.state_lock:
+                    if self.reload_in_progress:
+                        continue
+                    connection = self.connection
+                if connection is None:
+                    connection = self._connect()
+                return self._exchange(connection, command)
+
+    def request_then_wait_for_initialization(self, command: str) -> list[str]:
+        while True:
+            self.wait_for_reload()
+            with self.command_lock:
+                with self.connection_condition:
+                    if self.reload_in_progress:
+                        continue
+                    connection = self.connection
+                if connection is None:
+                    connection = self._connect()
+                with self.connection_condition:
+                    self.reload_in_progress = True
+                    generation = self.initialization_generation
+                try:
+                    response = self._exchange(connection, command)
+                except (OSError, ConnectionError, TimeoutError):
+                    with self.connection_condition:
+                        self.reload_in_progress = False
+                        self.connection_condition.notify_all()
+                    raise
+            try:
+                if response and response[0].startswith("SUCCESS:"):
+                    self.wait_for_initialization(generation)
+                return response
+            finally:
+                with self.connection_condition:
+                    self.reload_in_progress = False
+                    self.connection_condition.notify_all()
+
+    def wait_for_reload(self) -> None:
+        with self.connection_condition:
+            while self.reload_in_progress:
+                self.connection_condition.wait()
+
+    def wait_for_initialization(self, previous_generation: int) -> None:
+        deadline = time.monotonic() + self.timeout
+        with self.connection_condition:
+            while self.initialization_generation <= previous_generation:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError(
+                        "OpenVPN did not complete initialization after reload"
+                    )
+                self.connection_condition.wait(remaining)
 
     def ensure_connected(self) -> None:
         with self.command_lock:
@@ -236,6 +294,10 @@ class ManagementBroker:
                         if command == "broker-health":
                             self.backend.request("version")
                             lines = ["SUCCESS: broker connected to OpenVPN"]
+                        elif command == "signal SIGHUP":
+                            lines = self.backend.request_then_wait_for_initialization(
+                                command
+                            )
                         else:
                             lines = self.backend.request(command)
                     except (OSError, ConnectionError, TimeoutError) as exc:
