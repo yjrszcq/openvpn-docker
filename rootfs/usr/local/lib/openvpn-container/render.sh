@@ -231,11 +231,16 @@ ovpn_render_server() {
 }
 
 ovpn_render_client() {
-  local client_reference="${1:-}"
+  local usage='usage: ovpn render client <client>|--id <ID>|--name <NAME> [--stdout|--output <path>]'
+  local selector_mode client_reference consumed
   local client_name
   local output_path='-'
-  [ -n "$client_reference" ] || ovpn_die "usage: ovpn render client <client> [--stdout|--output path]"
-  shift
+
+  ovpn_client_parse_single_selector_or_die "$usage" "$@"
+  selector_mode="$OVPN_CLIENT_SELECTOR_MODE"
+  client_reference="$OVPN_CLIENT_SELECTOR_REFERENCE"
+  consumed="$OVPN_CLIENT_SELECTOR_CONSUMED"
+  shift "$consumed"
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -253,7 +258,7 @@ ovpn_render_client() {
     esac
     shift
   done
-  ovpn_client_resolve_ref_or_die "$client_reference"
+  ovpn_client_resolve_selector_or_die "$selector_mode" "$client_reference"
   client_name="$OVPN_CLIENT_RESOLVED_NAME"
   ovpn_write_or_print "$output_path" "$(ovpn_render_client_content "$client_name")"
 }
@@ -278,7 +283,7 @@ ovpn_render_command() {
     ;;
   client)
     if ovpn_help_requested "$@"; then
-      ovpn_command_usage "ovpn render client <client> [--stdout|--output <path>]" "Render a client profile."
+      ovpn_command_usage "ovpn render client <client>|--id <ID>|--name <NAME> [--stdout|--output <path>]" "Render a client profile."
     else
       ovpn_render_client "$@"
     fi

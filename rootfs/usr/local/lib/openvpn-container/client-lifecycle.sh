@@ -399,14 +399,15 @@ ovpn_client_rename_audit() {
 }
 
 ovpn_client_rename_inner() (
-  local reference="$1"
-  local new_name="$2"
+  local selector_mode="$1"
+  local reference="$2"
+  local new_name="$3"
   local id old_name state state_file registry audit_file profile_dir old_profile new_profile
   local stage rollback_ok transaction_success=false
 
   ovpn_require_healthy_state
   ovpn_client_ip_prepare_mutation
-  ovpn_client_resolve_ref_or_die "$reference"
+  ovpn_client_resolve_selector_or_die "$selector_mode" "$reference"
   id="$OVPN_CLIENT_RESOLVED_ID"
   old_name="$OVPN_CLIENT_RESOLVED_NAME"
   state="$OVPN_CLIENT_RESOLVED_STATE"
@@ -489,12 +490,17 @@ ovpn_client_rename_inner() (
 )
 
 ovpn_client_rename_command() {
-  local reference="${1:-}"
-  local new_name="${2:-}"
+  local usage='usage: ovpn client rename <client>|--id <ID>|--name <NAME> <new-name>'
+  local selector_mode reference consumed new_name
 
-  [ -n "$reference" ] && [ -n "$new_name" ] && [ "$#" -eq 2 ] ||
-    ovpn_die 'usage: ovpn client rename <client> <new-name>'
-  ovpn_with_data_lock client ovpn_client_rename_inner "$reference" "$new_name"
+  ovpn_client_parse_single_selector_or_die "$usage" "$@"
+  selector_mode="$OVPN_CLIENT_SELECTOR_MODE"
+  reference="$OVPN_CLIENT_SELECTOR_REFERENCE"
+  consumed="$OVPN_CLIENT_SELECTOR_CONSUMED"
+  shift "$consumed"
+  new_name="${1:-}"
+  [ -n "$new_name" ] && [ "$#" -eq 1 ] || ovpn_die "$usage"
+  ovpn_with_data_lock client ovpn_client_rename_inner "$selector_mode" "$reference" "$new_name"
 }
 
 ovpn_client_lifecycle_kick() {
@@ -515,13 +521,14 @@ ovpn_client_lifecycle_move_profile_to_revoked() {
 }
 
 ovpn_client_revoke_inner() {
-  local reference="$1"
-  local release_ip="$2"
+  local selector_mode="$1"
+  local reference="$2"
+  local release_ip="$3"
   local name index id assignment
 
   ovpn_require_healthy_state
   ovpn_client_ip_prepare_mutation
-  ovpn_client_resolve_ref_or_die "$reference"
+  ovpn_client_resolve_selector_or_die "$selector_mode" "$reference"
   id="$OVPN_CLIENT_RESOLVED_ID"
   name="$OVPN_CLIENT_RESOLVED_NAME"
   ovpn_client_require_registry_active "$name"
@@ -545,26 +552,31 @@ ovpn_client_revoke_inner() {
 }
 
 ovpn_client_revoke_command() {
-  local reference="${1:-}"
+  local usage='usage: ovpn client revoke <client>|--id <ID>|--name <NAME> [--release-ip]'
+  local selector_mode reference consumed
   local release_ip=false
 
-  [ -n "$reference" ] || ovpn_die 'usage: ovpn client revoke <client> [--release-ip]'
-  shift
+  ovpn_client_parse_single_selector_or_die "$usage" "$@"
+  selector_mode="$OVPN_CLIENT_SELECTOR_MODE"
+  reference="$OVPN_CLIENT_SELECTOR_REFERENCE"
+  consumed="$OVPN_CLIENT_SELECTOR_CONSUMED"
+  shift "$consumed"
   if [ "$#" -eq 1 ] && [ "$1" = --release-ip ]; then
     release_ip=true
   elif [ "$#" -ne 0 ]; then
-    ovpn_die 'usage: ovpn client revoke <client> [--release-ip]'
+    ovpn_die "$usage"
   fi
-  ovpn_with_data_lock client ovpn_client_revoke_inner "$reference" "$release_ip"
+  ovpn_with_data_lock client ovpn_client_revoke_inner "$selector_mode" "$reference" "$release_ip"
 }
 
 ovpn_client_release_ip_inner() {
-  local reference="$1"
+  local selector_mode="$1"
+  local reference="$2"
   local name status index assignment id
 
   ovpn_require_healthy_state
   ovpn_client_ip_prepare_mutation
-  ovpn_client_resolve_ref_or_die "$reference"
+  ovpn_client_resolve_selector_or_die "$selector_mode" "$reference"
   id="$OVPN_CLIENT_RESOLVED_ID"
   name="$OVPN_CLIENT_RESOLVED_NAME"
   status="${OVPN_CLIENT_IP_PKI_STATES[$name]:-}"
@@ -582,22 +594,28 @@ ovpn_client_release_ip_inner() {
 }
 
 ovpn_client_release_ip_command() {
-  local reference="${1:-}"
+  local usage='usage: ovpn client ip release <client>|--id <ID>|--name <NAME>'
+  local selector_mode reference consumed
 
-  [ -n "$reference" ] || ovpn_die "usage: ovpn client ip release <client>"
-  [ "$#" -eq 1 ] || ovpn_die "usage: ovpn client ip release <client>"
-  ovpn_with_data_lock client ovpn_client_release_ip_inner "$reference"
+  ovpn_client_parse_single_selector_or_die "$usage" "$@"
+  selector_mode="$OVPN_CLIENT_SELECTOR_MODE"
+  reference="$OVPN_CLIENT_SELECTOR_REFERENCE"
+  consumed="$OVPN_CLIENT_SELECTOR_CONSUMED"
+  shift "$consumed"
+  [ "$#" -eq 0 ] || ovpn_die "$usage"
+  ovpn_with_data_lock client ovpn_client_release_ip_inner "$selector_mode" "$reference"
 }
 
 ovpn_client_reissue_inner() {
-  local reference="$1"
-  local mode="$2"
-  local requested_ip="$3"
+  local selector_mode="$1"
+  local reference="$2"
+  local mode="$3"
+  local requested_ip="$4"
   local name status index id assignment allocated_ip=''
 
   ovpn_require_healthy_state
   ovpn_client_ip_prepare_mutation
-  ovpn_client_resolve_ref_or_die "$reference"
+  ovpn_client_resolve_selector_or_die "$selector_mode" "$reference"
   id="$OVPN_CLIENT_RESOLVED_ID"
   name="$OVPN_CLIENT_RESOLVED_NAME"
   status="${OVPN_CLIENT_IP_PKI_STATES[$name]:-}"
@@ -658,18 +676,22 @@ ovpn_client_reissue_inner() {
       ;;
   esac
 
-  ovpn_render_client "$name" --output "$OVPN_DATA_DIR/clients/active/$name.ovpn"
+  ovpn_write_or_print "$OVPN_DATA_DIR/clients/active/$name.ovpn" "$(ovpn_render_client_content "$name")"
   ovpn_client_lifecycle_kick "$id"
   ovpn_client_lifecycle_audit reissue applied "$id" "$name" || true
   ovpn_log "reissued client '$name'"
 }
 
 ovpn_client_reissue_command() {
-  local reference="${1:-}"
+  local usage='usage: ovpn client reissue <client>|--id <ID>|--name <NAME> [--dynamic|--ip <IPv4>]'
+  local selector_mode reference consumed
   local mode='' requested_ip=''
 
-  [ -n "$reference" ] || ovpn_die 'usage: ovpn client reissue <client> [--dynamic|--ip <IPv4>]'
-  shift
+  ovpn_client_parse_single_selector_or_die "$usage" "$@"
+  selector_mode="$OVPN_CLIENT_SELECTOR_MODE"
+  reference="$OVPN_CLIENT_SELECTOR_REFERENCE"
+  consumed="$OVPN_CLIENT_SELECTOR_CONSUMED"
+  shift "$consumed"
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --dynamic)
@@ -683,11 +705,11 @@ ovpn_client_reissue_command() {
         mode=static
         requested_ip="$1"
         ;;
-      *) ovpn_die 'usage: ovpn client reissue <client> [--dynamic|--ip <IPv4>]' ;;
+      *) ovpn_die "$usage" ;;
     esac
     shift
   done
-  ovpn_with_data_lock client ovpn_client_reissue_inner "$reference" "$mode" "$requested_ip"
+  ovpn_with_data_lock client ovpn_client_reissue_inner "$selector_mode" "$reference" "$mode" "$requested_ip"
 }
 
 ovpn_client_delete_current_assignment() {
@@ -712,12 +734,13 @@ ovpn_client_delete_current_assignment() {
 }
 
 ovpn_client_delete_inner() {
-  local reference="$1"
+  local selector_mode="$1"
+  local reference="$2"
   local name status index id state_file state_backup
 
   ovpn_require_healthy_state
   ovpn_client_ip_prepare_mutation
-  ovpn_client_resolve_ref_or_die "$reference"
+  ovpn_client_resolve_selector_or_die "$selector_mode" "$reference"
   id="$OVPN_CLIENT_RESOLVED_ID"
   name="$OVPN_CLIENT_RESOLVED_NAME"
   status="${OVPN_CLIENT_IP_PKI_STATES[$name]:-}"
@@ -753,11 +776,16 @@ ovpn_client_delete_inner() {
 }
 
 ovpn_client_delete_command() {
-  local reference="${1:-}"
+  local usage='usage: ovpn client delete <client>|--id <ID>|--name <NAME>'
+  local selector_mode reference consumed
 
-  [ -n "$reference" ] || ovpn_die 'usage: ovpn client delete <client>'
-  [ "$#" -eq 1 ] || ovpn_die 'usage: ovpn client delete <client>'
-  ovpn_with_data_lock client ovpn_client_delete_inner "$reference"
+  ovpn_client_parse_single_selector_or_die "$usage" "$@"
+  selector_mode="$OVPN_CLIENT_SELECTOR_MODE"
+  reference="$OVPN_CLIENT_SELECTOR_REFERENCE"
+  consumed="$OVPN_CLIENT_SELECTOR_CONSUMED"
+  shift "$consumed"
+  [ "$#" -eq 0 ] || ovpn_die "$usage"
+  ovpn_with_data_lock client ovpn_client_delete_inner "$selector_mode" "$reference"
 }
 
 
@@ -780,7 +808,7 @@ ovpn_client_command() {
       ;;
     export)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client export <client>" "Render an active client profile to stdout."
+        ovpn_command_usage "ovpn client export <client>|--id <ID>|--name <NAME>" "Render an active client profile to stdout."
       else
         ovpn_client_export_command "$@"
       fi
@@ -796,14 +824,14 @@ ovpn_client_command() {
       case "$ip_subcommand" in
         set)
           if ovpn_help_requested "$@"; then
-            ovpn_command_usage "ovpn client ip set <client...|--all> [--dynamic|--ip <IPv4>]" "Assign client IP addresses."
+            ovpn_command_usage "ovpn client ip set <client...>|--id <ID>|--name <NAME>|--all [--dynamic|--ip <IPv4>]" "Assign client IP addresses."
           else
             ovpn_client_set_command "$@"
           fi
           ;;
         release)
           if ovpn_help_requested "$@"; then
-            ovpn_command_usage "ovpn client ip release <client>" "Release the retained static IP of a revoked client."
+            ovpn_command_usage "ovpn client ip release <client>|--id <ID>|--name <NAME>" "Release the retained static IP of a revoked client."
           else
             ovpn_client_release_ip_command "$@"
           fi
@@ -813,21 +841,21 @@ ovpn_client_command() {
       ;;
     revoke)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client revoke <client> [--release-ip]" "Revoke a client certificate and optionally release its static IP."
+        ovpn_command_usage "ovpn client revoke <client>|--id <ID>|--name <NAME> [--release-ip]" "Revoke a client certificate and optionally release its static IP."
       else
         ovpn_client_revoke_command "$@"
       fi
       ;;
     reissue)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client reissue <client> [--dynamic|--ip <IPv4>]" "Issue a new certificate for an existing client, optionally changing IP assignment."
+        ovpn_command_usage "ovpn client reissue <client>|--id <ID>|--name <NAME> [--dynamic|--ip <IPv4>]" "Issue a new certificate for an existing client, optionally changing IP assignment."
       else
         ovpn_client_reissue_command "$@"
       fi
       ;;
     delete)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client delete <client>" "Remove a client and its local credentials."
+        ovpn_command_usage "ovpn client delete <client>|--id <ID>|--name <NAME>" "Remove a client and its local credentials."
       else
         ovpn_client_delete_command "$@"
       fi
@@ -841,7 +869,7 @@ ovpn_client_command() {
       ;;
     rename)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client rename <client> <new-name>" "Change a client's display name without replacing its UUID or certificate."
+        ovpn_command_usage "ovpn client rename <client>|--id <ID>|--name <NAME> <new-name>" "Change a client's display name without replacing its UUID or certificate."
       else
         ovpn_client_rename_command "$@"
       fi

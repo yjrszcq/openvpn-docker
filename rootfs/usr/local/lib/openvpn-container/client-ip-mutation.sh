@@ -228,13 +228,17 @@ ovpn_client_collect_active_targets() {
   [ "${#OVPN_CLIENT_MUTATION_TARGETS[@]}" -gt 0 ] || ovpn_die 'there are no active clients to change'
 }
 
-ovpn_client_collect_named_targets() {
-  local reference name
+ovpn_client_collect_selected_targets() {
+  local selector_mode reference name
   local -A seen=()
 
   OVPN_CLIENT_MUTATION_TARGETS=()
-  for reference in "$@"; do
-    ovpn_client_resolve_ref_or_die "$reference"
+  while [ "$#" -gt 0 ]; do
+    [ "$#" -ge 2 ] || ovpn_die 'internal client selector is incomplete'
+    selector_mode="$1"
+    reference="$2"
+    shift 2
+    ovpn_client_resolve_selector_or_die "$selector_mode" "$reference"
     name="$OVPN_CLIENT_RESOLVED_NAME"
     [ -z "${seen[$name]+present}" ] || ovpn_die "client '$name' was specified more than once"
     seen["$name"]=1
@@ -323,11 +327,13 @@ ovpn_client_set_from_editor() {
 ovpn_client_set_single_inner() {
   local mode="$1"
   local requested_ip="$2"
-  local name="$3"
+  local selector_mode="$3"
+  local reference="$4"
+  local name
   local address
 
   ovpn_client_ip_prepare_mutation
-  ovpn_client_collect_named_targets "$name"
+  ovpn_client_collect_selected_targets "$selector_mode" "$reference"
   name="${OVPN_CLIENT_MUTATION_TARGETS[0]}"
 
   case "$mode" in
@@ -364,7 +370,7 @@ ovpn_client_set_from_editor_inner() {
   if [ "$use_all" = true ]; then
     ovpn_client_collect_active_targets
   else
-    ovpn_client_collect_named_targets "$@"
+    ovpn_client_collect_selected_targets "$@"
   fi
   ovpn_client_set_from_editor
   ovpn_client_ip_apply_current_mutation
@@ -373,16 +379,33 @@ ovpn_client_set_from_editor_inner() {
 }
 
 ovpn_client_set_command() {
+  local usage='usage: ovpn client ip set <client...>|--id <ID>|--name <NAME>|--all [--dynamic|--ip <IPv4>]'
   local mode=static requested_ip='' use_all=false
-  local -a names=()
+  local selector_kind=''
+  local target_count
+  local -a selectors=()
 
-  [ "$#" -gt 0 ] || ovpn_die 'usage: ovpn client ip set <client...|--all> [--dynamic|--ip <IPv4>]'
+  [ "$#" -gt 0 ] || ovpn_die "$usage"
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --all)
         $use_all && ovpn_die '--all may only be specified once'
         use_all=true
+        ;;
+      --id|-i)
+        [ "$#" -gt 1 ] || ovpn_die "$1 requires a client ID"
+        [ -z "$selector_kind" ] || [ "$selector_kind" = id ] || ovpn_die '--id cannot be mixed with names or positional client references'
+        selector_kind=id
+        shift
+        selectors+=(id "$1")
+        ;;
+      --name|-n)
+        [ "$#" -gt 1 ] || ovpn_die "$1 requires a client name"
+        [ -z "$selector_kind" ] || [ "$selector_kind" = name ] || ovpn_die '--name cannot be mixed with IDs or positional client references'
+        selector_kind=name
+        shift
+        selectors+=(name "$1")
         ;;
       --dynamic)
         [ "$mode" = static ] && [ -z "$requested_ip" ] || ovpn_die '--dynamic cannot be combined with --ip'
@@ -394,22 +417,28 @@ ovpn_client_set_command() {
         [ "$mode" = static ] && [ -z "$requested_ip" ] || ovpn_die '--ip cannot be combined with --dynamic or repeated'
         requested_ip="$1"
         ;;
-      --*) ovpn_die 'usage: ovpn client ip set <client...|--all> [--dynamic|--ip <IPv4>]' ;;
-      *) names+=("$1") ;;
+      --*) ovpn_die "$usage" ;;
+      *)
+        [ -z "$selector_kind" ] || [ "$selector_kind" = auto ] || ovpn_die 'positional client references cannot be mixed with --id or --name'
+        selector_kind=auto
+        selectors+=(auto "$1")
+        ;;
     esac
     shift
   done
 
+  target_count=$((${#selectors[@]} / 2))
+
   if $use_all; then
-    [ "${#names[@]}" -eq 0 ] || ovpn_die '--all cannot be combined with client names'
+    [ "$target_count" -eq 0 ] || ovpn_die '--all cannot be combined with client selectors'
     [ "$mode" = static ] && [ -z "$requested_ip" ] || ovpn_die '--dynamic and --ip cannot be combined with --all'
     ovpn_with_data_lock client ovpn_client_set_from_editor_inner true
-  elif [ "${#names[@]}" -gt 1 ]; then
-    [ "$mode" = static ] && [ -z "$requested_ip" ] || ovpn_die '--dynamic and --ip cannot be combined with multiple client names'
-    ovpn_with_data_lock client ovpn_client_set_from_editor_inner false "${names[@]}"
-  elif [ "${#names[@]}" -eq 1 ]; then
-    ovpn_with_data_lock client ovpn_client_set_single_inner "$mode" "$requested_ip" "${names[0]}"
+  elif [ "$target_count" -gt 1 ]; then
+    [ "$mode" = static ] && [ -z "$requested_ip" ] || ovpn_die '--dynamic and --ip cannot be combined with multiple clients'
+    ovpn_with_data_lock client ovpn_client_set_from_editor_inner false "${selectors[@]}"
+  elif [ "$target_count" -eq 1 ]; then
+    ovpn_with_data_lock client ovpn_client_set_single_inner "$mode" "$requested_ip" "${selectors[@]}"
   else
-    ovpn_die 'usage: ovpn client ip set <client...|--all> [--dynamic|--ip <IPv4>]'
+    ovpn_die "$usage"
   fi
 }

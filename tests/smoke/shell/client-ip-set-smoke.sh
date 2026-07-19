@@ -52,7 +52,7 @@ cat >"$canonical" <<'EOF'
 EOF
 
 # Test: set triggers apply transaction, canonical ordering, CCD generation
-"$OVPN" client ip set "$bravo_id" --ip 10.88.0.3 >"$TMP_DIR/apply.out" 2>&1
+"$OVPN" client ip set --id "${bravo_id%%-*}" --ip 10.88.0.3 >"$TMP_DIR/apply.out" 2>&1
 grep -Fq 'set client' "$TMP_DIR/apply.out"
 cmp "$canonical" "$OVPN_DATA_DIR/meta/client-ip.csv"
 grep -Fq '"outcome":"applied"' "$OVPN_DATA_DIR/meta/audit.jsonl"
@@ -74,7 +74,7 @@ grep -Fq "static IP '10.88.0.4' is already assigned" "$TMP_DIR/rejected.out"
 cmp "$canonical" "$OVPN_DATA_DIR/meta/client-ip.csv"
 
 # Test: set with same value re-applies cleanly
-"$OVPN" client ip set bravo --ip 10.88.0.3 >"$TMP_DIR/sync.out" 2>&1
+"$OVPN" client ip set --name bravo --ip 10.88.0.3 >"$TMP_DIR/sync.out" 2>&1
 cmp "$canonical" "$OVPN_DATA_DIR/meta/client-ip.csv"
 
 # Test: boundary addresses in static region
@@ -127,6 +127,15 @@ if ! OVPN_EDITOR=true "$OVPN" client ip set --all >"$TMP_DIR/editor-unchanged.ou
   exit 1
 fi
 cmp "$TMP_DIR/dynamic.csv" "$OVPN_DATA_DIR/meta/client-ip.csv"
+
+# Test: repeated explicit selectors may batch clients only when they use one selector type.
+OVPN_EDITOR=true "$OVPN" client ip set --id "${alpha_id%%-*}" -i "${zulu_id%%-*}" >"$TMP_DIR/editor-ids.out" 2>&1
+cmp "$TMP_DIR/dynamic.csv" "$OVPN_DATA_DIR/meta/client-ip.csv"
+if "$OVPN" client ip set --id "${alpha_id%%-*}" --name zulu >"$TMP_DIR/mixed-selectors.out" 2>&1; then
+  echo 'mixed ID/name selectors unexpectedly succeeded' >&2
+  exit 1
+fi
+grep -Fq -- '--name cannot be mixed with IDs' "$TMP_DIR/mixed-selectors.out"
 
 # Test: explicit assignments are reserved before editor 'auto' allocation.
 editor="$TMP_DIR/allocate-editor.sh"

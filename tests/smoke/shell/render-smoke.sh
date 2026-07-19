@@ -66,7 +66,11 @@ printf '%s\n' '# id,name,state' "$client_id,laptop,active" >"$OVPN_DATA_DIR/meta
 
 "$OVPN" render client laptop --stdout >"$TMP_DIR/laptop.ovpn"
 "$OVPN" render client "$client_id" --stdout >"$TMP_DIR/laptop-by-id.ovpn"
+"$OVPN" render client --id "${client_id%%-*}" --stdout >"$TMP_DIR/laptop-by-short-id.ovpn"
+"$OVPN" render client -n laptop --stdout >"$TMP_DIR/laptop-by-name.ovpn"
 cmp "$TMP_DIR/laptop.ovpn" "$TMP_DIR/laptop-by-id.ovpn"
+cmp "$TMP_DIR/laptop.ovpn" "$TMP_DIR/laptop-by-short-id.ovpn"
+cmp "$TMP_DIR/laptop.ovpn" "$TMP_DIR/laptop-by-name.ovpn"
 grep -q '^remote vpn.example.test 1194$' "$TMP_DIR/laptop.ovpn"
 grep -q '^proto udp$' "$TMP_DIR/laptop.ovpn"
 grep -Fqx "# ovpn-client-id: $client_id" "$TMP_DIR/laptop.ovpn"

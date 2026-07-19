@@ -10,6 +10,8 @@ export OVPN_DATA_DIR="$TMP_DIR/data"
 . "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/common.sh"
 # shellcheck source=../../../rootfs/usr/local/lib/openvpn-container/registry.sh
 . "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/registry.sh"
+# shellcheck source=../../../rootfs/usr/local/lib/openvpn-container/client.sh
+. "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/client.sh"
 # shellcheck source=../../../rootfs/usr/local/lib/openvpn-container/client-ip.sh
 . "$ROOT_DIR/rootfs/usr/local/lib/openvpn-container/client-ip.sh"
 
@@ -86,6 +88,25 @@ assert_status "$OVPN_REGISTRY_RESOLVE_NOT_FOUND" ovpn_registry_resolve_current_b
 assert_status "$OVPN_REGISTRY_RESOLVE_NOT_FOUND" ovpn_registry_resolve_current missing-client
 assert_rejected ovpn_registry_resolve_current "$deleted_id"
 assert_rejected ovpn_registry_resolve_current retired
+
+ovpn_client_parse_single_selector_or_die usage -i 33333333 trailing
+[ "$OVPN_CLIENT_SELECTOR_MODE" = id ]
+[ "$OVPN_CLIENT_SELECTOR_REFERENCE" = 33333333 ]
+[ "$OVPN_CLIENT_SELECTOR_CONSUMED" -eq 2 ]
+ovpn_client_resolve_selector_or_die id 33333333
+[ "$OVPN_CLIENT_RESOLVED_NAME" = phone ]
+ovpn_client_resolve_selector_or_die name 22222222
+[ "$OVPN_CLIENT_RESOLVED_ID" = 22222222-aaaa-4aaa-8aaa-aaaaaaaaaaaa ]
+if (ovpn_client_resolve_selector_or_die auto 22222222) 2>"$TMP_DIR/ambiguous.err"; then
+  echo 'ambiguous automatic selector unexpectedly succeeded' >&2
+  exit 1
+fi
+grep -Fq 'use --id or --name' "$TMP_DIR/ambiguous.err"
+if (ovpn_client_resolve_selector_or_die id 2222222) 2>"$TMP_DIR/short-id.err"; then
+  echo 'short client ID unexpectedly succeeded' >&2
+  exit 1
+fi
+grep -Fq 'use 8-32 hexadecimal characters or a full UUID' "$TMP_DIR/short-id.err"
 
 cat >"$TMP_DIR/duplicate-current.csv" <<'EOF'
 # id,name,state
