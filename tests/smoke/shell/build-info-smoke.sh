@@ -12,10 +12,10 @@ set -a
 set +a
 
 OVPN_RUNTIME_STRATEGY=source-build \
-OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION" \
-OVPN_VCS_REF=test-revision \
-OVPN_BUILD_DATE=1970-01-01T00:00:00Z \
-"$GENERATOR" "$output_path"
+  OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION" \
+  OVPN_VCS_REF=test-revision \
+  OVPN_BUILD_DATE=1970-01-01T00:00:00Z \
+  "$GENERATOR" "$output_path"
 
 grep -Fq "\"image_version\": \"$IMAGE_VERSION\"" "$output_path"
 grep -Fq "\"data_schema\": $DATA_SCHEMA" "$output_path"
@@ -46,10 +46,10 @@ grep -Fqx "OVPN_CURRENT_DATA_SCHEMA=$DATA_SCHEMA" "$ROOT_DIR/rootfs/usr/local/li
 
 control_revision=$'control\b\f\x01revision'
 OVPN_RUNTIME_STRATEGY=source-build \
-OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION" \
-OVPN_VCS_REF="$control_revision" \
-OVPN_BUILD_DATE=1970-01-01T00:00:00Z \
-"$GENERATOR" "$output_path"
+  OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION" \
+  OVPN_VCS_REF="$control_revision" \
+  OVPN_BUILD_DATE=1970-01-01T00:00:00Z \
+  "$GENERATOR" "$output_path"
 jq -e --arg expected "$control_revision" '.vcs_revision == $expected' "$output_path" >/dev/null
 
 printf 'build-info smoke passed\n'
