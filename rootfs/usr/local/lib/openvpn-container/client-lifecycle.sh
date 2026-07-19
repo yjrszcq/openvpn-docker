@@ -197,7 +197,13 @@ ovpn_client_list_command() {
 }
 
 ovpn_pki_stage_create() {
-  local stage
+  local stage stale
+
+  for stale in "$OVPN_DATA_DIR"/.pki-operation.*; do
+    [ -d "$stale" ] || continue
+    [ ! -e "$stale/previous" ] || continue
+    rm -rf "$stale" || return 1
+  done
 
   stage="$(mktemp -d "$OVPN_DATA_DIR/.pki-operation.XXXXXX")" || return 1
   chmod 700 "$stage" || {

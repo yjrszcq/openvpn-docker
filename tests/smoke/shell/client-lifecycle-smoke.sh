@@ -332,28 +332,6 @@ phone_id="$(awk -F, '$2 == "phone" && $3 == "active" { print $1 }' "$OVPN_DATA_D
 grep -Fqx "$phone_id,phone," "$OVPN_DATA_DIR/meta/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/ccd/$phone_id"
 
-"$OVPN" client create revoke-failure --dynamic >"$TMP_DIR/revoke-failure-create.out" 2>"$TMP_DIR/revoke-failure-create.err"
-revoke_failure_id="$(awk -F, '$2 == "revoke-failure" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
-revoke_failure_pki_before="$(pki_snapshot)"
-if FAKE_EASYRSA_FAIL_REVOKE="$revoke_failure_id" \
-  "$OVPN" client revoke revoke-failure >"$TMP_DIR/revoke-failure.out" 2>"$TMP_DIR/revoke-failure.err"; then
-  echo 'failed Easy-RSA revoke was reported as successful' >&2
-  exit 1
-fi
-grep -Fq 'failed to revoke client certificate' "$TMP_DIR/revoke-failure.err"
-grep -Fqx "$revoke_failure_id,revoke-failure,active" "$OVPN_DATA_DIR/meta/client-state.csv"
-[ "$revoke_failure_pki_before" = "$(pki_snapshot)" ]
-
-if FAKE_EASYRSA_FAIL_GEN_CRL=true \
-  "$OVPN" client revoke revoke-failure >"$TMP_DIR/crl-failure.out" 2>"$TMP_DIR/crl-failure.err"; then
-  echo 'failed Easy-RSA CRL generation was reported as successful' >&2
-  exit 1
-fi
-grep -Fq 'failed to revoke client certificate' "$TMP_DIR/crl-failure.err"
-grep -Fqx "$revoke_failure_id,revoke-failure,active" "$OVPN_DATA_DIR/meta/client-state.csv"
-[ "$revoke_failure_pki_before" = "$(pki_snapshot)" ]
-[ "$("$OVPN" state show)" = HEALTHY ]
-
 "$OVPN" client ip set "$phone_id" --ip 10.88.0.20 >"$TMP_DIR/phone-static.out" 2>"$TMP_DIR/phone-static.err"
 grep -Fqx "$phone_id,phone,10.88.0.20" "$OVPN_DATA_DIR/meta/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.20 255.255.255.0' "$OVPN_DATA_DIR/ccd/$phone_id"
@@ -555,6 +533,31 @@ grep -Fqx "$laptop_id,retired-laptop,revoked" "$OVPN_DATA_DIR/meta/client-state.
 grep -Fqx "$laptop_id,retired-laptop," "$OVPN_DATA_DIR/meta/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/clients/revoked/laptop.ovpn"
 grep -Fqx '# ovpn-client-name: retired-laptop' "$OVPN_DATA_DIR/clients/revoked/retired-laptop.ovpn"
+[ "$("$OVPN" state show)" = HEALTHY ]
+
+"$OVPN" client create revoke-failure --dynamic >"$TMP_DIR/revoke-failure-create.out" 2>"$TMP_DIR/revoke-failure-create.err"
+revoke_failure_id="$(awk -F, '$2 == "revoke-failure" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
+revoke_failure_pki_before="$(pki_snapshot)"
+mkdir -p "$OVPN_DATA_DIR/.pki-operation.stale/pki/private"
+printf 'stale private material\n' >"$OVPN_DATA_DIR/.pki-operation.stale/pki/private/client.key"
+if FAKE_EASYRSA_FAIL_REVOKE="$revoke_failure_id" \
+  "$OVPN" client revoke revoke-failure >"$TMP_DIR/revoke-failure.out" 2>"$TMP_DIR/revoke-failure.err"; then
+  echo 'failed Easy-RSA revoke was reported as successful' >&2
+  exit 1
+fi
+grep -Fq 'failed to revoke client certificate' "$TMP_DIR/revoke-failure.err"
+grep -Fqx "$revoke_failure_id,revoke-failure,active" "$OVPN_DATA_DIR/meta/client-state.csv"
+[ "$revoke_failure_pki_before" = "$(pki_snapshot)" ]
+test ! -e "$OVPN_DATA_DIR/.pki-operation.stale"
+
+if FAKE_EASYRSA_FAIL_GEN_CRL=true \
+  "$OVPN" client revoke revoke-failure >"$TMP_DIR/crl-failure.out" 2>"$TMP_DIR/crl-failure.err"; then
+  echo 'failed Easy-RSA CRL generation was reported as successful' >&2
+  exit 1
+fi
+grep -Fq 'failed to revoke client certificate' "$TMP_DIR/crl-failure.err"
+grep -Fqx "$revoke_failure_id,revoke-failure,active" "$OVPN_DATA_DIR/meta/client-state.csv"
+[ "$revoke_failure_pki_before" = "$(pki_snapshot)" ]
 [ "$("$OVPN" state show)" = HEALTHY ]
 
 "$OVPN" client create issuance-failure --dynamic >"$TMP_DIR/issuance-failure-create.out" 2>"$TMP_DIR/issuance-failure-create.err"
