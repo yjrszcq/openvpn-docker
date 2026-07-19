@@ -79,8 +79,7 @@ ovpn -V
 ovpn --version
 ```
 
-`-v` 保留已发布的精简语义，仅打印镜像版本（如 `3.1.0`）。`-V` 与 `--version`
-输出相同的四项面向运维者的版本信息：
+`-v` 保留已发布的精简语义，仅打印镜像版本（如 `3.1.0`）。`-V` 与 `--version` 输出相同的四项面向运维者的版本信息：
 
 ```text
 image:           3.0.0
@@ -93,11 +92,7 @@ data schema:     3
 
 ### 公共参数短形式
 
-每个公共多字母参数都有单字母形式。短形式只在所属子命令内解释，因此 `client list`
-中的 `-d` 表示 `--detail`，分配命令中的 `-d` 表示 `--dynamic`；同理，客户端选择器
-中的 `-n` 表示 `--name`，network 命令中的 `-n` 表示 `--network`。小写 `-i` 继续
-表示客户端 ID，因此 IP 分配使用大写 `-I`。短参数必须分开传入（如 `-d -t`），接口
-不承诺支持 `-dt` 这类聚合写法。
+每个公共多字母参数都有单字母形式。短形式只在所属子命令内解释，因此 `client list` 中的 `-d` 表示 `--detail`，分配命令中的 `-d` 表示 `--dynamic`；同理，客户端选择器中的 `-n` 表示 `--name`，network 命令中的 `-n` 表示 `--network`。小写 `-i` 继续表示客户端 ID，因此 IP 分配使用大写 `-I`。短参数必须分开传入（如 `-d -t`），接口不承诺支持 `-dt` 这类聚合写法。
 
 | 长参数 | 短参数 |
 |---|---|
@@ -171,15 +166,7 @@ ovpn config apply
 
 ## 客户端生命周期
 
-每个客户端都有不可变的 UUID 身份。证书 CN、Easy-RSA 实体、CCD 文件名、动态租约
-文件名和 OpenVPN management 身份均使用该 UUID；客户端名称仍作为面向人的管理标签和
-profile 文件名。生成的 profile 包含 `ovpn-client-id` 与 `ovpn-client-name` 注释，
-因此无需改变 OpenVPN 语法也能恢复两种身份。除 `create` 外，选择客户端的命令均接受
-`<selector>`：位置参数 `<client>`、`--id <ID>`/`-i <ID>`，或者
-`--name <NAME>`/`-n <NAME>`。显式 ID 可使用标准 UUID，或至少 8 位、不区分大小写的
-紧凑十六进制前缀；前缀必须唯一匹配 active/revoked 客户端。显式名称进行区分大小写的
-精确匹配。位置参数会同时尝试名称和 ID；若两者指向不同客户端，则必须使用 `--id` 或
-`--name` 消歧。UUID 形式不能用作显示名称。
+每个客户端都有不可变的 UUID 身份。证书 CN、Easy-RSA 实体、CCD 文件名、动态租约文件名和 OpenVPN management 身份均使用该 UUID；客户端名称仍作为面向人的管理标签和 profile 文件名。生成的 profile 包含 `ovpn-client-id` 与 `ovpn-client-name` 注释，因此无需改变 OpenVPN 语法也能恢复两种身份。除 `create` 外，选择客户端的命令均接受 `<selector>`：位置参数 `<client>`、`--id <ID>`/`-i <ID>`，或者 `--name <NAME>`/`-n <NAME>`。显式 ID 可使用标准 UUID，或至少 8 位、不区分大小写的紧凑十六进制前缀；前缀必须唯一匹配 active/revoked 客户端。显式名称进行区分大小写的精确匹配。位置参数会同时尝试名称和 ID；若两者指向不同客户端，则必须使用 `--id` 或 `--name` 消歧。UUID 形式不能用作显示名称。
 
 ### `ovpn client create`
 
@@ -189,10 +176,7 @@ profile 文件名。生成的 profile 包含 `ovpn-client-id` 与 `ovpn-client-n
 ovpn client create <name> [--dynamic|-d|--ip|-I <IPv4>]
 ```
 
-在一个事务中创建由唯一 UUID 标识的客户端证书、私钥、活跃 profile、清单记录以及
-IP 分配。不带选项时，客户端获取最低的可用静态地址。`--dynamic` 创建动态分配，
-要求动态池容量非零。`--ip <IPv4>` 请求静态区内的特定未使用地址。`--dynamic` 与
-`--ip` 不可同时使用。
+在一个事务中创建由唯一 UUID 标识的客户端证书、私钥、活跃 profile、清单记录以及 IP 分配。不带选项时，客户端获取最低的可用静态地址。`--dynamic` 创建动态分配，要求动态池容量非零。`--ip <IPv4>` 请求静态区内的特定未使用地址。`--dynamic` 与 `--ip` 不可同时使用。
 
 ### `ovpn client export`
 
@@ -212,9 +196,7 @@ ovpn client export <selector>
 ovpn client list [--detail|-d] [--no-trunc|-t]
 ```
 
-不带 `--detail` 时，依次打印对齐的 `CLIENT ID`、`NAME` 和 `STATE` 列。ID 默认显示
-去掉连字符后 UUID 的前 12 位，可直接复制给任意客户端选择器；`--no-trunc` 显示完整
-标准 UUID。带 `--detail` 时，额外打印 `MODE`、`IP`、`IP STATE` 和 `CONNECTION`。
+不带 `--detail` 时，依次打印对齐的 `CLIENT ID`、`NAME` 和 `STATE` 列。ID 默认显示去掉连字符后 UUID 的前 12 位，可直接复制给任意客户端选择器；`--no-trunc` 显示完整标准 UUID。带 `--detail` 时，额外打印 `MODE`、`IP`、`IP STATE` 和 `CONNECTION`。
 
 在 IP 视图下，静态分配为 `configured`，或撤销后为 `retained`。动态地址在有当前租约时显示为 `connected`，在有缓存租约记录时显示为 `last-known`，否则为 `unavailable`。`CONNECTION` 根据管理套接字可用性和当前路由显示为 `online`、`offline` 或 `unknown`。该视图读取权威 IP 清单，并结合当前连接与租约缓存生成状态。
 
@@ -226,11 +208,7 @@ ovpn client list [--detail|-d] [--no-trunc|-t]
 ovpn client rename <selector> <new-name>
 ```
 
-原子修改面向人的显示名称，同时保持 UUID、证书、私钥、IP 分配、CCD、租约以及当前
-OpenVPN 连接不变。身份目录、IP 清单、profile 文件名及其中的名称注释
-会一同更新。源客户端可使用当前名称或 UUID；新名称必须合法且未被当前客户端占用。
-客户端改名或删除后，旧名称可由新的 UUID 复用；已删除 UUID 的 tombstone 仍作为
-权威历史保留。
+原子修改面向人的显示名称，同时保持 UUID、证书、私钥、IP 分配、CCD、租约以及当前 OpenVPN 连接不变。身份目录、IP 清单、profile 文件名及其中的名称注释会一同更新。源客户端可使用当前名称或 UUID；新名称必须合法且未被当前客户端占用。客户端改名或删除后，旧名称可由新的 UUID 复用；已删除 UUID 的 tombstone 仍作为权威历史保留。
 
 ### `ovpn client revoke`
 
@@ -265,9 +243,7 @@ ovpn client reissue <selector> [--dynamic|-d|--ip|-I <IPv4>]
 ovpn client delete <selector>
 ```
 
-不可逆地移除客户端。活跃客户端会先被撤销；然后命令移除其 IP 记录、活跃或已撤销
-profile、私钥、已签发证书和请求文件，同时在身份目录中保留 UUID tombstone。已删除
-客户端的显示名称可供新的 UUID 复用。旧私钥仅能从安全备份中恢复。
+不可逆地移除客户端。活跃客户端会先被撤销；然后命令移除其 IP 记录、活跃或已撤销 profile、私钥、已签发证书和请求文件，同时在身份目录中保留 UUID tombstone。已删除客户端的显示名称可供新的 UUID 复用。旧私钥仅能从安全备份中恢复。
 
 ## 客户端 IP 管理
 
@@ -298,9 +274,7 @@ ovpn client ip set <client...|(--id|-i <ID>)...|(--name|-n <NAME>)...|--all|-a> 
 - `--ip <IPv4>` → 显式指定静态地址
 - `--dynamic` → 设为动态分配
 
-多个位置参数、重复的 `--id`、重复的 `--name` 或 `--all` 会打开编辑器显示
-`client,ip` 行。显式 ID、显式名称、位置参数和 `--all` 不能互相混用。编辑器支持
-三种赋值：
+多个位置参数、重复的 `--id`、重复的 `--name` 或 `--all` 会打开编辑器显示 `client,ip` 行。显式 ID、显式名称、位置参数和 `--all` 不能互相混用。编辑器支持三种赋值：
 
 - 输入 `auto` 分配最低可用静态地址
 - 输入显式 IPv4 指定静态地址
@@ -350,17 +324,9 @@ ovpn repair plan [--json|-j]
 
 只读。扫描实例并打印符合条件的自动操作与受阻问题。文本报告中以 `SAFE` 或 `RECOVER` 标记操作；`--json` 将状态、操作和受阻条目以 JSON 输出。关键和不可恢复状态在报告后以退出状态 `78` 退出。
 
-符合条件的操作包括：恢复派生配置或元数据、重新生成 CRL、渲染缺失的活跃 profile、
-恢复已验证的证书或密钥副本、恢复当前客户端身份/IP 清单，以及创建运行时目录。
+符合条件的操作包括：恢复派生配置或元数据、重新生成 CRL、渲染缺失的活跃 profile、恢复已验证的证书或密钥副本、恢复当前客户端身份/IP 清单，以及创建运行时目录。
 
-当 `meta/client-state.csv` 缺失或无效时，恢复以当前 PKI 中 UUID 形式的客户端条目为
-起点。显示名称只有在当前格式的 IP 清单、profile 身份注释及最后一条适用
-的 rename 审计记录相互一致时才会采用。证据冲突会进入 `CRITICAL`，需要使用备份或
-人工检查。若名称证据全部丢失，repair 会分配确定性的临时名称
-`client-<去掉连字符的 UUID>`；修复后应将其改名。当前 runtime 不解析历史清单或
-历史审计格式。由于 PKI 只能记录证书处于 active 还是 revoked，权威身份清单丢失后
-无法区分 deleted tombstone 与 revoked 客户端；repair 会让该 UUID 保持 revoked，
-不会将其恢复为 active。
+当 `meta/client-state.csv` 缺失或无效时，恢复以当前 PKI 中 UUID 形式的客户端条目为起点。显示名称只有在当前格式的 IP 清单、profile 身份注释及最后一条适用的 rename 审计记录相互一致时才会采用。证据冲突会进入 `CRITICAL`，需要使用备份或人工检查。若名称证据全部丢失，repair 会分配确定性的临时名称 `client-<去掉连字符的 UUID>`；修复后应将其改名。当前 runtime 不解析历史清单或历史审计格式。由于 PKI 只能记录证书处于 active 还是 revoked，权威身份清单丢失后无法区分 deleted tombstone 与 revoked 客户端；repair 会让该 UUID 保持 revoked，不会将其恢复为 active。
 
 ### `ovpn repair apply`
 
@@ -412,9 +378,7 @@ ovpn render server [--stdout|-s|--output|-o <path>]
 ovpn render client <selector> [--stdout|-s|--output|-o <path>]
 ```
 
-根据已配置的端点、CA 证书、指定客户端证书和私钥以及 tls-crypt 密钥构建客户端
-`.ovpn` profile。输出默认为标准输出；`--output` 写入一个原子替换的 mode-`0600`
-文件。
+根据已配置的端点、CA 证书、指定客户端证书和私钥以及 tls-crypt 密钥构建客户端 `.ovpn` profile。输出默认为标准输出；`--output` 写入一个原子替换的 mode-`0600` 文件。
 
 ## 持久化数据迁移
 
@@ -427,20 +391,11 @@ ovpn migrate plan [--json|-j]
 ovpn migrate apply [--yes|-y]
 ```
 
-此命令只能通过已停止服务的 `openvpn-maintenance` 使用。`plan` 为只读操作，报告
-源/目标 schema、有序迁移链、客户端数量、阻塞项、凭据影响和 profile 重分发需求。
-`apply` 要求交互确认；非 TTY 必须传 `--yes`。已经是当前 schema 时幂等成功。
+此命令只能通过已停止服务的 `openvpn-maintenance` 使用。`plan` 为只读操作，报告源/目标 schema、有序迁移链、客户端数量、阻塞项、凭据影响和 profile 重分发需求。`apply` 要求交互确认；非 TTY 必须传 `--yes`。已经是当前 schema 时幂等成功。
 
-迁移始终使用当前 maintenance 镜像内置代码且不访问网络。apply 获取独占运行锁、
-创建持久化快照、只迁移 staging 副本，验证 schema、PKI、清单、profile 和配置后
-原子提交数据。失败或中断时恢复原数据。schema 1 执行
-`1→2→3`，schema 2 执行 `2→3`；两者都会把名称 CN 凭据替换为 UUID CN 凭据，
-成功后报告的所有活跃 profile 都必须重新分发。
+迁移始终使用当前 maintenance 镜像内置代码且不访问网络。apply 获取独占运行锁、创建持久化快照、只迁移 staging 副本，验证 schema、PKI、清单、profile 和配置后原子提交数据。失败或中断时恢复原数据。schema 1 执行 `1→2→3`，schema 2 执行 `2→3`；两者都会把名称 CN 凭据替换为 UUID CN 凭据，成功后报告的所有活跃 profile 都必须重新分发。
 
-读取数据的命令对旧、冲突、非法或更新 schema 返回 `78`；只有 `migrate` 可以读取
-历史格式。不解析实例数据的 help、version 和 capabilities 仍可使用。
-快照和报告保存在 `repair/migrations` 下。数据迁移后若要运行旧镜像，必须恢复与其
-匹配的迁移前快照；仅回滚镜像不等于回滚数据。
+读取数据的命令对旧、冲突、非法或更新 schema 返回 `78`；只有 `migrate` 可以读取历史格式。不解析实例数据的 help、version 和 capabilities 仍可使用。快照和报告保存在 `repair/migrations` 下。数据迁移后若要运行旧镜像，必须恢复与其匹配的迁移前快照；仅回滚镜像不等于回滚数据。
 
 ## 运行时检查
 
@@ -482,11 +437,7 @@ ovpn runtime capabilities
 ovpn runtime version
 ```
 
-打印 `/usr/local/share/openvpn-container/build-info.json` 中的构建信息 JSON，其中
-Easy-RSA 版本为运行时检测值。输出包含镜像版本、数据 schema、OpenVPN、Easy-RSA、
-runtime/构建来源和自动化使用的 OpenVPN 候选范围。候选范围不是 runtime 兼容性声明。
-若构建信息缺失，则检测
-Easy-RSA，其余不可用字段打印 `unknown`。
+打印 `/usr/local/share/openvpn-container/build-info.json` 中的构建信息 JSON，其中 Easy-RSA 版本为运行时检测值。输出包含镜像版本、数据 schema、OpenVPN、Easy-RSA、runtime/构建来源和自动化使用的 OpenVPN 候选范围。候选范围不是 runtime 兼容性声明。若构建信息缺失，则检测 Easy-RSA，其余不可用字段打印 `unknown`。
 
 ### `ovpn runtime logs`
 
@@ -496,11 +447,7 @@ Easy-RSA，其余不可用字段打印 `unknown`。
 ovpn runtime logs [--lines|-l N] [--follow|-f] [--raw|-r] [--no-trunc|-t]
 ```
 
-读取持久化轮转的 OpenVPN 日志，默认最近 100 行。已知 UUID 显示为
-`名称 [短ID]`，使用与 `client list` 相同的 12 位 ID；未知身份保持完整且不变。
-`--no-trunc` 显示已知客户端的完整 UUID；`--raw` 同时禁用翻译和截断。
-`--follow` 可跨追加、轮转和原子替换持续跟随，且不会占用或阻塞 OpenVPN
-management socket。
+读取持久化轮转的 OpenVPN 日志，默认最近 100 行。已知 UUID 显示为 `名称 [短ID]`，使用与 `client list` 相同的 12 位 ID；未知身份保持完整且不变。`--no-trunc` 显示已知客户端的完整 UUID；`--raw` 同时禁用翻译和截断。`--follow` 可跨追加、轮转和原子替换持续跟随，且不会占用或阻塞 OpenVPN management socket。
 
 ### `ovpn runtime events`
 
@@ -510,16 +457,9 @@ management socket。
 ovpn runtime events [--lines|-l N] [--follow|-f] [--json|-j] [--no-trunc|-t]
 ```
 
-读取最近 100 条结构化连接、断开、客户端生命周期、IP、rename、网络迁移和数据迁移
-事件。默认文本使用 12 位客户端 ID；`--no-trunc` 显示完整 UUID。`--json` 每行输出
-磁盘中保存的完整 JSON 对象，不受 `--no-trunc` 影响。`--follow` 持续输出新记录且
-不阻塞 management 命令。
+读取最近 100 条结构化连接、断开、客户端生命周期、IP、rename、网络迁移和数据迁移事件。默认文本使用 12 位客户端 ID；`--no-trunc` 显示完整 UUID。`--json` 每行输出磁盘中保存的完整 JSON 对象，不受 `--no-trunc` 影响。`--follow` 持续输出新记录且不阻塞 management 命令。
 
-该命令读取面向用户可观察性的 `logs/events.jsonl`，不会读取 `meta/audit.jsonl`。
-后者是由数据 schema 管理的严格内部审计，记录 IP 应用、客户端生命周期变更、
-rename 和网络迁移等关键持久化修改。状态检查会校验其格式；repair 可将最后一条
-rename 记录用作身份恢复证据；数据迁移会保留或转换它。请勿手动编辑、截断或删除
-`meta/audit.jsonl`。
+该命令读取面向用户可观察性的 `logs/events.jsonl`，不会读取 `meta/audit.jsonl`。后者是由数据 schema 管理的严格内部审计，记录 IP 应用、客户端生命周期变更、rename 和网络迁移等关键持久化修改。状态检查会校验其格式；repair 可将最后一条 rename 记录用作身份恢复证据；数据迁移会保留或转换它。请勿手动编辑、截断或删除 `meta/audit.jsonl`。
 
 ## 示例
 

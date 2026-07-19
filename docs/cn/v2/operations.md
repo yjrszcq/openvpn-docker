@@ -1,14 +1,11 @@
 # OpenVPN 操作手册
 
-本文是面向运维人员的操作指南，按工作流组织命令组合用法。单个命令的完整语法和选项
-请参阅 [v2 命令参考](commands.md)。
+本文是面向运维人员的操作指南，按工作流组织命令组合用法。单个命令的完整语法和选项请参阅 [v2 命令参考](commands.md)。
 
 ## 运行环境约定
 
-- **openvpn 容器**：运行中的在线服务，需要管理 socket。日常客户端操作、配置变更、
-  网络迁移在此执行。
-- **openvpn-maintenance 容器**：低权限离线容器，不申请 TUN / NET_ADMIN。诊断和
-  修复在此执行。
+- **openvpn 容器**：运行中的在线服务，需要管理 socket。日常客户端操作、配置变更、网络迁移在此执行。
+- **openvpn-maintenance 容器**：低权限离线容器，不申请 TUN / NET_ADMIN。诊断和修复在此执行。
 
 ```bash
 # 在线容器
@@ -18,8 +15,7 @@ docker compose exec openvpn ovpn <command>
 docker compose run --rm openvpn-maintenance <command>
 ```
 
-`ovpn` 是 maintenance 容器的入口点，`<command>` 即 `ovpn` 之后的命令部分。例如
-`state doctor` 相当于执行 `ovpn state doctor`。
+`ovpn` 是 maintenance 容器的入口点，`<command>` 即 `ovpn` 之后的命令部分。例如 `state doctor` 相当于执行 `ovpn state doctor`。
 
 如果 compose 文件中还没有 maintenance 服务，在 `services:` 下追加：
 
@@ -82,8 +78,7 @@ docker compose exec openvpn ovpn client revoke laptop --release-ip
 docker compose exec openvpn ovpn client ip release laptop
 ```
 
-吊销保留 IP 分配时，客户端状态变为 `revoked`，IP 状态显示为 `retained`。释放后
-IP 回到可用池，但已吊销的 profile、私钥和审计历史均保留。
+吊销保留 IP 分配时，客户端状态变为 `revoked`，IP 状态显示为 `retained`。释放后 IP 回到可用池，但已吊销的 profile、私钥和审计历史均保留。
 
 ### 重签发证书
 
@@ -101,9 +96,7 @@ docker compose exec openvpn ovpn client reissue tablet --ip 10.42.0.30
 docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
 ```
 
-已有静态 IP 的客户端重签时保留原 IP；无 IP 的客户端重签时自动分配最低可用
-静态地址。使用 `--dynamic` 可转为动态分配，`--ip <addr>` 可指定静态地址。
-完成后须重新导出并分发 profile。
+已有静态 IP 的客户端重签时保留原 IP；无 IP 的客户端重签时自动分配最低可用静态地址。使用 `--dynamic` 可转为动态分配，`--ip <addr>` 可指定静态地址。完成后须重新导出并分发 profile。
 
 ### 删除客户端
 
@@ -176,16 +169,14 @@ laptop,                  # 留空保留动态分配
    docker compose up -d openvpn
    ```
 
-3. 重新导出并分发所有活动客户端的 profile。使用临时文件可避免导出失败时覆盖
-   本地已有 profile：
+3. 重新导出并分发所有活动客户端的 profile。使用临时文件可避免导出失败时覆盖本地已有 profile：
 
    ```bash
    docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn.tmp &&
    mv laptop.ovpn.tmp laptop.ovpn
    ```
 
-> **注意**：`config apply` 只重写持久化配置，不会修改客户端证书、私钥或 IP 分配。
-> 不要用它修改 `OVPN_NETWORK` 或 `OVPN_DYNAMIC_POOL_SIZE`——应使用网络迁移命令。
+> **注意**：`config apply` 只重写持久化配置，不会修改客户端证书、私钥或 IP 分配。不要用它修改 `OVPN_NETWORK` 或 `OVPN_DYNAMIC_POOL_SIZE`——应使用网络迁移命令。
 
 ### 查看当前配置
 
@@ -213,13 +204,7 @@ environment:
   OVPN_TRANSPORT_FAMILY: auto
 ```
 
-按上一节的配置变更流程执行 `ovpn config apply`、重启服务并重新导出客户端
-profile。服务端使用双栈传输 socket，客户端在连接时解析并尝试 A/AAAA 记录；
-`config apply` 不解析 DNS。由于未设置 `bind ipv6only`，服务端 socket 会通过
-IPv4-mapped 地址接受 IPv4。只有需要拒绝 IPv4 传输时才改用 `ipv6`。该设置只影响
-OpenVPN 外层连接，VPN 内网仍使用 `OVPN_NETWORK`
-定义的 IPv4 TUN。若服务器没有 IPv4 出口，现有 IPv4 NAT 无法让客户端访问公网
-IPv4；本镜像不提供 NAT64。客户端所在网络也必须能够访问公网 IPv6。
+按上一节的配置变更流程执行 `ovpn config apply`、重启服务并重新导出客户端 profile。服务端使用双栈传输 socket，客户端在连接时解析并尝试 A/AAAA 记录；`config apply` 不解析 DNS。由于未设置 `bind ipv6only`，服务端 socket 会通过 IPv4-mapped 地址接受 IPv4。只有需要拒绝 IPv4 传输时才改用 `ipv6`。该设置只影响 OpenVPN 外层连接，VPN 内网仍使用 `OVPN_NETWORK` 定义的 IPv4 TUN。若服务器没有 IPv4 出口，现有 IPv4 NAT 无法让客户端访问公网 IPv4；本镜像不提供 NAT64。客户端所在网络也必须能够访问公网 IPv6。
 
 ---
 
@@ -237,13 +222,9 @@ docker compose exec openvpn ovpn network apply \
   --network 10.43.0.0/24 --dynamic-pool-size 96 --yes
 ```
 
-迁移流程：快照当前状态 → 更新配置和清单 → SIGHUP 重载 OpenVPN → 验证管理 socket
-和容器健康。失败时自动回滚并重载旧配置。受影响客户端需重新连接。
+迁移流程：快照当前状态 → 更新配置和清单 → SIGHUP 重载 OpenVPN → 验证管理 socket 和容器健康。失败时自动回滚并重载旧配置。受影响客户端需重新连接。
 
-> **重要：** 迁移成功后，请同步更新 `docker-compose.yaml` 或 `.env` 中的
-> `OVPN_NETWORK`（以及 `OVPN_DYNAMIC_POOL_SIZE`，如有变更）。持久化的
-> `project.env` 持有新值并决定重启后的行为，但后续 `ovpn config apply` 会读取
-> 环境变量——旧值会导致网络被静默回退。
+> **重要：** 迁移成功后，请同步更新 `docker-compose.yaml` 或 `.env` 中的 `OVPN_NETWORK`（以及 `OVPN_DYNAMIC_POOL_SIZE`，如有变更）。持久化的 `project.env` 持有新值并决定重启后的行为，但后续 `ovpn config apply` 会读取环境变量——旧值会导致网络被静默回退。
 
 ---
 
@@ -260,8 +241,7 @@ docker compose run --rm openvpn-maintenance state doctor
 docker compose run --rm openvpn-maintenance state doctor --json
 ```
 
-状态取值：`EMPTY`、`HEALTHY`、`DEGRADED_REPAIRABLE`、`DEGRADED_RECOVERABLE`、
-`CRITICAL`、`UNRECOVERABLE`。
+状态取值：`EMPTY`、`HEALTHY`、`DEGRADED_REPAIRABLE`、`DEGRADED_RECOVERABLE`、`CRITICAL`、`UNRECOVERABLE`。
 
 ### 修复降级实例
 
@@ -273,9 +253,7 @@ docker compose run --rm openvpn-maintenance repair plan
 docker compose run --rm openvpn-maintenance repair apply
 ```
 
-`repair plan` 列出 `SAFE`（直接重建派生文件）和 `RECOVER`（从备份路径恢复证书/密钥）
-操作。`repair apply` 暂存、快照并原子应用允许的修复。`CRITICAL` 状态默认拒绝修复
-（退出码 78）；仅在排障需要保留现场时设 `OVPN_CRITICAL_MODE=maintenance`。
+`repair plan` 列出 `SAFE`（直接重建派生文件）和 `RECOVER`（从备份路径恢复证书/密钥）操作。`repair apply` 暂存、快照并原子应用允许的修复。`CRITICAL` 状态默认拒绝修复 （退出码 78）；仅在排障需要保留现场时设 `OVPN_CRITICAL_MODE=maintenance`。
 
 ### 运行时检查
 
@@ -292,8 +270,7 @@ docker compose exec openvpn ovpn runtime version      # 构建信息
 
 ### 备份
 
-`./openvpn-data` 保存 CA 私钥、服务端与客户端私钥、profile、tls-crypt 密钥、
-实例元数据以及动态租约状态。备份此目录：
+`./openvpn-data` 保存 CA 私钥、服务端与客户端私钥、profile、tls-crypt 密钥、实例元数据以及动态租约状态。备份此目录：
 
 ```bash
 docker compose stop openvpn

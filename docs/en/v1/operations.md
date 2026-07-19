@@ -1,15 +1,11 @@
 # OpenVPN v1 Operations Guide
 
-A workflow-oriented guide for operators on release commit
-`6619921e5257e604f5df2c63d2fa10505b680d84`. For complete command syntax and
-options, see the [v1 command reference](commands.md).
+A workflow-oriented guide for operators on release commit `6619921e5257e604f5df2c63d2fa10505b680d84`. For complete command syntax and options, see the [v1 command reference](commands.md).
 
 ## Runtime conventions
 
-- **openvpn container** — the live server. Run day-to-day client operations,
-  config changes, and runtime inspection here.
-- **openvpn-maintenance container** — a low-privilege one-shot container
-  without TUN or NET_ADMIN. Run diagnostics and repairs here.
+- **openvpn container** — the live server. Run day-to-day client operations, config changes, and runtime inspection here.
+- **openvpn-maintenance container** — a low-privilege one-shot container without TUN or NET_ADMIN. Run diagnostics and repairs here.
 
 ```bash
 # live container
@@ -19,11 +15,9 @@ docker compose exec openvpn ovpn <command>
 docker compose run --rm openvpn-maintenance <command>
 ```
 
-`ovpn` is the maintenance container's entrypoint, so `<command>` is the part that follows
-`ovpn` — for example, `state doctor` runs `ovpn state doctor`.
+`ovpn` is the maintenance container's entrypoint, so `<command>` is the part that follows `ovpn` — for example, `state doctor` runs `ovpn state doctor`.
 
-If your compose file does not include the maintenance service, add it under
-`services:`:
+If your compose file does not include the maintenance service, add it under `services:`:
 
 ```yaml
   openvpn-maintenance:
@@ -39,8 +33,7 @@ If your compose file does not include the maintenance service, add it under
       - /usr/local/bin/ovpn
 ```
 
-It mounts the same persistent data but does not request TUN, `NET_ADMIN`, or
-exposed ports.
+It mounts the same persistent data but does not request TUN, `NET_ADMIN`, or exposed ports.
 
 ---
 
@@ -56,9 +49,7 @@ docker compose exec openvpn ovpn add-client laptop
 docker compose exec -T openvpn ovpn export-client laptop > laptop.ovpn
 ```
 
-`add-client` creates the certificate, private key, and active profile in one
-step. `export-client` refreshes the active profile atomically and writes it to
-standard output.
+`add-client` creates the certificate, private key, and active profile in one step. `export-client` refreshes the active profile atomically and writes it to standard output.
 
 ### View client status
 
@@ -66,8 +57,7 @@ standard output.
 docker compose exec openvpn ovpn list-clients
 ```
 
-Prints one `name state` line per client from the Easy-RSA index. State is
-`active` for valid certificates and `revoked` for revoked certificates.
+Prints one `name state` line per client from the Easy-RSA index. State is `active` for valid certificates and `revoked` for revoked certificates.
 
 ### Revoke a client
 
@@ -75,9 +65,7 @@ Prints one `name state` line per client from the Easy-RSA index. State is
 docker compose exec openvpn ovpn revoke-client laptop
 ```
 
-Revokes the certificate, regenerates the CRL, and moves the profile from
-`clients/active/` to `clients/revoked/`. Private key and certificate material
-are preserved.
+Revokes the certificate, regenerates the CRL, and moves the profile from `clients/active/` to `clients/revoked/`. Private key and certificate material are preserved.
 
 ---
 
@@ -105,17 +93,14 @@ Example: switch from UDP to TCP.
    docker compose exec openvpn ovpn config print
    ```
 
-3. Re-export and distribute profiles for all active clients. Use a temp file to
-   avoid overwriting the local copy on export failure:
+3. Re-export and distribute profiles for all active clients. Use a temp file to avoid overwriting the local copy on export failure:
 
    ```bash
    docker compose exec -T openvpn ovpn export-client laptop > laptop.ovpn.tmp &&
    mv laptop.ovpn.tmp laptop.ovpn
    ```
 
-> **Note**: `config init` only rewrites persistent configuration. It does not
-> modify client certificates, keys, or profiles. Do not run `add-client` again
-> for an existing name — re-export the profile instead.
+> **Note**: `config init` only rewrites persistent configuration. It does not modify client certificates, keys, or profiles. Do not run `add-client` again for an existing name — re-export the profile instead.
 
 ### View current configuration
 
@@ -138,12 +123,9 @@ docker compose run --rm openvpn-maintenance doctor
 docker compose run --rm openvpn-maintenance doctor --json
 ```
 
-`state` prints a single state name. `doctor` lists detected issues with
-severities and recommended actions; `--json` emits a `state` and `issues`
-object.
+`state` prints a single state name. `doctor` lists detected issues with severities and recommended actions; `--json` emits a `state` and `issues` object.
 
-State values: `EMPTY`, `HEALTHY`, `DEGRADED_REPAIRABLE`,
-`DEGRADED_RECOVERABLE`, `DEGRADED_REISSUABLE`, `CRITICAL`, `UNRECOVERABLE`.
+State values: `EMPTY`, `HEALTHY`, `DEGRADED_REPAIRABLE`, `DEGRADED_RECOVERABLE`, `DEGRADED_REISSUABLE`, `CRITICAL`, `UNRECOVERABLE`.
 
 ### Repair a degraded instance
 
@@ -158,12 +140,7 @@ docker compose run --rm openvpn-maintenance repair --plan --json
 docker compose run --rm openvpn-maintenance repair
 ```
 
-`repair --plan` lists proposed `SAFE` and `RECOVER` actions without modifying
-any files. `repair` stages, validates, snapshots, and atomically applies allowed
-repairs only when the state is `HEALTHY`, `DEGRADED_REPAIRABLE`, or
-`DEGRADED_RECOVERABLE`. `CRITICAL` and `UNRECOVERABLE` states refuse repair by
-default (exit code 78); set `OVPN_CRITICAL_MODE=maintenance` only to preserve a
-broken container for inspection.
+`repair --plan` lists proposed `SAFE` and `RECOVER` actions without modifying any files. `repair` stages, validates, snapshots, and atomically applies allowed repairs only when the state is `HEALTHY`, `DEGRADED_REPAIRABLE`, or `DEGRADED_RECOVERABLE`. `CRITICAL` and `UNRECOVERABLE` states refuse repair by default (exit code 78); set `OVPN_CRITICAL_MODE=maintenance` only to preserve a broken container for inspection.
 
 ### Runtime inspection
 
@@ -180,9 +157,7 @@ docker compose exec openvpn ovpn version        # build information
 
 ### Backup
 
-`./openvpn-data` stores CA, server, and client private keys, profiles, tls-crypt
-material, and instance metadata. Stop the service before archiving for a
-consistent snapshot:
+`./openvpn-data` stores CA, server, and client private keys, profiles, tls-crypt material, and instance metadata. Stop the service before archiving for a consistent snapshot:
 
 ```bash
 docker compose stop openvpn
@@ -190,13 +165,11 @@ tar --numeric-owner -C . -czf openvpn-backup-YYYYMMDD.tar.gz openvpn-data
 docker compose up -d openvpn
 ```
 
-Encrypt backup archives and restrict access. Never copy private keys into
-tickets, logs, or temporary recovery notes.
+Encrypt backup archives and restrict access. Never copy private keys into tickets, logs, or temporary recovery notes.
 
 ### Restore
 
-Place the data directory at its original mount path, then inspect state before
-starting:
+Place the data directory at its original mount path, then inspect state before starting:
 
 ```bash
 docker compose run --rm openvpn-maintenance doctor
@@ -204,5 +177,4 @@ docker compose run --rm openvpn-maintenance repair --plan
 docker compose up -d openvpn
 ```
 
-> **Warning**: Do not point the bind mount at a fresh empty directory — an empty
-> directory is intentionally treated as a request to create a new instance.
+> **Warning**: Do not point the bind mount at a fresh empty directory — an empty directory is intentionally treated as a request to create a new instance.

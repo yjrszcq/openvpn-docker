@@ -1,14 +1,11 @@
 # OpenVPN Operations Guide
 
-A workflow-oriented guide for operators. For complete command syntax and options,
-see the [v2 command reference](commands.md).
+A workflow-oriented guide for operators. For complete command syntax and options, see the [v2 command reference](commands.md).
 
 ## Runtime conventions
 
-- **openvpn container** — the live server with a management socket. Run
-  day-to-day client operations, config changes, and network migrations here.
-- **openvpn-maintenance container** — a low-privilege one-shot container
-  without TUN or NET_ADMIN. Run diagnostics and repairs here.
+- **openvpn container** — the live server with a management socket. Run day-to-day client operations, config changes, and network migrations here.
+- **openvpn-maintenance container** — a low-privilege one-shot container without TUN or NET_ADMIN. Run diagnostics and repairs here.
 
 ```bash
 # live container
@@ -18,11 +15,9 @@ docker compose exec openvpn ovpn <command>
 docker compose run --rm openvpn-maintenance <command>
 ```
 
-`ovpn` is the maintenance container's entrypoint, so `<command>` is the part that follows
-`ovpn` — for example, `state doctor` runs `ovpn state doctor`.
+`ovpn` is the maintenance container's entrypoint, so `<command>` is the part that follows `ovpn` — for example, `state doctor` runs `ovpn state doctor`.
 
-If your compose file does not include the maintenance service, add it under
-`services:`:
+If your compose file does not include the maintenance service, add it under `services:`:
 
 ```yaml
   openvpn-maintenance:
@@ -38,8 +33,7 @@ If your compose file does not include the maintenance service, add it under
       - /usr/local/bin/ovpn
 ```
 
-It mounts the same persistent data but does not request TUN, `NET_ADMIN`, or
-exposed ports.
+It mounts the same persistent data but does not request TUN, `NET_ADMIN`, or exposed ports.
 
 ---
 
@@ -84,9 +78,7 @@ docker compose exec openvpn ovpn client revoke laptop --release-ip
 docker compose exec openvpn ovpn client ip release laptop
 ```
 
-When a revoked client retains its IP, the assignment shows `retained`. After
-release the IP returns to the pool; the revoked profile, private key, and audit
-history are kept.
+When a revoked client retains its IP, the assignment shows `retained`. After release the IP returns to the pool; the revoked profile, private key, and audit history are kept.
 
 ### Reissue certificates
 
@@ -104,10 +96,7 @@ docker compose exec openvpn ovpn client reissue tablet --ip 10.42.0.30
 docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
 ```
 
-Clients that already have a static IP keep it. Clients without an IP auto-allocate
-the lowest available static address. Use `--dynamic` to switch to a dynamic
-assignment or `--ip <addr>` to pick a specific static address.
-Re-export and distribute the profile afterward.
+Clients that already have a static IP keep it. Clients without an IP auto-allocate the lowest available static address. Use `--dynamic` to switch to a dynamic assignment or `--ip <addr>` to pick a specific static address. Re-export and distribute the profile afterward.
 
 ### Delete a client
 
@@ -115,8 +104,7 @@ Re-export and distribute the profile afterward.
 docker compose exec openvpn ovpn client delete laptop
 ```
 
-Irreversible. Active clients are revoked first, then the registry record,
-profile, and private key are removed.
+Irreversible. Active clients are revoked first, then the registry record, profile, and private key are removed.
 
 ---
 
@@ -137,8 +125,7 @@ docker compose exec openvpn ovpn client ip set phone --dynamic
 
 ### Batch operations
 
-For multiple names or `--all`, the command opens an editor with a `client,ip`
-manifest:
+For multiple names or `--all`, the command opens an editor with a `client,ip` manifest:
 
 ```bash
 # named multi-client edit
@@ -156,8 +143,7 @@ tablet,10.42.0.20        # explicit static address
 laptop,                  # leave empty to keep dynamic
 ```
 
-Editor selection order: `OVPN_EDITOR` > `EDITOR` > `nano`. The image ships
-`nano` and `vim`.
+Editor selection order: `OVPN_EDITOR` > `EDITOR` > `nano`. The image ships `nano` and `vim`.
 
 ---
 
@@ -183,18 +169,14 @@ Example: switch from UDP to TCP.
    docker compose up -d openvpn
    ```
 
-3. Re-export and distribute profiles for all active clients. Use a temp file to
-   avoid overwriting the local copy on export failure:
+3. Re-export and distribute profiles for all active clients. Use a temp file to avoid overwriting the local copy on export failure:
 
    ```bash
    docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn.tmp &&
    mv laptop.ovpn.tmp laptop.ovpn
    ```
 
-> **Note**: `config apply` only rewrites persistent configuration. It does not
-> modify client certificates, keys, or IP assignments. Do not use it to change
-> `OVPN_NETWORK` or `OVPN_DYNAMIC_POOL_SIZE` — use the network migration
-> commands instead.
+> **Note**: `config apply` only rewrites persistent configuration. It does not modify client certificates, keys, or IP assignments. Do not use it to change `OVPN_NETWORK` or `OVPN_DYNAMIC_POOL_SIZE` — use the network migration commands instead.
 
 ### View current configuration
 
@@ -222,23 +204,13 @@ environment:
   OVPN_TRANSPORT_FAMILY: auto
 ```
 
-Follow the configuration-change workflow above to run `ovpn config apply`,
-restart the service, and re-export client profiles. The server uses a dual-stack
-transport socket, while clients resolve and try A/AAAA records when connecting;
-`config apply` does not resolve DNS. The server socket accepts IPv4 through
-IPv4-mapped addresses because `bind ipv6only` is omitted. Set `ipv6` instead
-only when IPv4 transport must be rejected. This affects only the outer OpenVPN
-connection; the VPN data plane remains the IPv4 TUN defined by
-`OVPN_NETWORK`. Without IPv4 egress on the server, the existing IPv4 NAT cannot
-provide public IPv4 access, and this image does not provide NAT64. Client
-networks must also have public IPv6 connectivity.
+Follow the configuration-change workflow above to run `ovpn config apply`, restart the service, and re-export client profiles. The server uses a dual-stack transport socket, while clients resolve and try A/AAAA records when connecting; `config apply` does not resolve DNS. The server socket accepts IPv4 through IPv4-mapped addresses because `bind ipv6only` is omitted. Set `ipv6` instead only when IPv4 transport must be rejected. This affects only the outer OpenVPN connection; the VPN data plane remains the IPv4 TUN defined by `OVPN_NETWORK`. Without IPv4 egress on the server, the existing IPv4 NAT cannot provide public IPv4 access, and this image does not provide NAT64. Client networks must also have public IPv6 connectivity.
 
 ---
 
 ## Network migration
 
-Changing the tunnel subnet or dynamic pool size requires migration commands,
-run **in the live container** (needs the management socket):
+Changing the tunnel subnet or dynamic pool size requires migration commands, run **in the live container** (needs the management socket):
 
 ```bash
 # preview migration plan (read-only)
@@ -250,16 +222,9 @@ docker compose exec openvpn ovpn network apply \
   --network 10.43.0.0/24 --dynamic-pool-size 96 --yes
 ```
 
-Migration flow: snapshot current state → update config and registry → SIGHUP
-reload OpenVPN → verify management socket and container health. On failure it
-automatically restores snapshots and reloads the old config. Affected clients
-must reconnect.
+Migration flow: snapshot current state → update config and registry → SIGHUP reload OpenVPN → verify management socket and container health. On failure it automatically restores snapshots and reloads the old config. Affected clients must reconnect.
 
-> **Important:** After a successful migration, update `OVPN_NETWORK` (and
-> `OVPN_DYNAMIC_POOL_SIZE` if changed) in your `docker-compose.yaml` or `.env`
-> to match. The persisted `project.env` holds the new values and controls
-> restarts, but a future `ovpn config apply` reads the environment variables —
-> stale values there would silently revert the network.
+> **Important:** After a successful migration, update `OVPN_NETWORK` (and `OVPN_DYNAMIC_POOL_SIZE` if changed) in your `docker-compose.yaml` or `.env` to match. The persisted `project.env` holds the new values and controls restarts, but a future `ovpn config apply` reads the environment variables — stale values there would silently revert the network.
 
 ---
 
@@ -276,8 +241,7 @@ docker compose run --rm openvpn-maintenance state doctor
 docker compose run --rm openvpn-maintenance state doctor --json
 ```
 
-State values: `EMPTY`, `HEALTHY`, `DEGRADED_REPAIRABLE`,
-`DEGRADED_RECOVERABLE`, `CRITICAL`, `UNRECOVERABLE`.
+State values: `EMPTY`, `HEALTHY`, `DEGRADED_REPAIRABLE`, `DEGRADED_RECOVERABLE`, `CRITICAL`, `UNRECOVERABLE`.
 
 ### Repair a degraded instance
 
@@ -289,11 +253,7 @@ docker compose run --rm openvpn-maintenance repair plan
 docker compose run --rm openvpn-maintenance repair apply
 ```
 
-`repair plan` lists `SAFE` actions (rebuild derived files) and `RECOVER` actions
-(restore certificates/keys from backup paths). `repair apply` stages, snapshots,
-and atomically applies allowed repairs. `CRITICAL` states refuse repair by
-default (exit code 78); set `OVPN_CRITICAL_MODE=maintenance` only to preserve
-a broken container for inspection.
+`repair plan` lists `SAFE` actions (rebuild derived files) and `RECOVER` actions (restore certificates/keys from backup paths). `repair apply` stages, snapshots, and atomically applies allowed repairs. `CRITICAL` states refuse repair by default (exit code 78); set `OVPN_CRITICAL_MODE=maintenance` only to preserve a broken container for inspection.
 
 ### Runtime inspection
 
@@ -310,8 +270,7 @@ docker compose exec openvpn ovpn runtime version      # build information
 
 ### Backup
 
-`./openvpn-data` stores CA, server, and client private keys, profiles, tls-crypt
-material, instance metadata, and dynamic lease state. Back it up:
+`./openvpn-data` stores CA, server, and client private keys, profiles, tls-crypt material, instance metadata, and dynamic lease state. Back it up:
 
 ```bash
 docker compose stop openvpn
@@ -320,13 +279,11 @@ tar --numeric-owner -C . -czf openvpn-backup-YYYYMMDD.tar.gz \
 docker compose up -d openvpn
 ```
 
-Encrypt backup archives and restrict access. Never copy private keys into
-tickets, logs, or temporary recovery notes.
+Encrypt backup archives and restrict access. Never copy private keys into tickets, logs, or temporary recovery notes.
 
 ### Restore
 
-Place the data directory at its original mount path, then inspect state before
-starting:
+Place the data directory at its original mount path, then inspect state before starting:
 
 ```bash
 docker compose run --rm openvpn-maintenance state doctor
@@ -334,5 +291,4 @@ docker compose run --rm openvpn-maintenance repair plan
 docker compose up -d openvpn
 ```
 
-> **Warning**: Do not point the bind mount at a fresh empty directory — an empty
-> directory is intentionally treated as a request to create a new instance.
+> **Warning**: Do not point the bind mount at a fresh empty directory — an empty directory is intentionally treated as a request to create a new instance.

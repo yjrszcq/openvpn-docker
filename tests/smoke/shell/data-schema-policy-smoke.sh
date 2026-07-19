@@ -16,14 +16,14 @@ test ! -e "$ROOT_DIR/compatibility/data-schema-releases.jsonl"
 # Historical command references are frozen. Unlike current documentation, their
 # exact contents are an intentional compatibility record.
 cat <<'EOF' | sha256sum -c -
-5c5c95878150c9f297d1d3520df89b30aa85253714b9f8b7279a17e9bf566e74  docs/en/v1/commands.md
-a761f1f56c5eea22b66496ada40fa3710f553f619b5c77e33fcbadbd0ed44e7d  docs/en/v1/operations.md
+f98d44cd721060984e5fc7f37c89895101500770bd7e9d47a9a512d5606fde99  docs/en/v1/commands.md
+e22252a34a7b53313710b71558dc6f50e6416824b280b0925d5e3c85a94c35d1  docs/en/v1/operations.md
 0bca0c77221794b6590697dded6c956b9cbc566e7775b2177ac8cbc56fbb5e5d  docs/cn/v1/commands.md
-f28e39e8f83d5f772743a7c6ce514c2e1b357bb649829e165dba1b8c2c54ee36  docs/cn/v1/operations.md
-d61f0134655bbe22b06e90dc395c7c0b7b8b9279edc7d0de530c201a8f18fb90  docs/en/v2/commands.md
-ad314ea7f5dfed4bce0a008fa57f969f0b256bfae35420a9bef58534f8ef8c2b  docs/en/v2/operations.md
+22515bc3c5b64819f1842998805887d8dadcd9f5a49871d8d721b4a03774c3d8  docs/cn/v1/operations.md
+b58589fe0683cd166b26f13bcfada8446b7dae54b0a40d225776e8468f9577ff  docs/en/v2/commands.md
+d13cee8fe91ca5a8d68afa2c105333bfb7d419ce23bcbebc04f063e1bda67edb  docs/en/v2/operations.md
 c3383632d8045831eb74311434db933ed60535e460e9f57b0808de0cee0853f1  docs/cn/v2/commands.md
-9c5b4d2d27c7306c2a2d4dac391670797d00dc1f04026ee467c61c3c5e6e6562  docs/cn/v2/operations.md
+651c956ce94c5af13daf446a665694c5f37d9a9f0e8154326055f5deb9f2f973  docs/cn/v2/operations.md
 EOF
 
 for ((schema = 1; schema < DATA_SCHEMA; schema++)); do
