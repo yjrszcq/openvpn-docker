@@ -93,9 +93,9 @@ Commands:
   apply             apply a tunnel-network migration
 
 Options:
-  --network CIDR            target tunnel network
-  --dynamic-pool-size N     target dynamic-pool size
-  --yes                     skip the apply confirmation prompt
+  -n, --network CIDR        target tunnel network
+  -p, --dynamic-pool-size N target dynamic-pool size
+  -y, --yes                 skip the apply confirmation prompt
 EOF
 }
 

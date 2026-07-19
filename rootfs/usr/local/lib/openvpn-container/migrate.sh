@@ -159,6 +159,18 @@ ovpn_migrate_command() {
   fi
   [ -n "$subcommand" ] || ovpn_die 'usage: ovpn migrate <plan|apply>'
   shift
+  if ovpn_help_requested "$@"; then
+    case "$subcommand" in
+    plan)
+      ovpn_command_usage "ovpn migrate plan [--json|-j]" "Inspect the required schema migration without changing persistent data."
+      ;;
+    apply)
+      ovpn_command_usage "ovpn migrate apply [--yes|-y]" "Apply the required schema migration in maintenance mode."
+      ;;
+    *) ovpn_die 'usage: ovpn migrate <plan|apply>' ;;
+    esac
+    return 0
+  fi
   while [ "$#" -gt 0 ]; do
     case "$1" in
     --json|-j) json=true ;;

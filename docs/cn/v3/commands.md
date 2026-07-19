@@ -235,6 +235,8 @@ ovpn client reissue <selector> [--dynamic|-d|--ip|-I <IPv4>]
 - `--dynamic` → 重签后使用动态分配，要求动态池容量非零。
 - `--ip <IPv4>` → 重签后使用指定的静态地址，必须在静态区域内且未被占用。
 
+证书签发与 IP 分配是两个独立的暂存操作。若证书重签成功，但请求的 IP 变更失败并回滚，命令会报错退出，同时让客户端以原分配保持 active；此时必须导出并重新分发新 profile。首次创建客户端也使用暂存 PKI；若后续分配失败并需要撤销新证书，只保留 deleted UUID tombstone，因此显示名称仍可安全复用。
+
 ### `ovpn client delete`
 
 语法：

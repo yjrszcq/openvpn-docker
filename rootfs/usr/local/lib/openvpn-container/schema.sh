@@ -123,14 +123,30 @@ ovpn_schema_initialization_in_progress() {
   return 1
 }
 
-ovpn_schema_command_uses_data() {
+ovpn_schema_invocation_is_help() {
   local command="$1"
-  local argument
   shift
 
-  for argument in "$@"; do
-    case "$argument" in -h|--help) return 1 ;; esac
-  done
+  case "$#" in
+    1) ovpn_help_requested "$1" ;;
+    2)
+      case "$command" in
+        config|client|network|repair|state|render|runtime) ovpn_help_requested "$2" ;;
+        *) return 1 ;;
+      esac
+      ;;
+    3)
+      [ "$command" = client ] && [ "$1" = ip ] && ovpn_help_requested "$3"
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+ovpn_schema_command_uses_data() {
+  local command="$1"
+  shift
+
+  ovpn_schema_invocation_is_help "$command" "$@" && return 1
   case "$command" in
     help|-h|--help|-v|--version|migrate) return 1 ;;
     runtime)

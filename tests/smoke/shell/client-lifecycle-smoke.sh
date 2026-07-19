@@ -74,7 +74,8 @@ case "${1:-}" in
     printf '%s\n' "$sequence" >"$sequence_file"
     printf 'FAKE CLIENT CERT %s %s\n' "$name" "$sequence" >"$EASYRSA_PKI/issued/$name.crt"
     printf 'FAKE CLIENT KEY %s %s\n' "$name" "$sequence" >"$EASYRSA_PKI/private/$name.key"
-    if [ "${FAKE_EASYRSA_FAIL_BUILD_CLIENT_AFTER_OUTPUT:-}" = "$name" ] && \
+    if { [ "${FAKE_EASYRSA_FAIL_BUILD_CLIENT_AFTER_OUTPUT:-}" = "$name" ] || \
+      [ "${FAKE_EASYRSA_FAIL_BUILD_CLIENT_AFTER_OUTPUT:-}" = true ]; } && \
       [[ "$EASYRSA_PKI" == */.pki-operation.*/pki ]]; then
       echo "injected Easy-RSA post-issuance failure" >&2
       exit 1
@@ -578,6 +579,54 @@ fi
 grep -Fq 'failed to revoke client certificate' "$TMP_DIR/crl-failure.err"
 grep -Fqx "$revoke_failure_id,revoke-failure,active" "$OVPN_DATA_DIR/meta/client-state.csv"
 [ "$revoke_failure_pki_before" = "$(pki_snapshot)" ]
+[ "$("$OVPN" state show)" = HEALTHY ]
+
+create_issuance_pki_before="$(pki_snapshot)"
+create_issuance_registry_before="$(sha256sum "$OVPN_DATA_DIR/meta/client-state.csv" "$OVPN_DATA_DIR/meta/client-ip.csv")"
+if FAKE_EASYRSA_FAIL_BUILD_CLIENT_AFTER_OUTPUT=true \
+  "$OVPN" client create create-issuance-failure --dynamic >"$TMP_DIR/create-issuance-failure.out" 2>"$TMP_DIR/create-issuance-failure.err"; then
+  echo 'failed staged client issuance was reported as successful' >&2
+  exit 1
+fi
+grep -Fq 'failed to issue client certificate; no client was created' "$TMP_DIR/create-issuance-failure.err"
+[ "$create_issuance_pki_before" = "$(pki_snapshot)" ]
+[ "$create_issuance_registry_before" = "$(sha256sum "$OVPN_DATA_DIR/meta/client-state.csv" "$OVPN_DATA_DIR/meta/client-ip.csv")" ]
+test ! -e "$OVPN_DATA_DIR/clients/active/create-issuance-failure.ovpn"
+[ "$("$OVPN" state show)" = HEALTHY ]
+
+if OVPN_CLIENT_IP_APPLY_FAIL_AFTER=ccd \
+  "$OVPN" client create create-failure --dynamic >"$TMP_DIR/create-failure.out" 2>"$TMP_DIR/create-failure.err"; then
+  echo 'client creation with a failed assignment transaction unexpectedly succeeded' >&2
+  exit 1
+fi
+grep -Fq "failed to apply client creation for 'create-failure'; the certificate was revoked and no client was created" "$TMP_DIR/create-failure.err"
+create_failure_id="$(awk -F, '$2 == "create-failure" && $3 == "deleted" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
+[[ "$create_failure_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
+test ! -e "$OVPN_DATA_DIR/pki/issued/$create_failure_id.crt"
+test ! -e "$OVPN_DATA_DIR/pki/private/$create_failure_id.key"
+test ! -e "$OVPN_DATA_DIR/clients/active/create-failure.ovpn"
+if grep -Fq "$create_failure_id,create-failure," "$OVPN_DATA_DIR/meta/client-ip.csv"; then
+  echo 'failed client creation retained an IP registry row' >&2
+  exit 1
+fi
+[ "$("$OVPN" state show)" = HEALTHY ]
+"$OVPN" client create create-failure --dynamic >"$TMP_DIR/create-failure-reuse.out" 2>"$TMP_DIR/create-failure-reuse.err"
+grep -Fq ',create-failure,active' "$OVPN_DATA_DIR/meta/client-state.csv"
+
+"$OVPN" client create assignment-failure --dynamic >"$TMP_DIR/assignment-failure-create.out" 2>"$TMP_DIR/assignment-failure-create.err"
+assignment_failure_id="$(awk -F, '$2 == "assignment-failure" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
+assignment_failure_cert_before="$(sha256sum "$OVPN_DATA_DIR/pki/issued/$assignment_failure_id.crt")"
+if OVPN_CLIENT_IP_APPLY_FAIL_AFTER=ccd \
+  "$OVPN" client reissue assignment-failure --ip 10.88.0.40 >"$TMP_DIR/assignment-failure.out" 2>"$TMP_DIR/assignment-failure.err"; then
+  echo 'reissue with a failed assignment change unexpectedly succeeded' >&2
+  exit 1
+fi
+grep -Fq 'certificate was reissued, but the requested IP assignment change failed' "$TMP_DIR/assignment-failure.err"
+grep -Fqx "$assignment_failure_id,assignment-failure,active" "$OVPN_DATA_DIR/meta/client-state.csv"
+grep -Fqx "$assignment_failure_id,assignment-failure," "$OVPN_DATA_DIR/meta/client-ip.csv"
+test -f "$OVPN_DATA_DIR/clients/active/assignment-failure.ovpn"
+[ "$assignment_failure_cert_before" != "$(sha256sum "$OVPN_DATA_DIR/pki/issued/$assignment_failure_id.crt")" ]
+grep -Fq "\"event\":\"client_lifecycle\",\"operation\":\"reissue\",\"outcome\":\"failed\",\"client_id\":\"$assignment_failure_id\"" "$OVPN_DATA_DIR/meta/audit.jsonl"
 [ "$("$OVPN" state show)" = HEALTHY ]
 
 "$OVPN" client create issuance-failure --dynamic >"$TMP_DIR/issuance-failure-create.out" 2>"$TMP_DIR/issuance-failure-create.err"

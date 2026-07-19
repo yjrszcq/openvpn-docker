@@ -640,6 +640,7 @@ ovpn_client_reissue_inner() {
   local mode="$3"
   local requested_ip="$4"
   local name status index id assignment allocated_ip=''
+  local assignment_change_failed=false
 
   ovpn_require_healthy_state
   ovpn_client_ip_prepare_mutation
@@ -690,22 +691,26 @@ ovpn_client_reissue_inner() {
   case "$mode" in
     dynamic)
       ovpn_client_ip_set_current_assignment "$name" ''
-      ovpn_client_ip_apply_current_mutation
+      ovpn_client_ip_apply_current_mutation || assignment_change_failed=true
       ;;
     static)
       ovpn_client_ip_set_current_assignment "$name" "$requested_ip"
-      ovpn_client_ip_apply_current_mutation
+      ovpn_client_ip_apply_current_mutation || assignment_change_failed=true
       ;;
     '')
       if [ -n "$allocated_ip" ]; then
         ovpn_client_ip_set_current_assignment "$name" "$allocated_ip"
-        ovpn_client_ip_apply_current_mutation
+        ovpn_client_ip_apply_current_mutation || assignment_change_failed=true
       fi
       ;;
   esac
 
   ovpn_write_or_print "$OVPN_DATA_DIR/clients/active/$name.ovpn" "$(ovpn_render_client_content "$name")"
   ovpn_client_lifecycle_kick "$id"
+  if [ "$assignment_change_failed" = true ]; then
+    ovpn_client_lifecycle_audit reissue failed "$id" "$name" || true
+    ovpn_die 'client certificate was reissued, but the requested IP assignment change failed; the previous assignment was retained and the new profile must be exported'
+  fi
   ovpn_client_lifecycle_audit reissue applied "$id" "$name" || true
   ovpn_log "reissued client '$name'"
 }

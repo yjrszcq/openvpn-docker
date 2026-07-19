@@ -56,6 +56,8 @@ assert_help "Usage: ovpn render client <name>|--id|-i <ID>|--name|-n <NAME> [--s
 assert_help "Usage: ovpn runtime <command>" runtime --help
 assert_help "Usage: ovpn runtime version" runtime version -h
 assert_help "Usage: ovpn migrate <command> [options]" migrate --help
+assert_help "Usage: ovpn migrate plan [--json|-j]" migrate plan -h
+assert_help "Usage: ovpn migrate apply [--yes|-y]" migrate apply --help
 
 assert_help "Usage: ovpn config show" config show --help
 assert_help "Usage: ovpn client export <name>|--id|-i <ID>|--name|-n <NAME>" client export -h
@@ -74,6 +76,28 @@ assert_help "Usage: ovpn runtime health" runtime health -h
 assert_help "Usage: ovpn runtime capabilities" runtime capabilities --help
 assert_help "usage: ovpn runtime logs [--lines|-l N] [--follow|-f] [--raw|-r] [--no-trunc|-t]" runtime logs -h
 assert_help "usage: ovpn runtime events [--lines|-l N] [--follow|-f] [--json|-j] [--no-trunc|-t]" runtime events --help
+
+export OVPN_DATA_DIR="$data_dir"
+
+assert_rejected_usage() {
+  local expected="$1"
+  shift
+  if "$OVPN" "$@" >/tmp/ovpn-invalid.out 2>/tmp/ovpn-invalid.err; then
+    echo "invalid command arguments unexpectedly succeeded: $*" >&2
+    exit 1
+  fi
+  if ! grep -Fq "$expected" /tmp/ovpn-invalid.err; then
+    echo "invalid command arguments did not report expected usage: $expected" >&2
+    exit 1
+  fi
+}
+
+assert_rejected_usage "usage: ovpn init" init unexpected
+assert_rejected_usage "usage: ovpn start" start unexpected
+assert_rejected_usage "usage: ovpn config show" config show unexpected
+assert_rejected_usage "usage: ovpn config apply" config apply unexpected
+assert_rejected_usage "usage: ovpn -v" -v unexpected
+assert_rejected_usage "usage: ovpn --version" --version unexpected
 
 declare -A public_short_options=()
 while IFS='|' read -r context long_option short_option; do
@@ -113,6 +137,11 @@ render server|--stdout|-s
 network apply|--yes|-y
 EOF
 
+network_help="$("$OVPN" network --help)"
+grep -Fq -- '-n, --network CIDR' <<<"$network_help"
+grep -Fq -- '-p, --dynamic-pool-size N' <<<"$network_help"
+grep -Fq -- '-y, --yes' <<<"$network_help"
+
 "$OVPN" runtime version >/tmp/ovpn-version.out
 if ! grep -Fq "\"image_version\": \"$IMAGE_VERSION\"" /tmp/ovpn-version.out; then
   echo 'version output missing image_version' >&2
@@ -139,7 +168,6 @@ grep -Eq '^easy-rsa:        (unknown|[0-9]+\.[0-9]+\.[0-9]+)$' /tmp/ovpn-version
 grep -Fqx "data schema:     $DATA_SCHEMA" /tmp/ovpn-version-summary.out
 [ "$(wc -l </tmp/ovpn-version-summary.out)" -eq 4 ]
 [ "$(tail -n 1 /tmp/ovpn-version-summary.out)" = "data schema:     $DATA_SCHEMA" ]
-export OVPN_DATA_DIR="$data_dir"
 "$OVPN" state doctor -j >/tmp/ovpn-doctor.out 2>/tmp/ovpn-doctor.err
 if ! grep -Fq '"state": "EMPTY"' /tmp/ovpn-doctor.out; then
   echo 'doctor JSON output missing EMPTY state' >&2

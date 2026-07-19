@@ -317,14 +317,16 @@ ovpn_config_command() {
       if ovpn_help_requested "$@"; then
         ovpn_command_usage "ovpn config show" "Print persisted project configuration."
       else
-        ovpn_config_print "$@"
+        [ "$#" -eq 0 ] || ovpn_die "usage: ovpn config show"
+        ovpn_config_print
       fi
       ;;
     apply)
       if ovpn_help_requested "$@"; then
         ovpn_command_usage "ovpn config apply" "Validate the environment and write persistent project configuration."
       else
-        ovpn_config_write "$@"
+        [ "$#" -eq 0 ] || ovpn_die "usage: ovpn config apply"
+        ovpn_config_write
       fi
       ;;
     *)

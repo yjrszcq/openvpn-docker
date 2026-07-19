@@ -235,6 +235,8 @@ Clients that already have a static IP keep their assignment by default. Clients 
 - `--dynamic` → use a dynamic assignment after reissue; requires nonzero dynamic-pool capacity.
 - `--ip <IPv4>` → use the specified static address, which must lie inside the static region and be unoccupied.
 
+Certificate issuance and IP assignment are separate staged operations. If certificate reissue succeeds but the requested IP change fails and rolls back, the command exits with an error while keeping the client active on its previous assignment; export and redistribute the newly generated profile. Initial client creation uses staged PKI and leaves only a deleted UUID tombstone if a later assignment failure requires the new certificate to be revoked, so the display name can be reused safely.
+
 ### `ovpn client delete`
 
 Syntax:

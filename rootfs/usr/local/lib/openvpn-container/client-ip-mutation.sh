@@ -177,11 +177,19 @@ ovpn_client_create_inner() {
   else
     OVPN_CLIENT_IP_INTS+=('')
   fi
-  ovpn_pki_issue_client "$id"
+  ovpn_pki_try_issue_client "$id" || ovpn_die 'failed to issue client certificate; no client was created'
   ovpn_client_registry_set_state "$name" active "$id"
   if ! ovpn_client_ip_apply_current_mutation; then
-    ovpn_pki_try_revoke_client "$id" || true
-    ovpn_die "failed to apply client creation for '$name'; the certificate was revoked"
+    if ovpn_pki_try_revoke_client "$id"; then
+      ovpn_client_registry_set_state "$name" deleted
+      rm -f "$OVPN_DATA_DIR/pki/private/$id.key" "$OVPN_DATA_DIR/pki/issued/$id.crt" "$OVPN_DATA_DIR/pki/reqs/$id.req"
+      if declare -F ovpn_event_write >/dev/null 2>&1; then
+        ovpn_event_write client_lifecycle create failed "$id" "$name" || true
+      fi
+      ovpn_die "failed to apply client creation for '$name'; the certificate was revoked and no client was created"
+    fi
+    ovpn_log "CRITICAL: failed to revoke client '$name' [$id] after its assignment transaction failed"
+    ovpn_die "failed to apply client creation for '$name'; manual PKI and registry recovery is required"
   fi
   ovpn_render_client "$name" --output "$OVPN_DATA_DIR/clients/active/$name.ovpn"
   if declare -F ovpn_event_write >/dev/null 2>&1; then

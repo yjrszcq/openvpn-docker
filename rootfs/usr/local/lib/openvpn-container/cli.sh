@@ -39,8 +39,14 @@ ovpn_schema_gate_command "$command" "$@" || exit $?
 
 case "$command" in
   help|-h|--help) ovpn_usage ;;
-  -v) ovpn_version_short ;;
-  -V|--version) ovpn_version_summary ;;
+  -v)
+    [ "$#" -eq 0 ] || ovpn_die "usage: ovpn -v"
+    ovpn_version_short
+    ;;
+  -V|--version)
+    [ "$#" -eq 0 ] || ovpn_die "usage: ovpn --version"
+    ovpn_version_summary
+    ;;
   init)
     if ovpn_help_requested "$@"; then
       ovpn_command_usage "ovpn init" "Initialize an empty OpenVPN data directory."

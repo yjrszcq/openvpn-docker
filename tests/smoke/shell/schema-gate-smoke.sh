@@ -48,6 +48,20 @@ grep -Fq "unknown command 'upgrade'" "$TMP_DIR/upgrade.err"
 
 OVPN_DATA_DIR="$old" "$OVPN" help >/dev/null
 OVPN_DATA_DIR="$old" OVPN_BUILD_INFO="$TMP_DIR/missing-build-info" "$OVPN" --version >/dev/null
+OVPN_DATA_DIR="$old" "$OVPN" config --help >/dev/null
+OVPN_DATA_DIR="$old" "$OVPN" config show --help >/dev/null
+OVPN_DATA_DIR="$old" "$OVPN" client ip set --help >/dev/null
+
+help_value="$TMP_DIR/help-value"
+write_schema "$help_value" 1 1
+set +e
+OVPN_DATA_DIR="$help_value" OVPN_ENDPOINT=vpn.example.test "$OVPN" config apply ignored --help >"$TMP_DIR/help-value.out" 2>"$TMP_DIR/help-value.err"
+status=$?
+set -e
+[ "$status" -eq 78 ]
+grep -Fq 'data schema migration required' "$TMP_DIR/help-value.err"
+grep -Fqx '1' "$help_value/config/schema-version"
+
 set +e
 OVPN_DATA_DIR="$old" "$OVPN" migrate plan >"$TMP_DIR/migrate.out" 2>"$TMP_DIR/migrate.err"
 status=$?

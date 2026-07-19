@@ -114,5 +114,6 @@ ovpn_start_inner() {
 }
 
 ovpn_start_command() {
-  ovpn_with_runtime_shared_lock ovpn_start_inner "$@"
+  [ "$#" -eq 0 ] || ovpn_die "usage: ovpn start"
+  ovpn_with_runtime_shared_lock ovpn_start_inner
 }

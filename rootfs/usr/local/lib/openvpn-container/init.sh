@@ -101,5 +101,6 @@ ovpn_init_inner() {
 }
 
 ovpn_init_command() {
+  [ "$#" -eq 0 ] || ovpn_die "usage: ovpn init"
   ovpn_with_data_lock init ovpn_init_inner
 }
