@@ -168,7 +168,7 @@ Project code and runtime changes follow the permanent
 [image update policy](docs/en/image-update-policy.md). The image is the only
 code delivery unit; data migrations remain a separate maintenance operation.
 
-- [v1 command reference](docs/en/v1/commands.md) — release commit `6619921e5257e604f5df2c63d2fa10505b680d84`.
+- [v1 command reference](docs/en/v1/commands.md) — for `1.0.0`.
   - [v1 operations guide](docs/en/v1/operations.md) — workflow-oriented command combinations.
 - [v2 command reference](docs/en/v2/commands.md) — releases `2.0.0` through `2.1.1`.
   - [v2 operations guide](docs/en/v2/operations.md) — workflow-oriented command combinations.

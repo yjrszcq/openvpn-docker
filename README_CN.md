@@ -149,7 +149,7 @@ maintenance-only 迁移要求在命令文档换版后仍持续有效。
 [镜像更新政策](docs/cn/image-update-policy.md)。镜像是唯一代码交付单元，数据迁移
 始终是独立的 maintenance 操作。
 
-- [v1 命令参考](docs/cn/v1/commands.md)：发布提交 `6619921e5257e604f5df2c63d2fa10505b680d84`。
+- [v1 命令参考](docs/cn/v1/commands.md)：适用于 `1.0.0`。
   - [v1 操作手册](docs/cn/v1/operations.md)：按工作流组织的命令组合用法。
 - [v2 命令参考](docs/cn/v2/commands.md)：适用于 `2.0.0` 至 `2.1.1`。
   - [v2 操作手册](docs/cn/v2/operations.md)：按工作流组织的命令组合用法。
