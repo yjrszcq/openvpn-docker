@@ -8,6 +8,7 @@ for workflow in test.yml candidate.yml upstream-check.yml release.yml; do
   test -s "$WORKFLOWS/$workflow"
 done
 test ! -e "$WORKFLOWS/management-release.yml"
+test ! -e "$ROOT_DIR/tests/smoke/container/upgrade-state-smoke.sh"
 
 grep -Fq 'workflow_call:' "$WORKFLOWS/test.yml"
 grep -Fq 'mvdan/shfmt:v3.10.0' "$WORKFLOWS/test.yml"
@@ -51,6 +52,10 @@ grep -Fq 'image_required=false' "$WORKFLOWS/candidate.yml"
 if grep -Eq 'MANAGEMENT_VERSION|PLATFORM_API|MANAGEMENT_SIGNING' \
   "$WORKFLOWS/test.yml" "$WORKFLOWS/candidate.yml"; then
   echo 'image workflows still contain online management release metadata' >&2
+  exit 1
+fi
+if grep -Eq 'upgrade-state|OVPN_UPGRADE_' "$WORKFLOWS/test.yml"; then
+  echo 'test workflow still contains updater-oriented state handoff interfaces' >&2
   exit 1
 fi
 grep -Fq 'schedule:' "$WORKFLOWS/upstream-check.yml"

@@ -390,7 +390,7 @@ ovpn_repair_validate_stage() {
     source="$OVPN_REPAIR_STAGE_DIR/$target"
     [ -e "$source" ] || ovpn_die "missing staged repair target: $target"
     mkdir -p "$(dirname "$validation_dir/$target")"
-    rm -rf "$validation_dir/$target"
+    rm -rf "${validation_dir:?}/$target"
     cp -a "$source" "$validation_dir/$target" || ovpn_die "failed to stage validation copy of $target"
   done
 
