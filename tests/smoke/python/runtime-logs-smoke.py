@@ -25,6 +25,13 @@ def write_registry(path: Path, name: str) -> None:
     os.replace(temporary, path)
 
 
+def write_registry_in_place(path: Path, name: str) -> None:
+    path.write_text(
+        f"# id,name,state\n{CLIENT_ID},{name},active\n",
+        encoding="utf-8",
+    )
+
+
 def read_follow_line(process: subprocess.Popen[str]) -> str:
     assert process.stdout is not None
     ready, _, _ = select.select([process.stdout], [], [], 5)
@@ -132,14 +139,40 @@ def main() -> int:
             ):
                 raise AssertionError("follow did not translate the initial name")
 
+            registry.write_text(
+                f"# xx,name,state\n{CLIENT_ID},laptop,active\n",
+                encoding="utf-8",
+            )
+            invalid_signature = registry.stat()
+            with raw_log.open("a", encoding="utf-8") as stream:
+                stream.write(f">LOG:6,N,during registry error {CLIENT_ID}\n")
+                stream.flush()
+            if read_follow_line(follower) != (
+                f">LOG:6,N,during registry error laptop [{CLIENT_SHORT_ID}]"
+            ):
+                raise AssertionError("follow discarded the last valid identity mapping")
+
+            write_registry_in_place(registry, "tablet")
+            os.utime(
+                registry,
+                ns=(invalid_signature.st_atime_ns, invalid_signature.st_mtime_ns),
+            )
+            with raw_log.open("a", encoding="utf-8") as stream:
+                stream.write(f">LOG:7,N,after registry recovery {CLIENT_ID}\n")
+                stream.flush()
+            if read_follow_line(follower) != (
+                f">LOG:7,N,after registry recovery tablet [{CLIENT_SHORT_ID}]"
+            ):
+                raise AssertionError("follow did not retry a failed registry signature")
+
             write_registry(registry, "workstation")
             os.replace(raw_log, raw_log.with_name("openvpn.log.1"))
             raw_log.write_text(
-                f">LOG:6,N,after rename {CLIENT_ID}\n",
+                f">LOG:8,N,after rename {CLIENT_ID}\n",
                 encoding="utf-8",
             )
             if read_follow_line(follower) != (
-                f">LOG:6,N,after rename workstation [{CLIENT_SHORT_ID}]"
+                f">LOG:8,N,after rename workstation [{CLIENT_SHORT_ID}]"
             ):
                 raise AssertionError("follow did not refresh mapping across rotation")
         finally:

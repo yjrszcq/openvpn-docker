@@ -110,7 +110,10 @@ def follow(
                 continue
         line = stream.readline()
         if line:
-            emit(line.rstrip("\r\n"), json_output, no_trunc)
+            try:
+                emit(line.rstrip("\r\n"), json_output, no_trunc)
+            except ValueError as exc:
+                print(f"ovpn: skipped event while following: {exc}", file=sys.stderr, flush=True)
             continue
         try:
             current_state = event_file.stat()

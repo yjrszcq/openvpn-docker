@@ -54,6 +54,17 @@ def read_follow_line(process: subprocess.Popen[str]) -> str:
     return line.rstrip("\r\n")
 
 
+def read_follow_error(process: subprocess.Popen[str]) -> str:
+    assert process.stderr is not None
+    ready, _, _ = select.select([process.stderr], [], [], 5)
+    if not ready:
+        raise AssertionError("timed out waiting for followed event warning")
+    line = process.stderr.readline()
+    if not line:
+        raise AssertionError("runtime events follow exited without a warning")
+    return line.rstrip("\r\n")
+
+
 def main() -> int:
     root = Path(__file__).resolve().parents[3]
     script = root / "rootfs/usr/local/lib/openvpn-container/runtime-events.py"
@@ -116,10 +127,20 @@ def main() -> int:
             if json.loads(read_follow_line(follower)) != event(4):
                 raise AssertionError("follow missed an appended event")
 
+            with event_file.open("a", encoding="utf-8") as stream:
+                stream.write("{bad json}\n")
+                stream.flush()
+            warning = read_follow_error(follower)
+            if "invalid structured event" not in warning:
+                raise AssertionError(f"unexpected malformed-event warning: {warning!r}")
+            append_event(event_file, event(5))
+            if json.loads(read_follow_line(follower)) != event(5):
+                raise AssertionError("follow stopped after a malformed event")
+
             replacement = event_file.with_suffix(".new")
-            append_event(replacement, event(5, "workstation"))
+            append_event(replacement, event(6, "workstation"))
             os.replace(replacement, event_file)
-            if json.loads(read_follow_line(follower)) != event(5, "workstation"):
+            if json.loads(read_follow_line(follower)) != event(6, "workstation"):
                 raise AssertionError("follow missed an atomically replaced event file")
         finally:
             follower.terminate()

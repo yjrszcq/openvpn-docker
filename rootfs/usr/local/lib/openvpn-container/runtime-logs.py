@@ -53,7 +53,7 @@ class IdentityMap:
                         raise ValueError("invalid identity registry record")
                     names[fields[0]] = fields[1]
         except (OSError, UnicodeError, ValueError):
-            names = {}
+            return
         self.names = names
         self.signature = signature
 
