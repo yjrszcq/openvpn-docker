@@ -75,7 +75,7 @@ docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
 ### 查看客户端状态
 
 ```bash
-# 精简视图（名称 + 不可变 ID + 状态）
+# 精简视图（不可变客户端 ID + 名称 + 状态）
 docker compose exec openvpn ovpn client list
 
 # 详细视图（七列表格，含 ID、IP 和连接状态）

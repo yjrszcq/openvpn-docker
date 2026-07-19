@@ -379,7 +379,7 @@ for proto in udp tcp; do
   run_control "$data_dir" "$endpoint" ovpn client export "client-$proto" >"$profile_path"
   grep -q "^remote $endpoint $PORT$" "$profile_path"
   grep -q "^proto $proto$" "$profile_path"
-  grep -E "^client-${proto}[[:space:]]+[0-9a-f-]{36}[[:space:]]+active$" <(run_control "$data_dir" "$endpoint" ovpn client list)
+  grep -E "^[0-9a-f-]{36}[[:space:]]+client-${proto}[[:space:]]+active$" <(run_control "$data_dir" "$endpoint" ovpn client list)
 
   assert_client_connects "$network_name" "$profile_path" "$WORK_DIR/client-$proto-active.log"
   wait_for_runtime_log "$server_name" "client-$proto [$client_id]" \
@@ -404,7 +404,7 @@ for proto in udp tcp; do
     done
     for index in "${!concurrent_pids[@]}"; do
       wait "${concurrent_pids[$index]}"
-      grep -E "^client-udp[[:space:]]+${client_id}[[:space:]]+active" \
+      grep -E "^${client_id}[[:space:]]+client-udp[[:space:]]+active" \
         "$WORK_DIR/client-list-concurrent-$((index + 1))"
     done
 
@@ -418,7 +418,7 @@ for proto in udp tcp; do
     [ "$(docker exec "$server_name" sh -ec 'pgrep -xo openvpn')" = "$openvpn_pid" ]
     docker ps --format '{{.Names}}' | grep -Fqx "$rename_client"
     docker exec "$rename_client" ip -4 address show dev tun0 | grep -Fq 'inet '
-    grep -E "^renamed-udp[[:space:]]+${client_id}[[:space:]]+active.*online$" \
+    grep -E "^${client_id}[[:space:]]+renamed-udp[[:space:]]+active.*online$" \
       <(docker exec "$server_name" ovpn client list --detail)
     wait_for_runtime_log "$server_name" "renamed-udp [$client_id]" \
       "$WORK_DIR/runtime-renamed-udp.log"
@@ -430,7 +430,7 @@ for proto in udp tcp; do
 
   docker rm -f "$server_name" >/dev/null
   run_control "$data_dir" "$endpoint" ovpn client revoke "$client_id"
-  grep -E "^${client_display}[[:space:]]+${client_id}[[:space:]]+revoked$" <(run_control "$data_dir" "$endpoint" ovpn client list)
+  grep -E "^${client_id}[[:space:]]+${client_display}[[:space:]]+revoked$" <(run_control "$data_dir" "$endpoint" ovpn client list)
 
   start_server "$data_dir" "$endpoint" "$server_name" "$network_name"
   wait_for_log "$server_name" 'Initialization Sequence Completed' "$WORK_DIR/server-$proto-revoked-start.log"

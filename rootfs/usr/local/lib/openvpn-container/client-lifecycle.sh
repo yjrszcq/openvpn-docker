@@ -100,7 +100,7 @@ ovpn_client_list_load_connected_clients() {
 
 ovpn_client_list_with_ip_command() {
   local index id name state assignment address ip_state connection mode row
-  local client_width=6 id_width=2 state_width=5 mode_width=4 ip_width=2 ip_state_width=8
+  local id_width=9 name_width=4 state_width=5 mode_width=4 ip_width=2 ip_state_width=8
   local -a rows=()
 
   ovpn_require_healthy_state
@@ -142,27 +142,27 @@ ovpn_client_list_with_ip_command() {
   fi
   for row in "${rows[@]}"; do
     IFS=$'\t' read -r name id state mode address ip_state connection <<<"$row"
-    if ((${#name} > client_width)); then client_width=${#name}; fi
     if ((${#id} > id_width)); then id_width=${#id}; fi
+    if ((${#name} > name_width)); then name_width=${#name}; fi
     if ((${#state} > state_width)); then state_width=${#state}; fi
     if ((${#mode} > mode_width)); then mode_width=${#mode}; fi
     if ((${#address} > ip_width)); then ip_width=${#address}; fi
     if ((${#ip_state} > ip_state_width)); then ip_state_width=${#ip_state}; fi
   done
   printf '%-*s  %-*s  %-*s  %-*s  %-*s  %-*s  %s\n' \
-    "$client_width" CLIENT "$id_width" ID "$state_width" STATE "$mode_width" MODE "$ip_width" IP \
+    "$id_width" 'CLIENT ID' "$name_width" NAME "$state_width" STATE "$mode_width" MODE "$ip_width" IP \
     "$ip_state_width" 'IP STATE' CONNECTION
   for row in "${rows[@]}"; do
     IFS=$'\t' read -r name id state mode address ip_state connection <<<"$row"
     printf '%-*s  %-*s  %-*s  %-*s  %-*s  %-*s  %s\n' \
-      "$client_width" "$name" "$id_width" "$id" "$state_width" "$state" "$mode_width" "$mode" "$ip_width" "$address" \
+      "$id_width" "$id" "$name_width" "$name" "$state_width" "$state" "$mode_width" "$mode" "$ip_width" "$address" \
       "$ip_state_width" "$ip_state" "$connection"
   done
 }
 
 ovpn_client_list_plain_command() {
   local id name state entry
-  local name_width=6 id_width=2
+  local id_width=9 name_width=4
   local -a entries=()
 
   ovpn_require_healthy_state
@@ -173,10 +173,10 @@ ovpn_client_list_plain_command() {
   done < <(ovpn_client_records)
 
   if ((${#entries[@]})); then
-    printf '%-*s  %-*s  %s\n' "$name_width" CLIENT "$id_width" ID STATE
+    printf '%-*s  %-*s  %s\n' "$id_width" 'CLIENT ID' "$name_width" NAME STATE
     for entry in "${entries[@]}"; do
       IFS=$'\t' read -r name id state <<<"$entry"
-      printf '%-*s  %-*s  %s\n' "$name_width" "$name" "$id_width" "$id" "$state"
+      printf '%-*s  %-*s  %s\n' "$id_width" "$id" "$name_width" "$name" "$state"
     done
   fi
 }

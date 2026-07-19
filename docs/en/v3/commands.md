@@ -214,9 +214,10 @@ Syntax:
 ovpn client list [--detail]
 ```
 
-Without `--detail`, prints the aligned columns `CLIENT`, `ID`, and `STATE`.
-With `--detail`, it additionally prints `MODE`, `IP`, `IP STATE`, and
-`CONNECTION`. The immutable `ID` is shown in both views.
+Without `--detail`, prints the aligned columns `CLIENT ID`, `NAME`, and
+`STATE`, in that order. With `--detail`, it additionally prints `MODE`, `IP`,
+`IP STATE`, and `CONNECTION`. The immutable client ID is shown first in both
+views.
 
 For the IP view, static assignments are `configured` or `retained` after
 revocation. Dynamic addresses are `connected` when the management socket has a

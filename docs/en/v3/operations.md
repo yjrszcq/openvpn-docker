@@ -77,7 +77,7 @@ docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
 ### View client status
 
 ```bash
-# compact view (name + immutable ID + state)
+# compact view (immutable client ID + name + state)
 docker compose exec openvpn ovpn client list
 
 # detailed view (seven-column table with ID, IP, and connection state)

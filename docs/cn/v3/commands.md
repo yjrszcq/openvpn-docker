@@ -176,8 +176,9 @@ ovpn client export <client>
 ovpn client list [--detail]
 ```
 
-不带 `--detail` 时，打印对齐的 `CLIENT`、`ID` 和 `STATE` 列。带 `--detail` 时，
-额外打印 `MODE`、`IP`、`IP STATE` 和 `CONNECTION`；两种视图都显示不可变 `ID`。
+不带 `--detail` 时，依次打印对齐的 `CLIENT ID`、`NAME` 和 `STATE` 列。带
+`--detail` 时，额外打印 `MODE`、`IP`、`IP STATE` 和 `CONNECTION`；两种视图都把
+不可变客户端 ID 放在第一列。
 
 在 IP 视图下，静态分配为 `configured`，或撤销后为 `retained`。动态地址在有当前租约时显示为 `connected`，在有缓存租约记录时显示为 `last-known`，否则为 `unavailable`。`CONNECTION` 根据管理套接字可用性和当前路由显示为 `online`、`offline` 或 `unknown`。该视图读取权威 IP 清单，并结合当前连接与租约缓存生成状态。
 
