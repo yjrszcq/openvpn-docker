@@ -39,7 +39,7 @@ snapshot() {
 healthy="$TMP_DIR/healthy"
 make_healthy "$healthy"
 before="$(snapshot "$healthy")"
-OVPN_DATA_DIR="$healthy" "$OVPN" state doctor --json >"$TMP_DIR/healthy.json" 2>"$TMP_DIR/healthy.err"
+OVPN_DATA_DIR="$healthy" "$OVPN" state doctor -j >"$TMP_DIR/healthy.json" 2>"$TMP_DIR/healthy.err"
 after="$(snapshot "$healthy")"
 [ "$before" = "$after" ] || {
   echo 'doctor modified a healthy fixture' >&2

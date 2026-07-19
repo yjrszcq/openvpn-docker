@@ -14,8 +14,8 @@ Commands:
   apply             apply a planned migration in maintenance mode
 
 Options:
-  --json            print a machine-readable plan
-  --yes             skip apply confirmation
+  --json, -j        print a machine-readable plan
+  --yes, -y         skip apply confirmation
 EOF
 }
 
@@ -161,8 +161,8 @@ ovpn_migrate_command() {
   shift
   while [ "$#" -gt 0 ]; do
     case "$1" in
-    --json) json=true ;;
-    --yes) yes=true ;;
+    --json|-j) json=true ;;
+    --yes|-y) yes=true ;;
     *) ovpn_die "unknown migrate option '$1'" ;;
     esac
     shift

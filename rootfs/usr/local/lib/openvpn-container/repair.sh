@@ -184,11 +184,11 @@ ovpn_repair_plan_command() {
 
   case "$#" in
     0) ;;
-    1) [ "$1" = --json ] && output_format=json || {
-      ovpn_log 'usage: ovpn repair plan [--json]'
+    1) { [ "$1" = --json ] || [ "$1" = -j ]; } && output_format=json || {
+      ovpn_log 'usage: ovpn repair plan [--json|-j]'
       exit 64
     } ;;
-    *) ovpn_log 'usage: ovpn repair plan [--json]'; exit 64 ;;
+    *) ovpn_log 'usage: ovpn repair plan [--json|-j]'; exit 64 ;;
   esac
 
   ovpn_repair_plan_build
@@ -541,12 +541,12 @@ ovpn_repair_command() {
     ovpn_repair_usage
     return 0
   fi
-  [ -n "$operation" ] || ovpn_die "usage: ovpn repair <plan|apply> [--json]"
+  [ -n "$operation" ] || ovpn_die "usage: ovpn repair <plan|apply> [--json|-j]"
   shift
   case "$operation" in
     plan)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn repair plan [--json]" "Inspect eligible repair actions without changing state."
+        ovpn_command_usage "ovpn repair plan [--json|-j]" "Inspect eligible repair actions without changing state."
       else
         ovpn_repair_plan_command "$@"
       fi
@@ -562,6 +562,6 @@ ovpn_repair_command() {
         ovpn_with_data_lock repair ovpn_repair_apply_inner
       fi
       ;;
-    *) ovpn_die "usage: ovpn repair <plan|apply> [--json]" ;;
+    *) ovpn_die "usage: ovpn repair <plan|apply> [--json|-j]" ;;
   esac
 }

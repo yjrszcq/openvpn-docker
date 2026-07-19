@@ -295,34 +295,34 @@ ovpn_network_command() {
     ovpn_network_usage
     return 0
   fi
-  [ -n "$operation" ] || ovpn_die "usage: ovpn network <plan|apply> [--network CIDR] [--dynamic-pool-size N] [--yes]"
+  [ -n "$operation" ] || ovpn_die "usage: ovpn network <plan|apply> [--network|-n CIDR] [--dynamic-pool-size|-p N] [--yes|-y]"
   shift
   case "$operation" in
     plan)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn network plan [--network <CIDR>] [--dynamic-pool-size <N>]" "Preview a tunnel-network migration without changing state."
+        ovpn_command_usage "ovpn network plan [--network|-n <CIDR>] [--dynamic-pool-size|-p <N>]" "Preview a tunnel-network migration without changing state."
         return 0
       fi
       dry_run=true
       ;;
     apply)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn network apply [--network <CIDR>] [--dynamic-pool-size <N>] [--yes]" "Apply a tunnel-network migration after confirmation."
+        ovpn_command_usage "ovpn network apply [--network|-n <CIDR>] [--dynamic-pool-size|-p <N>] [--yes|-y]" "Apply a tunnel-network migration after confirmation."
         return 0
       fi
       ;;
-    *) ovpn_die "usage: ovpn network <plan|apply> [--network CIDR] [--dynamic-pool-size N] [--yes]" ;;
+    *) ovpn_die "usage: ovpn network <plan|apply> [--network|-n CIDR] [--dynamic-pool-size|-p N] [--yes|-y]" ;;
   esac
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --network) shift; [ "$#" -gt 0 ] || ovpn_die "--network requires CIDR"; target_network="$1" ;;
-      --dynamic-pool-size) shift; [ "$#" -gt 0 ] || ovpn_die "--dynamic-pool-size requires N"; target_pool="$1" ;;
-      --yes)
-        [ "$operation" = apply ] || ovpn_die "usage: ovpn network plan [--network CIDR] [--dynamic-pool-size N]"
+      --network|-n) shift; [ "$#" -gt 0 ] || ovpn_die "--network requires CIDR"; target_network="$1" ;;
+      --dynamic-pool-size|-p) shift; [ "$#" -gt 0 ] || ovpn_die "--dynamic-pool-size requires N"; target_pool="$1" ;;
+      --yes|-y)
+        [ "$operation" = apply ] || ovpn_die "usage: ovpn network plan [--network|-n CIDR] [--dynamic-pool-size|-p N]"
         yes=true
         ;;
-      *) ovpn_die "usage: ovpn network <plan|apply> [--network CIDR] [--dynamic-pool-size N] [--yes]" ;;
+      *) ovpn_die "usage: ovpn network <plan|apply> [--network|-n CIDR] [--dynamic-pool-size|-p N] [--yes|-y]" ;;
     esac
     shift
   done

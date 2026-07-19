@@ -94,11 +94,11 @@ printf '%s\n' '# id,name,state' \
 printf '10.88.0.200\n' >"$OVPN_LEASE_DIR/22222222-2222-4222-8222-222222222222"
 "$OVPN" client ip set alpha --ip 10.88.0.20
 
-"$OVPN" network plan --network 10.89.0.0/24 --dynamic-pool-size 100 >"$TMP_DIR/dry.out"
+"$OVPN" network plan -n 10.89.0.0/24 -p 100 >"$TMP_DIR/dry.out"
 grep -Eq 'Network:[[:space:]]+10\.88\.0\.0/24[[:space:]]+->[[:space:]]+10\.89\.0\.0/24' "$TMP_DIR/dry.out"
 grep -Fqx 'OVPN_NETWORK=10.88.0.0/24' "$OVPN_DATA_DIR/config/project.env"
 
-"$OVPN" network apply --network 10.89.0.0/24 --dynamic-pool-size 100 --yes >"$TMP_DIR/apply.out"
+"$OVPN" network apply -n 10.89.0.0/24 -p 100 -y >"$TMP_DIR/apply.out"
 grep -Fqx 'OVPN_NETWORK=10.89.0.0/24' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx 'OVPN_DYNAMIC_POOL_SIZE=100' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx '11111111-1111-4111-8111-111111111111,alpha,10.89.0.20' "$OVPN_DATA_DIR/meta/client-ip.csv"

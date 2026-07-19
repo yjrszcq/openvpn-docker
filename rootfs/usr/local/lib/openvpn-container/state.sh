@@ -462,7 +462,7 @@ ovpn_state_command() {
       ;;
     doctor)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn state doctor [--json]" "Print detected issues and recommended actions."
+        ovpn_command_usage "ovpn state doctor [--json|-j]" "Print detected issues and recommended actions."
       else
         ovpn_doctor_command "$@"
       fi
@@ -528,15 +528,15 @@ ovpn_doctor_command() {
     0)
       ;;
     1)
-      if [ "$1" = --json ]; then
+      if [ "$1" = --json ] || [ "$1" = -j ]; then
         output_format=json
       else
-        ovpn_log "usage: ovpn state doctor [--json]"
+        ovpn_log "usage: ovpn state doctor [--json|-j]"
         exit 64
       fi
       ;;
     *)
-      ovpn_log "usage: ovpn state doctor [--json]"
+      ovpn_log "usage: ovpn state doctor [--json|-j]"
       exit 64
       ;;
   esac

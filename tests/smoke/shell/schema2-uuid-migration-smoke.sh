@@ -173,7 +173,7 @@ chmod 600 \
   "$OVPN_DATA_DIR/meta/client-state.csv" "$OVPN_DATA_DIR/meta/audit.jsonl" \
   "$OVPN_DATA_DIR/pki/private/ca.key" "$OVPN_DATA_DIR/secrets/tls-crypt.key"
 
-"$OVPN" migrate plan --json >"$TMP_DIR/plan.json"
+"$OVPN" migrate plan -j >"$TMP_DIR/plan.json"
 grep -Fq '"source_schema":2' "$TMP_DIR/plan.json"
 grep -Fq '"chain":"2-to-3"' "$TMP_DIR/plan.json"
 grep -Fq '"clients":3' "$TMP_DIR/plan.json"
@@ -192,7 +192,7 @@ printf '{"timestamp":"2026-01-07T00:00:00Z","event":"unknown","outcome":"applied
   >>"$OVPN_DATA_DIR/meta/audit.jsonl"
 invalid_audit_before="$(sha256sum "$OVPN_DATA_DIR/meta/audit.jsonl")"
 set +e
-"$OVPN" migrate apply --yes \
+"$OVPN" migrate apply -y \
   >"$TMP_DIR/invalid-audit.out" 2>"$TMP_DIR/invalid-audit.err"
 status=$?
 set -e

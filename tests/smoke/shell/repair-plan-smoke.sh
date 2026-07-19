@@ -41,7 +41,7 @@ repairable="$TMP_DIR/repairable"
 make_healthy "$repairable"
 rm "$repairable/config/schema-version" "$repairable/meta/instance.json" "$repairable/server/server.conf" "$repairable/pki/crl.pem"
 before="$(snapshot "$repairable")"
-OVPN_DATA_DIR="$repairable" "$OVPN" repair plan --json >"$TMP_DIR/repairable.json" 2>"$TMP_DIR/repairable.err"
+OVPN_DATA_DIR="$repairable" "$OVPN" repair plan -j >"$TMP_DIR/repairable.json" 2>"$TMP_DIR/repairable.err"
 after="$(snapshot "$repairable")"
 [ "$before" = "$after" ] || {
   echo 'repair plan modified a repairable fixture' >&2
