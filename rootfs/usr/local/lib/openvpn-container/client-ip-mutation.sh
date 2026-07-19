@@ -290,9 +290,6 @@ ovpn_client_set_from_editor() {
     for name in "${OVPN_CLIENT_MUTATION_TARGETS[@]}"; do
       index="$(ovpn_client_ip_assignment_index "$name")"
       value="${OVPN_CLIENT_IP_VALUES[index]}"
-      if [ -z "$value" ]; then
-        value=auto
-      fi
       printf '%s,%s\n' "$name" "$value"
       targets["$name"]=1
     done
@@ -325,16 +322,22 @@ ovpn_client_set_from_editor() {
   for name in "${OVPN_CLIENT_MUTATION_TARGETS[@]}"; do
     value="${requests[$name]}"
     case "$value" in
+      '' | auto) ;;
+      *)
+        ovpn_client_ip_require_static_address "$value" "$name"
+        ovpn_client_ip_set_current_assignment "$name" "$value"
+        ;;
+    esac
+  done
+  for name in "${OVPN_CLIENT_MUTATION_TARGETS[@]}"; do
+    value="${requests[$name]}"
+    case "$value" in
       auto)
         address="$(ovpn_client_ip_allocate_static)"
         ovpn_client_ip_set_current_assignment "$name" "$address"
         ;;
       '')
         [ "$OVPN_IPAM_DYNAMIC_POOL_SIZE" -gt 0 ] || ovpn_die 'cannot leave a client dynamic: dynamic pool capacity is 0'
-        ;;
-      *)
-        ovpn_client_ip_require_static_address "$value" "$name"
-        ovpn_client_ip_set_current_assignment "$name" "$value"
         ;;
     esac
   done

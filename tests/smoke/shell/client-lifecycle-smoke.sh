@@ -323,8 +323,12 @@ test ! -e "$OVPN_DATA_DIR/ccd/$laptop_id"
 env -u OVPN_EDITOR -u EDITOR \
   OVPN_TEST_EDITOR_LOG="$TMP_DIR/editor.log" \
   PATH="$FAKE_BIN:$PATH" \
-  "$OVPN" client ip set "$laptop_id" phone >"$TMP_DIR/batch-static.out" 2>"$TMP_DIR/batch-static.err"
+  "$OVPN" client ip set "$laptop_id" phone >"$TMP_DIR/batch-unchanged.out" 2>"$TMP_DIR/batch-unchanged.err"
 grep -Eq '^nano:\.client-ip-set\.' "$TMP_DIR/editor.log"
+grep -Fqx "$laptop_id,laptop," "$OVPN_DATA_DIR/data/client-ip.csv"
+grep -Fqx "$phone_id,phone,10.88.0.20" "$OVPN_DATA_DIR/data/client-ip.csv"
+test ! -e "$OVPN_DATA_DIR/ccd/$laptop_id"
+"$OVPN" client ip set "$laptop_id" >"$TMP_DIR/laptop-static.out" 2>"$TMP_DIR/laptop-static.err"
 grep -Fqx "$laptop_id,laptop,10.88.0.2" "$OVPN_DATA_DIR/data/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.2 255.255.255.0' "$OVPN_DATA_DIR/ccd/$laptop_id"
 

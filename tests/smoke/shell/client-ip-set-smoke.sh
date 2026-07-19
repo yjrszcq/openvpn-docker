@@ -124,6 +124,27 @@ if [ -f "$OVPN_LEASE_DIR/$alpha_id" ]; then
   exit 1
 fi
 
+# Test: saving an unchanged batch editor preserves static and dynamic modes.
+OVPN_EDITOR=true "$OVPN" client ip set --all >"$TMP_DIR/editor-unchanged.out" 2>&1
+cmp "$TMP_DIR/dynamic.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
+
+# Test: explicit assignments are reserved before editor 'auto' allocation.
+editor="$TMP_DIR/allocate-editor.sh"
+cat >"$editor" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+sed -i 's/^zulu,$/zulu,auto/' "$1"
+EOF
+chmod +x "$editor"
+OVPN_EDITOR="$editor" "$OVPN" client ip set --all >"$TMP_DIR/editor-auto.out" 2>&1
+cat >"$TMP_DIR/editor-auto.csv" <<'EOF'
+# id,name,ip
+22222222-2222-4222-8222-222222222222,bravo,10.88.0.2
+33333333-3333-4333-8333-333333333333,zulu,10.88.0.3
+11111111-1111-4111-8111-111111111111,alpha,
+EOF
+diff -u "$TMP_DIR/editor-auto.csv" "$OVPN_DATA_DIR/data/client-ip.csv"
+
 # Test: transaction rollback on derived-state failure
 cp "$OVPN_DATA_DIR/meta/client-ip.applied.csv" "$TMP_DIR/before-failure.csv"
 ccd_before="$(sha256sum "$OVPN_DATA_DIR/ccd/$bravo_id")"
