@@ -109,6 +109,19 @@ def request(path: Path, command: str) -> str:
     return "\n".join(lines)
 
 
+def malformed_request(path: Path) -> str:
+    connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    connection.settimeout(5)
+    connection.connect(str(path))
+    with connection:
+        stream = connection.makefile("r", encoding="utf-8")
+        greeting = stream.readline()
+        if not greeting.startswith(">INFO:OpenVPN Management Broker"):
+            raise AssertionError(f"unexpected broker greeting: {greeting!r}")
+        connection.sendall(b"\xff\n")
+        return stream.readline().rstrip("\r\n")
+
+
 def wait_for_socket(path: Path) -> None:
     for _ in range(100):
         if path.is_socket():
@@ -138,14 +151,15 @@ def main() -> int:
                 "--backend",
                 str(backend_path),
                 "--raw-log",
-                str(raw_log),
+                raw_log.name,
                 "--max-bytes",
                 "240",
                 "--backups",
                 "2",
                 "--timeout",
                 "2",
-            ]
+            ],
+            cwd=work,
         )
         try:
             wait_for_socket(broker_path)
@@ -194,6 +208,12 @@ def main() -> int:
                 raise AssertionError("single-line management error waited for timeout")
             if not request(broker_path, "version").startswith("OpenVPN Version:"):
                 raise AssertionError("management error disconnected a healthy backend")
+            if malformed_request(broker_path) != (
+                "ERROR: invalid UTF-8 management command"
+            ):
+                raise AssertionError("malformed UTF-8 command was not rejected")
+            if not request(broker_path, "version").startswith("OpenVPN Version:"):
+                raise AssertionError("malformed client stopped the management broker")
             if not request(broker_path, "kill client-id").startswith("SUCCESS:"):
                 raise AssertionError("kill response was not proxied")
             if not request(broker_path, "test-disconnect").startswith("ERROR:"):

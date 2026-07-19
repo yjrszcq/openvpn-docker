@@ -18,8 +18,10 @@ class RotatingLog:
         self.max_bytes = max_bytes
         self.backups = backups
         self.lock = threading.Lock()
-        os.makedirs(os.path.dirname(path), mode=0o750, exist_ok=True)
-        os.chmod(os.path.dirname(path), 0o750)
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, mode=0o750, exist_ok=True)
+            os.chmod(directory, 0o750)
 
     def _rotate(self) -> None:
         if self.backups == 0:
@@ -140,32 +142,43 @@ class OpenVPNBackend:
 
     def _connect(self) -> socket.socket:
         connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        connection.settimeout(self.timeout)
-        connection.connect(self.path)
-        greeting = b""
-        while not greeting.endswith(b"\n"):
-            chunk = connection.recv(4096)
-            if not chunk:
-                connection.close()
-                raise ConnectionError("OpenVPN management greeting is unavailable")
-            greeting += chunk
-            if len(greeting) > 65536:
-                connection.close()
-                raise ConnectionError("OpenVPN management greeting is too large")
-        connection.settimeout(None)
-        with self.state_lock:
-            self.connection = connection
-        threading.Thread(
-            target=self._reader,
-            args=(connection,),
-            name="openvpn-management-reader",
-            daemon=True,
-        ).start()
-        response = self._exchange(connection, "log on all")
-        if not response or not response[0].startswith("SUCCESS:"):
-            self._disconnect(connection, "OpenVPN log subscription was rejected")
-            raise ConnectionError("OpenVPN log subscription was rejected")
-        return connection
+        try:
+            connection.settimeout(self.timeout)
+            connection.connect(self.path)
+            greeting = b""
+            while not greeting.endswith(b"\n"):
+                chunk = connection.recv(4096)
+                if not chunk:
+                    raise ConnectionError(
+                        "OpenVPN management greeting is unavailable"
+                    )
+                greeting += chunk
+                if len(greeting) > 65536:
+                    raise ConnectionError("OpenVPN management greeting is too large")
+            connection.settimeout(None)
+            with self.state_lock:
+                self.connection = connection
+            threading.Thread(
+                target=self._reader,
+                args=(connection,),
+                name="openvpn-management-reader",
+                daemon=True,
+            ).start()
+            response = self._exchange(connection, "log on all")
+            if not response or not response[0].startswith("SUCCESS:"):
+                raise ConnectionError("OpenVPN log subscription was rejected")
+            return connection
+        except Exception as exc:
+            with self.state_lock:
+                owned = self.connection is connection
+            if owned:
+                self._disconnect(connection, str(exc))
+            else:
+                try:
+                    connection.close()
+                except OSError:
+                    pass
+            raise
 
     def _exchange(self, connection: socket.socket, command: str) -> list[str]:
         pending = PendingResponse()
@@ -300,6 +313,11 @@ class ManagementBroker:
                     except (OSError, ConnectionError, TimeoutError) as exc:
                         lines = [f"ERROR: management backend unavailable: {exc}"]
                     client.sendall(("\n".join(lines) + "\n").encode())
+        except UnicodeError:
+            try:
+                client.sendall(b"ERROR: invalid UTF-8 management command\n")
+            except OSError:
+                pass
         except (BrokenPipeError, ConnectionResetError, OSError):
             return
         finally:
