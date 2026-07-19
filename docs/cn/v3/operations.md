@@ -53,6 +53,10 @@ docker compose run --rm openvpn-maintenance <command>
 
 ## 日常操作
 
+每个公共多字母参数都有所属子命令内的单字母形式，下面的示例会交替使用两种形式。
+特别需要注意：`-i` 表示客户端 ID，大写 `-I` 表示 IP 地址。短参数应分开传入
+（如 `-d -t`），不要写成 `-dt`。完整映射见命令参考。
+
 ### 创建和分发客户端
 
 显示名称是管理标签和 profile 文件名。OpenVPN 使用生成 profile 注释中记录的不可变
@@ -63,10 +67,10 @@ UUID 作为证书 CN 和运行时身份。
 docker compose exec openvpn ovpn client create laptop
 
 # 创建动态客户端
-docker compose exec openvpn ovpn client create phone --dynamic
+docker compose exec openvpn ovpn client create phone -d
 
 # 指定静态 IP 创建
-docker compose exec openvpn ovpn client create tablet --ip 10.42.0.10
+docker compose exec openvpn ovpn client create tablet -I 10.42.0.10
 
 # 导出 profile
 docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
@@ -79,18 +83,18 @@ docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
 docker compose exec openvpn ovpn client list
 
 # 详细视图（七列表格，含 ID、IP 和连接状态）
-docker compose exec openvpn ovpn client list --detail
+docker compose exec openvpn ovpn client list -d
 
 # 诊断或辅助复制时显示完整 UUID
-docker compose exec openvpn ovpn client list --no-trunc
+docker compose exec openvpn ovpn client list -t
 ```
 
 默认的 12 位 ID 可直接复制给任意客户端命令。用 `--id`/`-i` 强制按 ID 前缀匹配，
 或用 `--name`/`-n` 强制按名称精确匹配：
 
 ```bash
-docker compose exec openvpn ovpn client export --id 67fe9f6dec9b
-docker compose exec openvpn ovpn client export --name laptop
+docker compose exec openvpn ovpn client export -i 67fe9f6dec9b
+docker compose exec openvpn ovpn client export -n laptop
 ```
 
 ID 前缀至少需要 8 个十六进制字符，且必须唯一匹配 active/revoked 客户端。如果位置

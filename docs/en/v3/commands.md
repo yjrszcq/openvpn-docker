@@ -75,17 +75,19 @@ ovpn --help
 
 Prints the top-level command tree. It does not inspect or modify instance data.
 
-### `ovpn -v` / `ovpn --version`
+### `ovpn -v` / `ovpn -V` / `ovpn --version`
 
 Syntax:
 
 ```text
 ovpn -v
+ovpn -V
 ovpn --version
 ```
 
-`-v` prints only the image version (e.g. `3.0.0`). `--version` prints the four
-operator-facing version axes:
+`-v` keeps its released concise behavior and prints only the image version
+(e.g. `3.1.0`). `-V` and `--version` print the same four operator-facing
+version axes:
 
 ```text
 image:           3.0.0
@@ -95,6 +97,38 @@ data schema:     3
 ```
 
 Use `ovpn runtime version` for the complete build-information JSON.
+
+### Public option aliases
+
+Every public multi-letter option has a single-letter form. Aliases are scoped
+to their subcommand, so `-d` means `--detail` for `client list` and
+`--dynamic` for assignment commands; similarly, `-n` means `--name` in client
+selectors and `--network` in network commands. Lowercase `-i` remains the
+client-ID selector, so the IP-assignment alias is uppercase `-I`. Short options
+must be passed separately (`-d -t`); clustered forms such as `-dt` are not part
+of the interface contract.
+
+| Long option | Short option |
+|---|---|
+| `--all` | `-a` |
+| `--detail` | `-d` |
+| `--dynamic` | `-d` |
+| `--dynamic-pool-size` | `-p` |
+| `--follow` | `-f` |
+| `--help` | `-h` |
+| `--id` | `-i` |
+| `--ip` | `-I` |
+| `--json` | `-j` |
+| `--lines` | `-l` |
+| `--name` | `-n` |
+| `--network` | `-n` |
+| `--no-trunc` | `-t` |
+| `--output` | `-o` |
+| `--raw` | `-r` |
+| `--release-ip` | `-r` |
+| `--stdout` | `-s` |
+| `--version` | `-V` |
+| `--yes` | `-y` |
 
 ### `ovpn init`
 
@@ -190,7 +224,7 @@ cannot be used as a display name.
 Syntax:
 
 ```text
-ovpn client create <name> [--dynamic|--ip <IPv4>]
+ovpn client create <name> [--dynamic|-d|--ip|-I <IPv4>]
 ```
 
 Creates a unique UUID-backed client certificate, private key, active profile,
@@ -217,7 +251,7 @@ standard output. Redirect standard output to save the client profile.
 Syntax:
 
 ```text
-ovpn client list [--detail] [--no-trunc]
+ovpn client list [--detail|-d] [--no-trunc|-t]
 ```
 
 Without `--detail`, prints the aligned columns `CLIENT ID`, `NAME`, and
@@ -254,7 +288,7 @@ tombstones remain authoritative history.
 Syntax:
 
 ```text
-ovpn client revoke <selector> [--release-ip]
+ovpn client revoke <selector> [--release-ip|-r]
 ```
 
 Revokes an active certificate, regenerates the CRL, moves its active profile to
@@ -268,7 +302,7 @@ operation.
 Syntax:
 
 ```text
-ovpn client reissue <selector> [--dynamic|--ip <IPv4>]
+ovpn client reissue <selector> [--dynamic|-d|--ip|-I <IPv4>]
 ```
 
 Issues a new key and certificate for an existing client name. For an active
@@ -327,7 +361,7 @@ key, certificate history, and audit history remain.
 Syntax:
 
 ```text
-ovpn client ip set <client...|(--id <ID>)...|(--name <NAME>)...|--all> [--dynamic|--ip <IPv4>]
+ovpn client ip set <client...|(--id|-i <ID>)...|(--name|-n <NAME>)...|--all|-a> [--dynamic|-d|--ip|-I <IPv4>]
 ```
 
 Sets active clients to the specified IP assignment and applies the transaction
@@ -363,7 +397,7 @@ The editor is chosen from `OVPN_EDITOR`, then `EDITOR`, then `nano` (image ships
 Syntax:
 
 ```text
-ovpn network plan [--network <CIDR>] [--dynamic-pool-size <N>]
+ovpn network plan [--network|-n <CIDR>] [--dynamic-pool-size|-p <N>]
 ```
 
 Read-only. Builds and prints a migration plan for the requested values, using
@@ -376,7 +410,7 @@ lowest free static address. It does not contact the management socket.
 Syntax:
 
 ```text
-ovpn network apply [--network <CIDR>] [--dynamic-pool-size <N>] [--yes]
+ovpn network apply [--network|-n <CIDR>] [--dynamic-pool-size|-p <N>] [--yes|-y]
 ```
 
 Builds and prints the same plan, then asks for confirmation on an interactive
@@ -399,7 +433,7 @@ variables and would revert to the stale compose-file value.
 Syntax:
 
 ```text
-ovpn repair plan [--json]
+ovpn repair plan [--json|-j]
 ```
 
 Read-only. Scans the instance and prints eligible automatic actions and blocked
@@ -453,7 +487,7 @@ repairable or recoverable degraded states, and critical or unrecoverable states.
 Syntax:
 
 ```text
-ovpn state doctor [--json]
+ovpn state doctor [--json|-j]
 ```
 
 Read-only. Prints the detected state and every issue with its severity and
@@ -467,7 +501,7 @@ and unrecoverable states return exit status `78` after output.
 Syntax:
 
 ```text
-ovpn render server [--stdout|--output <path>]
+ovpn render server [--stdout|-s|--output|-o <path>]
 ```
 
 Renders the server configuration from persistent configuration, transport
@@ -487,7 +521,7 @@ standard output; `--output <path>` writes a mode-`0600` file at that path.
 Syntax:
 
 ```text
-ovpn render client <selector> [--stdout|--output <path>]
+ovpn render client <selector> [--stdout|-s|--output|-o <path>]
 ```
 
 Builds a client `.ovpn` profile from the configured endpoint, CA certificate,
@@ -502,8 +536,8 @@ atomically replaced mode-`0600` file.
 Syntax:
 
 ```text
-ovpn migrate plan [--json]
-ovpn migrate apply [--yes]
+ovpn migrate plan [--json|-j]
+ovpn migrate apply [--yes|-y]
 ```
 
 Available only through the stopped `openvpn-maintenance` service. `plan` is
@@ -588,7 +622,7 @@ is missing, it detects Easy-RSA and prints `unknown` for unavailable fields.
 Syntax:
 
 ```text
-ovpn runtime logs [--lines N] [--follow] [--raw] [--no-trunc]
+ovpn runtime logs [--lines|-l N] [--follow|-f] [--raw|-r] [--no-trunc|-t]
 ```
 
 Reads persistent rotated OpenVPN logs, defaulting to the latest 100 lines.
@@ -603,7 +637,7 @@ replacement without owning or blocking the OpenVPN management socket.
 Syntax:
 
 ```text
-ovpn runtime events [--lines N] [--follow] [--json] [--no-trunc]
+ovpn runtime events [--lines|-l N] [--follow|-f] [--json|-j] [--no-trunc|-t]
 ```
 
 Reads the latest 100 structured connection, disconnection, client lifecycle,

@@ -54,6 +54,11 @@ service, so migration code and the next runtime come from the same image.
 
 ## Day-to-day operations
 
+Every public multi-letter option has a command-local single-letter form. The
+examples below use both forms interchangeably. In particular, `-i` means client
+ID and uppercase `-I` means IP address. Pass short options separately (`-d -t`),
+not as a cluster such as `-dt`. The complete mapping is in the command reference.
+
 ### Create and distribute clients
 
 The displayed name is a management label and profile filename. OpenVPN uses
@@ -65,10 +70,10 @@ CN and runtime identity.
 docker compose exec openvpn ovpn client create laptop
 
 # create with dynamic IP
-docker compose exec openvpn ovpn client create phone --dynamic
+docker compose exec openvpn ovpn client create phone -d
 
 # create with a specific static IP
-docker compose exec openvpn ovpn client create tablet --ip 10.42.0.10
+docker compose exec openvpn ovpn client create tablet -I 10.42.0.10
 
 # export profile
 docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
@@ -81,10 +86,10 @@ docker compose exec -T openvpn ovpn client export laptop > laptop.ovpn
 docker compose exec openvpn ovpn client list
 
 # detailed view (seven-column table with ID, IP, and connection state)
-docker compose exec openvpn ovpn client list --detail
+docker compose exec openvpn ovpn client list -d
 
 # full UUIDs for diagnostics or machine-assisted copying
-docker compose exec openvpn ovpn client list --no-trunc
+docker compose exec openvpn ovpn client list -t
 ```
 
 The default 12-character ID can be copied directly into any client command.
@@ -92,8 +97,8 @@ Use `--id`/`-i` to force ID-prefix matching or `--name`/`-n` to force an exact
 name match:
 
 ```bash
-docker compose exec openvpn ovpn client export --id 67fe9f6dec9b
-docker compose exec openvpn ovpn client export --name laptop
+docker compose exec openvpn ovpn client export -i 67fe9f6dec9b
+docker compose exec openvpn ovpn client export -n laptop
 ```
 
 ID prefixes must contain at least 8 hexadecimal characters and match exactly
