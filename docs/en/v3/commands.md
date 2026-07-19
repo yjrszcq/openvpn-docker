@@ -84,20 +84,14 @@ ovpn -v
 ovpn --version
 ```
 
-`-v` prints only the image version (e.g. `3.0.0`). `--version` prints the image,
-data schema, OpenVPN, Easy-RSA, runtime strategy, base image, source revision,
-build date, and OpenVPN candidate range:
+`-v` prints only the image version (e.g. `3.0.0`). `--version` prints the four
+operator-facing version axes:
 
 ```text
 image:           3.0.0
-data schema:     3
 openvpn:         2.7.5
 easy-rsa:        3.2.2
-runtime:         source-build
-base image:      debian:trixie-slim
-vcs revision:    <commit>
-build date:      <UTC timestamp>
-candidate:       >=2.7.0 <2.8.0
+data schema:     3
 ```
 
 Use `ovpn runtime version` for the complete build-information JSON.

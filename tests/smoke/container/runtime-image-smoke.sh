@@ -63,6 +63,15 @@ if [ "$short_version" != "$IMAGE_VERSION" ]; then
   exit 1
 fi
 
+version_summary="$(docker run --rm --entrypoint ovpn "$IMAGE" --version)"
+expected_summary="$(printf 'image:           %s\nopenvpn:         %s\neasy-rsa:        3.2.2\ndata schema:     %s' \
+  "$IMAGE_VERSION" "$OPENVPN_VERSION" "$DATA_SCHEMA")"
+if [ "$version_summary" != "$expected_summary" ]; then
+  echo 'version summary does not match the four-field public format' >&2
+  printf 'expected:\n%s\nactual:\n%s\n' "$expected_summary" "$version_summary" >&2
+  exit 1
+fi
+
 docker run --rm --entrypoint sh "$IMAGE" -ec '
   ! command -v curl >/dev/null
   command -v jq >/dev/null

@@ -78,19 +78,13 @@ ovpn -v
 ovpn --version
 ```
 
-`-v` 仅打印镜像版本（如 `3.0.0`）。`--version` 打印镜像、数据 schema、OpenVPN、
-Easy-RSA、runtime 策略、基础镜像、源码提交、构建时间和 OpenVPN 候选范围：
+`-v` 仅打印镜像版本（如 `3.0.0`）。`--version` 打印四项面向运维者的版本信息：
 
 ```text
 image:           3.0.0
-data schema:     3
 openvpn:         2.7.5
 easy-rsa:        3.2.2
-runtime:         source-build
-base image:      debian:trixie-slim
-vcs revision:    <commit>
-build date:      <UTC timestamp>
-candidate:       >=2.7.0 <2.8.0
+data schema:     3
 ```
 
 完整的构建信息 JSON 可通过 `ovpn runtime version` 获取。

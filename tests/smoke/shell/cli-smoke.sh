@@ -91,9 +91,12 @@ if ! grep -Fq "\"openvpn_source_version\": \"$OPENVPN_VERSION\"" /tmp/ovpn-versi
   exit 1
 fi
 "$OVPN" --version >/tmp/ovpn-version-summary.out
-grep -Fq "image:          $IMAGE_VERSION" /tmp/ovpn-version-summary.out
-grep -Fq "data schema:    $DATA_SCHEMA" /tmp/ovpn-version-summary.out
-grep -Fq "candidate:      $OPENVPN_CANDIDATE_RANGE" /tmp/ovpn-version-summary.out
+grep -Fqx "image:           $IMAGE_VERSION" /tmp/ovpn-version-summary.out
+grep -Fqx "openvpn:         $OPENVPN_VERSION" /tmp/ovpn-version-summary.out
+grep -Eq '^easy-rsa:        (unknown|[0-9]+\.[0-9]+\.[0-9]+)$' /tmp/ovpn-version-summary.out
+grep -Fqx "data schema:     $DATA_SCHEMA" /tmp/ovpn-version-summary.out
+[ "$(wc -l </tmp/ovpn-version-summary.out)" -eq 4 ]
+[ "$(tail -n 1 /tmp/ovpn-version-summary.out)" = "data schema:     $DATA_SCHEMA" ]
 export OVPN_DATA_DIR="$data_dir"
 "$OVPN" state doctor --json >/tmp/ovpn-doctor.out 2>/tmp/ovpn-doctor.err
 if ! grep -Fq '"state": "EMPTY"' /tmp/ovpn-doctor.out; then
