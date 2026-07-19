@@ -400,6 +400,11 @@ docker compose exec openvpn ovpn runtime events --lines 100 --json
 迁移记录。两者都支持 `--follow`，且不会阻塞经 management broker 执行的状态、
 断开或重载操作。
 
+`runtime events` 读取面向用户的事件流 `logs/events.jsonl`。独立的
+`meta/audit.jsonl` 是严格的持久化 schema 状态：它记录关键修改，由 `state doctor`
+校验，并在身份恢复时提供 rename 证据；repair、网络和数据迁移事务也会包含它。
+请勿手动编辑或删除。
+
 ---
 
 ## 备份与恢复

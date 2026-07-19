@@ -189,6 +189,9 @@ docker compose exec openvpn ovpn runtime logs --lines 100
 docker compose exec openvpn ovpn runtime events --lines 100 --json
 ```
 
+面向用户的事件流与严格的内部审计 `meta/audit.jsonl` 分开保存。该审计属于持久化
+数据 schema，并用于状态校验、repair 恢复和数据迁移；请勿手动修改或删除。
+
 ## 安全说明
 
 - 默认设计将 CA 保持在持久化数据卷内，便于日常运维；数据卷被攻破可能导致 CA 泄露。

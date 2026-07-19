@@ -431,6 +431,12 @@ connection, lifecycle, rename, IP, network, and migration records.
 Both accept `--follow` and continue without blocking status, disconnect, or
 reload operations through the management broker.
 
+`runtime events` reads `logs/events.jsonl`, which is the user-facing event
+stream. The separate `meta/audit.jsonl` is strict persistent schema state: it
+records critical mutations, is validated by `state doctor`, and supplies
+rename evidence during identity recovery. It is included in repair, network,
+and migration transactions and must not be manually edited or deleted.
+
 ---
 
 ## Backup and restore

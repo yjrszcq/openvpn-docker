@@ -211,6 +211,11 @@ docker compose exec openvpn ovpn runtime logs --lines 100
 docker compose exec openvpn ovpn runtime events --lines 100 --json
 ```
 
+The user-facing event stream is stored separately from the strict internal
+audit at `meta/audit.jsonl`. The audit belongs to the persistent data schema and
+is used by state validation, repair recovery, and migration; do not edit or
+delete it manually.
+
 ## Security Notes
 
 - The default design keeps the CA inside the persistent data volume for

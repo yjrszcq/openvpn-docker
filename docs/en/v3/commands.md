@@ -606,6 +606,14 @@ IP, rename, network migration, and data migration events.
 The default is human-readable text; `--json` emits one JSON object per event.
 `--follow` streams new records without blocking management commands.
 
+This command reads `logs/events.jsonl`, the user-facing observability stream.
+It does not read `meta/audit.jsonl`. The latter is a strict, schema-owned
+internal audit of critical persistent mutations such as IP application,
+client lifecycle changes, rename, and network migration. State validation
+checks its format, repair may use the latest rename record as identity-recovery
+evidence, and data migration preserves or converts it. Do not edit, truncate,
+or delete `meta/audit.jsonl` manually.
+
 ## Examples
 
 ```bash

@@ -479,6 +479,12 @@ ovpn runtime events [--lines N] [--follow] [--json]
 事件。默认输出便于阅读的文本；`--json` 每行输出一个 JSON 对象。
 `--follow` 持续输出新记录且不阻塞 management 命令。
 
+该命令读取面向用户可观察性的 `logs/events.jsonl`，不会读取 `meta/audit.jsonl`。
+后者是由数据 schema 管理的严格内部审计，记录 IP 应用、客户端生命周期变更、
+rename 和网络迁移等关键持久化修改。状态检查会校验其格式；repair 可将最后一条
+rename 记录用作身份恢复证据；数据迁移会保留或转换它。请勿手动编辑、截断或删除
+`meta/audit.jsonl`。
+
 ## 示例
 
 ```bash
