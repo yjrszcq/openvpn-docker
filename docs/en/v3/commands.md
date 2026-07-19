@@ -57,7 +57,6 @@ ovpn
 │   ├── version         Print image and runtime build information.
 │   ├── logs            Read translated or raw persistent OpenVPN logs.
 │   └── events          Read structured runtime and lifecycle events.
-├── upgrade             Check, install, or roll back signed management code.
 ├── migrate             Plan or apply an offline data-schema migration.
 └── help                Print this help message.
 ```
@@ -85,15 +84,20 @@ ovpn -v
 ovpn --version
 ```
 
-`-v` prints only the active management-code version (e.g. `3.0.0`).
-`--version` prints a four-line summary with management, image, OpenVPN, and
-Easy-RSA versions:
+`-v` prints only the image version (e.g. `3.0.0`). `--version` prints the image,
+data schema, OpenVPN, Easy-RSA, runtime strategy, base image, source revision,
+build date, and OpenVPN candidate range:
 
 ```text
-management:   3.0.0
-image:        3.0.0
-openvpn:      2.7.5
-easy-rsa:     3.2.2
+image:           3.0.0
+data schema:     3
+openvpn:         2.7.5
+easy-rsa:        3.2.2
+runtime:         source-build
+base image:      debian:trixie-slim
+vcs revision:    <commit>
+build date:      <UTC timestamp>
+candidate:       >=2.7.0 <2.8.0
 ```
 
 Use `ovpn runtime version` for the complete build-information JSON.
@@ -486,38 +490,6 @@ selected client certificate and key, and tls-crypt key. `<client>` may be the
 current name or UUID. Output defaults to standard output; `--output` writes an
 atomically replaced mode-`0600` file.
 
-## Management code updates
-
-### `ovpn upgrade`
-
-Syntax:
-
-```text
-ovpn upgrade [--check] [--version VERSION] [--json] [--yes]
-ovpn upgrade --rollback [--yes]
-```
-
-Without `--version`, selects the highest newer stable GitHub Release compatible
-with the image platform API, OpenVPN runtime and capabilities, and current data
-schema. `--check` downloads and verifies only signed manifests. A target using a
-different schema is rejected with a maintenance `ovpn migrate` instruction.
-
-An update verifies Ed25519 signature, SHA-256, archive paths and types, and the
-inner compatibility contract before self-testing and atomically switching the
-active management bundle. It preserves active and previous assets under
-`repair/.scripts`, does not reload OpenVPN, and requires `--yes` outside a TTY.
-`--rollback` swaps to the retained compatible previous bundle or embedded
-fallback. Standard proxy variables and optional `OVPN_GITHUB_TOKEN` are honored.
-The supplied Compose file passes these values to both live and maintenance
-services; because both use host networking, `http://127.0.0.1:7890` addresses a
-proxy on the Docker host. Stable image-owned CLI and hook launchers resolve the
-active bundle per invocation, so later commands and connection hooks change
-versions without signaling OpenVPN.
-Exit status `64` reports invalid arguments or missing non-interactive
-confirmation, `69` reports GitHub/download unavailability, `74` reports
-verification or installation failure, and `78` reports an incompatible target
-or rollback. Success and an already-current target return `0`.
-
 ## Persistent data migration
 
 ### `ovpn migrate`
@@ -525,22 +497,21 @@ or rollback. Success and an already-current target return `0`.
 Syntax:
 
 ```text
-ovpn migrate plan [--to-version VERSION] [--json]
-ovpn migrate apply [--to-version VERSION] [--yes]
+ovpn migrate plan [--json]
+ovpn migrate apply [--yes]
 ```
 
 Available only through the stopped `openvpn-maintenance` service. `plan` is
 read-only and reports source/target schemas, the ordered migration chain,
-client count, blockers, and an optional target management release. `apply`
-requires confirmation, or `--yes` outside a TTY. An already-current schema is
-an idempotent success.
+client count, blockers, credential impact, and profile redistribution needs.
+`apply` requires confirmation, or `--yes` outside a TTY. An already-current
+schema is an idempotent success.
 
-Without `--to-version`, the currently active management code migrates to its
-current schema. With `--to-version`, the command verifies a compatible signed target
-bundle and stages target code and data together. Apply obtains the exclusive
-runtime lock, snapshots persistent data, migrates only a staging copy,
-validates schema, PKI, registries, profiles, and target code, then commits both
-selectors. Failure or interruption restores the data and active-code selector.
+Migration always uses code embedded in the current maintenance image and does
+not access the network. Apply obtains the exclusive runtime lock, snapshots
+persistent data, migrates only a staging copy, validates schema, PKI,
+registries, profiles, and configuration, then atomically commits the data.
+Failure or interruption restores the original data.
 Schema 1 runs `1→2→3`; schema 2 runs `2→3`. Both replace name-CN client
 credentials with UUID-CN credentials, so every active profile reported after
 success must be redistributed.
@@ -548,7 +519,7 @@ success must be redistributed.
 Data-dependent commands reject old, conflicting, invalid, or newer schemas
 with exit status `78`; only `migrate` may read historical formats. Help,
 version, and capability inspection remain available without parsing instance
-data. Platform API or OpenVPN incompatibility also returns `78` and requires an image update.
+data.
 Snapshots and reports are retained below `repair/migrations`. Restoring an old
 image after migration requires restoring its matching pre-migration snapshot;
 an image rollback alone is not a data rollback.
@@ -602,11 +573,10 @@ ovpn runtime version
 
 Prints build-information JSON from
 `/usr/local/share/openvpn-container/build-info.json`, with the Easy-RSA version
-detected at runtime. It reports the active management version and source
-(`embedded` or `online`), image version, platform API, data schema, OpenVPN,
-Easy-RSA, and the OpenVPN candidate range used by update automation. The
-candidate range is not a runtime compatibility claim. If build information is
-missing, it detects Easy-RSA and prints `unknown` for unavailable fields.
+detected at runtime. It reports image version, data schema, OpenVPN, Easy-RSA,
+runtime/build provenance, and the OpenVPN candidate range used by automation.
+The candidate range is not a runtime compatibility claim. If build information
+is missing, it detects Easy-RSA and prints `unknown` for unavailable fields.
 
 ### `ovpn runtime logs`
 
@@ -631,7 +601,7 @@ ovpn runtime events [--lines N] [--follow] [--json]
 ```
 
 Reads the latest 100 structured connection, disconnection, client lifecycle,
-IP, rename, network migration, management update, and data migration events.
+IP, rename, network migration, and data migration events.
 The default is human-readable text; `--json` emits one JSON object per event.
 `--follow` streams new records without blocking management commands.
 

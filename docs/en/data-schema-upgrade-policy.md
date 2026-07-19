@@ -1,67 +1,70 @@
 # Data Schema Upgrade Policy
 
-This version-independent policy governs persistent data compatibility for every
-management release and remains in force when command manuals are archived.
+This version-independent policy defines the persistent-data compatibility
+contract. It remains in force when command manuals and image releases change.
 
-## Independent versions
+## Version independence
 
-The management-code version, image version, OpenVPN runtime version, and
-persistent data schema are independent. The data schema is a monotonically
-increasing integer and changes only for incompatible persisted-state changes.
-Multiple management and image releases may use the same schema.
+The image version, OpenVPN runtime version, and persistent data schema are
+independent. The schema is a monotonically increasing positive integer and
+changes only when the persistent format becomes incompatible. Multiple image
+and OpenVPN versions may use the same schema, and every image using that schema
+must interpret it identically.
 
-Published management versions, exact source commits, schemas, distribution
-type, platform API range, and exactly verified OpenVPN versions are recorded in
-`compatibility/data-schema-releases.jsonl`. Every release must be registered.
-Historical `legacy-image` rows explicitly have no online platform range;
-online-capable releases use `signed-bundle`.
-The registry uses one strict JSON object per line. Unknown fields and invalid
-types are rejected so registry-format changes require an explicit validator
-update.
+Migration dispatch is based only on schema evidence stored in the data
+directory. It must not select persistent formats by image version, release tag,
+source commit, or OpenVPN version.
 
-```json
-{"management_version":"3.0.0","commit":"<40-character commit>","data_schema":3,"distribution":"signed-bundle","platform_api":{"min":2,"max":2},"openvpn":{"supported":["2.7.5"]}}
-```
+## Strict runtime gate
 
-`legacy-image` entries use `null` for `platform_api`.
+Normal runtime code accepts only its current schema. Historical schemas may be
+read only by migration modules lazy-loaded by `ovpn migrate`; normal config,
+client, IP, state, repair, recovery, and server-start paths must not source or
+parse historical formats.
 
-## Runtime boundary
+An older schema prevents server startup and data-dependent commands with exit
+status `78`. Help, version, capabilities, and migration planning may remain
+available where they do not parse current-format state. Conflicting, malformed,
+unknown, or newer schema evidence is rejected rather than guessed.
 
-A management release runs only its current schema. Historical schemas may be
-read only by migration modules loaded by `ovpn migrate`; normal configuration, client,
-network, state, repair, render, and runtime-data commands must not contain
-historical compatibility branches.
+Startup migration, repair-driven migration, and config-driven backfilling are
+forbidden. `state doctor` diagnoses only the current schema; use `migrate plan`
+for historical data.
 
-An older schema prevents the server from starting. Automatic startup migration,
-migration through repair, and old-format completion by `config apply` are
-prohibited. Data-independent help, version, and runtime-capability inspection
-may remain available. Supporting an older release means supporting its migration,
-not running its data without migration.
+## Continuous migrations
 
-## Migration requirements
+Every schema change provides one dedicated `N-to-N+1` migration. A multi-schema
+upgrade executes those steps in order. Historical migration code is loaded
+only by the migrate dispatcher and is never sourced by normal runtime code.
 
-Every schema change provides a dedicated `N-to-N+1` migration. Multi-schema
-upgrades run registered steps in order. Historical migration code is loaded
-only by the migrate command and is not sourced by the normal runtime.
+The current image should retain a complete migration chain from every schema
+for which sufficient released-format evidence exists. A missing step or
+insufficient/conflicting evidence blocks migration.
 
-The newest management release should retain a complete chain from every
-published schema for which sufficient evidence exists. Migrate must refuse to
-guess when a schema is
-unknown, newer than the image, inconsistent, or missing required evidence.
+## Maintenance transaction
 
-Destructive migration is offline and runs through `openvpn-maintenance`.
-Migrate must provide a read-only plan, explicit apply confirmation, a durable
-snapshot, staging, full target validation, interrupted-commit recovery, and a
-report of credential replacement, profile invalidation, and lost history.
+All destructive migrations run while OpenVPN is stopped, through the current
+image's `openvpn-maintenance` service. `migrate plan` is read-only. `migrate
+apply` requires explicit confirmation and must acquire the exclusive runtime
+lock, create a durable snapshot and transaction marker, migrate a staging copy,
+validate the target schema and state, and commit atomically. Failure or
+interruption restores the original data.
 
-A migrated data directory cannot be used by older management code that lacks
-support for its schema. Rolling back code or an image requires restoring the
-matching pre-migration snapshot when their embedded code does not support it.
+Migration uses only code embedded in the maintenance image and must not query
+or download project releases. The final report identifies credentials or
+profiles that were replaced and must be redistributed.
 
-## Release gates
+## Rollback
 
-A schema-changing release is incomplete without migration, fixtures,
-documentation, and tests. CI must exercise every published release baseline in
-the manifest to the current schema. Every management release must register its
-version, exact source commit, schema, distribution type, platform range, and
-exactly verified OpenVPN versions even when the schema is unchanged.
+Migrated data cannot be given to an older image that does not support its
+schema. An image rollback after migration requires restoring the matching
+pre-migration snapshot. Recreating an old container without restoring its data
+is not a supported rollback.
+
+## Definition of done
+
+A schema change is incomplete without the schema increment, one continuous
+migration step, representative source fixtures, target validation, failure and
+recovery tests, and updates to this policy and current operations documents.
+CI must verify every retained source schema to the current schema, current
+schema idempotence, and rejection of invalid or newer schemas.

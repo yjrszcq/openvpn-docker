@@ -5,8 +5,8 @@ see the [v3 command reference](commands.md).
 
 Persistent format changes follow the version-independent
 [data schema upgrade policy](../data-schema-upgrade-policy.md).
-Management-code and image responsibilities follow the permanent
-[management code update policy](../management-update-policy.md).
+Project-code and runtime delivery follows the permanent
+[image update policy](../image-update-policy.md).
 
 ## Runtime conventions
 
@@ -31,18 +31,13 @@ If your compose file does not include the maintenance service, add it under
 
 ```yaml
   openvpn-maintenance:
-    image: szcq/openvpn:2.7.5
+    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
     restart: "no"
     network_mode: host
     volumes:
       - ./openvpn-data:/etc/openvpn
     environment:
       OVPN_MAINTENANCE: "true"
-      OVPN_GITHUB_TOKEN: ${OVPN_GITHUB_TOKEN:-}
-      HTTP_PROXY: ${HTTP_PROXY:-}
-      HTTPS_PROXY: ${HTTPS_PROXY:-}
-      ALL_PROXY: ${ALL_PROXY:-}
-      NO_PROXY: ${NO_PROXY:-}
     profiles:
       - maintenance
     command:
@@ -52,8 +47,8 @@ If your compose file does not include the maintenance service, add it under
 ```
 
 It mounts the same persistent data but does not request TUN, `NET_ADMIN`, or
-exposed ports. Host networking lets standard proxy variables refer to a proxy
-on the Docker host, including `http://127.0.0.1:7890`.
+exposed ports. Always set `OVPN_IMAGE` to the image being prepared for the live
+service, so migration code and the next runtime come from the same image.
 
 ---
 
@@ -265,39 +260,31 @@ networks must also have public IPv6 connectivity.
 
 ---
 
-## Management code updates
+## Image updates
 
-Management code, the image/platform, OpenVPN, and persistent data schema are
-independent. Check the active values before an update:
+The image is the only project-code delivery unit. `IMAGE_VERSION`,
+`OPENVPN_VERSION`, and the persistent data schema are independent. Inspect the
+running image before an update, then select and pull an explicit target image:
 
 ```bash
 docker compose exec openvpn ovpn --version
-docker compose exec openvpn ovpn runtime version
-docker compose exec openvpn ovpn upgrade --check --json
+# edit OVPN_IMAGE in .env, then:
+docker compose pull openvpn openvpn-maintenance
 ```
 
-Install the newest compatible stable management bundle:
+An image update may replace project code, OpenVPN, system dependencies, and the
+base system. It does not implicitly rewrite persistent data. Stop the live
+service before handing the mounted directory to the target image:
 
 ```bash
-docker compose exec openvpn ovpn upgrade --yes
+docker compose stop openvpn
+docker compose run --rm openvpn-maintenance migrate plan
 ```
 
-Use `--version X.Y.Z` to select a specific newer stable release. Download,
-signature verification, extraction, and self-test happen before the active
-selector changes. The command does not modify instance data, reload OpenVPN,
-or disconnect clients. If the newest release is incompatible, automatic
-selection may choose the highest compatible newer release and report skipped
-targets. A platform API or OpenVPN mismatch requires a newer image. A schema
-mismatch requires the stopped maintenance migration below.
-
-Only the retained compatible previous bundle can be restored:
-
-```bash
-docker compose exec openvpn ovpn upgrade --rollback --yes
-```
-
-Rollback changes management code only. It cannot undo configuration changes or
-data migration.
+If plan reports that source and target schemas are already equal, skip apply,
+run `state doctor`, and recreate the live service. If it reports a migration
+chain, continue with the migration procedure below. Starting the target image
+without the required migration fails closed with status `78`.
 
 ---
 
@@ -312,22 +299,11 @@ data commands. Do not run repair or `config apply` to bypass this gate.
    docker compose stop openvpn
    ```
 
-2. Inspect the migration without changing code or data:
+2. Inspect the migration with the target image without changing data:
 
    ```bash
    docker compose run --rm openvpn-maintenance migrate plan
    docker compose run --rm openvpn-maintenance migrate plan --json
-   ```
-
-   To migrate with a newer signed management release in the same transaction,
-   add `--to-version X.Y.Z` to both plan and apply. If that target needs a newer
-   platform API or OpenVPN runtime, update the image first.
-
-   ```bash
-   docker compose run --rm openvpn-maintenance migrate plan \
-     --to-version X.Y.Z
-   docker compose run --rm openvpn-maintenance migrate apply \
-     --to-version X.Y.Z --yes
    ```
 
 3. Apply from maintenance:
@@ -337,11 +313,11 @@ data commands. Do not run repair or `config apply` to bypass this gate.
    ```
 
    Apply requires the server to remain stopped and obtains an exclusive lock.
-   It snapshots the data directory (excluding the internal
-   `repair/.scripts` bundle store), stages migration separately, validates the
-   target, then commits code and data together. Failures restore both
-   selectors; an interrupted transaction is recovered by the next apply.
-   Reports and snapshots remain under `openvpn-data/repair/migrations/`.
+   It snapshots the data directory, migrates an isolated staging copy with code
+   embedded in the maintenance image, validates the target, then atomically
+   commits data. It does not access the network. Failures restore the original
+   data; an interrupted transaction is recovered by the next apply. Reports and
+   snapshots remain under `openvpn-data/repair/migrations/`.
 
 4. Check the migrated instance and restart:
 
@@ -441,7 +417,7 @@ docker compose exec openvpn ovpn runtime events --lines 100 --json
 
 `runtime logs` translates known certificate UUIDs to `name [uuid]`; use
 `--raw` when comparing exact OpenVPN output. `runtime events` exposes
-connection, lifecycle, rename, IP, network, upgrade, and migration records.
+connection, lifecycle, rename, IP, network, and migration records.
 Both accept `--follow` and continue without blocking status, disconnect, or
 reload operations through the management broker.
 

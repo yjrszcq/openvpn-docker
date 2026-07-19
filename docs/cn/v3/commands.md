@@ -51,7 +51,6 @@ ovpn
 │   ├── version         打印镜像和运行时构建信息。
 │   ├── logs            读取已翻译或原始的持久化 OpenVPN 日志。
 │   └── events          读取结构化运行时和生命周期事件。
-├── upgrade             检查、安装或回滚已签名的管理代码。
 ├── migrate             规划或执行离线数据 schema 迁移。
 └── help                打印此帮助。
 ```
@@ -79,14 +78,19 @@ ovpn -v
 ovpn --version
 ```
 
-`-v` 仅打印当前管理代码版本（如 `3.0.0`）。`--version` 打印四行摘要，包含
-管理代码、镜像、OpenVPN 和 Easy-RSA 版本：
+`-v` 仅打印镜像版本（如 `3.0.0`）。`--version` 打印镜像、数据 schema、OpenVPN、
+Easy-RSA、runtime 策略、基础镜像、源码提交、构建时间和 OpenVPN 候选范围：
 
 ```text
-management:   3.0.0
-image:        3.0.0
-openvpn:      2.7.5
-easy-rsa:     3.2.2
+image:           3.0.0
+data schema:     3
+openvpn:         2.7.5
+easy-rsa:        3.2.2
+runtime:         source-build
+base image:      debian:trixie-slim
+vcs revision:    <commit>
+build date:      <UTC timestamp>
+candidate:       >=2.7.0 <2.8.0
 ```
 
 完整的构建信息 JSON 可通过 `ovpn runtime version` 获取。
@@ -379,35 +383,6 @@ ovpn render client <client> [--stdout|--output <path>]
 `.ovpn` profile。`<client>` 可使用当前名称或 UUID。输出默认为标准输出；`--output`
 写入一个原子替换的 mode-`0600` 文件。
 
-## 管理代码在线更新
-
-### `ovpn upgrade`
-
-语法：
-
-```text
-ovpn upgrade [--check] [--version VERSION] [--json] [--yes]
-ovpn upgrade --rollback [--yes]
-```
-
-未指定 `--version` 时，选择 GitHub 稳定 Release 中高于当前版本、且与镜像
-platform API、OpenVPN runtime 及能力、当前数据 schema 兼容的最高版本。
-`--check` 只下载并验证签名清单。目标 schema 不同时拒绝在线更新，并提示通过
-maintenance 中的 `ovpn migrate` 处理。
-
-实际更新会验证 Ed25519 签名、SHA-256、归档路径和类型、bundle 内兼容 contract，
-通过隔离自检后原子切换 active 管理 bundle。active 和 previous 资产保存在
-`repair/.scripts`，不会重载 OpenVPN；非 TTY 必须提供 `--yes`。`--rollback` 切换到
-仍兼容的 previous bundle 或镜像内 embedded fallback。下载遵循标准代理变量，并支持
-可选的 `OVPN_GITHUB_TOKEN`。
-项目提供的 Compose 会把这些变量传给在线和 maintenance 服务；两者均使用 host 网络，
-因此 `http://127.0.0.1:7890` 指向 Docker 宿主机代理。镜像内稳定的 CLI 和 hook
-launcher 每次调用时解析 active bundle，后续命令与连接 hook 可直接切换版本，而不会
-向 OpenVPN 发送信号。
-退出状态 `64` 表示参数或非交互确认错误，`69` 表示 GitHub/API/下载不可用，`74`
-表示验证或安装事务失败，`78` 表示目标或回滚版本不兼容；成功及目标已是当前版本时
-返回 `0`。
-
 ## 持久化数据迁移
 
 ### `ovpn migrate`
@@ -415,24 +390,22 @@ launcher 每次调用时解析 active bundle，后续命令与连接 hook 可直
 语法：
 
 ```text
-ovpn migrate plan [--to-version VERSION] [--json]
-ovpn migrate apply [--to-version VERSION] [--yes]
+ovpn migrate plan [--json]
+ovpn migrate apply [--yes]
 ```
 
 此命令只能通过已停止服务的 `openvpn-maintenance` 使用。`plan` 为只读操作，报告
-源/目标 schema、有序迁移链、客户端数量、阻塞项和可选目标管理版本。`apply`
-要求交互确认；非 TTY 必须传 `--yes`。已经是当前 schema 时幂等成功。
+源/目标 schema、有序迁移链、客户端数量、阻塞项、凭据影响和 profile 重分发需求。
+`apply` 要求交互确认；非 TTY 必须传 `--yes`。已经是当前 schema 时幂等成功。
 
-不传 `--to-version` 时，使用当前 active 管理代码迁移到其当前 schema。传入目标版本时，
-命令先验证兼容的已签名 bundle，再共同 staging 目标代码和数据。apply 获取独占
-运行锁、创建持久化快照、只迁移 staging 副本，验证 schema、PKI、清单、profile
-和目标代码后再同时提交。失败或中断时恢复数据与 active 代码指针。schema 1 执行
+迁移始终使用当前 maintenance 镜像内置代码且不访问网络。apply 获取独占运行锁、
+创建持久化快照、只迁移 staging 副本，验证 schema、PKI、清单、profile 和配置后
+原子提交数据。失败或中断时恢复原数据。schema 1 执行
 `1→2→3`，schema 2 执行 `2→3`；两者都会把名称 CN 凭据替换为 UUID CN 凭据，
 成功后报告的所有活跃 profile 都必须重新分发。
 
 读取数据的命令对旧、冲突、非法或更新 schema 返回 `78`；只有 `migrate` 可以读取
-历史格式。不解析实例数据的 help、version 和 capabilities 仍可使用。platform API
-或 OpenVPN 不兼容同样返回 `78`，此时必须升级镜像。
+历史格式。不解析实例数据的 help、version 和 capabilities 仍可使用。
 快照和报告保存在 `repair/migrations` 下。数据迁移后若要运行旧镜像，必须恢复与其
 匹配的迁移前快照；仅回滚镜像不等于回滚数据。
 
@@ -477,9 +450,9 @@ ovpn runtime version
 ```
 
 打印 `/usr/local/share/openvpn-container/build-info.json` 中的构建信息 JSON，其中
-Easy-RSA 版本为运行时检测值。输出包含 active 管理版本及来源（`embedded` 或
-`online`）、镜像版本、platform API、数据 schema、OpenVPN、Easy-RSA 和更新自动化
-使用的 OpenVPN 候选范围。候选范围不是 runtime 兼容性声明。若构建信息缺失，则检测
+Easy-RSA 版本为运行时检测值。输出包含镜像版本、数据 schema、OpenVPN、Easy-RSA、
+runtime/构建来源和自动化使用的 OpenVPN 候选范围。候选范围不是 runtime 兼容性声明。
+若构建信息缺失，则检测
 Easy-RSA，其余不可用字段打印 `unknown`。
 
 ### `ovpn runtime logs`
@@ -502,8 +475,8 @@ ovpn runtime logs [--lines N] [--follow] [--raw]
 ovpn runtime events [--lines N] [--follow] [--json]
 ```
 
-读取最近 100 条结构化连接、断开、客户端生命周期、IP、rename、网络迁移、管理更新
-和数据迁移事件。默认输出便于阅读的文本；`--json` 每行输出一个 JSON 对象。
+读取最近 100 条结构化连接、断开、客户端生命周期、IP、rename、网络迁移和数据迁移
+事件。默认输出便于阅读的文本；`--json` 每行输出一个 JSON 对象。
 `--follow` 持续输出新记录且不阻塞 management 命令。
 
 ## 示例

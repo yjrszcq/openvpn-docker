@@ -18,12 +18,16 @@ EOF
 for commands in \
   "$ROOT_DIR/docs/en/v3/commands.md" \
   "$ROOT_DIR/docs/cn/v3/commands.md"; do
-  grep -Fq 'ovpn migrate plan [--to-version VERSION] [--json]' "$commands"
-  grep -Fq 'ovpn migrate apply [--to-version VERSION] [--yes]' "$commands"
+  grep -Fq 'ovpn migrate plan [--json]' "$commands"
+  grep -Fq 'ovpn migrate apply [--yes]' "$commands"
   grep -Fq 'ovpn runtime logs [--lines N] [--follow] [--raw]' "$commands"
   grep -Fq 'ovpn runtime events [--lines N] [--follow] [--json]' "$commands"
   grep -Fq 'OVPN_LOG_MAX_BYTES' "$commands"
   grep -Fq 'OVPN_LOG_BACKUPS' "$commands"
+  if grep -Eq 'ovpn upgrade|--to-version|MANAGEMENT_VERSION|PLATFORM_API|repair/\.scripts' "$commands"; then
+    echo "current command reference contains removed online-update interfaces: $commands" >&2
+    exit 1
+  fi
 done
 # shellcheck disable=SC2016 # Assert literal Markdown code spans.
 grep -Fq 'data schema version `3`' "$ROOT_DIR/docs/en/v3/commands.md"
@@ -40,21 +44,33 @@ for operations in \
   grep -Fq 'openvpn-maintenance migrate apply --yes' "$operations"
   grep -Fq 'openvpn-maintenance state doctor' "$operations"
   grep -Fq 'docker compose up -d openvpn' "$operations"
-  grep -Fq 'repair/.scripts' "$operations"
   grep -Fq 'repair/migrations/' "$operations"
   grep -Fq 'runtime logs --lines 100' "$operations"
   grep -Fq 'runtime events --lines 100 --json' "$operations"
+  grep -Fq 'image-update-policy.md' "$operations"
+  if grep -Eq 'ovpn upgrade|--to-version|OVPN_GITHUB_TOKEN|PLATFORM_API|repair/\.scripts' "$operations"; then
+    echo "current operations guide contains removed online-update interfaces: $operations" >&2
+    exit 1
+  fi
 done
 
 for readme in "$ROOT_DIR/README.md" "$ROOT_DIR/README_CN.md"; do
   grep -Fq 'OVPN_LOG_MAX_BYTES' "$readme"
   grep -Fq 'OVPN_LOG_BACKUPS' "$readme"
-  grep -Fq 'ovpn upgrade --check' "$readme"
   grep -Fq 'openvpn-maintenance migrate plan' "$readme"
   grep -Fq 'runtime logs --lines 100' "$readme"
   grep -Fq 'runtime events --lines 100 --json' "$readme"
-  grep -Fq 'signed-bundle' "$readme"
+  grep -Fq 'image-update-policy.md' "$readme"
+  if grep -Eq 'ovpn upgrade|OVPN_GITHUB_TOKEN|MANAGEMENT_VERSION|PLATFORM_API|signed-bundle|data-schema-releases' "$readme"; then
+    echo "README contains removed online-update interfaces: $readme" >&2
+    exit 1
+  fi
 done
+
+test -r "$ROOT_DIR/docs/en/image-update-policy.md"
+test -r "$ROOT_DIR/docs/cn/image-update-policy.md"
+test ! -e "$ROOT_DIR/docs/en/management-update-policy.md"
+test ! -e "$ROOT_DIR/docs/cn/management-update-policy.md"
 
 grep -Fq 'docs/en/v3/commands.md' "$ROOT_DIR/README.md"
 grep -Fq 'docs/en/v3/operations.md' "$ROOT_DIR/README.md"

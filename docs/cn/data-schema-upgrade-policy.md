@@ -1,55 +1,54 @@
 # 数据 Schema 升级政策
 
-本政策约束所有管理代码版本的持久化数据兼容性。它独立于命令手册版本；旧版命令文档
-归档后，本文仍持续有效。
+本文定义独立于版本的持久化数据兼容契约；命令手册换版或镜像发布后仍持续生效。
 
-## 相互独立的版本
+## 版本独立
 
-管理代码版本、镜像版本、OpenVPN runtime 版本和持久化数据 schema 相互独立。
-数据 schema 使用单调递增整数，只在持久化状态发生不兼容变化时递增；多个管理代码
-和镜像版本可以共用同一个 schema。
+镜像版本、OpenVPN runtime 版本和持久化数据 schema 相互独立。schema 使用单调递增
+的正整数，只在持久化格式发生不兼容变化时递增。多个镜像和 OpenVPN 版本可以共用
+同一 schema，所有使用该 schema 的镜像都必须以相同方式解释数据。
 
-所有已发布管理代码、精确源码提交、schema、分发类型、platform API 范围及经过精确
-验证的 OpenVPN 版本记录在 `compatibility/data-schema-releases.jsonl`，每次发布都
-必须登记。历史
-`legacy-image` 条目明确不声明在线 platform 范围；支持在线更新的版本使用
-`signed-bundle`。
-清单采用每行一个严格 JSON 对象的格式；未知字段和错误类型都会被拒绝，因此清单格式
-变化必须显式更新校验器。
+迁移调度只依据数据目录中记录的 schema 证据，不得按镜像版本、Release tag、源码
+提交或 OpenVPN 版本选择持久化格式。
 
-```json
-{"management_version":"3.0.0","commit":"<40 位 commit>","data_schema":3,"distribution":"signed-bundle","platform_api":{"min":2,"max":2},"openvpn":{"supported":["2.7.5"]}}
-```
+## 严格 runtime gate
 
-`legacy-image` 条目的 `platform_api` 使用 `null`。
+普通 runtime 代码只接受当前 schema。历史 schema 只能由 `ovpn migrate` 延迟加载的
+migration 模块读取；普通 config、client、IP、state、repair、recovery 和服务启动
+路径不得 source 或解析历史格式。
 
-## 运行边界
+旧 schema 会使服务启动和读取数据的命令以状态 `78` 拒绝。help、version、
+capabilities 以及不解析当前格式状态的迁移计划仍可使用。schema 证据冲突、非法、
+未知或高于当前版本时必须拒绝，不得猜测。
 
-管理代码只运行当前 schema。历史 schema 只能由 `ovpn migrate` 加载的 migration 模块
-读取；普通 config、client、network、state、repair、render 和运行时数据命令不得
-包含历史兼容分支。
+禁止启动时迁移、repair 顺带迁移或 config 补写旧格式。`state doctor` 只诊断当前
+schema；历史数据应使用 `migrate plan`。
 
-旧 schema 必须阻止服务启动。禁止启动时自动迁移、repair 顺带迁移以及
-`config apply` 补写旧格式。不读取实例数据的帮助、版本和 runtime 能力检查可以继续
-使用。支持旧版本是指支持其迁移，不是允许旧版数据未经迁移直接运行。
+## 连续迁移
 
-## Migration 要求
+每次 schema 变化必须提供独立的 `N-to-N+1` migration；跨多个 schema 时按顺序连续
+执行。历史 migration 只能由 migrate dispatcher 加载，普通 runtime 不得 source。
 
-每次 schema 更新必须提供独立的 `N-to-N+1` migration；跨越多个 schema 时按注册
-顺序连续执行。历史 migration 只能由 migrate 命令加载，普通运行时不得 source。
+只要仍有足够的已发布格式证据，当前镜像就应保留从每个历史 schema 到当前 schema
+的完整迁移链。缺少迁移步骤或证据不足、冲突时必须阻止迁移。
 
-只要已发布 schema 仍有足够证据，最新管理代码就应保留完整迁移链。schema 未知、
-高于当前版本、内部不一致或缺少关键证据时，migrate 必须拒绝猜测。
+## Maintenance 事务
 
-所有破坏性迁移必须离线并通过 `openvpn-maintenance` 执行。migrate 必须提供只读
-plan、apply 显式确认、持久化快照、staging、目标完整验证、中断恢复，以及凭据更换、
-profile 失效和不可恢复历史报告。
+所有破坏性迁移必须停止 OpenVPN，并通过当前镜像的 `openvpn-maintenance` 服务执行。
+`migrate plan` 只读；`migrate apply` 必须显式确认、获取独占运行锁、创建持久化快照
+和事务标记、只迁移 staging 副本、验证目标 schema 与状态并原子提交。失败或中断时
+恢复原数据。
 
-迁移后的数据目录不能交给不支持其 schema 的旧管理代码运行；回滚代码或镜像时，
-若其中的代码不支持当前 schema，必须同时恢复匹配的迁移前快照。
+迁移只使用 maintenance 镜像内置代码，不查询或下载项目 Release。最终报告必须明确
+列出已替换并需要重新分发的凭据或 profile。
 
-## 发布门禁
+## 回滚
 
-缺少 migration、夹具、文档或测试的 schema 更新不算完成。CI 必须覆盖清单中每个
-已发布版本到当前 schema 的迁移。即使 schema 不变，新管理代码发布仍必须登记版本、
-精确源码提交、schema、分发类型、platform API 范围和经过精确验证的 OpenVPN 版本。
+迁移后的数据不能交给不支持其 schema 的旧镜像。迁移后回滚镜像时，必须恢复匹配的
+迁移前快照；只重建旧容器而不恢复数据不是受支持的回滚方式。
+
+## 完成定义
+
+schema 更新若缺少 schema 递增、连续 migration、代表性源格式夹具、目标验证、失败与
+恢复测试，或未更新本文和当前操作文档，则不算完成。CI 必须验证所有保留源 schema
+到当前 schema 的迁移、当前 schema 幂等以及非法或更新 schema 的拒绝行为。

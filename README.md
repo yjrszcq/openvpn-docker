@@ -114,8 +114,6 @@ bootstrap environment variables do not rewrite an existing instance.
 | `OVPN_LOG_BACKUPS` | `5` | `5` | Number of rotated OpenVPN log backups to retain; `0` disables backups. |
 | `OVPN_CRITICAL_MODE` | `exit` | `exit` | Use `maintenance` only to hold a critical container for inspection. |
 | `OVPN_EDITOR` | `EDITOR`, otherwise `nano` | unset | Editor used by interactive client-IP workflows. |
-| `OVPN_GITHUB_TOKEN` | unset | unset | Optional read-only GitHub token for management-release checks and downloads. Standard proxy variables are honored. |
-| `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` | inherited/empty | empty | Standard outbound proxy controls used by online management updates. Compose passes them to both services; host networking makes a host proxy such as `http://127.0.0.1:7890` reachable. |
 
 Runtime defaults apply only when the environment omits a value. The quick-start
 values are the deliberately opinionated values in
@@ -163,12 +161,12 @@ reference that matches the image version you operate:
 
 Persistent compatibility follows the version-independent
 [data schema upgrade policy](docs/en/data-schema-upgrade-policy.md). Its
-maintenance-only migration and release requirements remain in force across
+maintenance-only migration requirements remain in force across
 command-documentation versions.
 
-Management code, images, OpenVPN, and data schemas follow the independent
-[management code update policy](docs/en/management-update-policy.md). Online
-management updates never replace the OpenVPN kernel or migrate persistent data.
+Project code and runtime changes follow the permanent
+[image update policy](docs/en/image-update-policy.md). The image is the only
+code delivery unit; data migrations remain a separate maintenance operation.
 
 - [v1 command reference](docs/en/v1/commands.md) — release commit `6619921e5257e604f5df2c63d2fa10505b680d84`.
   - [v1 operations guide](docs/en/v1/operations.md) — workflow-oriented command combinations.
@@ -179,16 +177,9 @@ management updates never replace the OpenVPN kernel or migrate persistent data.
 
 ## Updates, migrations, and logs
 
-`MANAGEMENT_VERSION`, `IMAGE_VERSION`, `OPENVPN_VERSION`, and the integer data
-schema are independent. Inspect them with `ovpn --version` and
-`ovpn runtime version`.
-
-Same-schema management fixes can be installed without restarting OpenVPN:
-
-```bash
-docker compose exec openvpn ovpn upgrade --check
-docker compose exec openvpn ovpn upgrade --yes
-```
+`IMAGE_VERSION`, `OPENVPN_VERSION`, and the integer data schema are independent.
+Inspect them with `ovpn --version` and `ovpn runtime version`. Pull or build a
+new image and recreate the container for every project-code update.
 
 If a new image finds an older data schema, normal data commands and server
 startup fail with status `78`. Stop the live service and migrate only through
@@ -203,9 +194,9 @@ docker compose up -d openvpn
 ```
 
 Migration may replace client credentials; redistribute every active profile
-listed by `migrate apply`. A code/image rollback does not roll back migrated
+listed by `migrate apply`. An image rollback does not roll back migrated
 data—restore the matching pre-migration snapshot instead. See the operations
-guide for target-version migration, snapshots, and recovery.
+guide for snapshots and recovery.
 
 Persistent OpenVPN logs translate known UUIDs back to display names, while the
 event stream provides structured lifecycle records:
@@ -247,8 +238,8 @@ and `/dev/net/tun`.
 
 `OPENVPN_CANDIDATE_RANGE` in `versions.env` limits which upstream versions
 automation may propose; it does not claim runtime compatibility. Exact OpenVPN
-versions verified for the current management code are listed in
-`compatibility/contract.env` and signed into each management release.
+versions verified for the current image are listed in
+`compatibility/contract.env`.
 
 ## Build & Release
 
@@ -269,25 +260,16 @@ scripts/docker-build.sh -t szcq/openvpn-server:dev .
 OVPN_IMAGE=szcq/openvpn-server:dev docker compose up -d
 ```
 
-GitHub Actions separates management releases from image releases. Pushing a
-stable `v<MANAGEMENT_VERSION>` tag runs the full test gate, builds a
-deterministic management bundle, signs its strict manifest with the repository
-Ed25519 release key, and publishes only the three management assets described
-in the [management update policy](docs/en/management-update-policy.md). The
-repository secret `MANAGEMENT_SIGNING_KEY` contains that private key; it is
-never embedded in an image.
+GitHub Actions publishes project code only as images. Changing `IMAGE_VERSION`
+on the default branch publishes a tested GHCR candidate and then runs the Image
+Release workflow, which creates stable GHCR tags and the OpenVPN-version tag on
+Docker Hub. Image-version changes remain separate release commits.
 
-Because a commit cannot contain its own hash, prepare the release source commit
-first, register that exact hash as a `signed-bundle` object in
-`compatibility/data-schema-releases.jsonl` on the default branch, and only then
-tag the source commit. The release workflow reads the default-branch registry
-and rejects an unregistered tag or a schema/platform/OpenVPN mismatch.
-
-Changing `IMAGE_VERSION` on the default branch publishes a tested GHCR
-candidate and then runs the Image Release workflow, which creates stable GHCR
-tags and the OpenVPN-version tag on Docker Hub. A management-only version
-change does not publish an image. Platform API, OpenVPN, base-system, or
-immutable-bootstrap changes must include an image-version change.
+An incompatible persistent-format change must also increment `DATA_SCHEMA` and
+provide the next continuous migration, representative source fixtures, and
+policy/tests required by the [data schema upgrade policy](docs/en/data-schema-upgrade-policy.md).
+OpenVPN, base-system, dependency, and project-code changes are all delivered by
+the image; there is no management-code release channel.
 
 A weekly (or manually triggered) Upstream Check watches for new official
 OpenVPN releases within `OPENVPN_CANDIDATE_RANGE`. When one is found it pushes
