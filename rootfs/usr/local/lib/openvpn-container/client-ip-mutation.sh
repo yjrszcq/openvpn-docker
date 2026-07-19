@@ -28,7 +28,7 @@ ovpn_client_ip_set_current_assignment() {
   local value="$2"
   local index
 
-  index="$(ovpn_client_ip_assignment_index "$name")" || ovpn_die "client '$name' is missing from the applied client-IP registry"
+  index="$(ovpn_client_ip_assignment_index "$name")" || ovpn_die "client '$name' is missing from the authoritative client-IP registry"
   OVPN_CLIENT_IP_VALUES[index]="$value"
   if [ -n "$value" ]; then
     OVPN_CLIENT_IP_INTS[index]="$(ovpn_ipam_ipv4_to_int "$value")" || ovpn_die "invalid IP assignment '$value' for client '$name'"
