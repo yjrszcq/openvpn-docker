@@ -213,10 +213,10 @@ ovpn_render_server() {
   local output_path="$OVPN_DATA_DIR/server/server.conf"
   while [ "$#" -gt 0 ]; do
     case "$1" in
-    --stdout|-s)
+    --stdout | -s)
       output_path='-'
       ;;
-    --output|-o)
+    --output | -o)
       shift
       [ "$#" -gt 0 ] || ovpn_die "--output requires a path"
       output_path="$1"
@@ -244,10 +244,10 @@ ovpn_render_client() {
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-    --stdout|-s)
+    --stdout | -s)
       output_path='-'
       ;;
-    --output|-o)
+    --output | -o)
       shift
       [ "$#" -gt 0 ] || ovpn_die "--output requires a path"
       output_path="$1"
