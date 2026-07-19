@@ -78,18 +78,22 @@ if ! grep -Fq "\"image_version\": \"$IMAGE_VERSION\"" /tmp/ovpn-version.out; the
   echo 'version output missing image_version' >&2
   exit 1
 fi
-if ! grep -Fq "\"management_version\": \"$MANAGEMENT_VERSION\"" /tmp/ovpn-version.out; then
-  echo 'version output missing management_version' >&2
+if [ "$("$OVPN" -v)" != "$IMAGE_VERSION" ]; then
+  echo 'short version output does not report image version' >&2
   exit 1
 fi
-if [ "$("$OVPN" -v)" != "$MANAGEMENT_VERSION" ]; then
-  echo 'short version output does not report management version' >&2
+if grep -Eq 'management_version|management_source|platform_api' /tmp/ovpn-version.out; then
+  echo 'version output contains removed management version fields' >&2
   exit 1
 fi
 if ! grep -Fq "\"openvpn_source_version\": \"$OPENVPN_VERSION\"" /tmp/ovpn-version.out; then
   echo 'version output missing openvpn_source_version' >&2
   exit 1
 fi
+"$OVPN" --version >/tmp/ovpn-version-summary.out
+grep -Fq "image:          $IMAGE_VERSION" /tmp/ovpn-version-summary.out
+grep -Fq "data schema:    $DATA_SCHEMA" /tmp/ovpn-version-summary.out
+grep -Fq "candidate:      $OPENVPN_CANDIDATE_RANGE" /tmp/ovpn-version-summary.out
 export OVPN_DATA_DIR="$data_dir"
 "$OVPN" state doctor --json >/tmp/ovpn-doctor.out 2>/tmp/ovpn-doctor.err
 if ! grep -Fq '"state": "EMPTY"' /tmp/ovpn-doctor.out; then

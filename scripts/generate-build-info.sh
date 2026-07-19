@@ -23,8 +23,6 @@ json_string() {
 
 for name in \
   IMAGE_VERSION \
-  MANAGEMENT_VERSION \
-  PLATFORM_API \
   DATA_SCHEMA \
   BASE_IMAGE \
   OPENVPN_VERSION \
@@ -34,14 +32,6 @@ for name in \
   require_value "$name"
 done
 
-if ! [[ "$MANAGEMENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-  printf 'MANAGEMENT_VERSION must use SemVer form\n' >&2
-  exit 64
-fi
-if ! [[ "$PLATFORM_API" =~ ^[1-9][0-9]*$ ]]; then
-  printf 'PLATFORM_API must be a positive integer\n' >&2
-  exit 64
-fi
 if ! [[ "$DATA_SCHEMA" =~ ^[1-9][0-9]*$ ]]; then
   printf 'DATA_SCHEMA must be a positive integer\n' >&2
   exit 64
@@ -56,9 +46,6 @@ mkdir -p "$(dirname "$output_path")"
 {
   printf '{\n'
   printf '  "image_version": %s,\n' "$(json_string "$IMAGE_VERSION")"
-  printf '  "management_version": %s,\n' "$(json_string "$MANAGEMENT_VERSION")"
-  printf '  "management_source": "embedded",\n'
-  printf '  "platform_api": %s,\n' "$PLATFORM_API"
   printf '  "data_schema": %s,\n' "$DATA_SCHEMA"
   printf '  "runtime_strategy": %s,\n' "$(json_string "$runtime_strategy")"
   printf '  "openvpn_version": %s,\n' "$(json_string "$runtime_openvpn_version")"

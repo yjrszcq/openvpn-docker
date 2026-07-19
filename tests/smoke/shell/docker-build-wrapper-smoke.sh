@@ -37,8 +37,6 @@ assert_proxy_args() {
 
 assert_version_args() {
   grep -Fxq "IMAGE_VERSION=$IMAGE_VERSION" "$ARGS_FILE"
-  grep -Fxq "MANAGEMENT_VERSION=$MANAGEMENT_VERSION" "$ARGS_FILE"
-  grep -Fxq "PLATFORM_API=$PLATFORM_API" "$ARGS_FILE"
   grep -Fxq "DATA_SCHEMA=$DATA_SCHEMA" "$ARGS_FILE"
 }
 

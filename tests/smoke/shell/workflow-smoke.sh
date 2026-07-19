@@ -4,9 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 WORKFLOWS="$ROOT_DIR/.github/workflows"
 
-for workflow in test.yml candidate.yml upstream-check.yml release.yml management-release.yml; do
+for workflow in test.yml candidate.yml upstream-check.yml release.yml; do
   test -s "$WORKFLOWS/$workflow"
 done
+test ! -e "$WORKFLOWS/management-release.yml"
 
 grep -Fq 'workflow_call:' "$WORKFLOWS/test.yml"
 grep -Fq 'mvdan/shfmt:v3.10.0' "$WORKFLOWS/test.yml"
@@ -21,25 +22,18 @@ grep -Fq 'tests/smoke/shell/runtime-events-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'rootfs/usr/local/lib/openvpn-container/events.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/management-hook-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/uuid-registry-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/management-release-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/management-matrix-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/schema-gate-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/migration-isolation-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/registry-migration-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/schema2-uuid-migration-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/container/schema-migration-container-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/container/released-migration-matrix-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'OVPN_RELEASED_MIGRATION_REQUIRED=1' "$WORKFLOWS/test.yml"
+grep -Fq 'Verify schema 1 and schema 2 migration fixtures' "$WORKFLOWS/test.yml"
 grep -Fq 'fetch-depth: 0' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/client-ip-set-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/ipam-repair-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/network-migration-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'OVPN_NETWORK_MIGRATION_REQUIRED=1' "$WORKFLOWS/test.yml"
 grep -Fq 'linux/amd64,linux/arm64' "$WORKFLOWS/test.yml"
-# shellcheck disable=SC2016 # Assert literal workflow build-argument expressions.
-grep -Fq -- '--build-arg "MANAGEMENT_VERSION=$MANAGEMENT_VERSION"' "$WORKFLOWS/test.yml"
-# shellcheck disable=SC2016 # Assert literal workflow build-argument expressions.
-grep -Fq -- '--build-arg "PLATFORM_API=$PLATFORM_API"' "$WORKFLOWS/candidate.yml"
 # shellcheck disable=SC2016 # Assert literal workflow build-argument expressions.
 grep -Fq -- '--build-arg "DATA_SCHEMA=$DATA_SCHEMA"' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/container/upgrade-state-smoke.sh' "$WORKFLOWS/test.yml"
@@ -51,8 +45,11 @@ grep -Fq 'packages: write' "$WORKFLOWS/candidate.yml"
 grep -Fq "GHCR_TOKEN: \${{ github.token }}" "$WORKFLOWS/candidate.yml"
 grep -Fq 'scripts/release-policy.sh' "$WORKFLOWS/candidate.yml"
 grep -Fq 'image_required=false' "$WORKFLOWS/candidate.yml"
-grep -Fq 'secrets.MANAGEMENT_SIGNING_KEY' "$WORKFLOWS/candidate.yml"
-grep -Fq 'MANAGEMENT_SIGNING_PUBLIC_KEY_B64' "$WORKFLOWS/candidate.yml"
+if grep -Eq 'MANAGEMENT_VERSION|PLATFORM_API|MANAGEMENT_SIGNING' \
+  "$WORKFLOWS/test.yml" "$WORKFLOWS/candidate.yml"; then
+  echo 'image workflows still contain online management release metadata' >&2
+  exit 1
+fi
 grep -Fq 'schedule:' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'scripts/update-openvpn.sh' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'OPENVPN_CANDIDATE_RANGE' "$WORKFLOWS/upstream-check.yml"
@@ -70,15 +67,4 @@ grep -Fq 'secrets.DOCKER_TOKEN' "$WORKFLOWS/release.yml"
 grep -Fq "GHCR_TOKEN: \${{ github.token }}" "$WORKFLOWS/release.yml"
 # shellcheck disable=SC2016 # This asserts the literal shell assignment in the workflow.
 grep -Fq 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"' "$WORKFLOWS/release.yml"
-grep -Fq 'name: Management Release' "$WORKFLOWS/management-release.yml"
-grep -Fq 'secrets.MANAGEMENT_SIGNING_KEY' "$WORKFLOWS/management-release.yml"
-grep -Fq 'scripts/package-management-release.sh' "$WORKFLOWS/management-release.yml"
-grep -Fq 'scripts/validate-management-matrix.sh' "$WORKFLOWS/management-release.yml"
-# shellcheck disable=SC2016 # Assert the literal default-branch registry lookup.
-grep -Fq 'origin/$DEFAULT_BRANCH:compatibility/data-schema-releases.jsonl' "$WORKFLOWS/management-release.yml"
-grep -Fq 'scripts/verify-management-release.sh' "$WORKFLOWS/management-release.yml"
-grep -Fq 'management-bundle.tar.gz' "$WORKFLOWS/management-release.yml"
-grep -Fq 'management-release.env.sig' "$WORKFLOWS/management-release.yml"
-grep -Fq 'gh release create' "$WORKFLOWS/management-release.yml"
-
 printf 'workflow smoke passed\n'

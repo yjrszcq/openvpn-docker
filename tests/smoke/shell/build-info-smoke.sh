@@ -18,9 +18,6 @@ OVPN_BUILD_DATE=1970-01-01T00:00:00Z \
 "$GENERATOR" "$output_path"
 
 grep -Fq "\"image_version\": \"$IMAGE_VERSION\"" "$output_path"
-grep -Fq "\"management_version\": \"$MANAGEMENT_VERSION\"" "$output_path"
-grep -Fq '"management_source": "embedded"' "$output_path"
-grep -Fq "\"platform_api\": $PLATFORM_API" "$output_path"
 grep -Fq "\"data_schema\": $DATA_SCHEMA" "$output_path"
 grep -Fq '"runtime_strategy": "source-build"' "$output_path"
 grep -Fq "\"openvpn_version\": \"$OPENVPN_VERSION\"" "$output_path"
@@ -37,12 +34,8 @@ if ! [[ "$OPENVPN_SOURCE_SHA256" =~ ^[[:xdigit:]]{64}$ ]]; then
   exit 1
 fi
 
-if ! [[ "$MANAGEMENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo 'MANAGEMENT_VERSION must be a stable SemVer value' >&2
-  exit 1
-fi
-if ! [[ "$PLATFORM_API" =~ ^[1-9][0-9]*$ ]]; then
-  echo 'PLATFORM_API must be a positive integer' >&2
+if grep -Eq 'management_version|management_source|platform_api' "$output_path"; then
+  echo 'build info contains removed management version fields' >&2
   exit 1
 fi
 if ! [[ "$DATA_SCHEMA" =~ ^[1-9][0-9]*$ ]]; then

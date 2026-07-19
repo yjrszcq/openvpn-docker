@@ -10,13 +10,11 @@ grep -Fq 'make DESTDIR=/out install' "$dockerfile"
 grep -Fq 'fetch-openvpn-source /tmp/source' "$dockerfile"
 grep -Fq 'OVPN_RUNTIME_STRATEGY=source-build' "$dockerfile"
 grep -Fq 'OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION"' "$dockerfile"
-grep -Fq 'MANAGEMENT_VERSION="$MANAGEMENT_VERSION"' "$dockerfile"
-grep -Fq 'PLATFORM_API="$PLATFORM_API"' "$dockerfile"
 grep -Fq 'grep -Fq "OpenVPN $OPENVPN_VERSION" /tmp/openvpn-version' "$dockerfile"
 grep -Fq "! grep -Fq 'not found' /tmp/openvpn-ldd" "$dockerfile"
 
 for removed in embedded-management openvpn-bootstrap.sh trusted-management-keys \
-  MANAGEMENT_SIGNING_PUBLIC_KEY_B64; do
+  MANAGEMENT_SIGNING_PUBLIC_KEY_B64 MANAGEMENT_VERSION PLATFORM_API; do
   if grep -Fq "$removed" "$dockerfile"; then
     echo "runtime Dockerfile still contains online-update artifact: $removed" >&2
     exit 1

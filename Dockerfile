@@ -47,8 +47,6 @@ FROM ${BASE_IMAGE}
 ARG BASE_IMAGE
 ARG DEBIAN_FRONTEND=noninteractive
 ARG IMAGE_VERSION
-ARG MANAGEMENT_VERSION
-ARG PLATFORM_API
 ARG DATA_SCHEMA
 ARG OPENVPN_VERSION
 ARG OPENVPN_SOURCE_SHA256
@@ -58,8 +56,6 @@ ARG VCS_REF=unknown
 ARG BUILD_DATE=unknown
 
 RUN test -n "$IMAGE_VERSION" \
-    && test -n "$MANAGEMENT_VERSION" \
-    && test -n "$PLATFORM_API" \
     && test -n "$DATA_SCHEMA" \
     && test -n "$OPENVPN_VERSION" \
     && test -n "$OPENVPN_SOURCE_SHA256" \
@@ -101,8 +97,6 @@ RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/ovpn-hook /usr/local/bin/docker-
        /usr/local/lib/openvpn-container/cli.sh \
     && mkdir -p /etc/openvpn /usr/local/share/openvpn-container \
     && IMAGE_VERSION="$IMAGE_VERSION" \
-       MANAGEMENT_VERSION="$MANAGEMENT_VERSION" \
-       PLATFORM_API="$PLATFORM_API" \
        DATA_SCHEMA="$DATA_SCHEMA" \
        BASE_IMAGE="$BASE_IMAGE" \
        OPENVPN_VERSION="$OPENVPN_VERSION" \

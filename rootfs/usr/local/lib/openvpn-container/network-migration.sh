@@ -4,7 +4,7 @@ ovpn_network_migration_management_command() {
   ovpn_management_socket_request "$OVPN_MANAGEMENT_SOCKET" "$1"
 }
 
-ovpn_network_migration_management_version() {
+ovpn_network_migration_openvpn_version() {
   local response
 
   response="$(ovpn_network_migration_management_command version)" || return 1
@@ -19,7 +19,7 @@ ovpn_network_migration_signal_reload() {
 }
 
 ovpn_network_migration_runtime_preflight() {
-  if ! ovpn_network_migration_management_version >/dev/null 2>&1; then
+  if ! ovpn_network_migration_openvpn_version >/dev/null 2>&1; then
     return 1
   fi
   ovpn_healthcheck_command >/dev/null 2>&1
@@ -36,7 +36,7 @@ ovpn_network_migration_wait_for_healthy() {
     if [ "$rollback" = false ] && [ "${OVPN_NETWORK_MIGRATION_FAIL_HEALTH:-false}" = true ]; then
       return 1
     fi
-    if ovpn_network_migration_management_version >/dev/null 2>&1 && ovpn_healthcheck_command >/dev/null 2>&1; then
+    if ovpn_network_migration_openvpn_version >/dev/null 2>&1 && ovpn_healthcheck_command >/dev/null 2>&1; then
       return 0
     fi
     [ "$SECONDS" -ge "$deadline" ] && return 1

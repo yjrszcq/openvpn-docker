@@ -47,9 +47,15 @@ if grep -Fq 'not found' <<<"$ldd_output"; then
 fi
 
 metadata="$(docker run --rm --entrypoint ovpn "$IMAGE" runtime version)"
+grep -Fq "\"image_version\": \"$IMAGE_VERSION\"" <<<"$metadata"
+grep -Fq "\"data_schema\": $DATA_SCHEMA" <<<"$metadata"
 grep -Fq '"runtime_strategy": "source-build"' <<<"$metadata"
 grep -Fq "\"openvpn_version\": \"$OPENVPN_VERSION\"" <<<"$metadata"
 grep -Fq "\"openvpn_source_version\": \"$OPENVPN_VERSION\"" <<<"$metadata"
+if grep -Eq 'management_version|management_source|platform_api' <<<"$metadata"; then
+  echo 'runtime metadata contains removed management version fields' >&2
+  exit 1
+fi
 
 docker run --rm --entrypoint sh "$IMAGE" -ec '
   ! command -v curl >/dev/null

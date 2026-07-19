@@ -157,4 +157,72 @@ done
 docker exec "$CONTAINER" ovpn runtime health
 docker stop -t 10 "$CONTAINER" >/dev/null
 
+schema1_dir="$WORK_DIR/schema1"
+mkdir -p "$schema1_dir"
+docker run --rm \
+  -v "$schema1_dir:/etc/openvpn" \
+  --entrypoint /bin/bash \
+  "$IMAGE" -ec '
+    export EASYRSA_BATCH=1 EASYRSA_PKI=/etc/openvpn/pki
+    easyrsa=/usr/share/easy-rsa/easyrsa
+    "$easyrsa" init-pki
+    EASYRSA_REQ_CN="Schema 1 Migration CA" "$easyrsa" build-ca nopass
+    EASYRSA_REQ_CN=openvpn-server "$easyrsa" build-server-full openvpn-server nopass
+    EASYRSA_REQ_CN=v1-active "$easyrsa" build-client-full v1-active nopass
+    EASYRSA_REQ_CN=v1-revoked "$easyrsa" build-client-full v1-revoked nopass
+    "$easyrsa" revoke v1-revoked
+    "$easyrsa" gen-crl
+    mkdir -p /etc/openvpn/config /etc/openvpn/clients/active \
+      /etc/openvpn/clients/revoked /etc/openvpn/ccd /etc/openvpn/server \
+      /etc/openvpn/secrets
+    {
+      printf "OVPN_CONFIG_VERSION=1\n"
+      printf "OVPN_ENDPOINT=schema1.example.test\n"
+      printf "OVPN_PROTO=tcp\n"
+      printf "OVPN_PORT=443\n"
+      printf "OVPN_NETWORK=10.92.0.0/24\n"
+      printf "OVPN_NAT=false\n"
+      printf "OVPN_NAT_INTERFACE=auto\n"
+      printf "OVPN_REDIRECT_GATEWAY=false\n"
+      printf "OVPN_CLIENT_TO_CLIENT=true\n"
+      printf "OVPN_DNS=\n"
+      printf "OVPN_ROUTES=\n"
+    } >/etc/openvpn/config/project.env
+    printf "1\n" >/etc/openvpn/config/schema-version
+    openvpn --genkey secret /etc/openvpn/secrets/tls-crypt.key
+    chmod 600 /etc/openvpn/config/project.env \
+      /etc/openvpn/config/schema-version /etc/openvpn/secrets/tls-crypt.key
+  '
+
+docker run --rm \
+  -e OVPN_MAINTENANCE=true \
+  -v "$schema1_dir:/etc/openvpn" \
+  "$IMAGE" migrate plan --json >"$WORK_DIR/schema1-plan.json"
+grep -Fq '"source_schema":1' "$WORK_DIR/schema1-plan.json"
+grep -Fq '"chain":"1-to-2;2-to-3"' "$WORK_DIR/schema1-plan.json"
+docker run --rm \
+  -e OVPN_MAINTENANCE=true \
+  -v "$schema1_dir:/etc/openvpn" \
+  "$IMAGE" migrate apply --yes >"$WORK_DIR/schema1-apply.out"
+
+docker run --rm \
+  -v "$schema1_dir:/etc/openvpn:ro" \
+  --entrypoint /bin/bash \
+  "$IMAGE" -ec '
+    grep -Fqx 3 /etc/openvpn/config/schema-version
+    grep -Fqx OVPN_CONFIG_VERSION=3 /etc/openvpn/config/project.env
+    active_id="$(awk -F, '\''$2 == "v1-active" && $3 == "active" { print $1 }'\'' \
+      /etc/openvpn/meta/client-state.csv)"
+    revoked_id="$(awk -F, '\''$2 == "v1-revoked" && $3 == "revoked" { print $1 }'\'' \
+      /etc/openvpn/meta/client-state.csv)"
+    [[ "$active_id" =~ ^[0-9a-f-]{36}$ ]]
+    [[ "$revoked_id" =~ ^[0-9a-f-]{36}$ ]]
+    openssl x509 -in "/etc/openvpn/pki/issued/$active_id.crt" -noout -subject |
+      grep -Eq "CN ?= ?$active_id"
+    grep -Fqx "# ovpn-client-id: $active_id" \
+      /etc/openvpn/clients/active/v1-active.ovpn
+    grep -Fqx "# ovpn-client-id: $revoked_id" \
+      /etc/openvpn/clients/revoked/v1-revoked.ovpn
+  '
+
 printf 'schema migration container smoke passed\n'
