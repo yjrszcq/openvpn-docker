@@ -384,7 +384,7 @@ for proto in udp tcp; do
   grep -E "^${client_short_id}[[:space:]]+client-${proto}[[:space:]]+active$" <(run_control "$data_dir" "$endpoint" ovpn client list)
 
   assert_client_connects "$network_name" "$profile_path" "$WORK_DIR/client-$proto-active.log"
-  wait_for_runtime_log "$server_name" "client-$proto [$client_id]" \
+  wait_for_runtime_log "$server_name" "client-$proto [$client_short_id]" \
     "$WORK_DIR/runtime-$proto.log"
   wait_for_runtime_event "$server_name" \
     "any(.[]; .event == \"client_connection\" and .operation == \"connect\" and .client_id == \"$client_id\" and .client_name == \"client-$proto\")" \
@@ -422,7 +422,7 @@ for proto in udp tcp; do
     docker exec "$rename_client" ip -4 address show dev tun0 | grep -Fq 'inet '
     grep -E "^${client_short_id}[[:space:]]+renamed-udp[[:space:]]+active.*online$" \
       <(docker exec "$server_name" ovpn client list --detail)
-    wait_for_runtime_log "$server_name" "renamed-udp [$client_id]" \
+    wait_for_runtime_log "$server_name" "renamed-udp [$client_short_id]" \
       "$WORK_DIR/runtime-renamed-udp.log"
     wait_for_runtime_event "$server_name" \
       "any(.[]; .event == \"client_lifecycle\" and .operation == \"rename\" and .client_id == \"$client_id\" and .client_name == \"renamed-udp\" and .old_name == \"client-udp\")" \

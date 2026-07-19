@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 CLIENT_ID = "11111111-1111-4111-8111-111111111111"
+CLIENT_SHORT_ID = CLIENT_ID.replace("-", "")[:12]
 
 
 def event(sequence: int, name: str = "laptop") -> dict[str, object]:
@@ -64,12 +65,22 @@ def main() -> int:
         text = run_reader(script, event_file, "--lines", "1")
         expected = (
             f"2026-01-01T00:00:03Z client_connection connect applied "
-            f"laptop [{CLIENT_ID}] sequence=3"
+            f"laptop [{CLIENT_SHORT_ID}] sequence=3"
         )
         if text.returncode != 0 or text.stdout.strip() != expected:
             raise AssertionError(f"unexpected text event output: {text!r}")
 
-        structured = run_reader(script, event_file, "--lines", "2", "--json")
+        full_text = run_reader(script, event_file, "--lines", "1", "--no-trunc")
+        expected_full = (
+            f"2026-01-01T00:00:03Z client_connection connect applied "
+            f"laptop [{CLIENT_ID}] sequence=3"
+        )
+        if full_text.returncode != 0 or full_text.stdout.strip() != expected_full:
+            raise AssertionError(f"unexpected no-trunc event output: {full_text!r}")
+
+        structured = run_reader(
+            script, event_file, "--lines", "2", "--json", "--no-trunc"
+        )
         parsed = [json.loads(line) for line in structured.stdout.splitlines()]
         if structured.returncode != 0 or parsed != [event(2), event(3)]:
             raise AssertionError("JSON history did not preserve structured events")

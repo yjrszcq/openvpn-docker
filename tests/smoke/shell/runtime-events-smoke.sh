@@ -40,6 +40,10 @@ jq -e -s --arg id "$client_id" '
 
 "$ROOT_DIR/rootfs/usr/local/bin/ovpn" runtime events --lines 1 --json |
   jq -e --arg id "$client_id" '.client_id == $id and .client_name == "laptop"' >/dev/null
+"$ROOT_DIR/rootfs/usr/local/bin/ovpn" runtime events --lines 1 |
+  grep -Fq 'laptop [111111111111]'
+"$ROOT_DIR/rootfs/usr/local/bin/ovpn" runtime events --lines 1 --no-trunc |
+  grep -Fq "laptop [$client_id]"
 "$ROOT_DIR/rootfs/usr/local/bin/ovpn" runtime events --help |
   grep -Fq 'usage: ovpn runtime events'
 

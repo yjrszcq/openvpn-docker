@@ -57,11 +57,12 @@ class IdentityMap:
         self.names = names
         self.signature = signature
 
-    def translate(self, line: str) -> str:
+    def translate(self, line: str, no_trunc: bool) -> str:
         self.refresh()
         return UUID_PATTERN.sub(
             lambda match: (
-                f"{self.names[match.group(0)]} [{match.group(0)}]"
+                f"{self.names[match.group(0)]} "
+                f"[{match.group(0) if no_trunc else match.group(0).replace('-', '')[:12]}]"
                 if match.group(0) in self.names
                 else match.group(0)
             ),
@@ -79,8 +80,8 @@ def rotated_paths(raw_log: Path) -> list[Path]:
     return [path for _, path in rotations] + [raw_log]
 
 
-def emit(line: str, raw: bool, identities: IdentityMap) -> None:
-    output = line if raw else identities.translate(line)
+def emit(line: str, raw: bool, no_trunc: bool, identities: IdentityMap) -> None:
+    output = line if raw else identities.translate(line, no_trunc)
     try:
         print(output, flush=True)
     except BrokenPipeError:
@@ -121,6 +122,7 @@ def follow(
     raw_log: Path,
     stream: TextIO | None,
     raw: bool,
+    no_trunc: bool,
     identities: IdentityMap,
 ) -> None:
     while True:
@@ -132,7 +134,7 @@ def follow(
                 continue
         line = stream.readline()
         if line:
-            emit(line.rstrip("\r\n"), raw, identities)
+            emit(line.rstrip("\r\n"), raw, no_trunc, identities)
             continue
         try:
             current_state = raw_log.stat()
@@ -153,11 +155,12 @@ def follow(
 def main() -> int:
     parser = UsageParser(
         prog="ovpn runtime logs",
-        usage="ovpn runtime logs [--lines N] [--follow] [--raw]",
+        usage="ovpn runtime logs [--lines N] [--follow] [--raw] [--no-trunc]",
     )
     parser.add_argument("--lines", type=int, default=100)
     parser.add_argument("--follow", action="store_true")
     parser.add_argument("--raw", action="store_true")
+    parser.add_argument("--no-trunc", action="store_true")
     parser.add_argument("--log-file", required=True, help=argparse.SUPPRESS)
     parser.add_argument("--registry", required=True, help=argparse.SUPPRESS)
     args = parser.parse_args()
@@ -169,10 +172,10 @@ def main() -> int:
     try:
         lines, stream = history(raw_log, args.lines)
         for line in lines:
-            emit(line, args.raw, identities)
+            emit(line, args.raw, args.no_trunc, identities)
         if args.follow:
             try:
-                follow(raw_log, stream, args.raw, identities)
+                follow(raw_log, stream, args.raw, args.no_trunc, identities)
             except KeyboardInterrupt:
                 return 0
         elif stream is not None:

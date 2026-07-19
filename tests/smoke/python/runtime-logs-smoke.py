@@ -13,6 +13,7 @@ from pathlib import Path
 
 CLIENT_ID = "11111111-1111-4111-8111-111111111111"
 UNKNOWN_ID = "22222222-2222-4222-8222-222222222222"
+CLIENT_SHORT_ID = CLIENT_ID.replace("-", "")[:12]
 
 
 def write_registry(path: Path, name: str) -> None:
@@ -84,14 +85,20 @@ def main() -> int:
         if translated.returncode != 0:
             raise AssertionError(translated.stderr)
         expected = [
-            f">LOG:2,N,connected laptop [{CLIENT_ID}]",
+            f">LOG:2,N,connected laptop [{CLIENT_SHORT_ID}]",
             f">LOG:3,N,unknown {UNKNOWN_ID}",
-            f">LOG:4,N,known laptop [{CLIENT_ID}]",
+            f">LOG:4,N,known laptop [{CLIENT_SHORT_ID}]",
         ]
         if translated.stdout.splitlines() != expected:
             raise AssertionError(f"unexpected translated history: {translated.stdout!r}")
 
-        raw = run_reader(script, raw_log, registry, "--lines", "1", "--raw")
+        full = run_reader(script, raw_log, registry, "--lines", "1", "--no-trunc")
+        if full.stdout.strip() != f">LOG:4,N,known laptop [{CLIENT_ID}]":
+            raise AssertionError("no-trunc mode did not preserve the known client UUID")
+
+        raw = run_reader(
+            script, raw_log, registry, "--lines", "1", "--raw", "--no-trunc"
+        )
         if raw.stdout.strip() != f">LOG:4,N,known {CLIENT_ID}":
             raise AssertionError("raw mode changed the OpenVPN log line")
 
@@ -121,7 +128,7 @@ def main() -> int:
                 stream.write(f">LOG:5,N,before rename {CLIENT_ID}\n")
                 stream.flush()
             if read_follow_line(follower) != (
-                f">LOG:5,N,before rename laptop [{CLIENT_ID}]"
+                f">LOG:5,N,before rename laptop [{CLIENT_SHORT_ID}]"
             ):
                 raise AssertionError("follow did not translate the initial name")
 
@@ -132,7 +139,7 @@ def main() -> int:
                 encoding="utf-8",
             )
             if read_follow_line(follower) != (
-                f">LOG:6,N,after rename workstation [{CLIENT_ID}]"
+                f">LOG:6,N,after rename workstation [{CLIENT_SHORT_ID}]"
             ):
                 raise AssertionError("follow did not refresh mapping across rotation")
         finally:

@@ -6,11 +6,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from collections import deque
 from pathlib import Path
 from typing import Any, TextIO
+
+UUID_PATTERN = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+)
 
 
 class UsageParser(argparse.ArgumentParser):
@@ -33,13 +38,16 @@ def parse_event(line: str) -> dict[str, Any]:
     return event
 
 
-def format_text(event: dict[str, Any]) -> str:
+def format_text(event: dict[str, Any], no_trunc: bool) -> str:
     client_id = event.get("client_id")
     client_name = event.get("client_name")
+    display_id = client_id
+    if client_id and not no_trunc and UUID_PATTERN.fullmatch(client_id):
+        display_id = client_id.replace("-", "")[:12]
     if client_id and client_name:
-        identity = f"{client_name} [{client_id}]"
+        identity = f"{client_name} [{display_id}]"
     elif client_id:
-        identity = client_id
+        identity = display_id
     elif client_name:
         identity = client_name
     else:
@@ -56,7 +64,7 @@ def format_text(event: dict[str, Any]) -> str:
     return f"{line} {details}" if details else line
 
 
-def emit(line: str, json_output: bool) -> None:
+def emit(line: str, json_output: bool, no_trunc: bool) -> None:
     try:
         event = parse_event(line)
     except (json.JSONDecodeError, ValueError) as exc:
@@ -64,7 +72,7 @@ def emit(line: str, json_output: bool) -> None:
     output = (
         json.dumps(event, ensure_ascii=False, separators=(",", ":"))
         if json_output
-        else format_text(event)
+        else format_text(event, no_trunc)
     )
     try:
         print(output, flush=True)
@@ -87,7 +95,12 @@ def history(event_file: Path, count: int) -> tuple[deque[str], TextIO | None]:
     return lines, stream
 
 
-def follow(event_file: Path, stream: TextIO | None, json_output: bool) -> None:
+def follow(
+    event_file: Path,
+    stream: TextIO | None,
+    json_output: bool,
+    no_trunc: bool,
+) -> None:
     while True:
         if stream is None:
             try:
@@ -97,7 +110,7 @@ def follow(event_file: Path, stream: TextIO | None, json_output: bool) -> None:
                 continue
         line = stream.readline()
         if line:
-            emit(line.rstrip("\r\n"), json_output)
+            emit(line.rstrip("\r\n"), json_output, no_trunc)
             continue
         try:
             current_state = event_file.stat()
@@ -118,11 +131,12 @@ def follow(event_file: Path, stream: TextIO | None, json_output: bool) -> None:
 def main() -> int:
     parser = UsageParser(
         prog="ovpn runtime events",
-        usage="ovpn runtime events [--lines N] [--follow] [--json]",
+        usage="ovpn runtime events [--lines N] [--follow] [--json] [--no-trunc]",
     )
     parser.add_argument("--lines", type=int, default=100)
     parser.add_argument("--follow", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--no-trunc", action="store_true")
     parser.add_argument("--event-file", required=True, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.lines < 0:
@@ -132,10 +146,10 @@ def main() -> int:
     try:
         lines, stream = history(event_file, args.lines)
         for line in lines:
-            emit(line, args.json)
+            emit(line, args.json, args.no_trunc)
         if args.follow:
             try:
-                follow(event_file, stream, args.json)
+                follow(event_file, stream, args.json, args.no_trunc)
             except KeyboardInterrupt:
                 return 0
         elif stream is not None:
