@@ -80,6 +80,8 @@ grep -Fqx 'OVPN_CONFIG_VERSION=3' "$OVPN_DATA_DIR/config/project.env"
 grep -Fqx '3' "$OVPN_DATA_DIR/config/schema-version"
 grep -Fqx '# id,name,state' "$OVPN_DATA_DIR/meta/client-state.csv"
 grep -Fqx '# id,name,ip' "$OVPN_DATA_DIR/meta/client-ip.csv"
+test ! -e "$OVPN_DATA_DIR/data"
+test ! -e "$OVPN_DATA_DIR/meta/client-ip.applied.csv"
 OVPN_ENDPOINT=changed.example.test "$OVPN" config show >"$TMP_DIR/config.out"
 grep -Fqx 'OVPN_ENDPOINT=vpn.example.test' "$TMP_DIR/config.out"
 

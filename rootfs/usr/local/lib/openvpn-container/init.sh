@@ -4,7 +4,6 @@ ovpn_layout_create() {
   mkdir -p \
     "$OVPN_DATA_DIR/config" \
     "$OVPN_DATA_DIR/meta" \
-    "$OVPN_DATA_DIR/data" \
     "$OVPN_DATA_DIR/server" \
     "$OVPN_DATA_DIR/pki" \
     "$OVPN_DATA_DIR/secrets" \
@@ -14,7 +13,7 @@ ovpn_layout_create() {
     "$OVPN_DATA_DIR/ccd" \
     "$OVPN_DATA_DIR/repair/journal" \
     "$OVPN_DATA_DIR/repair/snapshots"
-  chmod 750 "$OVPN_DATA_DIR" "$OVPN_DATA_DIR/config" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/data" "$OVPN_DATA_DIR/server" "$OVPN_DATA_DIR/pki" "$OVPN_DATA_DIR/secrets"
+  chmod 750 "$OVPN_DATA_DIR" "$OVPN_DATA_DIR/config" "$OVPN_DATA_DIR/meta" "$OVPN_DATA_DIR/server" "$OVPN_DATA_DIR/pki" "$OVPN_DATA_DIR/secrets"
 }
 
 ovpn_init_write_transaction_marker() {
@@ -52,7 +51,7 @@ ovpn_init_inner() {
     local status=$?
     if [ "$status" -ne 0 ]; then
       if [ "$commit_started" = true ]; then
-        for entry in ccd clients config data meta pki repair secrets server; do
+        for entry in ccd clients config meta pki repair secrets server; do
           [ -e "$final_data_dir/$entry" ] || continue
           [ -e "$stage_dir/$entry" ] && continue
           mv "$final_data_dir/$entry" "$stage_dir/$entry" 2>/dev/null || true
@@ -85,7 +84,7 @@ ovpn_init_inner() {
 
   ovpn_init_write_transaction_marker "$transaction_file" "$transaction_id"
   commit_started=true
-  for entry in ccd clients config data meta pki repair secrets server; do
+  for entry in ccd clients config meta pki repair secrets server; do
     mv "$stage_dir/$entry" "$final_data_dir/$entry" || ovpn_die "failed to move $entry into place"
   done
   OVPN_DATA_DIR="$final_data_dir"
