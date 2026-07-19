@@ -52,7 +52,7 @@ cat >"$canonical" <<'EOF'
 EOF
 
 # Test: set triggers apply transaction, canonical ordering, CCD generation
-"$OVPN" client ip set --id "${bravo_id%%-*}" --ip 10.88.0.3 >"$TMP_DIR/apply.out" 2>&1
+"$OVPN" client ip set --id "${bravo_id%%-*}" -I 10.88.0.3 >"$TMP_DIR/apply.out" 2>&1
 grep -Fq 'set client' "$TMP_DIR/apply.out"
 cmp "$canonical" "$OVPN_DATA_DIR/meta/client-ip.csv"
 grep -Fq '"outcome":"applied"' "$OVPN_DATA_DIR/meta/audit.jsonl"
@@ -103,7 +103,7 @@ grep -Fq 'outside the static address region' "$TMP_DIR/pool-overlap.out"
 cmp "$TMP_DIR/pre-overlap.csv" "$OVPN_DATA_DIR/meta/client-ip.csv"
 
 # Test: dynamic assignment removes CCD
-"$OVPN" client ip set alpha --dynamic >"$TMP_DIR/dynamic.out" 2>&1
+"$OVPN" client ip set alpha -d >"$TMP_DIR/dynamic.out" 2>&1
 cat >"$TMP_DIR/dynamic.csv" <<'EOF'
 # id,name,ip
 22222222-2222-4222-8222-222222222222,bravo,10.88.0.2
@@ -122,7 +122,7 @@ if [ -f "$OVPN_LEASE_DIR/$alpha_id" ]; then
 fi
 
 # Test: saving an unchanged batch editor preserves static and dynamic modes.
-if ! OVPN_EDITOR=true "$OVPN" client ip set --all >"$TMP_DIR/editor-unchanged.out" 2>&1; then
+if ! OVPN_EDITOR=true "$OVPN" client ip set -a >"$TMP_DIR/editor-unchanged.out" 2>&1; then
   cat "$TMP_DIR/editor-unchanged.out" >&2
   exit 1
 fi

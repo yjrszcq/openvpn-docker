@@ -290,7 +290,7 @@ fi
 "$OVPN" client list >"$TMP_DIR/client-list.out"
 grep -Eq '^CLIENT ID[[:space:]]+NAME[[:space:]]+STATE$' "$TMP_DIR/client-list.out"
 grep -E "^$(short_client_id "$laptop_id")[[:space:]]+laptop[[:space:]]+active$" "$TMP_DIR/client-list.out"
-grep -E "^${laptop_id}[[:space:]]+laptop[[:space:]]+active$" <("$OVPN" client list --no-trunc)
+grep -E "^${laptop_id}[[:space:]]+laptop[[:space:]]+active$" <("$OVPN" client list -t)
 "$OVPN" client export "$(short_client_id "$laptop_id")" >"$TMP_DIR/laptop-by-listed-id.ovpn"
 grep -Fqx "# ovpn-client-id: $laptop_id" "$TMP_DIR/laptop-by-listed-id.ovpn"
 if "$OVPN" client list --no-trunc --no-trunc >"$TMP_DIR/list-duplicate.out" 2>"$TMP_DIR/list-duplicate.err"; then
@@ -300,7 +300,7 @@ fi
 grep -Fq -- '--no-trunc may only be specified once' "$TMP_DIR/list-duplicate.err"
 test -f "$OVPN_DATA_DIR/clients/active/laptop.ovpn"
 
-"$OVPN" client create source --dynamic >"$TMP_DIR/rename-create.out" 2>"$TMP_DIR/rename-create.err"
+"$OVPN" client create source -d >"$TMP_DIR/rename-create.out" 2>"$TMP_DIR/rename-create.err"
 rename_id="$(awk -F, '$2 == "source" && $3 == "active" { print $1 }' "$OVPN_DATA_DIR/meta/client-state.csv")"
 rename_identity_before="$(sha256sum "$OVPN_DATA_DIR/pki/issued/$rename_id.crt" "$OVPN_DATA_DIR/pki/private/$rename_id.key")"
 "$OVPN" client rename --id "${rename_id%%-*}" target >"$TMP_DIR/rename.out" 2>"$TMP_DIR/rename.err"
@@ -351,10 +351,10 @@ phone_id="$(awk -F, '$2 == "phone" && $3 == "active" { print $1 }' "$OVPN_DATA_D
 grep -Fqx "$phone_id,phone," "$OVPN_DATA_DIR/meta/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/ccd/$phone_id"
 
-"$OVPN" client ip set -i "${phone_id%%-*}" --ip 10.88.0.20 >"$TMP_DIR/phone-static.out" 2>"$TMP_DIR/phone-static.err"
+"$OVPN" client ip set -i "${phone_id%%-*}" -I 10.88.0.20 >"$TMP_DIR/phone-static.out" 2>"$TMP_DIR/phone-static.err"
 grep -Fqx "$phone_id,phone,10.88.0.20" "$OVPN_DATA_DIR/meta/client-ip.csv"
 grep -Fqx 'ifconfig-push 10.88.0.20 255.255.255.0' "$OVPN_DATA_DIR/ccd/$phone_id"
-"$OVPN" client ip set laptop --dynamic >"$TMP_DIR/laptop-dynamic.out" 2>"$TMP_DIR/laptop-dynamic.err"
+"$OVPN" client ip set laptop -d >"$TMP_DIR/laptop-dynamic.out" 2>"$TMP_DIR/laptop-dynamic.err"
 grep -Fqx "$laptop_id,laptop," "$OVPN_DATA_DIR/meta/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/ccd/$laptop_id"
 env -u OVPN_EDITOR -u EDITOR \
@@ -395,7 +395,7 @@ mkdir -p "$OVPN_LEASE_DIR"
 printf '10.88.0.201\n' >"$OVPN_LEASE_DIR/$online_id"
 printf '10.88.0.202\n' >"$OVPN_LEASE_DIR/$known_id"
 printf '10.88.0.203\n' >"$OVPN_LEASE_DIR/unrelated"
-"$OVPN" client list --detail >"$TMP_DIR/client-list-ip.out"
+"$OVPN" client list -d >"$TMP_DIR/client-list-ip.out"
 grep -Fqx "$(format_client_list_row 'CLIENT ID' NAME STATE MODE IP 'IP STATE' CONNECTION)" "$TMP_DIR/client-list-ip.out"
 grep -Fqx "$(format_client_list_row "$(short_client_id "$laptop_id")" laptop active static 10.88.0.2 configured online)" "$TMP_DIR/client-list-ip.out"
 grep -Fqx "$(format_client_list_row "$(short_client_id "$phone_id")" phone active static 10.88.0.20 configured offline)" "$TMP_DIR/client-list-ip.out"
@@ -409,7 +409,7 @@ if grep -Fq 'unrelated' "$TMP_DIR/client-list-ip.out"; then
 fi
 grep -E "^$(short_client_id "$laptop_id")[[:space:]]+laptop[[:space:]]+active$" <("$OVPN" client list)
 grep -Fqx "$(format_client_list_row "$(short_client_id "$online_id")" online active dynamic 10.88.0.200 connected online)" <("$OVPN" client list --detail)
-grep -Fqx "$(format_client_list_full_row "$online_id" online active dynamic 10.88.0.200 connected online)" <("$OVPN" client list --no-trunc --detail)
+grep -Fqx "$(format_client_list_full_row "$online_id" online active dynamic 10.88.0.200 connected online)" <("$OVPN" client list -t -d)
 rm -f "$OVPN_MANAGEMENT_SOCKET"
 "$OVPN" client list --detail >"$TMP_DIR/client-list-ip-unknown.out"
 grep -Fqx "$(format_client_list_row "$(short_client_id "$laptop_id")" laptop active static 10.88.0.2 configured unknown)" "$TMP_DIR/client-list-ip-unknown.out"
@@ -463,7 +463,7 @@ fi
 
 grep -q 'already exists' "$TMP_DIR/duplicate.err"
 
-"$OVPN" client revoke --id "${phone_id%%-*}" --release-ip >"$TMP_DIR/phone-revoke.out" 2>"$TMP_DIR/phone-revoke.err"
+"$OVPN" client revoke --id "${phone_id%%-*}" -r >"$TMP_DIR/phone-revoke.out" 2>"$TMP_DIR/phone-revoke.err"
 grep -E "^$(short_client_id "$phone_id")[[:space:]]+phone[[:space:]]+revoked$" <("$OVPN" client list)
 grep -Fqx "$phone_id,phone," "$OVPN_DATA_DIR/meta/client-ip.csv"
 test ! -e "$OVPN_DATA_DIR/ccd/$phone_id"
@@ -503,7 +503,7 @@ grep -Fqx "$reused_phone_id,phone," "$OVPN_DATA_DIR/meta/client-ip.csv"
 [ "$("$OVPN" state show)" = HEALTHY ]
 
 tablet_index_before="$(sha256sum "$OVPN_DATA_DIR/pki/index.txt")"
-if FAKE_EASYRSA_FAIL_BUILD_CLIENT="$tablet_id" "$OVPN" client reissue tablet >"$TMP_DIR/tablet-reissue.out" 2>"$TMP_DIR/tablet-reissue.err"; then
+if FAKE_EASYRSA_FAIL_BUILD_CLIENT="$tablet_id" "$OVPN" client reissue tablet -d >"$TMP_DIR/tablet-reissue.out" 2>"$TMP_DIR/tablet-reissue.err"; then
   echo 'unsupported same-CN reissue unexpectedly succeeded' >&2
   exit 1
 fi

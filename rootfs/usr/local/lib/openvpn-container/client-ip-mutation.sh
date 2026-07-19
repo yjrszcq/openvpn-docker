@@ -196,21 +196,21 @@ ovpn_client_create_command() {
   local name="${1:-}"
   local mode=static requested_ip=''
 
-  [ -n "$name" ] || ovpn_die 'usage: ovpn client create <name> [--dynamic|--ip <IPv4>]'
+  [ -n "$name" ] || ovpn_die 'usage: ovpn client create <name> [--dynamic|-d|--ip|-I <IPv4>]'
   shift
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --dynamic)
+      --dynamic|-d)
         [ "$mode" = static ] && [ -z "$requested_ip" ] || ovpn_die '--dynamic cannot be combined with --ip'
         mode=dynamic
         ;;
-      --ip)
+      --ip|-I)
         shift
         [ "$#" -gt 0 ] || ovpn_die '--ip requires an IPv4 address'
         [ "$mode" = static ] && [ -z "$requested_ip" ] || ovpn_die '--ip cannot be combined with --dynamic or repeated'
         requested_ip="$1"
         ;;
-      *) ovpn_die 'usage: ovpn client create <name> [--dynamic|--ip <IPv4>]' ;;
+      *) ovpn_die 'usage: ovpn client create <name> [--dynamic|-d|--ip|-I <IPv4>]' ;;
     esac
     shift
   done
@@ -379,7 +379,7 @@ ovpn_client_set_from_editor_inner() {
 }
 
 ovpn_client_set_command() {
-  local usage='usage: ovpn client ip set <client...>|--id <ID>|--name <NAME>|--all [--dynamic|--ip <IPv4>]'
+  local usage='usage: ovpn client ip set <client...>|--id <ID>|--name <NAME>|--all|-a [--dynamic|-d|--ip|-I <IPv4>]'
   local mode=static requested_ip='' use_all=false
   local selector_kind=''
   local target_count
@@ -389,7 +389,7 @@ ovpn_client_set_command() {
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --all)
+      --all|-a)
         $use_all && ovpn_die '--all may only be specified once'
         use_all=true
         ;;
@@ -407,11 +407,11 @@ ovpn_client_set_command() {
         shift
         selectors+=(name "$1")
         ;;
-      --dynamic)
+      --dynamic|-d)
         [ "$mode" = static ] && [ -z "$requested_ip" ] || ovpn_die '--dynamic cannot be combined with --ip'
         mode=dynamic
         ;;
-      --ip)
+      --ip|-I)
         shift
         [ "$#" -gt 0 ] || ovpn_die '--ip requires an IPv4 address'
         [ "$mode" = static ] && [ -z "$requested_ip" ] || ovpn_die '--ip cannot be combined with --dynamic or repeated'

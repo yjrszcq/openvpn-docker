@@ -201,15 +201,15 @@ ovpn_client_list_plain_command() {
 
 ovpn_client_list_command() {
   local detail=false no_trunc=false
-  local usage='usage: ovpn client list [--detail] [--no-trunc]'
+  local usage='usage: ovpn client list [--detail|-d] [--no-trunc|-t]'
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --detail)
+      --detail|-d)
         [ "$detail" = false ] || ovpn_die '--detail may only be specified once'
         detail=true
         ;;
-      --no-trunc)
+      --no-trunc|-t)
         [ "$no_trunc" = false ] || ovpn_die '--no-trunc may only be specified once'
         no_trunc=true
         ;;
@@ -580,7 +580,7 @@ ovpn_client_revoke_inner() {
 }
 
 ovpn_client_revoke_command() {
-  local usage='usage: ovpn client revoke <client>|--id <ID>|--name <NAME> [--release-ip]'
+  local usage='usage: ovpn client revoke <client>|--id <ID>|--name <NAME> [--release-ip|-r]'
   local selector_mode reference consumed
   local release_ip=false
 
@@ -589,7 +589,7 @@ ovpn_client_revoke_command() {
   reference="$OVPN_CLIENT_SELECTOR_REFERENCE"
   consumed="$OVPN_CLIENT_SELECTOR_CONSUMED"
   shift "$consumed"
-  if [ "$#" -eq 1 ] && [ "$1" = --release-ip ]; then
+  if [ "$#" -eq 1 ] && { [ "$1" = --release-ip ] || [ "$1" = -r ]; }; then
     release_ip=true
   elif [ "$#" -ne 0 ]; then
     ovpn_die "$usage"
@@ -711,7 +711,7 @@ ovpn_client_reissue_inner() {
 }
 
 ovpn_client_reissue_command() {
-  local usage='usage: ovpn client reissue <client>|--id <ID>|--name <NAME> [--dynamic|--ip <IPv4>]'
+  local usage='usage: ovpn client reissue <client>|--id <ID>|--name <NAME> [--dynamic|-d|--ip|-I <IPv4>]'
   local selector_mode reference consumed
   local mode='' requested_ip=''
 
@@ -722,11 +722,11 @@ ovpn_client_reissue_command() {
   shift "$consumed"
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --dynamic)
+      --dynamic|-d)
         [ -z "$mode" ] || ovpn_die '--dynamic cannot be combined with --ip'
         mode=dynamic
         ;;
-      --ip)
+      --ip|-I)
         shift
         [ "$#" -gt 0 ] || ovpn_die '--ip requires an IPv4 address'
         [ -z "$mode" ] || ovpn_die '--ip cannot be combined with --dynamic'
@@ -829,7 +829,7 @@ ovpn_client_command() {
   case "$subcommand" in
     create)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client create <name> [--dynamic|--ip <IPv4>]" "Create a client certificate, profile, and IP assignment."
+        ovpn_command_usage "ovpn client create <name> [--dynamic|-d|--ip|-I <IPv4>]" "Create a client certificate, profile, and IP assignment."
       else
         ovpn_client_create_command "$@"
       fi
@@ -852,7 +852,7 @@ ovpn_client_command() {
       case "$ip_subcommand" in
         set)
           if ovpn_help_requested "$@"; then
-            ovpn_command_usage "ovpn client ip set <client...>|--id <ID>|--name <NAME>|--all [--dynamic|--ip <IPv4>]" "Assign client IP addresses."
+            ovpn_command_usage "ovpn client ip set <client...>|--id <ID>|--name <NAME>|--all|-a [--dynamic|-d|--ip|-I <IPv4>]" "Assign client IP addresses."
           else
             ovpn_client_set_command "$@"
           fi
@@ -869,14 +869,14 @@ ovpn_client_command() {
       ;;
     revoke)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client revoke <client>|--id <ID>|--name <NAME> [--release-ip]" "Revoke a client certificate and optionally release its static IP."
+        ovpn_command_usage "ovpn client revoke <client>|--id <ID>|--name <NAME> [--release-ip|-r]" "Revoke a client certificate and optionally release its static IP."
       else
         ovpn_client_revoke_command "$@"
       fi
       ;;
     reissue)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client reissue <client>|--id <ID>|--name <NAME> [--dynamic|--ip <IPv4>]" "Issue a new certificate for an existing client, optionally changing IP assignment."
+        ovpn_command_usage "ovpn client reissue <client>|--id <ID>|--name <NAME> [--dynamic|-d|--ip|-I <IPv4>]" "Issue a new certificate for an existing client, optionally changing IP assignment."
       else
         ovpn_client_reissue_command "$@"
       fi
@@ -890,7 +890,7 @@ ovpn_client_command() {
       ;;
     list)
       if ovpn_help_requested "$@"; then
-        ovpn_command_usage "ovpn client list [--detail] [--no-trunc]" "List client certificate state and optional detailed IP assignment."
+        ovpn_command_usage "ovpn client list [--detail|-d] [--no-trunc|-t]" "List client certificate state and optional detailed IP assignment."
       else
         ovpn_client_list_command "$@"
       fi

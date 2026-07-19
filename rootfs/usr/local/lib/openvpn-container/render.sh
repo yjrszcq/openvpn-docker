@@ -213,10 +213,10 @@ ovpn_render_server() {
   local output_path="$OVPN_DATA_DIR/server/server.conf"
   while [ "$#" -gt 0 ]; do
     case "$1" in
-    --stdout)
+    --stdout|-s)
       output_path='-'
       ;;
-    --output)
+    --output|-o)
       shift
       [ "$#" -gt 0 ] || ovpn_die "--output requires a path"
       output_path="$1"
@@ -231,7 +231,7 @@ ovpn_render_server() {
 }
 
 ovpn_render_client() {
-  local usage='usage: ovpn render client <client>|--id <ID>|--name <NAME> [--stdout|--output <path>]'
+  local usage='usage: ovpn render client <client>|--id <ID>|--name <NAME> [--stdout|-s|--output|-o <path>]'
   local selector_mode client_reference consumed
   local client_name
   local output_path='-'
@@ -244,10 +244,10 @@ ovpn_render_client() {
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-    --stdout)
+    --stdout|-s)
       output_path='-'
       ;;
-    --output)
+    --output|-o)
       shift
       [ "$#" -gt 0 ] || ovpn_die "--output requires a path"
       output_path="$1"
@@ -276,14 +276,14 @@ ovpn_render_command() {
   case "$target" in
   server)
     if ovpn_help_requested "$@"; then
-      ovpn_command_usage "ovpn render server [--stdout|--output <path>]" "Render the server configuration."
+      ovpn_command_usage "ovpn render server [--stdout|-s|--output|-o <path>]" "Render the server configuration."
     else
       ovpn_render_server "$@"
     fi
     ;;
   client)
     if ovpn_help_requested "$@"; then
-      ovpn_command_usage "ovpn render client <client>|--id <ID>|--name <NAME> [--stdout|--output <path>]" "Render a client profile."
+      ovpn_command_usage "ovpn render client <client>|--id <ID>|--name <NAME> [--stdout|-s|--output|-o <path>]" "Render a client profile."
     else
       ovpn_render_client "$@"
     fi
