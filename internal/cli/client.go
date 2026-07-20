@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -165,6 +166,134 @@ func runClientRename(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stdout, "renamed client to %s [%s]\n", result.Client.Name, result.Client.ID)
 	return int(apperror.ExitSuccess)
+}
+
+func runClientRevoke(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && isHelp(args[0]) {
+		fmt.Fprintln(stdout, "Usage: ovpn client revoke (--name NAME|--id ID) [--release-ipv4]")
+		return int(apperror.ExitSuccess)
+	}
+	release := false
+	filtered := make([]string, 0, len(args))
+	for _, arg := range args {
+		if arg == "--release-ipv4" {
+			if release {
+				return writeError(stderr, usageError("--release-ipv4 may only be specified once"))
+			}
+			release = true
+			continue
+		}
+		filtered = append(filtered, arg)
+	}
+	selector, positionals, err := parseMutationSelector(filtered)
+	if err != nil || len(positionals) != 0 {
+		return writeError(stderr, usageError("usage: ovpn client revoke (--name NAME|--id ID) [--release-ipv4]"))
+	}
+	manager, state, err := openClientManager(context.Background())
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	defer state.Close()
+	result, err := manager.Revoke(context.Background(), selector, release)
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	fmt.Fprintf(stdout, "revoked client %s [%s]; runtime disconnect required\n", result.Client.Name, result.Client.ID)
+	return int(apperror.ExitSuccess)
+}
+
+func runClientReissue(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && isHelp(args[0]) {
+		fmt.Fprintln(stdout, "Usage: ovpn client reissue (--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]")
+		return int(apperror.ExitSuccess)
+	}
+	ipv4 := ""
+	filtered := make([]string, 0, len(args))
+	for index := 0; index < len(args); index++ {
+		if args[index] != "--ipv4" {
+			filtered = append(filtered, args[index])
+			continue
+		}
+		if ipv4 != "" || index+1 >= len(args) || args[index+1] == "" {
+			return writeError(stderr, usageError("usage: ovpn client reissue (--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]"))
+		}
+		ipv4 = args[index+1]
+		index++
+	}
+	selector, positionals, err := parseMutationSelector(filtered)
+	if err != nil || len(positionals) != 0 {
+		return writeError(stderr, usageError("usage: ovpn client reissue (--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]"))
+	}
+	manager, state, err := openClientManager(context.Background())
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	defer state.Close()
+	result, err := manager.Reissue(context.Background(), selector, ipv4)
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	fmt.Fprintf(stdout, "reissued client %s [%s] with IPv4 %s; redistribute profile and disconnect prior session\n", result.Client.Name, result.Client.ID, formatIPv4(result.Client.IPv4))
+	return int(apperror.ExitSuccess)
+}
+
+func runClientDelete(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && isHelp(args[0]) {
+		fmt.Fprintln(stdout, "Usage: ovpn client delete (--name NAME|--id ID) --yes")
+		return int(apperror.ExitSuccess)
+	}
+	yes := false
+	filtered := make([]string, 0, len(args))
+	for _, arg := range args {
+		if arg == "--yes" {
+			if yes {
+				return writeError(stderr, usageError("--yes may only be specified once"))
+			}
+			yes = true
+			continue
+		}
+		filtered = append(filtered, arg)
+	}
+	selector, positionals, err := parseMutationSelector(filtered)
+	if err != nil || len(positionals) != 0 {
+		return writeError(stderr, usageError("usage: ovpn client delete (--name NAME|--id ID) --yes"))
+	}
+	if !yes {
+		confirmed, err := confirmClientDelete(stderr)
+		if err != nil {
+			return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "client delete requires an interactive confirmation or --yes", err))
+		}
+		if !confirmed {
+			return writeError(stderr, apperror.New(apperror.ExitPolicy, "confirmation_required", "client delete was not confirmed"))
+		}
+	}
+	manager, state, err := openClientManager(context.Background())
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	defer state.Close()
+	result, err := manager.Delete(context.Background(), selector)
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	fmt.Fprintf(stdout, "deleted client %s [%s]; UUID tombstone retained\n", result.Client.Name, result.Client.ID)
+	return int(apperror.ExitSuccess)
+}
+
+func confirmClientDelete(stderr io.Writer) (bool, error) {
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return false, err
+	}
+	if info.Mode()&os.ModeCharDevice == 0 {
+		return false, fmt.Errorf("stdin is not a TTY")
+	}
+	fmt.Fprint(stderr, "Type yes to permanently delete the client credentials: ")
+	value, err := bufio.NewReader(io.LimitReader(os.Stdin, 16)).ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, err
+	}
+	return strings.TrimSpace(value) == "yes", nil
 }
 
 func parseClientExport(args []string) (clientservice.Selector, string, error) {

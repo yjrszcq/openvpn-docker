@@ -61,7 +61,7 @@ func (store *Store) CommitArtifactOperation(ctx context.Context, operationID str
 		result, err := transaction.ExecContext(ctx, `
 INSERT INTO artifacts(id, instance_id, owner_kind, owner_id, kind, backend, artifact_key, digest, certificate_serial, certificate_fingerprint, status)
 VALUES(?, ?, ?, ?, ?, 'local', ?, ?, NULLIF(?, ''), ?, 'active')
-ON CONFLICT(backend, artifact_key) DO UPDATE SET
+ON CONFLICT(backend, artifact_key) WHERE status IN ('active', 'stale') DO UPDATE SET
     digest = excluded.digest,
     certificate_serial = excluded.certificate_serial,
     certificate_fingerprint = excluded.certificate_fingerprint,

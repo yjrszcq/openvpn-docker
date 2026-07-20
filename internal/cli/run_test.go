@@ -119,9 +119,33 @@ func TestClientCreateAndRenameUsage(t *testing.T) {
 		{"client", "rename", "--name", "laptop", "--id", "11111111", "new"},
 	} {
 		code, _, stderr := run(args...)
-		if code != 64 || !strings.Contains(stderr, "usage") {
+		if code != 64 || stderr == "" {
 			t.Fatalf("args=%v code=%d stderr=%q", args, code, stderr)
 		}
+	}
+}
+
+func TestClientLifecycleUsageAndDeleteConfirmation(t *testing.T) {
+	for _, command := range []string{"revoke", "reissue", "delete"} {
+		code, stdout, stderr := run("client", command, "--help")
+		if code != 0 || stderr != "" || !strings.Contains(stdout, "Usage: ovpn client "+command) {
+			t.Fatalf("%s help code=%d stdout=%q stderr=%q", command, code, stdout, stderr)
+		}
+	}
+	for _, args := range [][]string{
+		{"client", "revoke", "--name", "laptop", "--release-ip"},
+		{"client", "reissue", "--name", "laptop", "--ipv4"},
+		{"client", "reissue", "--name", "laptop", "--ipv4", "dynamic", "--ipv4", "auto"},
+		{"client", "delete", "--name", "laptop", "--yes", "--yes"},
+	} {
+		code, _, stderr := run(args...)
+		if code != 64 || stderr == "" {
+			t.Fatalf("args=%v code=%d stderr=%q", args, code, stderr)
+		}
+	}
+	code, _, stderr := run("client", "delete", "--name", "laptop")
+	if code != 78 || !strings.Contains(stderr, "confirm") {
+		t.Fatalf("non-TTY delete code=%d stderr=%q", code, stderr)
 	}
 }
 

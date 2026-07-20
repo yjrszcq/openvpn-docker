@@ -66,6 +66,15 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "client" && args[1] == "rename" {
 		return runClientRename(args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "client" && args[1] == "revoke" {
+		return runClientRevoke(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "client" && args[1] == "reissue" {
+		return runClientReissue(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "client" && args[1] == "delete" {
+		return runClientDelete(args[2:], stdout, stderr)
+	}
 
 	path := commandPath(args)
 	if len(path) == 0 {

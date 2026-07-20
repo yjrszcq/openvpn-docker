@@ -28,6 +28,9 @@ type MutationStore interface {
 	AdvanceOperation(context.Context, string, storesqlite.OperationState, json.RawMessage, string, time.Time) error
 	CommitCreateClientOperation(context.Context, string, string, storesqlite.ClientState, json.RawMessage, time.Time) error
 	CommitRenameClientOperation(context.Context, string, string, string, string, string, storesqlite.ArtifactMetadata, storesqlite.ArtifactDeletion, json.RawMessage, time.Time) error
+	CommitRevokeClientOperation(context.Context, string, string, string, string, bool, []storesqlite.ArtifactMetadata, []storesqlite.ArtifactDeletion, json.RawMessage, time.Time) error
+	CommitReissueClientOperation(context.Context, string, string, string, string, domain.ClientStatus, storesqlite.AddressAssignment, []storesqlite.ArtifactMetadata, []storesqlite.ArtifactDeletion, json.RawMessage, time.Time) error
+	CommitDeleteClientOperation(context.Context, string, string, string, string, domain.ClientStatus, []storesqlite.ArtifactMetadata, []storesqlite.ArtifactDeletion, json.RawMessage, time.Time) error
 }
 
 type Manager struct {
@@ -46,8 +49,9 @@ type CreateRequest struct {
 }
 
 type MutationResult struct {
-	OperationID string `json:"operation_id"`
-	Client      View   `json:"client"`
+	OperationID  string `json:"operation_id"`
+	Client       View   `json:"client"`
+	KickRequired bool   `json:"kick_required"`
 }
 
 type mutationRecovery struct {
@@ -493,11 +497,15 @@ func stageTree(ctx context.Context, operation *artifact.Operation, root, prefix 
 }
 
 func newReferenceMetadata(clientID, kind, key string, reference artifact.Reference, certificate *pki.CertificateInfo) (storesqlite.ArtifactMetadata, error) {
+	return newOwnerReferenceMetadata("client", clientID, kind, key, reference, certificate)
+}
+
+func newOwnerReferenceMetadata(ownerKind, ownerID, kind, key string, reference artifact.Reference, certificate *pki.CertificateInfo) (storesqlite.ArtifactMetadata, error) {
 	id, err := domain.GenerateUUID()
 	if err != nil {
 		return storesqlite.ArtifactMetadata{}, err
 	}
-	value := storesqlite.ArtifactMetadata{ID: id, OwnerKind: "client", OwnerID: clientID, Kind: kind, Key: key, Digest: reference.Digest, Status: storesqlite.ArtifactActive}
+	value := storesqlite.ArtifactMetadata{ID: id, OwnerKind: ownerKind, OwnerID: ownerID, Kind: kind, Key: key, Digest: reference.Digest, Status: storesqlite.ArtifactActive}
 	if certificate != nil {
 		value.CertificateSerial = certificate.Serial
 		value.CertificateFingerprint = append([]byte(nil), certificate.Fingerprint[:]...)

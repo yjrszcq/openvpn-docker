@@ -22,6 +22,7 @@ import (
 	"github.com/yjrszcq/openvpn-docker/internal/artifact"
 	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
+	"github.com/yjrszcq/openvpn-docker/internal/domain"
 	"github.com/yjrszcq/openvpn-docker/internal/pki"
 	"github.com/yjrszcq/openvpn-docker/internal/render"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
@@ -38,11 +39,12 @@ type mutationFixture struct {
 }
 
 type issueExecutor struct {
-	ca      *x509.Certificate
-	caKey   ed25519.PrivateKey
-	now     time.Time
-	failure error
-	calls   int
+	ca             *x509.Certificate
+	caKey          ed25519.PrivateKey
+	now            time.Time
+	failure        error
+	calls          int
+	revokedSerials []*big.Int
 }
 
 func (executor *issueExecutor) Run(_ context.Context, invocation pki.Invocation) error {
@@ -50,16 +52,55 @@ func (executor *issueExecutor) Run(_ context.Context, invocation pki.Invocation)
 	if executor.failure != nil {
 		return executor.failure
 	}
-	if len(invocation.Args) < 2 || invocation.Args[0] != "build-client-full" {
+	pkiDir := envValue(invocation.Env, "EASYRSA_PKI")
+	if len(invocation.Args) == 0 {
 		return fmt.Errorf("unexpected invocation: %+v", invocation)
 	}
-	clientID := invocation.Args[1]
-	pkiDir := envValue(invocation.Env, "EASYRSA_PKI")
+	switch invocation.Args[0] {
+	case "build-client-full":
+		if len(invocation.Args) < 2 {
+			return fmt.Errorf("missing client identity")
+		}
+		return executor.issue(pkiDir, invocation.Args[1])
+	case "revoke":
+		if len(invocation.Args) < 2 {
+			return fmt.Errorf("missing revoke identity")
+		}
+		certificate, err := os.ReadFile(filepath.Join(pkiDir, "issued", invocation.Args[1]+".crt"))
+		if err != nil {
+			return err
+		}
+		block, _ := pem.Decode(certificate)
+		if block == nil {
+			return fmt.Errorf("invalid certificate")
+		}
+		parsed, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return err
+		}
+		executor.revokedSerials = append(executor.revokedSerials, new(big.Int).Set(parsed.SerialNumber))
+		return nil
+	case "gen-crl":
+		entries := make([]x509.RevocationListEntry, 0, len(executor.revokedSerials))
+		for _, serial := range executor.revokedSerials {
+			entries = append(entries, x509.RevocationListEntry{SerialNumber: serial, RevocationTime: executor.now})
+		}
+		der, err := x509.CreateRevocationList(rand.Reader, &x509.RevocationList{Number: big.NewInt(int64(len(entries) + 1)), ThisUpdate: executor.now.Add(-time.Minute), NextUpdate: executor.now.Add(24 * time.Hour), RevokedCertificateEntries: entries}, executor.ca, executor.caKey)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(pkiDir, "crl.pem"), pem.EncodeToMemory(&pem.Block{Type: "X509 CRL", Bytes: der}), 0o644)
+	default:
+		return fmt.Errorf("unexpected invocation: %+v", invocation)
+	}
+}
+
+func (executor *issueExecutor) issue(pkiDir, clientID string) error {
 	public, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return err
 	}
-	template := &x509.Certificate{SerialNumber: new(big.Int).SetBytes([]byte(clientID[:8])), Subject: pkix.Name{CommonName: clientID}, NotBefore: executor.now.Add(-time.Hour), NotAfter: executor.now.Add(24 * time.Hour), KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}
+	template := &x509.Certificate{SerialNumber: new(big.Int).SetUint64(uint64(executor.calls + 1)), Subject: pkix.Name{CommonName: clientID}, NotBefore: executor.now.Add(-time.Hour), NotAfter: executor.now.Add(24 * time.Hour), KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}
 	der, err := x509.CreateCertificate(rand.Reader, template, executor.ca, public, executor.caKey)
 	if err != nil {
 		return err
@@ -296,10 +337,194 @@ func TestDatabaseCommitFailuresRestoreCreateAndRenameFiles(t *testing.T) {
 	})
 }
 
+func TestRevokeRetainsAssignmentAndReissueRestoresArtifacts(t *testing.T) {
+	fixture := newMutationFixture(t)
+	created, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "laptop", IPv4: "10.42.0.20"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	certificateBefore := readMutationArtifact(t, fixture.artifacts, "pki/issued/"+created.Client.ID+".crt")
+	revoked, err := fixture.manager.Revoke(context.Background(), Selector{Name: "laptop"}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !revoked.KickRequired || revoked.Client.Status != "revoked" || revoked.Client.IPv4.State != "retained" || revoked.Client.IPv4.Address == nil || *revoked.Client.IPv4.Address != "10.42.0.20" {
+		t.Fatalf("revoked result=%+v", revoked)
+	}
+	assertMutationMissing(t, filepath.Join(fixture.root, "clients", "active", "laptop.ovpn"))
+	_ = readMutationArtifact(t, fixture.artifacts, "clients/revoked/laptop.ovpn")
+	assertMutationMissing(t, filepath.Join(fixture.root, "ccd", created.Client.ID))
+	if _, err := os.Stat(filepath.Join(fixture.root, "pki", "crl.pem")); err != nil {
+		t.Fatal(err)
+	}
+
+	reissued, err := fixture.manager.Reissue(context.Background(), Selector{IDPrefix: ShortID(created.Client.ID)}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reissued.KickRequired || reissued.Client.Status != "active" || reissued.Client.IPv4.State != "active" || reissued.Client.IPv4.Address == nil || *reissued.Client.IPv4.Address != "10.42.0.20" {
+		t.Fatalf("reissued result=%+v", reissued)
+	}
+	certificateAfter := readMutationArtifact(t, fixture.artifacts, "pki/issued/"+created.Client.ID+".crt")
+	if certificateAfter == certificateBefore {
+		t.Fatal("reissue did not replace the certificate")
+	}
+	_ = readMutationArtifact(t, fixture.artifacts, "clients/active/laptop.ovpn")
+	_ = readMutationArtifact(t, fixture.artifacts, "ccd/"+created.Client.ID)
+	assertMutationMissing(t, filepath.Join(fixture.root, "clients", "revoked", "laptop.ovpn"))
+	operation, err := fixture.store.LoadOperation(context.Background(), reissued.OperationID)
+	if err != nil || operation.State != storesqlite.OperationCommitted || bytesContainSecret(operation.RecoveryPayload) {
+		t.Fatalf("reissue operation=%+v err=%v", operation, err)
+	}
+}
+
+func TestRevokeReleaseAndReissueDynamic(t *testing.T) {
+	fixture := newMutationFixture(t)
+	created, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "phone", IPv4: "auto"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	revoked, err := fixture.manager.Revoke(context.Background(), Selector{Name: "phone"}, true)
+	if err != nil || revoked.Client.IPv4.State != "none" {
+		t.Fatalf("released revoke=%+v err=%v", revoked, err)
+	}
+	reissued, err := fixture.manager.Reissue(context.Background(), Selector{IDPrefix: ShortID(created.Client.ID)}, "dynamic")
+	if err != nil || reissued.Client.Status != "active" || reissued.Client.IPv4.Mode != "dynamic" || reissued.Client.IPv4.Address != nil {
+		t.Fatalf("dynamic reissue=%+v err=%v", reissued, err)
+	}
+	assertMutationMissing(t, filepath.Join(fixture.root, "ccd", created.Client.ID))
+}
+
+func TestDeleteActiveClientKeepsTombstoneAndAllowsNameReuse(t *testing.T) {
+	fixture := newMutationFixture(t)
+	created, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "tablet", IPv4: "auto"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := fixture.manager.Delete(context.Background(), Selector{Name: "tablet"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !deleted.KickRequired || deleted.Client.Status != "deleted" || deleted.Client.ID != created.Client.ID || deleted.Client.IPv4.State != "none" {
+		t.Fatalf("deleted result=%+v", deleted)
+	}
+	for _, path := range []string{
+		filepath.Join(fixture.root, "pki", "issued", created.Client.ID+".crt"),
+		filepath.Join(fixture.root, "pki", "private", created.Client.ID+".key"),
+		filepath.Join(fixture.root, "clients", "active", "tablet.ovpn"),
+		filepath.Join(fixture.root, "ccd", created.Client.ID),
+	} {
+		assertMutationMissing(t, path)
+	}
+	loaded, err := fixture.store.LoadClient(context.Background(), fixture.instance.ID, created.Client.ID)
+	if err != nil || loaded.Client.Status != domain.ClientDeleted || loaded.DeletedAt == nil || loaded.RevokedAt == nil || loaded.Assignment != nil {
+		t.Fatalf("tombstone=%+v err=%v", loaded, err)
+	}
+	listed, err := fixture.store.ListClients(context.Background(), fixture.instance.ID)
+	if err != nil || len(listed) != 0 {
+		t.Fatalf("listed after delete=%+v err=%v", listed, err)
+	}
+	replacement, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "tablet", IPv4: "auto"})
+	if err != nil || replacement.Client.ID == created.Client.ID {
+		t.Fatalf("replacement=%+v err=%v", replacement, err)
+	}
+}
+
+func TestLifecyclePKIFailureLeavesActiveStateAndFiles(t *testing.T) {
+	fixture := newMutationFixture(t)
+	created, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "laptop", IPv4: "auto"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	profileBefore := readMutationArtifact(t, fixture.artifacts, "clients/active/laptop.ovpn")
+	fixture.executor.failure = fmt.Errorf("%w: injected revoke", pki.ErrCommand)
+	if _, err := fixture.manager.Revoke(context.Background(), Selector{Name: "laptop"}, false); !errors.Is(err, pki.ErrCommand) {
+		t.Fatalf("revoke failure=%v", err)
+	}
+	loaded, err := fixture.store.LoadClient(context.Background(), fixture.instance.ID, created.Client.ID)
+	if err != nil || loaded.Client.Status != domain.ClientActive || loaded.Assignment == nil || loaded.Assignment.Status != storesqlite.AssignmentActive {
+		t.Fatalf("state after failure=%+v err=%v", loaded, err)
+	}
+	if got := readMutationArtifact(t, fixture.artifacts, "clients/active/laptop.ovpn"); got != profileBefore {
+		t.Fatal("failed revoke changed active profile")
+	}
+	assertMutationMissing(t, filepath.Join(fixture.root, "clients", "revoked", "laptop.ovpn"))
+	pending, err := fixture.artifacts.PendingOperations()
+	if err != nil || len(pending) != 0 {
+		t.Fatalf("pending lifecycle file operations=%v err=%v", pending, err)
+	}
+}
+
+func TestLifecycleDatabaseCommitFailuresRestoreStateAndFiles(t *testing.T) {
+	t.Run("revoke", func(t *testing.T) {
+		fixture := newMutationFixture(t)
+		created, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "laptop", IPv4: "auto"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		injected := errors.New("injected revoke commit")
+		manager := managerWithStore(t, fixture, commitFailureStore{MutationStore: fixture.store, revokeErr: injected})
+		if _, err := manager.Revoke(context.Background(), Selector{Name: "laptop"}, false); !errors.Is(err, injected) {
+			t.Fatalf("revoke commit error=%v", err)
+		}
+		loaded, err := fixture.store.LoadClient(context.Background(), fixture.instance.ID, created.Client.ID)
+		if err != nil || loaded.Client.Status != domain.ClientActive {
+			t.Fatalf("revoke rollback state=%+v err=%v", loaded, err)
+		}
+		_ = readMutationArtifact(t, fixture.artifacts, "clients/active/laptop.ovpn")
+		assertMutationMissing(t, filepath.Join(fixture.root, "clients", "revoked", "laptop.ovpn"))
+	})
+	t.Run("reissue", func(t *testing.T) {
+		fixture := newMutationFixture(t)
+		created, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "laptop", IPv4: "auto"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fixture.manager.Revoke(context.Background(), Selector{Name: "laptop"}, false); err != nil {
+			t.Fatal(err)
+		}
+		certificateBefore := readMutationArtifact(t, fixture.artifacts, "pki/issued/"+created.Client.ID+".crt")
+		injected := errors.New("injected reissue commit")
+		manager := managerWithStore(t, fixture, commitFailureStore{MutationStore: fixture.store, reissueErr: injected})
+		if _, err := manager.Reissue(context.Background(), Selector{Name: "laptop"}, ""); !errors.Is(err, injected) {
+			t.Fatalf("reissue commit error=%v", err)
+		}
+		loaded, err := fixture.store.LoadClient(context.Background(), fixture.instance.ID, created.Client.ID)
+		if err != nil || loaded.Client.Status != domain.ClientRevoked || loaded.Assignment == nil || loaded.Assignment.Status != storesqlite.AssignmentRetained {
+			t.Fatalf("reissue rollback state=%+v err=%v", loaded, err)
+		}
+		if got := readMutationArtifact(t, fixture.artifacts, "pki/issued/"+created.Client.ID+".crt"); got != certificateBefore {
+			t.Fatal("reissue rollback did not restore certificate")
+		}
+		_ = readMutationArtifact(t, fixture.artifacts, "clients/revoked/laptop.ovpn")
+	})
+	t.Run("delete", func(t *testing.T) {
+		fixture := newMutationFixture(t)
+		created, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "laptop", IPv4: "auto"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		injected := errors.New("injected delete commit")
+		manager := managerWithStore(t, fixture, commitFailureStore{MutationStore: fixture.store, deleteErr: injected})
+		if _, err := manager.Delete(context.Background(), Selector{Name: "laptop"}); !errors.Is(err, injected) {
+			t.Fatalf("delete commit error=%v", err)
+		}
+		loaded, err := fixture.store.LoadClient(context.Background(), fixture.instance.ID, created.Client.ID)
+		if err != nil || loaded.Client.Status != domain.ClientActive {
+			t.Fatalf("delete rollback state=%+v err=%v", loaded, err)
+		}
+		_ = readMutationArtifact(t, fixture.artifacts, "pki/issued/"+created.Client.ID+".crt")
+		_ = readMutationArtifact(t, fixture.artifacts, "clients/active/laptop.ovpn")
+	})
+}
+
 type commitFailureStore struct {
 	MutationStore
-	createErr error
-	renameErr error
+	createErr  error
+	renameErr  error
+	revokeErr  error
+	reissueErr error
+	deleteErr  error
 }
 
 func (store commitFailureStore) CommitCreateClientOperation(context.Context, string, string, storesqlite.ClientState, json.RawMessage, time.Time) error {
@@ -308,6 +533,18 @@ func (store commitFailureStore) CommitCreateClientOperation(context.Context, str
 
 func (store commitFailureStore) CommitRenameClientOperation(context.Context, string, string, string, string, string, storesqlite.ArtifactMetadata, storesqlite.ArtifactDeletion, json.RawMessage, time.Time) error {
 	return store.renameErr
+}
+
+func (store commitFailureStore) CommitRevokeClientOperation(context.Context, string, string, string, string, bool, []storesqlite.ArtifactMetadata, []storesqlite.ArtifactDeletion, json.RawMessage, time.Time) error {
+	return store.revokeErr
+}
+
+func (store commitFailureStore) CommitReissueClientOperation(context.Context, string, string, string, string, domain.ClientStatus, storesqlite.AddressAssignment, []storesqlite.ArtifactMetadata, []storesqlite.ArtifactDeletion, json.RawMessage, time.Time) error {
+	return store.reissueErr
+}
+
+func (store commitFailureStore) CommitDeleteClientOperation(context.Context, string, string, string, string, domain.ClientStatus, []storesqlite.ArtifactMetadata, []storesqlite.ArtifactDeletion, json.RawMessage, time.Time) error {
+	return store.deleteErr
 }
 
 func managerWithStore(t *testing.T, fixture mutationFixture, state MutationStore) *Manager {

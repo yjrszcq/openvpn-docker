@@ -17,6 +17,33 @@ var migrations = []migration{
 	{revision: 4, apply: migrateAuditState},
 	{revision: 5, apply: migrateLeaseUniqueness},
 	{revision: 6, apply: migrateCAKeyArtifact},
+	{revision: 7, apply: migrateReusableArtifactKeys},
+}
+
+func migrateReusableArtifactKeys(ctx context.Context, transaction *sql.Tx) error {
+	_, err := transaction.ExecContext(ctx, `
+CREATE TABLE artifacts_v7 (
+    id TEXT PRIMARY KEY CHECK (length(id) = 36),
+    instance_id TEXT NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    owner_kind TEXT NOT NULL CHECK (owner_kind IN ('instance', 'client')),
+    owner_id TEXT NOT NULL CHECK (length(owner_id) = 36),
+    kind TEXT NOT NULL CHECK (kind IN ('ca-cert', 'ca-key', 'server-cert', 'server-key', 'client-cert', 'client-key', 'crl', 'tls-crypt', 'profile', 'ccd', 'server-config')),
+    backend TEXT NOT NULL CHECK (backend = 'local'),
+    artifact_key TEXT NOT NULL CHECK (length(artifact_key) > 0),
+    digest BLOB NOT NULL CHECK (length(digest) = 32),
+    certificate_serial TEXT,
+    certificate_fingerprint BLOB CHECK (certificate_fingerprint IS NULL OR length(certificate_fingerprint) = 32),
+    status TEXT NOT NULL CHECK (status IN ('active', 'stale', 'deleted'))
+) STRICT;
+INSERT INTO artifacts_v7 SELECT * FROM artifacts;
+DROP TABLE artifacts;
+ALTER TABLE artifacts_v7 RENAME TO artifacts;
+CREATE UNIQUE INDEX artifacts_current_key
+ON artifacts(backend, artifact_key) WHERE status IN ('active', 'stale')`)
+	if err != nil {
+		return classifySQLite("migrate reusable artifact keys", err)
+	}
+	return nil
 }
 
 func migrateCAKeyArtifact(ctx context.Context, transaction *sql.Tx) error {

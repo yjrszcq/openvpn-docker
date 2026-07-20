@@ -125,6 +125,24 @@ func (runner *Runner) RevokeClient(ctx context.Context, pkiDir, clientID string)
 	return runner.GenerateCRL(ctx, pkiDir)
 }
 
+// ReissueClient replaces the request, private key, and certificate for a
+// previously revoked common name. Easy-RSA's index remains the signing
+// authority; callers must revoke an active certificate before invoking it.
+func (runner *Runner) ReissueClient(ctx context.Context, pkiDir, clientID string) (CertificateInfo, error) {
+	if err := validatePKIPath(pkiDir); err != nil {
+		return CertificateInfo{}, err
+	}
+	if !domain.ValidUUID(clientID) {
+		return CertificateInfo{}, fmt.Errorf("invalid client UUID")
+	}
+	for _, relative := range []string{filepath.Join("reqs", clientID+".req"), filepath.Join("private", clientID+".key")} {
+		if err := os.Remove(filepath.Join(pkiDir, relative)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return CertificateInfo{}, fmt.Errorf("remove old client material: %w", err)
+		}
+	}
+	return runner.IssueClient(ctx, pkiDir, clientID)
+}
+
 func (runner *Runner) GenerateCRL(ctx context.Context, pkiDir string) error {
 	if err := validatePKIPath(pkiDir); err != nil {
 		return err
