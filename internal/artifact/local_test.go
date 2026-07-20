@@ -191,6 +191,47 @@ func TestStagedDigestTamperPreventsAnyInstall(t *testing.T) {
 	}
 }
 
+func TestOperationDeletionCommitsAndRollsBack(t *testing.T) {
+	store := newStore(t)
+	installArtifact(t, store, "ccd/client-id", 0o600, "ifconfig-push\n", operationID)
+	rollback, err := store.BeginOperation("45454545-4545-4454-8454-454545454545")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rollback.Remove("ccd/client-id"); err != nil {
+		t.Fatal(err)
+	}
+	if err := rollback.Install(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(store.Root(), "ccd", "client-id")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("deleted artifact remains: %v", err)
+	}
+	if err := rollback.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	data, _, err := store.Read(context.Background(), "ccd/client-id")
+	if err != nil || string(data) != "ifconfig-push\n" {
+		t.Fatalf("restored deletion=%q err=%v", data, err)
+	}
+	commit, err := store.BeginOperation("46464646-4646-4464-8464-464646464646")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := commit.Remove("ccd/client-id"); err != nil {
+		t.Fatal(err)
+	}
+	if err := commit.Install(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := commit.Commit(nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(store.Root(), "ccd", "client-id")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("committed deletion remains: %v", err)
+	}
+}
+
 func installArtifact(t *testing.T, store *artifact.LocalStore, key string, mode os.FileMode, content, id string) {
 	t.Helper()
 	operation, err := store.BeginOperation(id)

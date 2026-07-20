@@ -37,24 +37,16 @@ func ValidateAuthority(pkiDir, serverName string, now time.Time) (Authority, err
 	if err != nil {
 		return Authority{}, err
 	}
+	caInfo, err := validateCA(ca, now)
+	if err != nil {
+		return Authority{}, err
+	}
 	caKey, err := readPrivateKey(pkiDir + "/private/ca.key")
 	if err != nil {
 		return Authority{}, err
 	}
-	if !ca.IsCA || ca.KeyUsage&x509.KeyUsageCertSign == 0 {
-		return Authority{}, fmt.Errorf("%w: CA certificate cannot sign certificates", ErrInvalidMaterial)
-	}
-	if ca.Subject.CommonName != "OpenVPN Container CA" {
-		return Authority{}, fmt.Errorf("%w: CA certificate common name mismatch", ErrInvalidMaterial)
-	}
-	if err := ca.CheckSignatureFrom(ca); err != nil {
-		return Authority{}, fmt.Errorf("%w: CA certificate is not self-signed: %v", ErrInvalidMaterial, err)
-	}
 	if err := verifyKeyPair(ca, caKey); err != nil {
 		return Authority{}, fmt.Errorf("CA certificate/key: %w", err)
-	}
-	if err := validAt(ca, now); err != nil {
-		return Authority{}, fmt.Errorf("CA certificate: %w", err)
 	}
 	server, err := readCertificate(pkiDir + "/issued/" + serverName + ".crt")
 	if err != nil {
@@ -76,12 +68,24 @@ func ValidateAuthority(pkiDir, serverName string, now time.Time) (Authority, err
 	if err := ValidateCRL(pkiDir+"/crl.pem", ca, now); err != nil {
 		return Authority{}, err
 	}
-	return Authority{CA: certificateInfo(ca), Server: certificateInfo(server)}, nil
+	return Authority{CA: caInfo, Server: certificateInfo(server)}, nil
+}
+
+// ValidateCA verifies the persisted trust anchor and returns its stable identity.
+func ValidateCA(pkiDir string, now time.Time) (CertificateInfo, error) {
+	ca, err := readCertificate(pkiDir + "/ca.crt")
+	if err != nil {
+		return CertificateInfo{}, err
+	}
+	return validateCA(ca, now)
 }
 
 func ValidateClient(pkiDir, clientID string, now time.Time) (CertificateInfo, error) {
 	ca, err := readCertificate(pkiDir + "/ca.crt")
 	if err != nil {
+		return CertificateInfo{}, err
+	}
+	if _, err := validateCA(ca, now); err != nil {
 		return CertificateInfo{}, err
 	}
 	certificate, err := readCertificate(pkiDir + "/issued/" + clientID + ".crt")
@@ -104,8 +108,24 @@ func ValidateClient(pkiDir, clientID string, now time.Time) (CertificateInfo, er
 	return certificateInfo(certificate), nil
 }
 
+func validateCA(ca *x509.Certificate, now time.Time) (CertificateInfo, error) {
+	if !ca.IsCA || ca.KeyUsage&x509.KeyUsageCertSign == 0 {
+		return CertificateInfo{}, fmt.Errorf("%w: CA certificate cannot sign certificates", ErrInvalidMaterial)
+	}
+	if ca.Subject.CommonName != "OpenVPN Container CA" {
+		return CertificateInfo{}, fmt.Errorf("%w: CA certificate common name mismatch", ErrInvalidMaterial)
+	}
+	if err := ca.CheckSignatureFrom(ca); err != nil {
+		return CertificateInfo{}, fmt.Errorf("%w: CA certificate is not self-signed: %v", ErrInvalidMaterial, err)
+	}
+	if err := validAt(ca, now); err != nil {
+		return CertificateInfo{}, fmt.Errorf("CA certificate: %w", err)
+	}
+	return certificateInfo(ca), nil
+}
+
 func ValidateCRL(filePath string, ca *x509.Certificate, now time.Time) error {
-	data, err := readRegularFile(filePath)
+	data, err := readRegularFile(filePath, 0o644)
 	if err != nil {
 		return err
 	}
@@ -130,7 +150,7 @@ func ValidateCRL(filePath string, ca *x509.Certificate, now time.Time) error {
 }
 
 func ValidateTLSCryptKey(filePath string) error {
-	data, err := readRegularFile(filePath)
+	data, err := readRegularFile(filePath, 0o600)
 	if err != nil {
 		return err
 	}
@@ -168,7 +188,7 @@ func ValidateTLSCryptKey(filePath string) error {
 }
 
 func readCertificate(filePath string) (*x509.Certificate, error) {
-	data, err := readRegularFile(filePath)
+	data, err := readRegularFile(filePath, 0o644)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +210,7 @@ func readCertificate(filePath string) (*x509.Certificate, error) {
 }
 
 func readPrivateKey(filePath string) (crypto.PrivateKey, error) {
-	data, err := readRegularFile(filePath)
+	data, err := readRegularFile(filePath, 0o600)
 	if err != nil {
 		return nil, err
 	}
@@ -222,13 +242,16 @@ func readPrivateKey(filePath string) (crypto.PrivateKey, error) {
 	return nil, fmt.Errorf("%w: private key PEM is missing", ErrInvalidMaterial)
 }
 
-func readRegularFile(filePath string) ([]byte, error) {
+func readRegularFile(filePath string, expectedMode os.FileMode) ([]byte, error) {
 	info, err := os.Lstat(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("read PKI file %s: %w", filePath, err)
 	}
 	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
 		return nil, fmt.Errorf("%w: PKI path is not a regular file", ErrInvalidMaterial)
+	}
+	if info.Mode().Perm() != expectedMode {
+		return nil, fmt.Errorf("%w: PKI file %s has mode %04o, want %04o", ErrInvalidMaterial, filePath, info.Mode().Perm(), expectedMode)
 	}
 	file, err := os.Open(filePath)
 	if err != nil {

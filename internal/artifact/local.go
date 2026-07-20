@@ -118,6 +118,7 @@ const (
 type CrashInjector func(CrashPoint) error
 
 type operationEntry struct {
+	Action         string `json:"action"`
 	Key            string `json:"key"`
 	Mode           uint32 `json:"mode"`
 	Digest         string `json:"digest"`
@@ -263,11 +264,31 @@ func (operation *Operation) Stage(ctx context.Context, key string, mode os.FileM
 	}
 	var digest [32]byte
 	copy(digest[:], hash.Sum(nil))
-	operation.manifest.Entries = append(operation.manifest.Entries, operationEntry{Key: key, Mode: uint32(mode.Perm()), Digest: hex.EncodeToString(digest[:])})
+	operation.manifest.Entries = append(operation.manifest.Entries, operationEntry{Action: "write", Key: key, Mode: uint32(mode.Perm()), Digest: hex.EncodeToString(digest[:])})
 	if err := operation.saveManifest(); err != nil {
 		return Reference{}, err
 	}
 	return Reference{Backend: BackendLocal, Key: key, Digest: digest, Mode: uint32(mode.Perm())}, nil
+}
+
+// Remove stages an idempotent artifact deletion in the same operation journal.
+func (operation *Operation) Remove(key string) error {
+	if operation.manifest.State != OperationPrepared {
+		return fmt.Errorf("%w: cannot remove in %s", ErrOperationState, operation.manifest.State)
+	}
+	if err := ValidateKey(key); err != nil {
+		return err
+	}
+	for _, entry := range operation.manifest.Entries {
+		if entry.Key == key {
+			return fmt.Errorf("artifact %s is already staged", key)
+		}
+	}
+	if err := operation.store.preflightTarget(key); err != nil {
+		return err
+	}
+	operation.manifest.Entries = append(operation.manifest.Entries, operationEntry{Action: "delete", Key: key})
+	return operation.saveManifest()
 }
 
 func (operation *Operation) Install(ctx context.Context, inject CrashInjector) error {
@@ -275,9 +296,11 @@ func (operation *Operation) Install(ctx context.Context, inject CrashInjector) e
 		return fmt.Errorf("%w: operation is not installable", ErrOperationState)
 	}
 	for _, entry := range operation.manifest.Entries {
-		staged := filepath.Join(operation.dir, "staged", filepath.FromSlash(entry.Key))
-		if err := verifyStaged(staged, entry); err != nil {
-			return err
+		if entry.Action == "write" {
+			staged := filepath.Join(operation.dir, "staged", filepath.FromSlash(entry.Key))
+			if err := verifyStaged(staged, entry); err != nil {
+				return err
+			}
 		}
 		if err := operation.store.preflightTarget(entry.Key); err != nil {
 			return err
@@ -336,8 +359,10 @@ func (operation *Operation) Install(ctx context.Context, inject CrashInjector) e
 		case statErr != nil:
 			return fmt.Errorf("inspect target artifact %s: %w", entry.Key, statErr)
 		}
-		if err := os.Rename(staged, target); err != nil {
-			return fmt.Errorf("install artifact %s: %w", entry.Key, err)
+		if entry.Action == "write" {
+			if err := os.Rename(staged, target); err != nil {
+				return fmt.Errorf("install artifact %s: %w", entry.Key, err)
+			}
 		}
 		entry.Installed = true
 		if err := syncDirectory(filepath.Dir(target)); err != nil {
@@ -403,7 +428,7 @@ func (operation *Operation) Rollback() error {
 			if digestErr != nil || entry.OriginalDigest == "" || currentDigest != entry.OriginalDigest {
 				return fmt.Errorf("%w: original artifact %s cannot be restored", ErrOperationState, entry.Key)
 			}
-		} else {
+		} else if entry.Action == "write" {
 			staged := filepath.Join(operation.dir, "staged", filepath.FromSlash(entry.Key))
 			_, stagedErr := os.Lstat(staged)
 			if entry.Installed || errors.Is(stagedErr, os.ErrNotExist) {
@@ -624,11 +649,18 @@ func readManifest(filePath string) (operationManifest, error) {
 	}
 	seen := make(map[string]struct{}, len(manifest.Entries))
 	for _, entry := range manifest.Entries {
-		if err := ValidateKey(entry.Key); err != nil || (entry.Mode != 0o600 && entry.Mode != 0o644) || len(entry.Digest) != 64 {
+		if err := ValidateKey(entry.Key); err != nil || (entry.Action != "write" && entry.Action != "delete") {
 			return operationManifest{}, fmt.Errorf("%w: invalid operation entry", ErrOperationState)
 		}
-		if _, err := hex.DecodeString(entry.Digest); err != nil {
-			return operationManifest{}, fmt.Errorf("%w: invalid operation digest", ErrOperationState)
+		if entry.Action == "write" {
+			if (entry.Mode != 0o600 && entry.Mode != 0o644) || len(entry.Digest) != 64 {
+				return operationManifest{}, fmt.Errorf("%w: invalid operation write entry", ErrOperationState)
+			}
+			if _, err := hex.DecodeString(entry.Digest); err != nil {
+				return operationManifest{}, fmt.Errorf("%w: invalid operation digest", ErrOperationState)
+			}
+		} else if entry.Mode != 0 || entry.Digest != "" {
+			return operationManifest{}, fmt.Errorf("%w: invalid operation delete entry", ErrOperationState)
 		}
 		if entry.HadOriginal {
 			if (entry.OriginalMode != 0o600 && entry.OriginalMode != 0o644) || len(entry.OriginalDigest) != 64 {

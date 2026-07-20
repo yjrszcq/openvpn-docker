@@ -196,6 +196,27 @@ func TestValidateTLSCryptKey(t *testing.T) {
 	}
 }
 
+func TestCryptoValidationRejectsUnsafePermissions(t *testing.T) {
+	fixture := makeCryptoFixture(t)
+	directory := filepath.Join(t.TempDir(), "pki")
+	writeFixture(t, directory, fixture)
+	if err := os.Chmod(filepath.Join(directory, "private", testClientID+".key"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ValidateClient(directory, testClientID, fixture.now); !errors.Is(err, ErrInvalidMaterial) {
+		t.Fatalf("public client key permissions error=%v", err)
+	}
+	tlsKey := filepath.Join(t.TempDir(), "tls.key")
+	encoded := hex.EncodeToString(bytesRepeat(0x5a, 256))
+	content := "-----BEGIN OpenVPN Static key V1-----\n" + encoded + "\n-----END OpenVPN Static key V1-----\n"
+	if err := os.WriteFile(tlsKey, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateTLSCryptKey(tlsKey); !errors.Is(err, ErrInvalidMaterial) {
+		t.Fatalf("public tls-crypt permissions error=%v", err)
+	}
+}
+
 func bytesRepeat(value byte, count int) []byte {
 	result := make([]byte, count)
 	for index := range result {
