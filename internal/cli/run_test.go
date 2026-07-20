@@ -59,9 +59,34 @@ func TestVersionJSONUsageError(t *testing.T) {
 }
 
 func TestUnimplementedCommandFailsExplicitly(t *testing.T) {
-	code, _, stderr := run("server", "init")
+	code, _, stderr := run("runtime", "status")
 	if code != 1 || !strings.Contains(stderr, "not implemented") {
 		t.Fatalf("foundation command code=%d stderr=%q", code, stderr)
+	}
+}
+
+func TestServerInitUsageAndInvalidConfiguration(t *testing.T) {
+	code, stdout, stderr := run("server", "init", "--help")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "Usage: ovpn server init") {
+		t.Fatalf("init help code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, _, stderr = run("server", "init", "extra")
+	if code != 64 || !strings.Contains(stderr, "usage: ovpn server init") {
+		t.Fatalf("init usage code=%d stderr=%q", code, stderr)
+	}
+	root := t.TempDir()
+	configFile := filepath.Join(root, "config.yaml")
+	if err := os.WriteFile(configFile, []byte("version: 1\nunknown: true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("OVPN_CONFIG_FILE", configFile)
+	t.Setenv("OVPN_DATA_DIR", filepath.Join(root, "data"))
+	t.Setenv("OVPN_RUNTIME_DIR", filepath.Join(root, "run"))
+	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
+	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
+	code, stdout, stderr = run("server", "init")
+	if code != 65 || stdout != "" || !strings.Contains(stderr, "initialization configuration is invalid") {
+		t.Fatalf("invalid init code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 

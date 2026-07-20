@@ -258,3 +258,36 @@ func TestClientRejectsPoolAndArtifactViolations(t *testing.T) {
 		t.Fatalf("failed aggregate was partially committed: count=%d err=%v", count, err)
 	}
 }
+
+func TestInstanceArtifactRegistrationAndOwnerBoundaries(t *testing.T) {
+	store, instance := storeWithInstance(t)
+	caKey := ArtifactMetadata{
+		ID: "35353535-3535-4353-8353-353535353535", OwnerKind: "instance", OwnerID: instance.ID,
+		Kind: "ca-key", Key: "pki/private/ca.key", Status: ArtifactActive,
+	}
+	if err := store.RegisterInstanceArtifacts(context.Background(), instance.ID, []ArtifactMetadata{caKey}); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := store.LoadInstanceArtifacts(context.Background(), instance.ID)
+	if err != nil || len(loaded) != 1 || loaded[0].Kind != "ca-key" || loaded[0].Key != caKey.Key {
+		t.Fatalf("instance artifacts=%+v err=%v", loaded, err)
+	}
+	invalid := ArtifactMetadata{
+		ID: "36363636-3636-4363-8363-363636363636", OwnerKind: "instance", OwnerID: instance.ID,
+		Kind: "client-key", Key: "pki/private/client.key", Status: ArtifactActive,
+	}
+	if err := store.RegisterInstanceArtifacts(context.Background(), instance.ID, []ArtifactMetadata{invalid}); err == nil {
+		t.Fatal("client-only artifact kind was accepted for an instance")
+	}
+	client := ClientState{
+		Client:    domain.Client{ID: "37373737-3737-4373-8373-373737373737", Name: "invalid-owner-kind", Status: domain.ClientActive},
+		CreatedAt: time.Now().UTC(),
+		Artifacts: []ArtifactMetadata{{
+			ID: "38383838-3838-4383-8383-383838383838", OwnerKind: "client", OwnerID: "37373737-3737-4373-8373-373737373737",
+			Kind: "ca-key", Key: "pki/private/ca.key", Status: ArtifactActive,
+		}},
+	}
+	if err := store.CreateClient(context.Background(), instance.ID, client); err == nil {
+		t.Fatal("instance-only artifact kind was accepted for a client")
+	}
+}

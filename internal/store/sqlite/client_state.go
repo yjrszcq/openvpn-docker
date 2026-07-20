@@ -24,6 +24,21 @@ const (
 	ArtifactDeleted    ArtifactStatus   = "deleted"
 )
 
+var artifactKinds = map[string]struct{}{
+	"ca-cert": {}, "ca-key": {}, "server-cert": {}, "server-key": {},
+	"client-cert": {}, "client-key": {}, "crl": {}, "tls-crypt": {},
+	"profile": {}, "ccd": {}, "server-config": {},
+}
+
+var instanceArtifactKinds = map[string]struct{}{
+	"ca-cert": {}, "ca-key": {}, "server-cert": {}, "server-key": {},
+	"crl": {}, "tls-crypt": {}, "server-config": {},
+}
+
+var clientArtifactKinds = map[string]struct{}{
+	"client-cert": {}, "client-key": {}, "profile": {}, "ccd": {},
+}
+
 // AddressAssignment is the authoritative address intent, not a runtime lease.
 type AddressAssignment struct {
 	ID         string
@@ -214,6 +229,77 @@ ON CONFLICT(client_id, network_id) DO UPDATE SET address = excluded.address, upd
 	return classifyCommit(transaction.Commit(), "commit client lease")
 }
 
+// RegisterInstanceArtifacts records verified instance-owned file references.
+func (store *Store) RegisterInstanceArtifacts(ctx context.Context, instanceID string, artifacts []ArtifactMetadata) error {
+	if !domain.ValidUUID(instanceID) || len(artifacts) == 0 {
+		return fmt.Errorf("invalid instance artifact registration")
+	}
+	transaction, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return classifySQLite("begin instance artifact registration", err)
+	}
+	defer transaction.Rollback()
+	for _, artifact := range artifacts {
+		if err := validateArtifact(artifact); err != nil {
+			return err
+		}
+		if artifact.OwnerKind != "instance" || artifact.OwnerID != instanceID {
+			return fmt.Errorf("instance artifact owner mismatch")
+		}
+		if err := validateArtifactOwnerKind(artifact); err != nil {
+			return err
+		}
+		if err := insertArtifactMetadata(ctx, transaction, instanceID, artifact); err != nil {
+			return err
+		}
+	}
+	operationID, err := domain.GenerateUUID()
+	if err != nil {
+		return err
+	}
+	if err := appendAudit(ctx, transaction, instanceID, operationID, "artifacts.registered", map[string]any{"count": len(artifacts)}); err != nil {
+		return err
+	}
+	return classifyCommit(transaction.Commit(), "commit instance artifact registration")
+}
+
+// LoadInstanceArtifacts returns validated instance-owned artifact references.
+func (store *Store) LoadInstanceArtifacts(ctx context.Context, instanceID string) ([]ArtifactMetadata, error) {
+	if !domain.ValidUUID(instanceID) {
+		return nil, fmt.Errorf("invalid instance UUID")
+	}
+	rows, err := store.db.QueryContext(ctx, `
+SELECT id, owner_kind, owner_id, kind, artifact_key, digest,
+       COALESCE(certificate_serial, ''), certificate_fingerprint, status
+FROM artifacts
+WHERE instance_id = ? AND owner_kind = 'instance' AND owner_id = ?
+ORDER BY artifact_key`, instanceID, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	values := make([]ArtifactMetadata, 0)
+	for rows.Next() {
+		var value ArtifactMetadata
+		var digest []byte
+		if err := rows.Scan(&value.ID, &value.OwnerKind, &value.OwnerID, &value.Kind, &value.Key, &digest, &value.CertificateSerial, &value.CertificateFingerprint, &value.Status); err != nil {
+			return nil, err
+		}
+		if len(digest) != 32 {
+			return nil, fmt.Errorf("%w: invalid artifact digest", ErrSchema)
+		}
+		copy(value.Digest[:], digest)
+		if err := validateArtifact(value); err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrSchema, err)
+		}
+		if err := validateArtifactOwnerKind(value); err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrSchema, err)
+		}
+		values = append(values, value)
+	}
+	return values, rows.Err()
+}
+
 func validateClientState(state ClientState) error {
 	if _, err := domain.NewClient(state.Client.ID, state.Client.Name, state.Client.Status); err != nil {
 		return err
@@ -269,6 +355,9 @@ func validateClientState(state ClientState) error {
 	}
 	for _, artifact := range state.Artifacts {
 		if err := validateArtifact(artifact); err != nil {
+			return err
+		}
+		if err := validateArtifactOwnerKind(artifact); err != nil {
 			return err
 		}
 	}
@@ -356,6 +445,13 @@ func insertArtifact(ctx context.Context, transaction *sql.Tx, instanceID, client
 	if artifact.OwnerKind != "client" || artifact.OwnerID != clientID {
 		return fmt.Errorf("client artifact owner mismatch")
 	}
+	if err := validateArtifactOwnerKind(artifact); err != nil {
+		return err
+	}
+	return insertArtifactMetadata(ctx, transaction, instanceID, artifact)
+}
+
+func insertArtifactMetadata(ctx context.Context, transaction *sql.Tx, instanceID string, artifact ArtifactMetadata) error {
 	var fingerprint any
 	if len(artifact.CertificateFingerprint) > 0 {
 		fingerprint = artifact.CertificateFingerprint
@@ -378,10 +474,29 @@ func validateArtifact(artifact ArtifactMetadata) error {
 	if len(artifact.CertificateFingerprint) != 0 && len(artifact.CertificateFingerprint) != 32 {
 		return fmt.Errorf("artifact certificate fingerprint must contain 32 bytes")
 	}
+	if _, exists := artifactKinds[artifact.Kind]; !exists {
+		return fmt.Errorf("invalid artifact kind")
+	}
 	switch artifact.Status {
 	case ArtifactActive, ArtifactStale, ArtifactDeleted:
 	default:
 		return fmt.Errorf("invalid artifact status")
+	}
+	return nil
+}
+
+func validateArtifactOwnerKind(artifact ArtifactMetadata) error {
+	var allowed map[string]struct{}
+	switch artifact.OwnerKind {
+	case "instance":
+		allowed = instanceArtifactKinds
+	case "client":
+		allowed = clientArtifactKinds
+	default:
+		return fmt.Errorf("invalid artifact owner kind")
+	}
+	if _, exists := allowed[artifact.Kind]; !exists {
+		return fmt.Errorf("artifact kind %s is invalid for %s owner", artifact.Kind, artifact.OwnerKind)
 	}
 	return nil
 }

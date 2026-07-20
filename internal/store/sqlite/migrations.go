@@ -16,6 +16,32 @@ var migrations = []migration{
 	{revision: 3, apply: migrateClientState},
 	{revision: 4, apply: migrateAuditState},
 	{revision: 5, apply: migrateLeaseUniqueness},
+	{revision: 6, apply: migrateCAKeyArtifact},
+}
+
+func migrateCAKeyArtifact(ctx context.Context, transaction *sql.Tx) error {
+	_, err := transaction.ExecContext(ctx, `
+CREATE TABLE artifacts_v6 (
+    id TEXT PRIMARY KEY CHECK (length(id) = 36),
+    instance_id TEXT NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    owner_kind TEXT NOT NULL CHECK (owner_kind IN ('instance', 'client')),
+    owner_id TEXT NOT NULL CHECK (length(owner_id) = 36),
+    kind TEXT NOT NULL CHECK (kind IN ('ca-cert', 'ca-key', 'server-cert', 'server-key', 'client-cert', 'client-key', 'crl', 'tls-crypt', 'profile', 'ccd', 'server-config')),
+    backend TEXT NOT NULL CHECK (backend = 'local'),
+    artifact_key TEXT NOT NULL CHECK (length(artifact_key) > 0),
+    digest BLOB NOT NULL CHECK (length(digest) = 32),
+    certificate_serial TEXT,
+    certificate_fingerprint BLOB CHECK (certificate_fingerprint IS NULL OR length(certificate_fingerprint) = 32),
+    status TEXT NOT NULL CHECK (status IN ('active', 'stale', 'deleted')),
+    UNIQUE (backend, artifact_key)
+) STRICT;
+INSERT INTO artifacts_v6 SELECT * FROM artifacts;
+DROP TABLE artifacts;
+ALTER TABLE artifacts_v6 RENAME TO artifacts`)
+	if err != nil {
+		return classifySQLite("migrate CA key artifact metadata", err)
+	}
+	return nil
 }
 
 func migrateLeaseUniqueness(ctx context.Context, transaction *sql.Tx) error {

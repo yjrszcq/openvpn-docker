@@ -4,15 +4,21 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
 	"github.com/yjrszcq/openvpn-docker/internal/apperror"
+	"github.com/yjrszcq/openvpn-docker/internal/artifact"
 	"github.com/yjrszcq/openvpn-docker/internal/buildinfo"
 	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
+	"github.com/yjrszcq/openvpn-docker/internal/initialize"
+	"github.com/yjrszcq/openvpn-docker/internal/pki"
+	"github.com/yjrszcq/openvpn-docker/internal/render"
+	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
 )
 
 // Run dispatches the ovpn multicall CLI and returns a stable exit code.
@@ -45,6 +51,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "runtime" && args[1] == "capabilities" {
 		return runRuntimeCapabilities(args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "server" && args[1] == "init" {
+		return runServerInit(args[2:], stdout, stderr)
+	}
 
 	path := commandPath(args)
 	if len(path) == 0 {
@@ -63,6 +72,68 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	return writeError(stderr, apperror.New(apperror.ExitFailure, "not_implemented", strings.Join(path, " ")+" is not implemented in the foundation build"))
+}
+
+func runServerInit(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && isHelp(args[0]) {
+		fmt.Fprintln(stdout, "Usage: ovpn server init")
+		return int(apperror.ExitSuccess)
+	}
+	if len(args) != 0 {
+		return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn server init"))
+	}
+	contractPath := environmentOr("OVPN_COMPATIBILITY_FILE", compatibility.DefaultContractPath)
+	contract, err := compatibility.Load(contractPath)
+	if err != nil {
+		return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "invalid_compatibility_contract", "compatibility contract is invalid", err))
+	}
+	renderer, err := render.New(environmentOr("OVPN_TEMPLATE_ROOT", render.DefaultTemplateRoot), contract)
+	if err != nil {
+		return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "invalid_templates", "OpenVPN templates are invalid", err))
+	}
+	easyRSA := os.Getenv("OVPN_EASYRSA_BIN")
+	if easyRSA == "" {
+		if info, statErr := os.Stat("/usr/share/easy-rsa/easyrsa"); statErr == nil && info.Mode().IsRegular() {
+			easyRSA = "/usr/share/easy-rsa/easyrsa"
+		} else {
+			easyRSA = "easyrsa"
+		}
+	}
+	pkiRunner, err := pki.NewRunner(pki.Config{EasyRSABinary: easyRSA, OpenVPNBinary: environmentOr("OVPN_OPENVPN_BIN", "openvpn")}, nil)
+	if err != nil {
+		return writeError(stderr, apperror.Wrap(apperror.ExitData, "invalid_runtime_path", "PKI runtime configuration is invalid", err))
+	}
+	service, err := initialize.NewService(pkiRunner, renderer)
+	if err != nil {
+		return writeError(stderr, err)
+	}
+	result, err := service.Initialize(context.Background(), initialize.Options{
+		DataDir: environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir), RuntimeDir: environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir),
+		ConfigFile: environmentOr("OVPN_CONFIG_FILE", configservice.DefaultPath), ServerName: initialize.DefaultServerName, Version: buildinfo.Current().Version,
+	}, nil)
+	if err != nil {
+		switch {
+		case errors.Is(err, initialize.ErrInvalidConfig):
+			return writeError(stderr, apperror.Wrap(apperror.ExitData, "invalid_config", "initialization configuration is invalid", err))
+		case errors.Is(err, pki.ErrUnavailable):
+			return writeError(stderr, apperror.Wrap(apperror.ExitUnavailable, "dependency_unavailable", "initialization dependency is unavailable", err))
+		case errors.Is(err, artifact.ErrLocked):
+			return writeError(stderr, apperror.Wrap(apperror.ExitTemporary, "lock_conflict", "initialization lock is unavailable", err))
+		case errors.Is(err, initialize.ErrNotEmpty), errors.Is(err, initialize.ErrRecoveryNeeded), errors.Is(err, pki.ErrInvalidMaterial), errors.Is(err, storesqlite.ErrSchema), errors.Is(err, storesqlite.ErrCorrupt):
+			return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "initialization_refused", "initialization was refused by state or security policy", err))
+		default:
+			return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "initialization_failed", "initialize schema 4 instance", err))
+		}
+	}
+	fmt.Fprintf(stdout, "initialized schema 4 instance %s at %s\n", result.InstanceID, environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir))
+	return int(apperror.ExitSuccess)
+}
+
+func environmentOr(name, fallback string) string {
+	if value := os.Getenv(name); value != "" {
+		return value
+	}
+	return fallback
 }
 
 func runRuntimeCapabilities(args []string, stdout, stderr io.Writer) int {

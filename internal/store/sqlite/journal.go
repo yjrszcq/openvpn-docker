@@ -125,6 +125,21 @@ FROM operations WHERE instance_id = ? AND state IN ('prepared', 'files-installed
 	return values, rows.Err()
 }
 
+// LoadOperation returns one durable operation regardless of terminal state.
+func (store *Store) LoadOperation(ctx context.Context, operationID string) (Operation, error) {
+	if !domain.ValidUUID(operationID) {
+		return Operation{}, fmt.Errorf("invalid operation UUID")
+	}
+	row := store.db.QueryRowContext(ctx, `
+SELECT id, instance_id, kind, state, payload_version, recovery_payload, created_at, updated_at, COALESCE(failure, '')
+FROM operations WHERE id = ?`, operationID)
+	value, err := scanOperation(row)
+	if err != nil {
+		return Operation{}, fmt.Errorf("load operation: %w", err)
+	}
+	return value, nil
+}
+
 // AuditEvents returns a stable ascending page after sequence.
 func (store *Store) AuditEvents(ctx context.Context, instanceID string, after uint64, limit int) ([]AuditEvent, error) {
 	if !domain.ValidUUID(instanceID) {
