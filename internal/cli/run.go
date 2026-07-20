@@ -22,6 +22,7 @@ import (
 	"github.com/yjrszcq/openvpn-docker/internal/buildinfo"
 	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
+	"github.com/yjrszcq/openvpn-docker/internal/hook"
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
 	"github.com/yjrszcq/openvpn-docker/internal/pki"
 	"github.com/yjrszcq/openvpn-docker/internal/render"
@@ -179,6 +180,32 @@ func RunEntrypoint(args []string, stdout, stderr io.Writer) int {
 		return int(apperror.ExitSuccess)
 	}
 	return Run(args, stdout, stderr)
+}
+
+// RunHook dispatches the ovpn-hook multicall entrypoint.
+func RunHook(args []string, stderr io.Writer) int {
+	if len(args) != 1 || args[0] != "pool-persist" {
+		return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn-hook pool-persist"))
+	}
+	input := hook.Input{
+		ScriptType: os.Getenv("script_type"), ClientID: os.Getenv("common_name"), VirtualAddress: os.Getenv("ifconfig_pool_remote_ip"),
+		RemoteAddress: os.Getenv("trusted_ip"), RemotePort: os.Getenv("trusted_port"), BytesReceived: os.Getenv("bytes_received"),
+		BytesSent: os.Getenv("bytes_sent"), DurationSeconds: os.Getenv("time_duration"),
+	}
+	result, err := hook.Execute(context.Background(), environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir), input, time.Now().UTC())
+	if err != nil {
+		if errors.Is(err, hook.ErrInput) {
+			return writeError(stderr, apperror.Wrap(apperror.ExitData, "invalid_hook_input", "OpenVPN hook input is invalid", err))
+		}
+		if errors.Is(err, storesqlite.ErrBusy) {
+			return writeError(stderr, apperror.Wrap(apperror.ExitTemporary, "state_busy", "OpenVPN hook state is busy", err))
+		}
+		return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "hook_state_refused", "OpenVPN hook state is invalid", err))
+	}
+	if result.EventError != nil {
+		fmt.Fprintf(stderr, "ovpn: warning: unable to append runtime event: %v\n", result.EventError)
+	}
+	return int(apperror.ExitSuccess)
 }
 
 func runServerInit(args []string, stdout, stderr io.Writer) int {

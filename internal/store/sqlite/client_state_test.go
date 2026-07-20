@@ -116,6 +116,38 @@ func TestDynamicLeaseAddressIsUniqueWithinNetwork(t *testing.T) {
 	}
 }
 
+func TestRecordLeaseTransfersStaleObservedAddress(t *testing.T) {
+	store, instance := storeWithInstance(t)
+	now := time.Date(2026, 7, 20, 13, 0, 0, 0, time.UTC)
+	first := ClientState{
+		Client: domain.Client{ID: "23232323-2323-4232-8232-232323232323", Name: "first-observed", Status: domain.ClientActive}, CreatedAt: now,
+		Assignment: &AddressAssignment{ID: "31313131-3131-4131-8131-313131313131", NetworkID: instance.NetworkID, Kind: "dynamic", Status: AssignmentActive, CreatedAt: now, UpdatedAt: now},
+		Lease:      &ClientLease{NetworkID: instance.NetworkID, Address: address(t, "10.42.0.200"), UpdatedAt: now},
+	}
+	second := ClientState{
+		Client: domain.Client{ID: "24242424-2424-4242-8242-242424242424", Name: "second-observed", Status: domain.ClientActive}, CreatedAt: now,
+		Assignment: &AddressAssignment{ID: "32323232-3232-4232-8232-323232323232", NetworkID: instance.NetworkID, Kind: "dynamic", Status: AssignmentActive, CreatedAt: now, UpdatedAt: now},
+	}
+	if err := store.CreateClient(context.Background(), instance.ID, first); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CreateClient(context.Background(), instance.ID, second); err != nil {
+		t.Fatal(err)
+	}
+	lease := ClientLease{NetworkID: instance.NetworkID, Address: address(t, "10.42.0.200"), UpdatedAt: now.Add(time.Minute)}
+	if err := store.RecordLease(context.Background(), second.Client.ID, lease); err != nil {
+		t.Fatal(err)
+	}
+	loadedFirst, err := store.LoadClient(context.Background(), instance.ID, first.Client.ID)
+	if err != nil || loadedFirst.Lease != nil {
+		t.Fatalf("stale lease remains: %+v err=%v", loadedFirst.Lease, err)
+	}
+	loadedSecond, err := store.LoadClient(context.Background(), instance.ID, second.Client.ID)
+	if err != nil || loadedSecond.Lease == nil || loadedSecond.Lease.Address.String() != "10.42.0.200" {
+		t.Fatalf("new lease was not recorded: %+v err=%v", loadedSecond.Lease, err)
+	}
+}
+
 func TestClientRejectsCrossInstanceAssignment(t *testing.T) {
 	store, first := storeWithInstance(t)
 	secondState := initialInstance(t)

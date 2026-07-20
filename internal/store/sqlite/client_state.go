@@ -268,6 +268,11 @@ WHERE a.client_id = ? AND a.network_id = ? AND a.kind = 'dynamic'
 		return err
 	}
 	if _, err := transaction.ExecContext(ctx, `
+DELETE FROM client_leases
+WHERE network_id = ? AND family = 4 AND address = ? AND client_id <> ?`, lease.NetworkID, packAddress(lease.Address.Netip()), clientID); err != nil {
+		return classifySQLite("remove stale client lease", err)
+	}
+	if _, err := transaction.ExecContext(ctx, `
 INSERT INTO client_leases(client_id, network_id, family, address, updated_at)
 VALUES(?, ?, 4, ?, ?)
 ON CONFLICT(client_id, network_id) DO UPDATE SET address = excluded.address, updated_at = excluded.updated_at`, clientID, lease.NetworkID, packAddress(lease.Address.Netip()), formatTime(lease.UpdatedAt)); err != nil {

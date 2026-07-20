@@ -120,6 +120,19 @@ func TestEntrypointDispatchesOVPNAndDefaultCommands(t *testing.T) {
 	}
 }
 
+func TestHookUsageAndInvalidEnvironment(t *testing.T) {
+	var stderr bytes.Buffer
+	if code := cli.RunHook(nil, &stderr); code != 64 || !strings.Contains(stderr.String(), "ovpn-hook pool-persist") {
+		t.Fatalf("hook usage code=%d stderr=%q", code, stderr.String())
+	}
+	stderr.Reset()
+	t.Setenv("script_type", "client-connect")
+	t.Setenv("common_name", "not-a-uuid")
+	if code := cli.RunHook([]string{"pool-persist"}, &stderr); code != 65 || !strings.Contains(stderr.String(), "hook input is invalid") {
+		t.Fatalf("hook input code=%d stderr=%q", code, stderr.String())
+	}
+}
+
 func TestClientQueryUsageAndStructuredStateError(t *testing.T) {
 	code, stdout, stderr := run("client", "export", "--help")
 	if code != 0 || stderr != "" || !strings.Contains(stdout, "Usage: ovpn client export") {
