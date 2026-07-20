@@ -14,6 +14,37 @@ type migration struct {
 var migrations = []migration{
 	{revision: 2, apply: migrateConfigurationState},
 	{revision: 3, apply: migrateClientState},
+	{revision: 4, apply: migrateAuditState},
+}
+
+func migrateAuditState(ctx context.Context, transaction *sql.Tx) error {
+	_, err := transaction.ExecContext(ctx, `
+CREATE TABLE audit_events (
+    sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT NOT NULL UNIQUE CHECK (length(event_id) = 36),
+    instance_id TEXT NOT NULL REFERENCES instances(id) ON DELETE RESTRICT,
+    operation_id TEXT NOT NULL CHECK (length(operation_id) = 36),
+    event_type TEXT NOT NULL CHECK (length(event_type) > 0),
+    payload_version INTEGER NOT NULL CHECK (payload_version > 0),
+    payload TEXT NOT NULL CHECK (json_valid(payload)),
+    created_at TEXT NOT NULL CHECK (length(created_at) > 0)
+) STRICT;
+
+CREATE TABLE operations (
+    id TEXT PRIMARY KEY CHECK (length(id) = 36),
+    instance_id TEXT NOT NULL REFERENCES instances(id) ON DELETE RESTRICT,
+    kind TEXT NOT NULL CHECK (length(kind) > 0),
+    state TEXT NOT NULL CHECK (state IN ('prepared', 'files-installed', 'committed', 'rolled-back', 'failed')),
+    payload_version INTEGER NOT NULL CHECK (payload_version > 0),
+    recovery_payload TEXT NOT NULL CHECK (json_valid(recovery_payload)),
+    created_at TEXT NOT NULL CHECK (length(created_at) > 0),
+    updated_at TEXT NOT NULL CHECK (length(updated_at) > 0),
+    failure TEXT
+) STRICT`)
+	if err != nil {
+		return classifySQLite("migrate audit state", err)
+	}
+	return nil
 }
 
 func migrateClientState(ctx context.Context, transaction *sql.Tx) error {

@@ -44,6 +44,13 @@ VALUES(?, ?, ?, NULL)`, state.ID, state.CreatedAt.UTC().Truncate(time.Second).Fo
 	if err := writeApplied(ctx, transaction, state.ID, state.Applied); err != nil {
 		return err
 	}
+	operationID, err := domain.GenerateUUID()
+	if err != nil {
+		return err
+	}
+	if err := appendAudit(ctx, transaction, state.ID, operationID, "instance.created", map[string]any{"revision": state.Applied.Revision}); err != nil {
+		return err
+	}
 	if err := transaction.Commit(); err != nil {
 		return classifySQLite("commit instance creation", err)
 	}
@@ -71,6 +78,13 @@ func (store *Store) ApplyConfig(ctx context.Context, instanceID string, snapshot
 		return fmt.Errorf("applied revision must advance from %d to %d", current, current+1)
 	}
 	if err := writeApplied(ctx, transaction, instanceID, snapshot); err != nil {
+		return err
+	}
+	operationID, err := domain.GenerateUUID()
+	if err != nil {
+		return err
+	}
+	if err := appendAudit(ctx, transaction, instanceID, operationID, "config.applied", map[string]any{"revision": snapshot.Revision, "digest": snapshot.Digest}); err != nil {
 		return err
 	}
 	if err := transaction.Commit(); err != nil {

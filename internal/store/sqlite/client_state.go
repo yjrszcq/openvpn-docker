@@ -115,6 +115,13 @@ VALUES(?, ?, ?, ?, ?, ?, ?)`, state.Client.ID, instanceID, state.Client.Name, st
 			return err
 		}
 	}
+	operationID, err := domain.GenerateUUID()
+	if err != nil {
+		return err
+	}
+	if err := appendAudit(ctx, transaction, instanceID, operationID, "client.created", map[string]any{"client_id": state.Client.ID, "name": state.Client.Name}); err != nil {
+		return err
+	}
 	if err := transaction.Commit(); err != nil {
 		return classifySQLite("commit client creation", err)
 	}
