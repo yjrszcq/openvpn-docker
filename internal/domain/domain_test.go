@@ -88,3 +88,17 @@ func TestClientIdentity(t *testing.T) {
 		t.Fatal("UUID-shaped client name was accepted")
 	}
 }
+
+func TestGenerateUUID(t *testing.T) {
+	first, err := domain.GenerateUUID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := domain.GenerateUUID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !domain.ValidUUID(first) || !domain.ValidUUID(second) || first == second {
+		t.Fatalf("invalid generated UUIDs: %q %q", first, second)
+	}
+}

@@ -21,7 +21,8 @@ import (
 const (
 	DefaultPath     = "/etc/openvpn/meta/state.db"
 	DataSchema      = buildinfo.DataSchema
-	CurrentRevision = 1
+	InitialRevision = 1
+	CurrentRevision = 2
 	BusyTimeoutMS   = 30000
 )
 
@@ -95,6 +96,10 @@ func Create(ctx context.Context, path, createdVersion string) (_ *Store, resultE
 	if err != nil {
 		return nil, err
 	}
+	metadata, err = migrate(ctx, database, metadata)
+	if err != nil {
+		return nil, err
+	}
 	if err := requireMode(path); err != nil {
 		return nil, err
 	}
@@ -128,6 +133,10 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, err
 	}
 	if err := validateMetadata(metadata); err != nil {
+		return nil, err
+	}
+	metadata, err = migrate(ctx, database, metadata)
+	if err != nil {
 		return nil, err
 	}
 	closeOnError = false
@@ -221,7 +230,7 @@ CREATE TABLE schema_metadata (
 	}
 	metadata := Metadata{
 		DataSchema:       DataSchema,
-		DatabaseRevision: CurrentRevision,
+		DatabaseRevision: InitialRevision,
 		CreatedVersion:   createdVersion,
 		CreatedAt:        createdAt.Truncate(time.Second),
 	}
@@ -265,8 +274,11 @@ func validateMetadata(metadata Metadata) error {
 	if metadata.DataSchema != DataSchema {
 		return fmt.Errorf("%w: database has data schema %d, require %d", ErrUnsupportedSchema, metadata.DataSchema, DataSchema)
 	}
-	if metadata.DatabaseRevision != CurrentRevision {
-		return fmt.Errorf("%w: database has revision %d, require %d", ErrUnsupportedRevision, metadata.DatabaseRevision, CurrentRevision)
+	if metadata.DatabaseRevision <= 0 {
+		return fmt.Errorf("%w: invalid database revision %d", ErrSchema, metadata.DatabaseRevision)
+	}
+	if metadata.DatabaseRevision > CurrentRevision {
+		return fmt.Errorf("%w: database has revision %d, latest supported is %d", ErrUnsupportedRevision, metadata.DatabaseRevision, CurrentRevision)
 	}
 	if metadata.CreatedVersion == "" || metadata.CreatedAt.IsZero() {
 		return fmt.Errorf("%w: incomplete schema metadata", ErrSchema)

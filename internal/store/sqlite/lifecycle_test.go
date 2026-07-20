@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	sqlite3 "github.com/mattn/go-sqlite3"
 )
@@ -127,6 +128,46 @@ func TestOpenReadsExistingMetadata(t *testing.T) {
 	t.Cleanup(func() { _ = opened.Close() })
 	if opened.Metadata() != want {
 		t.Fatalf("opened metadata=%+v, want %+v", opened.Metadata(), want)
+	}
+}
+
+func TestOpenMigratesRevisionOne(t *testing.T) {
+	path := databasePath(t)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	database, err := connect(context.Background(), path, "rwc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := initialize(context.Background(), database, "4.0.0-test", time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if metadata.DatabaseRevision != InitialRevision {
+		t.Fatalf("bootstrap revision=%d", metadata.DatabaseRevision)
+	}
+	if err := database.Close(); err != nil {
+		t.Fatal(err)
+	}
+	store, err := Open(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if store.Metadata().DatabaseRevision != CurrentRevision {
+		t.Fatalf("migrated revision=%d, want %d", store.Metadata().DatabaseRevision, CurrentRevision)
+	}
+	var count int
+	if err := store.db.QueryRow("SELECT count(*) FROM sqlite_schema WHERE type = 'table' AND name = 'instances'").Scan(&count); err != nil || count != 1 {
+		t.Fatalf("instances migration count=%d err=%v", count, err)
 	}
 }
 
