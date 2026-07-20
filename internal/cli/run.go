@@ -60,6 +60,12 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "client" && args[1] == "export" {
 		return runClientExport(args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "client" && args[1] == "create" {
+		return runClientCreate(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "client" && args[1] == "rename" {
+		return runClientRename(args[2:], stdout, stderr)
+	}
 
 	path := commandPath(args)
 	if len(path) == 0 {
@@ -97,15 +103,7 @@ func runServerInit(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "invalid_templates", "OpenVPN templates are invalid", err))
 	}
-	easyRSA := os.Getenv("OVPN_EASYRSA_BIN")
-	if easyRSA == "" {
-		if info, statErr := os.Stat("/usr/share/easy-rsa/easyrsa"); statErr == nil && info.Mode().IsRegular() {
-			easyRSA = "/usr/share/easy-rsa/easyrsa"
-		} else {
-			easyRSA = "easyrsa"
-		}
-	}
-	pkiRunner, err := pki.NewRunner(pki.Config{EasyRSABinary: easyRSA, OpenVPNBinary: environmentOr("OVPN_OPENVPN_BIN", "openvpn")}, nil)
+	pkiRunner, err := runtimePKIRunner()
 	if err != nil {
 		return writeError(stderr, apperror.Wrap(apperror.ExitData, "invalid_runtime_path", "PKI runtime configuration is invalid", err))
 	}

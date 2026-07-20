@@ -8,12 +8,16 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/yjrszcq/openvpn-docker/internal/apperror"
 	"github.com/yjrszcq/openvpn-docker/internal/artifact"
 	clientservice "github.com/yjrszcq/openvpn-docker/internal/client"
+	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
+	"github.com/yjrszcq/openvpn-docker/internal/pki"
+	"github.com/yjrszcq/openvpn-docker/internal/render"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
 )
 
@@ -113,6 +117,56 @@ func runClientExport(args []string, stdout, stderr io.Writer) int {
 	return int(apperror.ExitSuccess)
 }
 
+func runClientCreate(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && isHelp(args[0]) {
+		fmt.Fprintln(stdout, "Usage: ovpn client create NAME [--ipv4 auto|dynamic|ADDRESS]")
+		return int(apperror.ExitSuccess)
+	}
+	if len(args) < 1 || len(args) > 3 || len(args) == 2 || strings.HasPrefix(args[0], "-") {
+		return writeError(stderr, usageError("usage: ovpn client create NAME [--ipv4 auto|dynamic|ADDRESS]"))
+	}
+	request := clientservice.CreateRequest{Name: args[0], IPv4: "auto"}
+	if len(args) == 3 {
+		if args[1] != "--ipv4" || args[2] == "" {
+			return writeError(stderr, usageError("usage: ovpn client create NAME [--ipv4 auto|dynamic|ADDRESS]"))
+		}
+		request.IPv4 = args[2]
+	}
+	manager, state, err := openClientManager(context.Background())
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	defer state.Close()
+	result, err := manager.Create(context.Background(), request)
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	fmt.Fprintf(stdout, "created client %s [%s] with IPv4 %s\n", result.Client.Name, result.Client.ID, formatIPv4(result.Client.IPv4))
+	return int(apperror.ExitSuccess)
+}
+
+func runClientRename(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && isHelp(args[0]) {
+		fmt.Fprintln(stdout, "Usage: ovpn client rename (--name NAME|--id ID) NEW_NAME")
+		return int(apperror.ExitSuccess)
+	}
+	selector, positionals, err := parseMutationSelector(args)
+	if err != nil || len(positionals) != 1 {
+		return writeError(stderr, usageError("usage: ovpn client rename (--name NAME|--id ID) NEW_NAME"))
+	}
+	manager, state, err := openClientManager(context.Background())
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	defer state.Close()
+	result, err := manager.Rename(context.Background(), selector, positionals[0])
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	fmt.Fprintf(stdout, "renamed client to %s [%s]\n", result.Client.Name, result.Client.ID)
+	return int(apperror.ExitSuccess)
+}
+
 func parseClientExport(args []string) (clientservice.Selector, string, error) {
 	var selector clientservice.Selector
 	var output string
@@ -172,6 +226,93 @@ func openClientService(ctx context.Context) (*clientservice.Service, *storesqlit
 	return service, state, nil
 }
 
+func openClientManager(ctx context.Context) (*clientservice.Manager, *storesqlite.Store, error) {
+	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
+	state, err := storesqlite.Open(ctx, filepath.Join(dataDir, "meta", "state.db"))
+	if err != nil {
+		return nil, nil, err
+	}
+	closeError := func(err error) (*clientservice.Manager, *storesqlite.Store, error) {
+		_ = state.Close()
+		return nil, nil, err
+	}
+	local, err := artifact.NewLocal(dataDir)
+	if err != nil {
+		return closeError(err)
+	}
+	contract, err := compatibility.Load(environmentOr("OVPN_COMPATIBILITY_FILE", compatibility.DefaultContractPath))
+	if err != nil {
+		return closeError(apperror.Wrap(apperror.ExitPolicy, "invalid_compatibility_contract", "compatibility contract is invalid", err))
+	}
+	renderer, err := render.New(environmentOr("OVPN_TEMPLATE_ROOT", render.DefaultTemplateRoot), contract)
+	if err != nil {
+		return closeError(apperror.Wrap(apperror.ExitPolicy, "invalid_templates", "OpenVPN templates are invalid", err))
+	}
+	runner, err := runtimePKIRunner()
+	if err != nil {
+		return closeError(err)
+	}
+	manager, err := clientservice.NewManager(state, local, runner, renderer, render.Paths{DataDir: dataDir, RuntimeDir: environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)})
+	if err != nil {
+		return closeError(err)
+	}
+	return manager, state, nil
+}
+
+func runtimePKIRunner() (*pki.Runner, error) {
+	easyRSA := os.Getenv("OVPN_EASYRSA_BIN")
+	if easyRSA == "" {
+		if info, err := os.Stat("/usr/share/easy-rsa/easyrsa"); err == nil && info.Mode().IsRegular() {
+			easyRSA = "/usr/share/easy-rsa/easyrsa"
+		} else {
+			easyRSA = "easyrsa"
+		}
+	}
+	return pki.NewRunner(pki.Config{EasyRSABinary: easyRSA, OpenVPNBinary: environmentOr("OVPN_OPENVPN_BIN", "openvpn")}, nil)
+}
+
+func parseMutationSelector(args []string) (clientservice.Selector, []string, error) {
+	var selector clientservice.Selector
+	positionals := make([]string, 0, 1)
+	for index := 0; index < len(args); index++ {
+		switch args[index] {
+		case "--name", "--id":
+			if index+1 >= len(args) {
+				return clientservice.Selector{}, nil, usageError("client selector requires a value")
+			}
+			value := args[index+1]
+			index++
+			if args[index-1] == "--name" {
+				if selector.Name != "" {
+					return clientservice.Selector{}, nil, usageError("--name may only be specified once")
+				}
+				selector.Name = value
+			} else {
+				if selector.IDPrefix != "" {
+					return clientservice.Selector{}, nil, usageError("--id may only be specified once")
+				}
+				selector.IDPrefix = value
+			}
+		default:
+			if strings.HasPrefix(args[index], "-") {
+				return clientservice.Selector{}, nil, usageError("unknown client option")
+			}
+			positionals = append(positionals, args[index])
+		}
+	}
+	if (selector.Name == "") == (selector.IDPrefix == "") {
+		return clientservice.Selector{}, nil, usageError("exactly one of --name or --id is required")
+	}
+	return selector, positionals, nil
+}
+
+func formatIPv4(value clientservice.IPv4View) string {
+	if value.Address != nil {
+		return value.Mode + ":" + *value.Address
+	}
+	return value.Mode
+}
+
 func writeExportFile(path string, content []byte) (resultErr error) {
 	if path == "" || filepath.Clean(path) != path || filepath.Base(path) == "." || filepath.Base(path) == ".." {
 		return fmt.Errorf("output path must be clean")
@@ -218,6 +359,25 @@ func writeClientError(stderr io.Writer, err error, jsonMode bool) int {
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "client_state_refused", err.Error(), err), jsonMode)
 	default:
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitFailure, "client_query_failed", "client query failed", err), jsonMode)
+	}
+}
+
+func writeClientMutationError(stderr io.Writer, err error) int {
+	var applicationError *apperror.Error
+	if errors.As(err, &applicationError) {
+		return writeError(stderr, err)
+	}
+	switch {
+	case errors.Is(err, artifact.ErrLocked):
+		return writeError(stderr, apperror.Wrap(apperror.ExitTemporary, "lock_conflict", "client mutation lock is unavailable", err))
+	case errors.Is(err, pki.ErrUnavailable):
+		return writeError(stderr, apperror.Wrap(apperror.ExitUnavailable, "dependency_unavailable", "client mutation dependency is unavailable", err))
+	case errors.Is(err, clientservice.ErrInvalidRequest), errors.Is(err, clientservice.ErrConflict), errors.Is(err, clientservice.ErrNotFound), errors.Is(err, clientservice.ErrAmbiguous), errors.Is(err, storesqlite.ErrConstraint):
+		return writeError(stderr, apperror.Wrap(apperror.ExitData, "client_request", err.Error(), err))
+	case errors.Is(err, clientservice.ErrArtifactMismatch), errors.Is(err, pki.ErrInvalidMaterial), errors.Is(err, artifact.ErrUnsafePath), errors.Is(err, storesqlite.ErrSchema), errors.Is(err, storesqlite.ErrCorrupt), errors.Is(err, storesqlite.ErrUnsupportedSchema), errors.Is(err, storesqlite.ErrUnsupportedRevision), errors.Is(err, storesqlite.ErrMissing), errors.Is(err, storesqlite.ErrPermission):
+		return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "client_state_refused", err.Error(), err))
+	default:
+		return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "client_mutation_failed", "client mutation failed", err))
 	}
 }
 

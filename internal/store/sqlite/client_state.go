@@ -135,6 +135,23 @@ func (store *Store) CreateClient(ctx context.Context, instanceID string, state C
 		return classifySQLite("begin client creation", err)
 	}
 	defer transaction.Rollback()
+	if err := insertClientAggregate(ctx, transaction, instanceID, state); err != nil {
+		return err
+	}
+	operationID, err := domain.GenerateUUID()
+	if err != nil {
+		return err
+	}
+	if err := appendAudit(ctx, transaction, instanceID, operationID, "client.created", map[string]any{"client_id": state.Client.ID, "name": state.Client.Name}); err != nil {
+		return err
+	}
+	if err := transaction.Commit(); err != nil {
+		return classifySQLite("commit client creation", err)
+	}
+	return nil
+}
+
+func insertClientAggregate(ctx context.Context, transaction *sql.Tx, instanceID string, state ClientState) error {
 	if _, err := transaction.ExecContext(ctx, `
 INSERT INTO clients(id, instance_id, current_name, status, created_at, revoked_at, deleted_at)
 VALUES(?, ?, ?, ?, ?, ?, ?)`, state.Client.ID, instanceID, state.Client.Name, state.Client.Status,
@@ -161,16 +178,6 @@ VALUES(?, ?, ?, ?, ?, ?, ?)`, state.Client.ID, instanceID, state.Client.Name, st
 		if err := insertArtifact(ctx, transaction, instanceID, state.Client.ID, artifact); err != nil {
 			return err
 		}
-	}
-	operationID, err := domain.GenerateUUID()
-	if err != nil {
-		return err
-	}
-	if err := appendAudit(ctx, transaction, instanceID, operationID, "client.created", map[string]any{"client_id": state.Client.ID, "name": state.Client.Name}); err != nil {
-		return err
-	}
-	if err := transaction.Commit(); err != nil {
-		return classifySQLite("commit client creation", err)
 	}
 	return nil
 }

@@ -22,6 +22,8 @@ var (
 	ErrAmbiguous        = errors.New("client ID prefix is ambiguous")
 	ErrInactive         = errors.New("client is not active")
 	ErrArtifactMismatch = errors.New("client artifact does not match state")
+	ErrInvalidRequest   = errors.New("client request is invalid")
+	ErrConflict         = errors.New("client state conflicts with the request")
 )
 
 type QueryStore interface {
@@ -154,10 +156,10 @@ func (service *Service) load(ctx context.Context) (storesqlite.InstanceState, []
 
 func validateSelector(selector Selector) error {
 	if (selector.Name == "") == (selector.IDPrefix == "") {
-		return fmt.Errorf("exactly one of client name or ID is required")
+		return fmt.Errorf("%w: exactly one of client name or ID is required", ErrInvalidRequest)
 	}
 	if selector.Name != "" && !domain.ValidClientName(selector.Name) {
-		return fmt.Errorf("invalid client name")
+		return fmt.Errorf("%w: invalid client name", ErrInvalidRequest)
 	}
 	if selector.IDPrefix != "" {
 		_, err := normalizeIDPrefix(selector.IDPrefix)
@@ -169,15 +171,15 @@ func validateSelector(selector Selector) error {
 func normalizeIDPrefix(value string) (string, error) {
 	lower := strings.ToLower(value)
 	if strings.ContainsRune(lower, '-') && !domain.ValidUUID(lower) {
-		return "", fmt.Errorf("hyphenated client ID must be a complete canonical UUID")
+		return "", fmt.Errorf("%w: hyphenated client ID must be a complete canonical UUID", ErrInvalidRequest)
 	}
 	compact := strings.ReplaceAll(lower, "-", "")
 	if len(compact) < MinimumIDPrefix || len(compact) > 32 {
-		return "", fmt.Errorf("client ID prefix must contain 8 to 32 hexadecimal characters")
+		return "", fmt.Errorf("%w: client ID prefix must contain 8 to 32 hexadecimal characters", ErrInvalidRequest)
 	}
 	for _, character := range compact {
 		if !strings.ContainsRune("0123456789abcdef", character) {
-			return "", fmt.Errorf("client ID prefix must be hexadecimal")
+			return "", fmt.Errorf("%w: client ID prefix must be hexadecimal", ErrInvalidRequest)
 		}
 	}
 	return compact, nil

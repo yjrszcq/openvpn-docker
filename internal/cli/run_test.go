@@ -106,6 +106,25 @@ func TestClientQueryUsageAndStructuredStateError(t *testing.T) {
 	}
 }
 
+func TestClientCreateAndRenameUsage(t *testing.T) {
+	code, stdout, stderr := run("client", "create", "--help")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "Usage: ovpn client create") {
+		t.Fatalf("create help code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	for _, args := range [][]string{
+		{"client", "create"},
+		{"client", "create", "laptop", "--ipv4"},
+		{"client", "create", "laptop", "--unknown", "value"},
+		{"client", "rename", "--name", "laptop"},
+		{"client", "rename", "--name", "laptop", "--id", "11111111", "new"},
+	} {
+		code, _, stderr := run(args...)
+		if code != 64 || !strings.Contains(stderr, "usage") {
+			t.Fatalf("args=%v code=%d stderr=%q", args, code, stderr)
+		}
+	}
+}
+
 func TestUnknownCommandIsUsageError(t *testing.T) {
 	code, _, stderr := run("unknown")
 	if code != 64 || !strings.Contains(stderr, "unknown command") {
