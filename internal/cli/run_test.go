@@ -3,6 +3,8 @@ package cli_test
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -78,5 +80,30 @@ func TestBrokerSkeleton(t *testing.T) {
 	stdout.Reset()
 	if code := cli.RunBroker([]string{"run"}, &stdout, &stderr); code != 64 {
 		t.Fatalf("broker invalid command code=%d, want 64", code)
+	}
+}
+
+func TestConfigValidate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	data := []byte("version: 1\nserver: {endpoint: vpn.example.test}\nipv4: {network: 10.42.0.0/24}\n")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("OVPN_CONFIG_FILE", path)
+	code, stdout, stderr := run("config", "validate", "--json")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"valid":true`) || !strings.Contains(stdout, `"dynamic_pool_size":126`) {
+		t.Fatalf("validate code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestConfigValidateJSONError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("version: 1\nunknown: true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("OVPN_CONFIG_FILE", path)
+	code, stdout, stderr := run("config", "validate", "--json")
+	if code != 65 || stdout != "" || !strings.Contains(stderr, `"kind":"invalid_config"`) {
+		t.Fatalf("validate error code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }

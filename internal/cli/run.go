@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/yjrszcq/openvpn-docker/internal/apperror"
 	"github.com/yjrszcq/openvpn-docker/internal/buildinfo"
+	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
 )
 
 // Run dispatches the ovpn multicall CLI and returns a stable exit code.
@@ -35,6 +37,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if args[0] == "version" {
 		return runVersion(args[1:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "config" && args[1] == "validate" {
+		return runConfigValidate(args[2:], stdout, stderr)
+	}
 
 	path := commandPath(args)
 	if len(path) == 0 {
@@ -53,6 +58,48 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	return writeError(stderr, apperror.New(apperror.ExitFailure, "not_implemented", strings.Join(path, " ")+" is not implemented in the foundation build"))
+}
+
+func runConfigValidate(args []string, stdout, stderr io.Writer) int {
+	jsonMode := false
+	for _, arg := range args {
+		if arg == "--json" {
+			jsonMode = true
+		}
+	}
+	for _, arg := range args {
+		switch arg {
+		case "--json":
+		case "-h", "--help":
+			if len(args) != 1 {
+				return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "help does not accept additional arguments"), jsonMode)
+			}
+			fmt.Fprintln(stdout, "Usage: ovpn config validate [--json]")
+			return int(apperror.ExitSuccess)
+		default:
+			return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn config validate [--json]"), jsonMode)
+		}
+	}
+	path := os.Getenv("OVPN_CONFIG_FILE")
+	if path == "" {
+		path = configservice.DefaultPath
+	}
+	value, err := configservice.LoadFile(path)
+	if err != nil {
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitData, "invalid_config", "configuration is invalid: "+err.Error(), err), jsonMode)
+	}
+	if jsonMode {
+		payload := struct {
+			Valid  bool               `json:"valid"`
+			Config configservice.View `json:"config"`
+		}{Valid: true, Config: configservice.NewView(value)}
+		if err := json.NewEncoder(stdout).Encode(payload); err != nil {
+			return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "output_failure", "write validation output", err))
+		}
+		return int(apperror.ExitSuccess)
+	}
+	fmt.Fprintf(stdout, "configuration is valid: %s\n", path)
+	return int(apperror.ExitSuccess)
 }
 
 func commandPath(args []string) []string {
@@ -112,6 +159,10 @@ func runVersion(args []string, stdout, stderr io.Writer) int {
 
 func writeError(stderr io.Writer, err error) int {
 	return int(apperror.Write(stderr, err, false))
+}
+
+func writeErrorMode(stderr io.Writer, err error, jsonMode bool) int {
+	return int(apperror.Write(stderr, err, jsonMode))
 }
 
 // RunBroker dispatches the independent broker process skeleton.
