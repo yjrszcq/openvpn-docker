@@ -66,6 +66,9 @@ func runRepairApply(args []string, stdout, stderr io.Writer) int {
 		return writeErrorMode(stderr, err, jsonMode)
 	}
 	ctx := context.Background()
+	if _, err := recoveryservice.RecoverOperations(ctx, options.DataDir); err != nil {
+		return writeRepairError(stderr, err, jsonMode)
+	}
 	plan, err := buildRepairPlan(ctx, options)
 	if err != nil {
 		return writeRepairError(stderr, err, jsonMode)
@@ -221,7 +224,7 @@ func writeRepairError(stderr io.Writer, err error, jsonMode bool) int {
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitTemporary, "repair_busy", "repair lock or state is busy", err), jsonMode)
 	case errors.Is(err, pki.ErrUnavailable):
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitUnavailable, "dependency_unavailable", "repair dependency is unavailable", err), jsonMode)
-	case errors.Is(err, storesqlite.ErrSchema), errors.Is(err, storesqlite.ErrCorrupt), errors.Is(err, storesqlite.ErrMissing), errors.Is(err, pki.ErrInvalidMaterial):
+	case errors.Is(err, storesqlite.ErrSchema), errors.Is(err, storesqlite.ErrCorrupt), errors.Is(err, storesqlite.ErrMissing), errors.Is(err, pki.ErrInvalidMaterial), errors.Is(err, recoveryservice.ErrOperationConflict):
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "repair_refused", "repair was refused by state or security policy", err), jsonMode)
 	default:
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitFailure, "repair_failed", "apply repair plan", err), jsonMode)

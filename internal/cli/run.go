@@ -25,6 +25,7 @@ import (
 	"github.com/yjrszcq/openvpn-docker/internal/hook"
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
 	"github.com/yjrszcq/openvpn-docker/internal/pki"
+	recoveryservice "github.com/yjrszcq/openvpn-docker/internal/recovery"
 	"github.com/yjrszcq/openvpn-docker/internal/render"
 	runtimecontrol "github.com/yjrszcq/openvpn-docker/internal/runtime"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
@@ -150,6 +151,12 @@ func runServerRun(args []string, stdout, stderr io.Writer) int {
 	}
 	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
 	runtimeDir := environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)
+	if _, err := recoveryservice.RecoverOperations(context.Background(), dataDir); err != nil {
+		if errors.Is(err, artifact.ErrLocked) || errors.Is(err, storesqlite.ErrBusy) {
+			return writeError(stderr, apperror.Wrap(apperror.ExitTemporary, "operation_recovery_busy", "interrupted operation recovery is busy", err))
+		}
+		return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "operation_recovery_refused", "interrupted operation recovery was refused", err))
+	}
 	instance, err := runtimecontrol.LoadInstance(context.Background(), dataDir)
 	if err != nil {
 		return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "runtime_state_refused", "runtime state is invalid", err))

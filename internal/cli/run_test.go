@@ -138,7 +138,7 @@ func TestServerRunUsageAndMissingState(t *testing.T) {
 	}
 	t.Setenv("OVPN_DATA_DIR", filepath.Join(t.TempDir(), "missing"))
 	code, stdout, stderr = run("server", "run")
-	if code != 78 || stdout != "" || !strings.Contains(stderr, "runtime state is invalid") {
+	if code != 78 || stdout != "" || !strings.Contains(stderr, "operation recovery was refused") {
 		t.Fatalf("missing state code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
