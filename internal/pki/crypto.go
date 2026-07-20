@@ -80,6 +80,107 @@ func ValidateCA(pkiDir string, now time.Time) (CertificateInfo, error) {
 	return validateCA(ca, now)
 }
 
+// ValidateCAKeyPair verifies that the signing private key belongs to the
+// persisted trust anchor. It is kept separate from ValidateCA so diagnostics
+// can distinguish a recoverable public certificate from a lost signing key.
+func ValidateCAKeyPair(pkiDir string, now time.Time) (CertificateInfo, error) {
+	ca, err := readCertificate(pkiDir + "/ca.crt")
+	if err != nil {
+		return CertificateInfo{}, err
+	}
+	info, err := validateCA(ca, now)
+	if err != nil {
+		return CertificateInfo{}, err
+	}
+	key, err := readPrivateKey(pkiDir + "/private/ca.key")
+	if err != nil {
+		return CertificateInfo{}, err
+	}
+	if err := verifyKeyPair(ca, key); err != nil {
+		return CertificateInfo{}, fmt.Errorf("CA certificate/key: %w", err)
+	}
+	return info, nil
+}
+
+// ValidateServer verifies the server identity without requiring a valid CRL.
+func ValidateServer(pkiDir, serverName string, now time.Time) (CertificateInfo, error) {
+	ca, err := readCertificate(pkiDir + "/ca.crt")
+	if err != nil {
+		return CertificateInfo{}, err
+	}
+	if _, err := validateCA(ca, now); err != nil {
+		return CertificateInfo{}, err
+	}
+	certificate, err := readCertificate(pkiDir + "/issued/" + serverName + ".crt")
+	if err != nil {
+		return CertificateInfo{}, err
+	}
+	key, err := readPrivateKey(pkiDir + "/private/" + serverName + ".key")
+	if err != nil {
+		return CertificateInfo{}, err
+	}
+	if certificate.Subject.CommonName != serverName {
+		return CertificateInfo{}, fmt.Errorf("%w: server certificate common name mismatch", ErrInvalidMaterial)
+	}
+	if err := verifyCertificate(certificate, ca, x509.ExtKeyUsageServerAuth, now); err != nil {
+		return CertificateInfo{}, fmt.Errorf("server certificate: %w", err)
+	}
+	if err := verifyKeyPair(certificate, key); err != nil {
+		return CertificateInfo{}, fmt.Errorf("server certificate/key: %w", err)
+	}
+	return certificateInfo(certificate), nil
+}
+
+// ValidateCRLForCA validates the current CRL against the persisted CA.
+func ValidateCRLForCA(pkiDir string, now time.Time) error {
+	ca, err := readCertificate(pkiDir + "/ca.crt")
+	if err != nil {
+		return err
+	}
+	if _, err := validateCA(ca, now); err != nil {
+		return err
+	}
+	return ValidateCRL(pkiDir+"/crl.pem", ca, now)
+}
+
+// ValidateRevocationStatus verifies that a certificate serial is present in
+// the current CRL exactly when SQLite marks the client revoked.
+func ValidateRevocationStatus(pkiDir, serial string, revoked bool, now time.Time) error {
+	ca, err := readCertificate(pkiDir + "/ca.crt")
+	if err != nil {
+		return err
+	}
+	if _, err := validateCA(ca, now); err != nil {
+		return err
+	}
+	data, err := readRegularFile(pkiDir+"/crl.pem", 0o644)
+	if err != nil {
+		return err
+	}
+	block, _ := pem.Decode(data)
+	if block == nil || block.Type != "X509 CRL" {
+		return fmt.Errorf("%w: CRL PEM is invalid", ErrInvalidMaterial)
+	}
+	list, err := x509.ParseRevocationList(block.Bytes)
+	if err != nil {
+		return fmt.Errorf("%w: parse CRL: %v", ErrInvalidMaterial, err)
+	}
+	if err := ValidateCRL(pkiDir+"/crl.pem", ca, now); err != nil {
+		return err
+	}
+	found := false
+	for _, entry := range list.RevokedCertificateEntries {
+		if entry.SerialNumber != nil && strings.EqualFold(entry.SerialNumber.Text(16), serial) {
+			found = true
+			break
+		}
+	}
+	if found != revoked {
+		return fmt.Errorf("%w: certificate revocation status does not match SQLite", ErrInvalidMaterial)
+	}
+	return nil
+}
+
 func ValidateClient(pkiDir, clientID string, now time.Time) (CertificateInfo, error) {
 	ca, err := readCertificate(pkiDir + "/ca.crt")
 	if err != nil {

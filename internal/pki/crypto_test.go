@@ -135,6 +135,18 @@ func TestValidateAuthorityAndClient(t *testing.T) {
 	if authority.CA.Serial != "1" || authority.Server.Serial != "2" || authority.CA.Fingerprint != sha256.Sum256(fixture.ca.Raw) {
 		t.Fatalf("unexpected authority: %+v", authority)
 	}
+	if info, err := ValidateCAKeyPair(directory, fixture.now); err != nil || info.Serial != "1" {
+		t.Fatalf("validate CA key pair: info=%+v err=%v", info, err)
+	}
+	if info, err := ValidateServer(directory, testServerName, fixture.now); err != nil || info.Serial != "2" {
+		t.Fatalf("validate server: info=%+v err=%v", info, err)
+	}
+	if err := ValidateCRLForCA(directory, fixture.now); err != nil {
+		t.Fatalf("validate CRL for CA: %v", err)
+	}
+	if err := ValidateRevocationStatus(directory, "3", false, fixture.now); err != nil {
+		t.Fatalf("validate active revocation status: %v", err)
+	}
 	client, err := ValidateClient(directory, testClientID, fixture.now)
 	if err != nil || client.Serial != "3" || client.Fingerprint != sha256.Sum256(fixture.client.Raw) {
 		t.Fatalf("unexpected client: %+v err=%v", client, err)

@@ -72,6 +72,12 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "runtime" && args[1] == "events" {
 		return runRuntimeEvents(args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "state" && args[1] == "show" {
+		return runState(args[2:], stdout, stderr, false)
+	}
+	if len(args) >= 2 && args[0] == "state" && args[1] == "doctor" {
+		return runState(args[2:], stdout, stderr, true)
+	}
 	if len(args) >= 2 && args[0] == "server" && args[1] == "init" {
 		return runServerInit(args[2:], stdout, stderr)
 	}
