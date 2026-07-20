@@ -60,7 +60,7 @@ func (supervisor Supervisor) Run(ctx context.Context, hup <-chan os.Signal, inst
 		"--listen", listen, "--backend", backend,
 		"--raw-log", filepath.Join(supervisor.DataDir, "logs", "openvpn.log"),
 		"--max-bytes", strconv.FormatUint(instance.Applied.Config.Logging.MaxBytes, 10),
-		"--backups", strconv.Itoa(instance.Applied.Config.Logging.Backups),
+		"--backups", strconv.FormatUint(uint64(instance.Applied.Config.Logging.Backups), 10),
 		"--timeout", "5s")
 	openvpnCommand := commandBuilder(supervisor.OpenVPNBinary, "--config", filepath.Join(supervisor.DataDir, "server", "server.conf"))
 	brokerCommand.Stderr = os.Stderr
@@ -81,12 +81,12 @@ func (supervisor Supervisor) Run(ctx context.Context, hup <-chan os.Signal, inst
 	for {
 		select {
 		case <-ctx.Done():
-			_ = signal(openvpnProcess, syscall.SIGTERM)
-			_ = signal(brokerProcess, syscall.SIGTERM)
+			_ = signalProcess(openvpnProcess, syscall.SIGTERM)
+			_ = signalProcess(brokerProcess, syscall.SIGTERM)
 			waitBoth(openvpnProcess, brokerProcess, supervisor.StopTimeout)
 			return nil
 		case <-hup:
-			if err := signal(openvpnProcess, syscall.SIGHUP); err != nil {
+			if err := signalProcess(openvpnProcess, syscall.SIGHUP); err != nil {
 				waitBoth(openvpnProcess, brokerProcess, supervisor.StopTimeout)
 				return fmt.Errorf("forward HUP to OpenVPN: %w", err)
 			}
@@ -182,7 +182,7 @@ func waitSocket(ctx context.Context, path string, process *childProcess, timeout
 	}
 }
 
-func signal(process *childProcess, value syscall.Signal) error {
+func signalProcess(process *childProcess, value syscall.Signal) error {
 	if process == nil || process.command == nil || process.command.Process == nil {
 		return os.ErrProcessDone
 	}

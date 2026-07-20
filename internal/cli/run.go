@@ -60,6 +60,18 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "runtime" && args[1] == "capabilities" {
 		return runRuntimeCapabilities(args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "runtime" && args[1] == "status" {
+		return runRuntimeStatus(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "runtime" && args[1] == "health" {
+		return runRuntimeHealth(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "runtime" && args[1] == "logs" {
+		return runRuntimeLogs(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "runtime" && args[1] == "events" {
+		return runRuntimeEvents(args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "server" && args[1] == "init" {
 		return runServerInit(args[2:], stdout, stderr)
 	}

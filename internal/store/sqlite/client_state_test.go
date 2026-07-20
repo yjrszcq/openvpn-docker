@@ -148,6 +148,20 @@ func TestRecordLeaseTransfersStaleObservedAddress(t *testing.T) {
 	}
 }
 
+func TestClientIdentitiesIncludeDeletedTombstones(t *testing.T) {
+	store, instance := storeWithInstance(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	deletedAt := now.Add(time.Minute)
+	client := ClientState{Client: domain.Client{ID: "25252525-2525-4252-8252-252525252525", Name: "historical", Status: domain.ClientDeleted}, CreatedAt: now, DeletedAt: &deletedAt}
+	if err := store.CreateClient(context.Background(), instance.ID, client); err != nil {
+		t.Fatal(err)
+	}
+	identities, err := store.ClientIdentities(context.Background(), instance.ID)
+	if err != nil || identities[client.Client.ID] != "historical" {
+		t.Fatalf("identities=%v err=%v", identities, err)
+	}
+}
+
 func TestClientRejectsCrossInstanceAssignment(t *testing.T) {
 	store, first := storeWithInstance(t)
 	secondState := initialInstance(t)

@@ -59,7 +59,7 @@ func TestVersionJSONUsageError(t *testing.T) {
 }
 
 func TestUnimplementedCommandFailsExplicitly(t *testing.T) {
-	code, _, stderr := run("runtime", "status")
+	code, _, stderr := run("state", "show")
 	if code != 1 || !strings.Contains(stderr, "not implemented") {
 		t.Fatalf("foundation command code=%d stderr=%q", code, stderr)
 	}
@@ -130,6 +130,40 @@ func TestHookUsageAndInvalidEnvironment(t *testing.T) {
 	t.Setenv("common_name", "not-a-uuid")
 	if code := cli.RunHook([]string{"pool-persist"}, &stderr); code != 65 || !strings.Contains(stderr.String(), "hook input is invalid") {
 		t.Fatalf("hook input code=%d stderr=%q", code, stderr.String())
+	}
+}
+
+func TestRuntimeLogAndEventHistory(t *testing.T) {
+	dataDir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dataDir, "logs"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, "logs", "openvpn.log"), []byte("first\nsecond\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	event := `{"timestamp":"2026-07-20T00:00:00Z","event":"client_connection","operation":"connect","outcome":"applied","client_id":null,"client_name":null}` + "\n"
+	if err := os.WriteFile(filepath.Join(dataDir, "logs", "events.jsonl"), []byte(event), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("OVPN_DATA_DIR", dataDir)
+	code, stdout, stderr := run("runtime", "logs", "--lines", "1", "--raw")
+	if code != 0 || stdout != "second\n" || stderr != "" {
+		t.Fatalf("logs code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, stdout, stderr = run("runtime", "events", "--lines", "1", "--json")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"event":"client_connection"`) {
+		t.Fatalf("events code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestRuntimeStreamUsageErrors(t *testing.T) {
+	code, stdout, stderr := run("runtime", "logs", "--lines", "-1")
+	if code != 64 || stdout != "" || !strings.Contains(stderr, "non-negative") {
+		t.Fatalf("logs usage code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, stdout, stderr = run("runtime", "events", "--json", "--raw")
+	if code != 64 || stdout != "" || !strings.Contains(stderr, `"kind":"usage"`) {
+		t.Fatalf("events usage code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 

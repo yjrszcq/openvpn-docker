@@ -122,6 +122,31 @@ ORDER BY current_name, id`, instanceID)
 	return values, nil
 }
 
+// ClientIdentities returns names for current clients and deleted tombstones so
+// historical runtime logs can still resolve their immutable certificate IDs.
+func (store *Store) ClientIdentities(ctx context.Context, instanceID string) (map[string]string, error) {
+	if !domain.ValidUUID(instanceID) {
+		return nil, fmt.Errorf("invalid instance UUID")
+	}
+	rows, err := store.db.QueryContext(ctx, "SELECT id, current_name FROM clients WHERE instance_id = ? ORDER BY id", instanceID)
+	if err != nil {
+		return nil, fmt.Errorf("list client identities: %w", err)
+	}
+	defer rows.Close()
+	values := make(map[string]string)
+	for rows.Next() {
+		var id, name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		if !domain.ValidUUID(id) || !domain.ValidClientName(name) {
+			return nil, fmt.Errorf("%w: invalid client identity", ErrSchema)
+		}
+		values[id] = name
+	}
+	return values, rows.Err()
+}
+
 // CreateClient stores one complete client aggregate atomically.
 func (store *Store) CreateClient(ctx context.Context, instanceID string, state ClientState) error {
 	if !domain.ValidUUID(instanceID) {
