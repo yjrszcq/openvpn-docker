@@ -1,7 +1,9 @@
 package ipam_test
 
 import (
+	"encoding/binary"
 	"errors"
+	"net/netip"
 	"testing"
 
 	"github.com/yjrszcq/openvpn-docker/internal/domain"
@@ -84,11 +86,44 @@ func TestLayoutRejectsUnsupportedNetworkAndPool(t *testing.T) {
 		pool    uint64
 	}{
 		{"10.42.0.0/31", 0},
+		{"10.42.0.0/32", 0},
 		{"2001:db8::/64", 0},
 		{"10.42.0.0/30", 2},
 	} {
 		if _, err := ipam.NewIPv4Layout(mustNetwork(t, test.network), test.pool); err == nil {
 			t.Fatalf("accepted network=%s pool=%d", test.network, test.pool)
+		}
+	}
+}
+
+func TestAllSupportedPrefixesAndPoolBoundaries(t *testing.T) {
+	for bits := 0; bits <= 30; bits++ {
+		prefix := netip.PrefixFrom(netip.MustParseAddr("172.31.19.203"), bits).Masked()
+		network, err := domain.NewNetwork(prefix)
+		if err != nil {
+			t.Fatalf("/%d network: %v", bits, err)
+		}
+		capacity, err := ipam.ClientCapacity(network)
+		if err != nil {
+			t.Fatalf("/%d capacity: %v", bits, err)
+		}
+		for _, dynamic := range []uint64{0, capacity / 2, capacity} {
+			layout, err := ipam.NewIPv4Layout(network, dynamic)
+			if err != nil {
+				t.Fatalf("/%d dynamic=%d: %v", bits, dynamic, err)
+			}
+			if layout.Clients.Capacity != capacity || layout.Static.Capacity+layout.Dynamic.Capacity != capacity {
+				t.Fatalf("/%d dynamic=%d capacity mismatch: %+v", bits, dynamic, layout)
+			}
+			if !layout.Clients.Contains(layout.Clients.First) || !layout.Clients.Contains(layout.Clients.Last) {
+				t.Fatalf("/%d dynamic=%d client boundaries are not contained", bits, dynamic)
+			}
+			if addressUint32(layout.Server)+1 != addressUint32(layout.Clients.First) {
+				t.Fatalf("/%d dynamic=%d server/client ranges are not contiguous", bits, dynamic)
+			}
+			if !layout.Static.Empty() && !layout.Dynamic.Empty() && addressUint32(layout.Static.Last)+1 != addressUint32(layout.Dynamic.First) {
+				t.Fatalf("/%d dynamic=%d static/dynamic ranges are not contiguous", bits, dynamic)
+			}
 		}
 	}
 }
@@ -149,4 +184,9 @@ func TestStaticExhaustion(t *testing.T) {
 	if _, err := allDynamic.NextStatic(nil); !errors.Is(err, ipam.ErrStaticExhausted) {
 		t.Fatalf("all-dynamic exhaustion error=%v", err)
 	}
+}
+
+func addressUint32(address domain.Address) uint32 {
+	packed := address.Netip().As4()
+	return binary.BigEndian.Uint32(packed[:])
 }
