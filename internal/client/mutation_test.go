@@ -518,6 +518,168 @@ func TestLifecycleDatabaseCommitFailuresRestoreStateAndFiles(t *testing.T) {
 	})
 }
 
+func TestAddressSetSynchronizesCCDAndClearsLease(t *testing.T) {
+	fixture := newMutationFixture(t)
+	created, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "phone", IPv4: "auto"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamic, err := fixture.manager.AddressSet(context.Background(), Selector{Name: "phone"}, "dynamic")
+	if err != nil || dynamic.Clients[0].IPv4.Mode != "dynamic" || len(dynamic.KickRequired) != 1 {
+		t.Fatalf("dynamic address result=%+v err=%v", dynamic, err)
+	}
+	assertMutationMissing(t, filepath.Join(fixture.root, "ccd", created.Client.ID))
+	if repeated, err := fixture.manager.AddressSet(context.Background(), Selector{Name: "phone"}, "dynamic"); err != nil || repeated.Clients[0].IPv4.Mode != "dynamic" {
+		t.Fatalf("file-noop dynamic update=%+v err=%v", repeated, err)
+	}
+	leaseAddress, _ := domain.ParseAddress("10.42.0.200")
+	if err := fixture.store.RecordLease(context.Background(), created.Client.ID, storesqlite.ClientLease{NetworkID: fixture.instance.NetworkID, Address: leaseAddress, UpdatedAt: fixture.now}); err != nil {
+		t.Fatal(err)
+	}
+	static, err := fixture.manager.AddressSet(context.Background(), Selector{IDPrefix: ShortID(created.Client.ID)}, "10.42.0.30")
+	if err != nil || static.Clients[0].IPv4.Address == nil || *static.Clients[0].IPv4.Address != "10.42.0.30" {
+		t.Fatalf("static address result=%+v err=%v", static, err)
+	}
+	if got := readMutationArtifact(t, fixture.artifacts, "ccd/"+created.Client.ID); got != "ifconfig-push 10.42.0.30 255.255.255.0\n" {
+		t.Fatalf("updated CCD=%q", got)
+	}
+	loaded, err := fixture.store.LoadClient(context.Background(), fixture.instance.ID, created.Client.ID)
+	if err != nil || loaded.Lease != nil {
+		t.Fatalf("lease after assignment change=%+v err=%v", loaded.Lease, err)
+	}
+}
+
+func TestRevokedAddressSetAndReleaseRemainOffline(t *testing.T) {
+	fixture := newMutationFixture(t)
+	created, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "tablet", IPv4: "auto"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.manager.Revoke(context.Background(), Selector{Name: "tablet"}, false); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := fixture.manager.AddressSet(context.Background(), Selector{Name: "tablet"}, "10.42.0.40")
+	if err != nil || changed.Clients[0].IPv4.State != "retained" || changed.Clients[0].IPv4.Address == nil || *changed.Clients[0].IPv4.Address != "10.42.0.40" || len(changed.KickRequired) != 0 {
+		t.Fatalf("revoked address set=%+v err=%v", changed, err)
+	}
+	assertMutationMissing(t, filepath.Join(fixture.root, "ccd", created.Client.ID))
+	released, err := fixture.manager.AddressRelease(context.Background(), Selector{Name: "tablet"})
+	if err != nil || released.Clients[0].IPv4.State != "none" {
+		t.Fatalf("address release=%+v err=%v", released, err)
+	}
+	if _, err := fixture.manager.AddressRelease(context.Background(), Selector{Name: "tablet"}); !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("second release error=%v", err)
+	}
+}
+
+func TestAddressEditAtomicallySwapsStaticAddresses(t *testing.T) {
+	fixture := newMutationFixture(t)
+	first, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "alpha", IPv4: "10.42.0.20"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "beta", IPv4: "10.42.0.21"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := fixture.manager.AddressEdit(context.Background(), AddressEditRequest{Selectors: []Selector{{Name: "alpha"}, {IDPrefix: ShortID(second.Client.ID)}}, Edit: func(path string) error {
+		return os.WriteFile(path, []byte("# client,ipv4\nalpha,10.42.0.21\nbeta,10.42.0.20\n"), 0o600)
+	}})
+	if err != nil || len(result.Clients) != 2 || len(result.KickRequired) != 2 {
+		t.Fatalf("address edit=%+v err=%v", result, err)
+	}
+	loadedFirst, err := fixture.store.LoadClient(context.Background(), fixture.instance.ID, first.Client.ID)
+	if err != nil || loadedFirst.Assignment == nil || loadedFirst.Assignment.Address.String() != "10.42.0.21" {
+		t.Fatalf("first swapped state=%+v err=%v", loadedFirst, err)
+	}
+	loadedSecond, err := fixture.store.LoadClient(context.Background(), fixture.instance.ID, second.Client.ID)
+	if err != nil || loadedSecond.Assignment == nil || loadedSecond.Assignment.Address.String() != "10.42.0.20" {
+		t.Fatalf("second swapped state=%+v err=%v", loadedSecond, err)
+	}
+	if got := readMutationArtifact(t, fixture.artifacts, "ccd/"+first.Client.ID); !strings.Contains(got, "10.42.0.21") {
+		t.Fatalf("first swapped CCD=%q", got)
+	}
+}
+
+func TestAddressEditRejectsDuplicateAndKeepsAssignments(t *testing.T) {
+	fixture := newMutationFixture(t)
+	first, _ := fixture.manager.Create(context.Background(), CreateRequest{Name: "alpha", IPv4: "10.42.0.20"})
+	second, _ := fixture.manager.Create(context.Background(), CreateRequest{Name: "beta", IPv4: "10.42.0.21"})
+	_, err := fixture.manager.AddressEdit(context.Background(), AddressEditRequest{All: true, Edit: func(path string) error {
+		return os.WriteFile(path, []byte("# client,ipv4\nalpha,10.42.0.30\nbeta,10.42.0.30\n"), 0o600)
+	}})
+	if !errors.Is(err, ErrConflict) {
+		t.Fatalf("duplicate edit error=%v", err)
+	}
+	for id, expected := range map[string]string{first.Client.ID: "10.42.0.20", second.Client.ID: "10.42.0.21"} {
+		loaded, loadErr := fixture.store.LoadClient(context.Background(), fixture.instance.ID, id)
+		if loadErr != nil || loaded.Assignment == nil || loaded.Assignment.Address.String() != expected {
+			t.Fatalf("unchanged assignment id=%s state=%+v err=%v", id, loaded, loadErr)
+		}
+	}
+}
+
+func TestAddressEditRejectsUnsafeEditorFile(t *testing.T) {
+	fixture := newMutationFixture(t)
+	created, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "alpha", IPv4: "10.42.0.20"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = fixture.manager.AddressEdit(context.Background(), AddressEditRequest{All: true, Edit: func(path string) error {
+		return os.Chmod(path, 0o644)
+	}})
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("unsafe editor file error=%v", err)
+	}
+	loaded, err := fixture.store.LoadClient(context.Background(), fixture.instance.ID, created.Client.ID)
+	if err != nil || loaded.Assignment == nil || loaded.Assignment.Address.String() != "10.42.0.20" {
+		t.Fatalf("state after unsafe editor file=%+v err=%v", loaded, err)
+	}
+}
+
+func TestAddressCommitFailureRestoresCCDAndAssignment(t *testing.T) {
+	fixture := newMutationFixture(t)
+	created, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "laptop", IPv4: "10.42.0.20"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ccdBefore := readMutationArtifact(t, fixture.artifacts, "ccd/"+created.Client.ID)
+	injected := errors.New("injected address commit")
+	manager := managerWithStore(t, fixture, commitFailureStore{MutationStore: fixture.store, addressErr: injected})
+	if _, err := manager.AddressSet(context.Background(), Selector{Name: "laptop"}, "dynamic"); !errors.Is(err, injected) {
+		t.Fatalf("address commit error=%v", err)
+	}
+	loaded, err := fixture.store.LoadClient(context.Background(), fixture.instance.ID, created.Client.ID)
+	if err != nil || loaded.Assignment == nil || loaded.Assignment.Address.String() != "10.42.0.20" {
+		t.Fatalf("address rollback state=%+v err=%v", loaded, err)
+	}
+	if got := readMutationArtifact(t, fixture.artifacts, "ccd/"+created.Client.ID); got != ccdBefore {
+		t.Fatal("address rollback did not restore CCD")
+	}
+}
+
+func TestAddressSetRejectsZeroDynamicCapacityBeforeMutation(t *testing.T) {
+	fixture := newMutationFixture(t)
+	created, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "laptop", IPv4: "auto"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	clients, err := fixture.store.ListClients(context.Background(), fixture.instance.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance := fixture.instance
+	instance.Applied.Config.IPv4.DynamicPoolSize = 0
+	_, err = fixture.manager.applyAddressesLocked(context.Background(), instance, clients, clients, map[string]string{created.Client.ID: "dynamic"}, "client.address.set")
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("zero dynamic capacity error=%v", err)
+	}
+	loaded, err := fixture.store.LoadClient(context.Background(), fixture.instance.ID, created.Client.ID)
+	if err != nil || loaded.Assignment == nil || loaded.Assignment.Kind != "static" {
+		t.Fatalf("state after rejected dynamic set=%+v err=%v", loaded, err)
+	}
+}
+
 type commitFailureStore struct {
 	MutationStore
 	createErr  error
@@ -525,6 +687,7 @@ type commitFailureStore struct {
 	revokeErr  error
 	reissueErr error
 	deleteErr  error
+	addressErr error
 }
 
 func (store commitFailureStore) CommitCreateClientOperation(context.Context, string, string, storesqlite.ClientState, json.RawMessage, time.Time) error {
@@ -545,6 +708,10 @@ func (store commitFailureStore) CommitReissueClientOperation(context.Context, st
 
 func (store commitFailureStore) CommitDeleteClientOperation(context.Context, string, string, string, string, domain.ClientStatus, []storesqlite.ArtifactMetadata, []storesqlite.ArtifactDeletion, json.RawMessage, time.Time) error {
 	return store.deleteErr
+}
+
+func (store commitFailureStore) CommitClientAddressOperation(context.Context, string, string, string, []storesqlite.ClientAddressChange, []storesqlite.ArtifactMetadata, []storesqlite.ArtifactDeletion, json.RawMessage, time.Time) error {
+	return store.addressErr
 }
 
 func managerWithStore(t *testing.T, fixture mutationFixture, state MutationStore) *Manager {

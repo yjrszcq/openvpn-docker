@@ -31,6 +31,7 @@ type MutationStore interface {
 	CommitRevokeClientOperation(context.Context, string, string, string, string, bool, []storesqlite.ArtifactMetadata, []storesqlite.ArtifactDeletion, json.RawMessage, time.Time) error
 	CommitReissueClientOperation(context.Context, string, string, string, string, domain.ClientStatus, storesqlite.AddressAssignment, []storesqlite.ArtifactMetadata, []storesqlite.ArtifactDeletion, json.RawMessage, time.Time) error
 	CommitDeleteClientOperation(context.Context, string, string, string, string, domain.ClientStatus, []storesqlite.ArtifactMetadata, []storesqlite.ArtifactDeletion, json.RawMessage, time.Time) error
+	CommitClientAddressOperation(context.Context, string, string, string, []storesqlite.ClientAddressChange, []storesqlite.ArtifactMetadata, []storesqlite.ArtifactDeletion, json.RawMessage, time.Time) error
 }
 
 type Manager struct {

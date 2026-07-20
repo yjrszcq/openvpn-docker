@@ -149,6 +149,31 @@ func TestClientLifecycleUsageAndDeleteConfirmation(t *testing.T) {
 	}
 }
 
+func TestClientAddressUsageAndBatchConfirmation(t *testing.T) {
+	for _, command := range []string{"set", "edit", "release"} {
+		code, stdout, stderr := run("client", "address", command, "--help")
+		if code != 0 || stderr != "" || !strings.Contains(stdout, "Usage: ovpn client address "+command) {
+			t.Fatalf("address %s help code=%d stdout=%q stderr=%q", command, code, stdout, stderr)
+		}
+	}
+	for _, args := range [][]string{
+		{"client", "address", "set", "--name", "laptop"},
+		{"client", "address", "set", "--name", "laptop", "--ipv4", "dynamic", "--ipv4", "auto"},
+		{"client", "address", "release", "--name", "laptop", "extra"},
+		{"client", "address", "edit", "--all", "--name", "laptop", "--yes"},
+		{"client", "address", "edit", "--name", "laptop", "--id", "11111111", "--yes"},
+	} {
+		code, _, stderr := run(args...)
+		if code != 64 || stderr == "" {
+			t.Fatalf("args=%v code=%d stderr=%q", args, code, stderr)
+		}
+	}
+	code, _, stderr := run("client", "address", "edit", "--all")
+	if code != 78 || !strings.Contains(stderr, "confirm") {
+		t.Fatalf("unconfirmed address edit code=%d stderr=%q", code, stderr)
+	}
+}
+
 func TestUnknownCommandIsUsageError(t *testing.T) {
 	code, _, stderr := run("unknown")
 	if code != 64 || !strings.Contains(stderr, "unknown command") {

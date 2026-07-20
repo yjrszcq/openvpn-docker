@@ -75,6 +75,15 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "client" && args[1] == "delete" {
 		return runClientDelete(args[2:], stdout, stderr)
 	}
+	if len(args) >= 3 && args[0] == "client" && args[1] == "address" && args[2] == "set" {
+		return runClientAddressSet(args[3:], stdout, stderr)
+	}
+	if len(args) >= 3 && args[0] == "client" && args[1] == "address" && args[2] == "edit" {
+		return runClientAddressEdit(args[3:], stdout, stderr)
+	}
+	if len(args) >= 3 && args[0] == "client" && args[1] == "address" && args[2] == "release" {
+		return runClientAddressRelease(args[3:], stdout, stderr)
+	}
 
 	path := commandPath(args)
 	if len(path) == 0 {

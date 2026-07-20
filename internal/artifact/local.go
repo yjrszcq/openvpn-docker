@@ -300,7 +300,7 @@ func (operation *Operation) Remove(key string) error {
 }
 
 func (operation *Operation) Install(ctx context.Context, inject CrashInjector) error {
-	if operation.manifest.State != OperationPrepared || len(operation.manifest.Entries) == 0 {
+	if operation.manifest.State != OperationPrepared {
 		return fmt.Errorf("%w: operation is not installable", ErrOperationState)
 	}
 	for _, entry := range operation.manifest.Entries {

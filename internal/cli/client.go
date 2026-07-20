@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
@@ -239,7 +240,7 @@ func runClientReissue(args []string, stdout, stderr io.Writer) int {
 
 func runClientDelete(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client delete (--name NAME|--id ID) --yes")
+		fmt.Fprintln(stdout, "Usage: ovpn client delete (--name NAME|--id ID) [--yes]")
 		return int(apperror.ExitSuccess)
 	}
 	yes := false
@@ -259,7 +260,7 @@ func runClientDelete(args []string, stdout, stderr io.Writer) int {
 		return writeError(stderr, usageError("usage: ovpn client delete (--name NAME|--id ID) --yes"))
 	}
 	if !yes {
-		confirmed, err := confirmClientDelete(stderr)
+		confirmed, err := confirmAction(stderr, "Type yes to permanently delete the client credentials: ")
 		if err != nil {
 			return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "client delete requires an interactive confirmation or --yes", err))
 		}
@@ -280,7 +281,7 @@ func runClientDelete(args []string, stdout, stderr io.Writer) int {
 	return int(apperror.ExitSuccess)
 }
 
-func confirmClientDelete(stderr io.Writer) (bool, error) {
+func confirmAction(stderr io.Writer, prompt string) (bool, error) {
 	info, err := os.Stdin.Stat()
 	if err != nil {
 		return false, err
@@ -288,12 +289,157 @@ func confirmClientDelete(stderr io.Writer) (bool, error) {
 	if info.Mode()&os.ModeCharDevice == 0 {
 		return false, fmt.Errorf("stdin is not a TTY")
 	}
-	fmt.Fprint(stderr, "Type yes to permanently delete the client credentials: ")
+	fmt.Fprint(stderr, prompt)
 	value, err := bufio.NewReader(io.LimitReader(os.Stdin, 16)).ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return false, err
 	}
 	return strings.TrimSpace(value) == "yes", nil
+}
+
+func runClientAddressSet(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && isHelp(args[0]) {
+		fmt.Fprintln(stdout, "Usage: ovpn client address set (--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS")
+		return int(apperror.ExitSuccess)
+	}
+	ipv4 := ""
+	filtered := make([]string, 0, len(args))
+	for index := 0; index < len(args); index++ {
+		if args[index] != "--ipv4" {
+			filtered = append(filtered, args[index])
+			continue
+		}
+		if ipv4 != "" || index+1 >= len(args) || args[index+1] == "" {
+			return writeError(stderr, usageError("usage: ovpn client address set (--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS"))
+		}
+		ipv4 = args[index+1]
+		index++
+	}
+	selector, positionals, err := parseMutationSelector(filtered)
+	if err != nil || len(positionals) != 0 || ipv4 == "" {
+		return writeError(stderr, usageError("usage: ovpn client address set (--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS"))
+	}
+	manager, state, err := openClientManager(context.Background())
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	defer state.Close()
+	result, err := manager.AddressSet(context.Background(), selector, ipv4)
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	fmt.Fprintf(stdout, "updated IPv4 for %s [%s] to %s\n", result.Clients[0].Name, result.Clients[0].ID, formatIPv4(result.Clients[0].IPv4))
+	return int(apperror.ExitSuccess)
+}
+
+func runClientAddressRelease(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && isHelp(args[0]) {
+		fmt.Fprintln(stdout, "Usage: ovpn client address release (--name NAME|--id ID)")
+		return int(apperror.ExitSuccess)
+	}
+	selector, positionals, err := parseMutationSelector(args)
+	if err != nil || len(positionals) != 0 {
+		return writeError(stderr, usageError("usage: ovpn client address release (--name NAME|--id ID)"))
+	}
+	manager, state, err := openClientManager(context.Background())
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	defer state.Close()
+	result, err := manager.AddressRelease(context.Background(), selector)
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	fmt.Fprintf(stdout, "released IPv4 for revoked client %s [%s]\n", result.Clients[0].Name, result.Clients[0].ID)
+	return int(apperror.ExitSuccess)
+}
+
+func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && isHelp(args[0]) {
+		fmt.Fprintln(stdout, "Usage: ovpn client address edit (--all|--name NAME...|--id ID...) [--yes]")
+		return int(apperror.ExitSuccess)
+	}
+	request := clientservice.AddressEditRequest{}
+	yes, selectorKind := false, ""
+	for index := 0; index < len(args); index++ {
+		switch args[index] {
+		case "--all":
+			if request.All {
+				return writeError(stderr, usageError("--all may only be specified once"))
+			}
+			request.All = true
+		case "--yes":
+			if yes {
+				return writeError(stderr, usageError("--yes may only be specified once"))
+			}
+			yes = true
+		case "--name", "--id":
+			if index+1 >= len(args) {
+				return writeError(stderr, usageError("client selector requires a value"))
+			}
+			kind := strings.TrimPrefix(args[index], "--")
+			if selectorKind != "" && selectorKind != kind {
+				return writeError(stderr, usageError("--name and --id cannot be mixed"))
+			}
+			selectorKind = kind
+			index++
+			selector := clientservice.Selector{}
+			if kind == "name" {
+				selector.Name = args[index]
+			} else {
+				selector.IDPrefix = args[index]
+			}
+			request.Selectors = append(request.Selectors, selector)
+		default:
+			return writeError(stderr, usageError("usage: ovpn client address edit (--all|--name NAME...|--id ID...) [--yes]"))
+		}
+	}
+	if request.All == (len(request.Selectors) > 0) {
+		return writeError(stderr, usageError("select exactly one of --all, --name, or --id"))
+	}
+	if !yes {
+		confirmed, err := confirmAction(stderr, "Type yes to edit multiple client IPv4 assignments: ")
+		if err != nil {
+			return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "batch address edit requires an interactive confirmation or --yes", err))
+		}
+		if !confirmed {
+			return writeError(stderr, apperror.New(apperror.ExitPolicy, "confirmation_required", "batch address edit was not confirmed"))
+		}
+	}
+	request.Edit = runAddressEditor
+	manager, state, err := openClientManager(context.Background())
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	defer state.Close()
+	result, err := manager.AddressEdit(context.Background(), request)
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	fmt.Fprintf(stdout, "updated IPv4 assignments for %d clients; runtime disconnect required for each\n", len(result.Clients))
+	return int(apperror.ExitSuccess)
+}
+
+func runAddressEditor(path string) error {
+	editor := os.Getenv("OVPN_EDITOR")
+	if editor == "" {
+		editor = os.Getenv("EDITOR")
+	}
+	if editor == "" {
+		editor = "vi"
+	}
+	if strings.ContainsAny(editor, " \t\r\n") {
+		return fmt.Errorf("%w: editor must be a single executable path", clientservice.ErrInvalidRequest)
+	}
+	resolved, err := exec.LookPath(editor)
+	if err != nil {
+		return fmt.Errorf("%w: editor %s", pki.ErrUnavailable, editor)
+	}
+	command := exec.Command(resolved, path)
+	command.Stdin = os.Stdin
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	return command.Run()
 }
 
 func parseClientExport(args []string) (clientservice.Selector, string, error) {
