@@ -54,27 +54,8 @@ func (store *Store) CommitArtifactOperation(ctx context.Context, operationID str
 			return fmt.Errorf("artifact operation contains duplicate key %s", metadata.Key)
 		}
 		seen[identity] = struct{}{}
-		var fingerprint any
-		if len(metadata.CertificateFingerprint) > 0 {
-			fingerprint = metadata.CertificateFingerprint
-		}
-		result, err := transaction.ExecContext(ctx, `
-INSERT INTO artifacts(id, instance_id, owner_kind, owner_id, kind, backend, artifact_key, digest, certificate_serial, certificate_fingerprint, status)
-VALUES(?, ?, ?, ?, ?, 'local', ?, ?, NULLIF(?, ''), ?, 'active')
-ON CONFLICT(backend, artifact_key) WHERE status IN ('active', 'stale') DO UPDATE SET
-    digest = excluded.digest,
-    certificate_serial = excluded.certificate_serial,
-    certificate_fingerprint = excluded.certificate_fingerprint,
-    status = 'active'
-WHERE artifacts.instance_id = excluded.instance_id
-  AND artifacts.owner_kind = excluded.owner_kind
-  AND artifacts.owner_id = excluded.owner_id
-  AND artifacts.kind = excluded.kind`, metadata.ID, instanceID, metadata.OwnerKind, metadata.OwnerID, metadata.Kind, metadata.Key, metadata.Digest[:], metadata.CertificateSerial, fingerprint)
-		if err != nil {
-			return classifySQLite("upsert artifact metadata", err)
-		}
-		if count, err := result.RowsAffected(); err != nil || count != 1 {
-			return fmt.Errorf("artifact key %s belongs to another owner or kind", metadata.Key)
+		if err := upsertActiveArtifact(ctx, transaction, instanceID, metadata); err != nil {
+			return err
 		}
 	}
 	for _, deletion := range deleted {

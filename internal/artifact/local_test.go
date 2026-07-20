@@ -369,6 +369,27 @@ func TestDeletionRecoversAtEveryCrashPoint(t *testing.T) {
 	}
 }
 
+func TestEmptyOperationCanJournalDatabaseOnlyMutation(t *testing.T) {
+	store := newStore(t)
+	operation, err := store.BeginOperation(generatedID(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := operation.Install(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if operation.State() != artifact.OperationFilesInstalled {
+		t.Fatalf("empty operation state=%s", operation.State())
+	}
+	if err := operation.Commit(nil); err != nil {
+		t.Fatal(err)
+	}
+	pending, err := store.PendingOperations()
+	if err != nil || len(pending) != 0 {
+		t.Fatalf("pending empty operations=%v err=%v", pending, err)
+	}
+}
+
 func generatedID(t *testing.T) string {
 	t.Helper()
 	id, err := domain.GenerateUUID()
