@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -23,6 +25,7 @@ import (
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
 	"github.com/yjrszcq/openvpn-docker/internal/pki"
 	"github.com/yjrszcq/openvpn-docker/internal/render"
+	runtimecontrol "github.com/yjrszcq/openvpn-docker/internal/runtime"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
 )
 
@@ -58,6 +61,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	if len(args) >= 2 && args[0] == "server" && args[1] == "init" {
 		return runServerInit(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "server" && args[1] == "run" {
+		return runServerRun(args[2:], stdout, stderr)
 	}
 	if len(args) >= 2 && args[0] == "client" && args[1] == "list" {
 		return runClientList(args[2:], stdout, stderr)
@@ -107,6 +113,72 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	return writeError(stderr, apperror.New(apperror.ExitFailure, "not_implemented", strings.Join(path, " ")+" is not implemented in the foundation build"))
+}
+
+func runServerRun(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && isHelp(args[0]) {
+		fmt.Fprintln(stdout, "Usage: ovpn server run")
+		return int(apperror.ExitSuccess)
+	}
+	if len(args) != 0 {
+		return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn server run"))
+	}
+	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
+	runtimeDir := environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)
+	instance, err := runtimecontrol.LoadInstance(context.Background(), dataDir)
+	if err != nil {
+		return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "runtime_state_refused", "runtime state is invalid", err))
+	}
+	configPath := environmentOr("OVPN_CONFIG_FILE", configservice.DefaultPath)
+	desired, configErr := configservice.LoadFile(configPath)
+	if configErr != nil {
+		fmt.Fprintf(stderr, "ovpn: warning: declarative configuration is unavailable or invalid; using applied revision %d\n", instance.Applied.Revision)
+	} else if digest, digestErr := configservice.Digest(desired); digestErr != nil || digest != instance.Applied.Digest {
+		fmt.Fprintf(stderr, "ovpn: warning: declarative configuration differs from applied revision %d; using the applied snapshot\n", instance.Applied.Revision)
+	}
+	openvpnBinary := environmentOr("OVPN_OPENVPN_BIN", "openvpn")
+	brokerBinary := environmentOr("OVPN_BROKER_BIN", "ovpn-broker")
+	for _, dependency := range []string{openvpnBinary, brokerBinary} {
+		if _, err := exec.LookPath(dependency); err != nil {
+			return writeError(stderr, apperror.Wrap(apperror.ExitUnavailable, "dependency_unavailable", "runtime dependency is unavailable", err))
+		}
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+	hup := make(chan os.Signal, 1)
+	signal.Notify(hup, syscall.SIGHUP)
+	defer signal.Stop(hup)
+	supervisor := runtimecontrol.Supervisor{DataDir: dataDir, RuntimeDir: runtimeDir, OpenVPNBinary: openvpnBinary, BrokerBinary: brokerBinary}
+	if err := supervisor.Run(ctx, hup, instance); err != nil {
+		if errors.Is(err, artifact.ErrLocked) {
+			return writeError(stderr, apperror.Wrap(apperror.ExitTemporary, "lock_conflict", "runtime lock is unavailable", err))
+		}
+		return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "runtime_failed", "OpenVPN runtime failed", err))
+	}
+	return int(apperror.ExitSuccess)
+}
+
+// RunEntrypoint preserves direct OpenVPN/shell execution while making an empty
+// container command start the Go runtime.
+func RunEntrypoint(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		return Run([]string{"server", "run"}, stdout, stderr)
+	}
+	base := filepath.Base(args[0])
+	if base == "ovpn" {
+		return Run(args[1:], stdout, stderr)
+	}
+	if base == "openvpn" || base == "bash" || base == "sh" {
+		binary, err := exec.LookPath(args[0])
+		if err != nil {
+			return writeError(stderr, apperror.Wrap(apperror.ExitUnavailable, "dependency_unavailable", "entrypoint command is unavailable", err))
+		}
+		if err := syscall.Exec(binary, args, os.Environ()); err != nil {
+			return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "entrypoint_failed", "execute entrypoint command", err))
+		}
+		return int(apperror.ExitSuccess)
+	}
+	return Run(args, stdout, stderr)
 }
 
 func runServerInit(args []string, stdout, stderr io.Writer) int {

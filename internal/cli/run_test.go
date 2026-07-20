@@ -90,6 +90,36 @@ func TestServerInitUsageAndInvalidConfiguration(t *testing.T) {
 	}
 }
 
+func TestServerRunUsageAndMissingState(t *testing.T) {
+	code, stdout, stderr := run("server", "run", "--help")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "Usage: ovpn server run") {
+		t.Fatalf("run help code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, _, stderr = run("server", "run", "extra")
+	if code != 64 || !strings.Contains(stderr, "usage: ovpn server run") {
+		t.Fatalf("run usage code=%d stderr=%q", code, stderr)
+	}
+	t.Setenv("OVPN_DATA_DIR", filepath.Join(t.TempDir(), "missing"))
+	code, stdout, stderr = run("server", "run")
+	if code != 78 || stdout != "" || !strings.Contains(stderr, "runtime state is invalid") {
+		t.Fatalf("missing state code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestEntrypointDispatchesOVPNAndDefaultCommands(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := cli.RunEntrypoint([]string{"ovpn", "version", "--short"}, &stdout, &stderr)
+	if code != 0 || strings.TrimSpace(stdout.String()) != "4.0.0-dev" || stderr.Len() != 0 {
+		t.Fatalf("ovpn entrypoint code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = cli.RunEntrypoint([]string{"version", "--short"}, &stdout, &stderr)
+	if code != 0 || strings.TrimSpace(stdout.String()) != "4.0.0-dev" || stderr.Len() != 0 {
+		t.Fatalf("default entrypoint code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+}
+
 func TestClientQueryUsageAndStructuredStateError(t *testing.T) {
 	code, stdout, stderr := run("client", "export", "--help")
 	if code != 0 || stderr != "" || !strings.Contains(stdout, "Usage: ovpn client export") {
