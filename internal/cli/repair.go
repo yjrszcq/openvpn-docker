@@ -32,7 +32,7 @@ func runRepairPlan(args []string, stdout, stderr io.Writer) int {
 	if len(args) != 0 && !jsonMode {
 		return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn repair plan [--json]"), jsonRequested)
 	}
-	options, err := repairScanOptions()
+	options, err := stateScanOptions()
 	if err != nil {
 		return writeErrorMode(stderr, err, jsonMode)
 	}
@@ -61,7 +61,7 @@ func runRepairApply(args []string, stdout, stderr io.Writer) int {
 			return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "confirmation_required", "repair apply was not confirmed"), jsonMode)
 		}
 	}
-	options, err := repairScanOptions()
+	options, err := stateScanOptions()
 	if err != nil {
 		return writeErrorMode(stderr, err, jsonMode)
 	}
@@ -166,7 +166,7 @@ func buildRepairPlan(ctx context.Context, options statecontrol.Options) (repairs
 	return repairservice.BuildPlan(report, ready), nil
 }
 
-func repairScanOptions() (statecontrol.Options, error) {
+func stateScanOptions() (statecontrol.Options, error) {
 	contract, err := compatibility.Load(environmentOr("OVPN_COMPATIBILITY_FILE", compatibility.DefaultContractPath))
 	if err != nil {
 		return statecontrol.Options{}, apperror.Wrap(apperror.ExitPolicy, "invalid_compatibility_contract", "compatibility contract is invalid", err)
@@ -193,6 +193,12 @@ func writeRepairPlan(plan repairservice.Plan, stdout, stderr io.Writer, jsonMode
 			fmt.Fprintf(stdout, " %s", action.OwnerID)
 		}
 		fmt.Fprintln(stdout)
+	}
+	for _, issue := range plan.Blockers {
+		fmt.Fprintf(stdout, "- blocked %s: %s -> %s\n", issue.ID, issue.Detail, issue.Action)
+	}
+	for _, issue := range plan.Deferred {
+		fmt.Fprintf(stdout, "- deferred %s: %s -> %s\n", issue.ID, issue.Detail, issue.Action)
 	}
 	return int(apperror.ExitSuccess)
 }

@@ -35,3 +35,13 @@ func TestBuildPlanEnablesOnlyVerifiedRecoveryCandidates(t *testing.T) {
 		t.Fatalf("plan=%+v", plan)
 	}
 }
+
+func TestBuildPlanKeepsDistinctVerifiedMetadataKinds(t *testing.T) {
+	plan := BuildPlan(statecontrol.Report{State: statecontrol.DegradedRepairable, Issues: []statecontrol.Issue{
+		{Severity: statecontrol.SeverityRepairable, Action: "REGISTER_VERIFIED_ARTIFACT", OwnerID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", ArtifactKind: "ca-cert"},
+		{Severity: statecontrol.SeverityRepairable, Action: "REGISTER_VERIFIED_ARTIFACT", OwnerID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", ArtifactKind: "ca-key"},
+	}})
+	if !plan.Applicable || len(plan.Actions) != 2 || plan.Actions[0].ArtifactKind == plan.Actions[1].ArtifactKind {
+		t.Fatalf("plan=%+v", plan)
+	}
+}

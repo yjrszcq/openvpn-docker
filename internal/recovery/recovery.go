@@ -152,8 +152,11 @@ func (service *Service) Recover(ctx context.Context, instanceID, action, ownerID
 			return "", fmt.Errorf("no mutually consistent CA profile evidence")
 		}
 		info, err := pki.ValidateCACertificate(values.ca.ca, service.now())
-		if err != nil || info.Fingerprint != values.instance.CAFingerprint {
+		if err != nil {
 			return "", fmt.Errorf("CA recovery evidence is no longer valid: %w", err)
+		}
+		if info.Fingerprint != values.instance.CAFingerprint {
+			return "", fmt.Errorf("CA recovery evidence no longer matches SQLite authority")
 		}
 		materials = []material{{mode: 0o644, owner: "instance", ownerID: instanceID, kind: "ca-cert", key: "pki/ca.crt", data: values.ca.ca, certInfo: &info}}
 	case "RECOVER_TLS_CRYPT":

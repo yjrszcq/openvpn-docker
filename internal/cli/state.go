@@ -7,10 +7,6 @@ import (
 	"io"
 
 	"github.com/yjrszcq/openvpn-docker/internal/apperror"
-	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
-	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
-	"github.com/yjrszcq/openvpn-docker/internal/initialize"
-	"github.com/yjrszcq/openvpn-docker/internal/render"
 	statecontrol "github.com/yjrszcq/openvpn-docker/internal/state"
 )
 
@@ -28,20 +24,11 @@ func runState(args []string, stdout, stderr io.Writer, doctor bool) int {
 	if len(args) != 0 && !jsonMode {
 		return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", fmt.Sprintf("usage: ovpn state %s [--json]", command)), jsonRequested)
 	}
-	contract, err := compatibility.Load(environmentOr("OVPN_COMPATIBILITY_FILE", compatibility.DefaultContractPath))
+	options, err := stateScanOptions()
 	if err != nil {
-		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "invalid_compatibility_contract", "compatibility contract is invalid", err), jsonMode)
+		return writeErrorMode(stderr, err, jsonMode)
 	}
-	renderer, err := render.New(environmentOr("OVPN_TEMPLATE_ROOT", render.DefaultTemplateRoot), contract)
-	if err != nil {
-		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "invalid_templates", "OpenVPN templates are invalid", err), jsonMode)
-	}
-	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
-	report := statecontrol.Scan(context.Background(), statecontrol.Options{
-		DataDir: dataDir, ConfigFile: environmentOr("OVPN_CONFIG_FILE", configservice.DefaultPath),
-		ServerName: initialize.DefaultServerName, Renderer: renderer,
-		Paths: render.Paths{DataDir: dataDir, RuntimeDir: environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)},
-	})
+	report := statecontrol.Scan(context.Background(), options)
 	if jsonMode {
 		if err := json.NewEncoder(stdout).Encode(report); err != nil {
 			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitFailure, "output_failure", "write state report", err), true)

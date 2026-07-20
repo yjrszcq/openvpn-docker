@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/yjrszcq/openvpn-docker/internal/derived"
 	"github.com/yjrszcq/openvpn-docker/internal/pki"
@@ -12,9 +13,10 @@ import (
 )
 
 type Action struct {
-	Type    string `json:"type"`
-	OwnerID string `json:"ownerId,omitempty"`
-	Target  string `json:"target,omitempty"`
+	Type         string `json:"type"`
+	OwnerID      string `json:"ownerId,omitempty"`
+	Target       string `json:"target,omitempty"`
+	ArtifactKind string `json:"artifactKind,omitempty"`
 }
 
 type Plan struct {
@@ -41,7 +43,7 @@ func BuildPlan(report statecontrol.Report, recoveryReady ...map[string]bool) Pla
 	seen := make(map[string]struct{})
 	for _, issue := range report.Issues {
 		ownerID := canonicalOwner(issue.Action, issue.OwnerID)
-		identity := issue.Action + "\x00" + ownerID
+		identity := actionIdentity(issue.Action, ownerID, issue.ArtifactKind)
 		if issue.Severity != statecontrol.SeverityRepairable && !(issue.Severity == statecontrol.SeverityRecoverable && ready[identity]) {
 			plan.Blockers = append(plan.Blockers, issue)
 			continue
@@ -50,28 +52,53 @@ func BuildPlan(report statecontrol.Report, recoveryReady ...map[string]bool) Pla
 			plan.Deferred = append(plan.Deferred, issue)
 			continue
 		}
-		action := Action{Type: issue.Action, OwnerID: ownerID, Target: issue.Target}
+		action := Action{Type: issue.Action, OwnerID: ownerID, Target: issue.Target, ArtifactKind: issue.ArtifactKind}
 		if _, exists := seen[identity]; exists {
 			continue
 		}
 		seen[identity] = struct{}{}
 		plan.Actions = append(plan.Actions, action)
 	}
+	clientConverges := map[string]bool{}
+	for _, action := range plan.Actions {
+		if action.Type == "REFRESH_CLIENT_ARTIFACTS" || action.Type == "RECOVER_CLIENT_IDENTITY" {
+			clientConverges[action.OwnerID] = true
+		}
+	}
+	filtered := plan.Actions[:0]
+	for _, action := range plan.Actions {
+		if action.Type == "REGISTER_VERIFIED_ARTIFACT" && strings.HasPrefix(action.ArtifactKind, "client-") && clientConverges[action.OwnerID] {
+			continue
+		}
+		filtered = append(filtered, action)
+	}
+	plan.Actions = filtered
 	sort.Slice(plan.Actions, func(i, j int) bool {
 		if plan.Actions[i].Type != plan.Actions[j].Type {
 			return plan.Actions[i].Type < plan.Actions[j].Type
 		}
-		return plan.Actions[i].OwnerID < plan.Actions[j].OwnerID
+		if plan.Actions[i].OwnerID != plan.Actions[j].OwnerID {
+			return plan.Actions[i].OwnerID < plan.Actions[j].OwnerID
+		}
+		return plan.Actions[i].ArtifactKind < plan.Actions[j].ArtifactKind
 	})
 	plan.Applicable = len(plan.Blockers) == 0
 	return plan
 }
 
 func canonicalOwner(action, ownerID string) string {
-	if action == "REFRESH_CLIENT_ARTIFACTS" || action == "RECOVER_CLIENT_IDENTITY" {
+	if action == "REFRESH_CLIENT_ARTIFACTS" || action == "RECOVER_CLIENT_IDENTITY" || action == "REGISTER_VERIFIED_ARTIFACT" {
 		return ownerID
 	}
 	return ""
+}
+
+func actionIdentity(action, ownerID, kind string) string {
+	identity := action + "\x00" + ownerID
+	if action == "REGISTER_VERIFIED_ARTIFACT" {
+		identity += "\x00" + kind
+	}
+	return identity
 }
 
 type Service struct {
@@ -116,6 +143,8 @@ func (service *Service) Apply(ctx context.Context, instanceID string, plan Plan)
 			var operationID string
 			operationID, err = service.recoverer.Recover(ctx, instanceID, action.Type, action.OwnerID)
 			operation.OperationID = operationID
+		case "REGISTER_VERIFIED_ARTIFACT":
+			operation, err = service.derived.RegisterVerifiedArtifact(ctx, instanceID, action.OwnerID, action.ArtifactKind)
 		default:
 			return Result{}, fmt.Errorf("unsupported repair action %s", action.Type)
 		}
@@ -129,7 +158,7 @@ func (service *Service) Apply(ctx context.Context, instanceID string, plan Plan)
 
 func automatic(action string) bool {
 	switch action {
-	case "REBUILD_CRL", "REFRESH_SERVER_ARTIFACTS", "REFRESH_CLIENT_ARTIFACTS", "RECOVER_CA_CERT", "RECOVER_TLS_CRYPT", "RECOVER_CLIENT_IDENTITY":
+	case "REBUILD_CRL", "REFRESH_SERVER_ARTIFACTS", "REFRESH_CLIENT_ARTIFACTS", "RECOVER_CA_CERT", "RECOVER_TLS_CRYPT", "RECOVER_CLIENT_IDENTITY", "REGISTER_VERIFIED_ARTIFACT":
 		return true
 	default:
 		return false

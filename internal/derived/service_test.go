@@ -191,6 +191,39 @@ func TestRefreshCRLStagesEasyRSAOutputAndCommitsMetadata(t *testing.T) {
 	}
 }
 
+func TestRegisterVerifiedArtifactRestoresOnlyMetadata(t *testing.T) {
+	fixture := newServiceFixture(t)
+	encodedKey, err := x509.MarshalPKCS8PrivateKey(fixture.caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(fixture.dataDir, "pki", "private", "ca.key"), pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: encodedKey}), 0o600)
+	before := readText(t, fixture.artifacts, "pki/private/ca.key")
+	for _, kind := range []string{"ca-cert", "ca-key", "tls-crypt"} {
+		if _, err := fixture.service.RegisterVerifiedArtifact(context.Background(), fixture.instance.ID, fixture.instance.ID, kind); err != nil {
+			t.Fatalf("register %s: %v", kind, err)
+		}
+	}
+	if after := readText(t, fixture.artifacts, "pki/private/ca.key"); after != before {
+		t.Fatal("metadata registration changed the CA private key")
+	}
+	metadata, err := fixture.state.LoadInstanceArtifacts(context.Background(), fixture.instance.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := map[string]bool{}
+	for _, item := range metadata {
+		if item.Status == storesqlite.ArtifactActive {
+			kinds[item.Kind] = true
+		}
+	}
+	for _, kind := range []string{"ca-cert", "ca-key", "tls-crypt"} {
+		if !kinds[kind] {
+			t.Fatalf("active artifact kinds=%v", kinds)
+		}
+	}
+}
+
 type executorFunc func(pki.Invocation) error
 
 func (function executorFunc) Run(_ context.Context, invocation pki.Invocation) error {

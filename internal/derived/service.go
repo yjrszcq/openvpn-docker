@@ -233,6 +233,123 @@ func (service *Service) RefreshCRL(ctx context.Context, instanceID string, runne
 	return service.apply(ctx, instanceID, "artifacts.crl.refresh", writes, nil, []storesqlite.ArtifactMetadata{metadata})
 }
 
+// RegisterVerifiedArtifact restores missing SQLite metadata for an unchanged
+// authority file only after independently validating its content and owner.
+func (service *Service) RegisterVerifiedArtifact(ctx context.Context, instanceID, ownerID, kind string) (RefreshResult, error) {
+	if !domain.ValidUUID(instanceID) {
+		return RefreshResult{}, fmt.Errorf("invalid instance UUID")
+	}
+	lock, err := artifact.AcquireLock(ctx, filepath.Join(service.paths.DataDir, ".ovpn-data.lock"), artifact.LockExclusive)
+	if err != nil {
+		return RefreshResult{}, err
+	}
+	defer lock.Release()
+	instance, err := service.state.LoadInstance(ctx, instanceID)
+	if err != nil {
+		return RefreshResult{}, err
+	}
+	now := service.now()
+	pkiDirectory := filepath.Join(service.paths.DataDir, "pki")
+	validateStoredCA := func() error {
+		info, err := pki.ValidateCA(pkiDirectory, now)
+		if err != nil {
+			return err
+		}
+		if info.Fingerprint != instance.CAFingerprint {
+			return fmt.Errorf("PKI CA fingerprint does not match SQLite instance state")
+		}
+		return nil
+	}
+	ownerKind := "instance"
+	key := ""
+	var certificate *pki.CertificateInfo
+	switch kind {
+	case "ca-cert":
+		key = "pki/ca.crt"
+		info, err := pki.ValidateCA(pkiDirectory, now)
+		if err != nil {
+			return RefreshResult{}, err
+		}
+		if info.Fingerprint != instance.CAFingerprint {
+			return RefreshResult{}, fmt.Errorf("CA artifact does not match SQLite authority")
+		}
+		certificate = &info
+	case "ca-key":
+		key = "pki/private/ca.key"
+		info, err := pki.ValidateCAKeyPair(pkiDirectory, now)
+		if err != nil {
+			return RefreshResult{}, err
+		}
+		if info.Fingerprint != instance.CAFingerprint {
+			return RefreshResult{}, fmt.Errorf("CA key artifact does not match SQLite authority")
+		}
+	case "server-cert", "server-key":
+		if err := validateStoredCA(); err != nil {
+			return RefreshResult{}, err
+		}
+		info, err := pki.ValidateServer(pkiDirectory, "openvpn-server", now)
+		if err != nil {
+			return RefreshResult{}, err
+		}
+		if kind == "server-cert" {
+			key, certificate = "pki/issued/openvpn-server.crt", &info
+		} else {
+			key = "pki/private/openvpn-server.key"
+		}
+	case "crl":
+		key = "pki/crl.pem"
+		if err := validateStoredCA(); err != nil {
+			return RefreshResult{}, err
+		}
+		if err := pki.ValidateCRLForCA(pkiDirectory, now); err != nil {
+			return RefreshResult{}, err
+		}
+	case "tls-crypt":
+		key = "secrets/tls-crypt.key"
+		if err := pki.ValidateTLSCryptKey(filepath.Join(service.paths.DataDir, key)); err != nil {
+			return RefreshResult{}, err
+		}
+	case "client-cert", "client-key":
+		if !domain.ValidUUID(ownerID) {
+			return RefreshResult{}, fmt.Errorf("client artifact owner UUID is invalid")
+		}
+		client, err := service.state.LoadClient(ctx, instanceID, ownerID)
+		if err != nil {
+			return RefreshResult{}, fmt.Errorf("client artifact owner is unavailable: %w", err)
+		}
+		if client.Client.Status == domain.ClientDeleted {
+			return RefreshResult{}, fmt.Errorf("client artifact owner is deleted")
+		}
+		if err := validateStoredCA(); err != nil {
+			return RefreshResult{}, err
+		}
+		info, err := pki.ValidateClient(pkiDirectory, ownerID, now)
+		if err != nil {
+			return RefreshResult{}, err
+		}
+		ownerKind = "client"
+		if kind == "client-cert" {
+			key, certificate = "pki/issued/"+ownerID+".crt", &info
+		} else {
+			key = "pki/private/" + ownerID + ".key"
+		}
+	default:
+		return RefreshResult{}, fmt.Errorf("artifact kind %s cannot be verified for metadata registration", kind)
+	}
+	if ownerKind == "instance" {
+		ownerID = instanceID
+	}
+	_, reference, err := service.artifacts.Read(ctx, key)
+	if err != nil {
+		return RefreshResult{}, err
+	}
+	metadata, err := verifiedReferenceMetadata(ownerKind, ownerID, kind, key, reference, certificate)
+	if err != nil {
+		return RefreshResult{}, err
+	}
+	return service.apply(ctx, instanceID, "artifacts.metadata.register", nil, nil, []storesqlite.ArtifactMetadata{metadata})
+}
+
 type writeSpec struct {
 	key      string
 	mode     os.FileMode
@@ -331,11 +448,15 @@ func newMetadata(ownerKind, ownerID, kind, key string, content []byte) (storesql
 }
 
 func referenceMetadata(clientID, kind, key string, reference artifact.Reference, certificate *pki.CertificateInfo) (storesqlite.ArtifactMetadata, error) {
+	return verifiedReferenceMetadata("client", clientID, kind, key, reference, certificate)
+}
+
+func verifiedReferenceMetadata(ownerKind, ownerID, kind, key string, reference artifact.Reference, certificate *pki.CertificateInfo) (storesqlite.ArtifactMetadata, error) {
 	id, err := domain.GenerateUUID()
 	if err != nil {
 		return storesqlite.ArtifactMetadata{}, err
 	}
-	value := storesqlite.ArtifactMetadata{ID: id, OwnerKind: "client", OwnerID: clientID, Kind: kind, Key: key, Digest: reference.Digest, Status: storesqlite.ArtifactActive}
+	value := storesqlite.ArtifactMetadata{ID: id, OwnerKind: ownerKind, OwnerID: ownerID, Kind: kind, Key: key, Digest: reference.Digest, Status: storesqlite.ArtifactActive}
 	if certificate != nil {
 		value.CertificateSerial = certificate.Serial
 		value.CertificateFingerprint = append([]byte(nil), certificate.Fingerprint[:]...)
@@ -345,8 +466,11 @@ func referenceMetadata(clientID, kind, key string, reference artifact.Reference,
 
 func copyRegularTree(source, destination string) error {
 	root, err := os.Lstat(source)
-	if err != nil || !root.IsDir() || root.Mode()&os.ModeSymlink != 0 {
+	if err != nil {
 		return fmt.Errorf("PKI source is unsafe: %w", err)
+	}
+	if !root.IsDir() || root.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("PKI source is unsafe")
 	}
 	if err := os.Mkdir(destination, 0o700); err != nil {
 		return err

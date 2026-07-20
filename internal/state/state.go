@@ -44,12 +44,13 @@ const (
 )
 
 type Issue struct {
-	ID       string   `json:"id"`
-	Severity Severity `json:"severity"`
-	Action   string   `json:"action"`
-	Target   string   `json:"target,omitempty"`
-	OwnerID  string   `json:"ownerId,omitempty"`
-	Detail   string   `json:"detail"`
+	ID           string   `json:"id"`
+	Severity     Severity `json:"severity"`
+	Action       string   `json:"action"`
+	Target       string   `json:"target,omitempty"`
+	OwnerID      string   `json:"ownerId,omitempty"`
+	ArtifactKind string   `json:"artifactKind,omitempty"`
+	Detail       string   `json:"detail"`
 }
 
 type Report struct {
@@ -214,12 +215,20 @@ func scanArtifactSet(ctx context.Context, report *Report, local *artifact.LocalS
 	active := map[string]storesqlite.ArtifactMetadata{}
 	for _, item := range metadata {
 		if item.Status == storesqlite.ArtifactActive {
+			if existing, exists := active[item.Kind]; exists {
+				report.add(Issue{ID: "ARTIFACT_METADATA_DUPLICATE", Severity: SeverityCritical, Action: "RESTORE_BACKUP", Target: item.Key, OwnerID: ownerID, ArtifactKind: item.Kind, Detail: "multiple active artifact keys exist for one kind: " + existing.Key})
+				continue
+			}
 			active[item.Kind] = item
 		}
 	}
 	for kind, key := range expected {
 		item, ok := active[kind]
 		if !ok {
+			if _, _, err := local.Read(ctx, key); err == nil && verifiableArtifact(kind) {
+				report.add(Issue{ID: "ARTIFACT_METADATA_MISSING", Severity: SeverityRepairable, Action: "REGISTER_VERIFIED_ARTIFACT", Target: key, OwnerID: ownerID, ArtifactKind: kind, Detail: "present file has no active artifact metadata and must be verified before registration"})
+				continue
+			}
 			report.add(Issue{ID: "ARTIFACT_METADATA_MISSING", Severity: severityForArtifact(kind), Action: actionForArtifact(kind), Target: key, OwnerID: ownerID, Detail: "active artifact metadata is missing"})
 			continue
 		}
@@ -251,7 +260,15 @@ func scanClient(ctx context.Context, report *Report, local *artifact.LocalStore,
 	active := map[string]storesqlite.ArtifactMetadata{}
 	for _, item := range client.Artifacts {
 		if item.Status == storesqlite.ArtifactActive {
+			if existing, exists := active[item.Kind]; exists {
+				report.add(Issue{ID: "CLIENT_ARTIFACT_METADATA_DUPLICATE", Severity: SeverityCritical, Action: "RESTORE_BACKUP", Target: item.Key, OwnerID: id, ArtifactKind: item.Kind, Detail: "multiple active artifact keys exist for one kind: " + existing.Key})
+				continue
+			}
 			active[item.Kind] = item
+			if expected := expectedClientArtifactKey(client, item.Kind); expected != "" && item.Key != expected {
+				report.add(Issue{ID: "CLIENT_ARTIFACT_KEY_INVALID", Severity: SeverityCritical, Action: "RESTORE_BACKUP", Target: item.Key, OwnerID: id, ArtifactKind: item.Kind, Detail: fmt.Sprintf("%s must use canonical key %s", item.Kind, expected)})
+				continue
+			}
 			_, reference, err := local.Read(ctx, item.Key)
 			if err != nil || reference.Digest != item.Digest {
 				detail := "artifact digest does not match SQLite metadata"
@@ -264,6 +281,18 @@ func scanClient(ctx context.Context, report *Report, local *artifact.LocalStore,
 	}
 	for _, kind := range []string{"client-cert", "client-key", "profile"} {
 		if _, ok := active[kind]; !ok {
+			key := ""
+			if kind == "client-cert" {
+				key = "pki/issued/" + id + ".crt"
+			} else if kind == "client-key" {
+				key = "pki/private/" + id + ".key"
+			}
+			if identityErr == nil && key != "" {
+				if _, _, err := local.Read(ctx, key); err == nil {
+					report.add(Issue{ID: "CLIENT_ARTIFACT_METADATA_MISSING", Severity: SeverityRepairable, Action: "REGISTER_VERIFIED_ARTIFACT", Target: key, OwnerID: id, ArtifactKind: kind, Detail: kind + " present file has no active metadata and must be verified before registration"})
+					continue
+				}
+			}
 			report.add(Issue{ID: "CLIENT_ARTIFACT_METADATA_MISSING", Severity: severityForArtifact(kind), Action: actionForArtifact(kind), OwnerID: id, Detail: kind + " metadata is missing"})
 		}
 	}
@@ -294,6 +323,25 @@ func scanClient(ctx context.Context, report *Report, local *artifact.LocalStore,
 		}
 	} else if _, _, err := local.Read(ctx, ccdKey); err == nil {
 		report.add(Issue{ID: "CLIENT_CCD_UNEXPECTED", Severity: SeverityRepairable, Action: "REFRESH_CLIENT_ARTIFACTS", Target: ccdKey, OwnerID: id, Detail: "CCD exists without an active static assignment"})
+	}
+}
+
+func expectedClientArtifactKey(client storesqlite.ClientState, kind string) string {
+	switch kind {
+	case "client-cert":
+		return "pki/issued/" + client.Client.ID + ".crt"
+	case "client-key":
+		return "pki/private/" + client.Client.ID + ".key"
+	case "profile":
+		directory := "active"
+		if client.Client.Status == domain.ClientRevoked {
+			directory = "revoked"
+		}
+		return "clients/" + directory + "/" + client.Client.Name + ".ovpn"
+	case "ccd":
+		return "ccd/" + client.Client.ID
+	default:
+		return ""
 	}
 }
 
@@ -416,6 +464,15 @@ func actionForArtifact(kind string) string {
 	}
 }
 
+func verifiableArtifact(kind string) bool {
+	switch kind {
+	case "ca-cert", "ca-key", "server-cert", "server-key", "crl", "tls-crypt", "client-cert", "client-key":
+		return true
+	default:
+		return false
+	}
+}
+
 func repairAction(id string) string {
 	if id == "SERVER_CONFIG_DRIFT" {
 		return "REFRESH_SERVER_ARTIFACTS"
@@ -440,7 +497,18 @@ func databaseIssueID(err error) string {
 
 func directoryEmpty(path string) bool {
 	entries, err := os.ReadDir(path)
-	return errors.Is(err, os.ErrNotExist) || (err == nil && len(entries) == 0)
+	if errors.Is(err, os.ErrNotExist) {
+		return true
+	}
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if entry.Name() != ".ovpn-data.lock" && entry.Name() != ".ovpn-runtime.lock" {
+			return false
+		}
+	}
+	return true
 }
 
 func requireRegular(path string) error {
