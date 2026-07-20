@@ -87,27 +87,19 @@ VALUES(?, ?, ?, ?, ?, ?, ?)`, state.Client.ID, instanceID, state.Client.Name, st
 		return classifySQLite("insert client", err)
 	}
 	if state.Assignment != nil {
+		if err := ensureNetworkInstance(ctx, transaction, state.Assignment.NetworkID, instanceID); err != nil {
+			return err
+		}
 		if err := insertAssignment(ctx, transaction, state.Client.ID, *state.Assignment); err != nil {
 			return err
 		}
 	}
 	if state.Lease != nil {
-		if state.Assignment == nil || state.Assignment.Kind != "dynamic" || state.Assignment.NetworkID != state.Lease.NetworkID {
-			return fmt.Errorf("lease requires a matching dynamic assignment")
-		}
 		if err := validateLeasePool(ctx, transaction, *state.Lease); err != nil {
 			return err
 		}
 		if _, err := transaction.ExecContext(ctx, `INSERT INTO client_leases(client_id, network_id, family, address, updated_at) VALUES(?, ?, 4, ?, ?)`, state.Client.ID, state.Lease.NetworkID, packAddress(state.Lease.Address.Netip()), formatTime(state.Lease.UpdatedAt)); err != nil {
 			return classifySQLite("insert client lease", err)
-		}
-	}
-	if state.Lease != nil {
-		if state.Lease.Address.Family() != domain.FamilyIPv4 || state.Lease.UpdatedAt.IsZero() || !domain.ValidUUID(state.Lease.NetworkID) {
-			return fmt.Errorf("invalid client lease")
-		}
-		if state.Assignment == nil || state.Assignment.Kind != "dynamic" || state.Assignment.NetworkID != state.Lease.NetworkID {
-			return fmt.Errorf("lease requires a matching dynamic assignment")
 		}
 	}
 	for _, artifact := range state.Artifacts {
@@ -171,6 +163,11 @@ func (store *Store) LoadClient(ctx context.Context, instanceID, clientID string)
 	if err := validateClientState(state); err != nil {
 		return ClientState{}, fmt.Errorf("%w: %v", ErrSchema, err)
 	}
+	if state.Assignment != nil {
+		if err := ensureNetworkInstance(ctx, store.db, state.Assignment.NetworkID, instanceID); err != nil {
+			return ClientState{}, fmt.Errorf("%w: assignment network belongs to another instance", ErrSchema)
+		}
+	}
 	if state.Assignment != nil && state.Assignment.Address != nil {
 		layout, err := loadNetworkLayout(ctx, store.db, state.Assignment.NetworkID)
 		if err != nil || layout.ValidateStatic(*state.Assignment.Address) != nil {
@@ -196,7 +193,13 @@ func (store *Store) RecordLease(ctx context.Context, clientID string, lease Clie
 	}
 	defer transaction.Rollback()
 	var count int
-	if err := transaction.QueryRowContext(ctx, `SELECT count(*) FROM address_assignments WHERE client_id = ? AND network_id = ? AND kind = 'dynamic' AND status IN ('active', 'retained')`, clientID, lease.NetworkID).Scan(&count); err != nil || count != 1 {
+	if err := transaction.QueryRowContext(ctx, `
+SELECT count(*)
+FROM address_assignments a
+JOIN clients c ON c.id = a.client_id
+JOIN networks n ON n.id = a.network_id AND n.instance_id = c.instance_id
+WHERE a.client_id = ? AND a.network_id = ? AND a.kind = 'dynamic'
+  AND a.status IN ('active', 'retained')`, clientID, lease.NetworkID).Scan(&count); err != nil || count != 1 {
 		return fmt.Errorf("dynamic assignment is missing")
 	}
 	if err := validateLeasePool(ctx, transaction, lease); err != nil {
@@ -256,6 +259,14 @@ func validateClientState(state ClientState) error {
 			return fmt.Errorf("invalid dynamic assignment")
 		}
 	}
+	if state.Lease != nil {
+		if state.Lease.Address.Family() != domain.FamilyIPv4 || state.Lease.UpdatedAt.IsZero() || !domain.ValidUUID(state.Lease.NetworkID) {
+			return fmt.Errorf("invalid client lease")
+		}
+		if state.Assignment == nil || state.Assignment.Kind != "dynamic" || state.Assignment.NetworkID != state.Lease.NetworkID || state.Assignment.Status == AssignmentReleased {
+			return fmt.Errorf("lease requires a matching current dynamic assignment")
+		}
+	}
 	for _, artifact := range state.Artifacts {
 		if err := validateArtifact(artifact); err != nil {
 			return err
@@ -292,6 +303,19 @@ func validateLeasePool(ctx context.Context, query interface {
 		return err
 	}
 	return layout.ValidateDynamicLease(lease.Address)
+}
+
+func ensureNetworkInstance(ctx context.Context, query interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, networkID, instanceID string) error {
+	var count int
+	if err := query.QueryRowContext(ctx, "SELECT count(*) FROM networks WHERE id = ? AND instance_id = ?", networkID, instanceID).Scan(&count); err != nil {
+		return fmt.Errorf("validate assignment network owner: %w", err)
+	}
+	if count != 1 {
+		return fmt.Errorf("assignment network does not belong to the client instance")
+	}
+	return nil
 }
 
 func loadNetworkLayout(ctx context.Context, query interface {

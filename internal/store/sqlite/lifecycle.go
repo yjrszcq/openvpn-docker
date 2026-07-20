@@ -22,7 +22,7 @@ const (
 	DefaultPath     = "/etc/openvpn/meta/state.db"
 	DataSchema      = buildinfo.DataSchema
 	InitialRevision = 1
-	CurrentRevision = 4
+	CurrentRevision = 5
 	BusyTimeoutMS   = 30000
 )
 
@@ -100,6 +100,12 @@ func Create(ctx context.Context, path, createdVersion string) (_ *Store, resultE
 	if err != nil {
 		return nil, err
 	}
+	if err := integrityCheck(ctx, database); err != nil {
+		return nil, err
+	}
+	if err := validateSchemaObjects(ctx, database); err != nil {
+		return nil, err
+	}
 	if err := requireMode(path); err != nil {
 		return nil, err
 	}
@@ -135,8 +141,17 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	if err := validateMetadata(metadata); err != nil {
 		return nil, err
 	}
+	openedRevision := metadata.DatabaseRevision
 	metadata, err = migrate(ctx, database, metadata)
 	if err != nil {
+		return nil, err
+	}
+	if metadata.DatabaseRevision != openedRevision {
+		if err := integrityCheck(ctx, database); err != nil {
+			return nil, err
+		}
+	}
+	if err := validateSchemaObjects(ctx, database); err != nil {
 		return nil, err
 	}
 	closeOnError = false
@@ -307,6 +322,102 @@ func integrityCheck(ctx context.Context, database *sql.DB) error {
 	}
 	if len(issues) > 0 {
 		return fmt.Errorf("%w: %s", ErrCorrupt, strings.Join(issues, "; "))
+	}
+	return foreignKeyCheck(ctx, database)
+}
+
+func foreignKeyCheck(ctx context.Context, database *sql.DB) error {
+	rows, err := database.QueryContext(ctx, "PRAGMA foreign_key_check")
+	if err != nil {
+		return classifySQLite("run SQLite foreign key check", err)
+	}
+	defer rows.Close()
+	issues := make([]string, 0)
+	for rows.Next() {
+		var table, parent string
+		var rowID sql.NullInt64
+		var foreignKey int
+		if err := rows.Scan(&table, &rowID, &parent, &foreignKey); err != nil {
+			return classifySQLite("read SQLite foreign key check", err)
+		}
+		row := "without-rowid"
+		if rowID.Valid {
+			row = fmt.Sprint(rowID.Int64)
+		}
+		issues = append(issues, fmt.Sprintf("%s row %s references %s (foreign key %d)", table, row, parent, foreignKey))
+	}
+	if err := rows.Err(); err != nil {
+		return classifySQLite("read SQLite foreign key check", err)
+	}
+	if len(issues) > 0 {
+		return fmt.Errorf("%w: %s", ErrCorrupt, strings.Join(issues, "; "))
+	}
+	return nil
+}
+
+func validateSchemaObjects(ctx context.Context, database *sql.DB) error {
+	requiredTables := map[string]struct{}{
+		"schema_metadata":     {},
+		"instances":           {},
+		"applied_config":      {},
+		"networks":            {},
+		"address_pools":       {},
+		"pushed_routes":       {},
+		"dns_servers":         {},
+		"clients":             {},
+		"address_assignments": {},
+		"client_leases":       {},
+		"artifacts":           {},
+		"audit_events":        {},
+		"operations":          {},
+	}
+	rows, err := database.QueryContext(ctx, `
+SELECT name, sql FROM sqlite_schema
+WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`)
+	if err != nil {
+		return classifySQLite("read SQLite schema tables", err)
+	}
+	found := make(map[string]struct{}, len(requiredTables))
+	for rows.Next() {
+		var name, definition string
+		if err := rows.Scan(&name, &definition); err != nil {
+			_ = rows.Close()
+			return classifySQLite("read SQLite schema table", err)
+		}
+		if _, expected := requiredTables[name]; !expected {
+			_ = rows.Close()
+			return fmt.Errorf("%w: unexpected table %s", ErrSchema, name)
+		}
+		if !strings.HasSuffix(strings.TrimSpace(definition), "STRICT") {
+			_ = rows.Close()
+			return fmt.Errorf("%w: table %s is not STRICT", ErrSchema, name)
+		}
+		found[name] = struct{}{}
+	}
+	if err := rows.Close(); err != nil {
+		return classifySQLite("close SQLite schema tables", err)
+	}
+	if err := rows.Err(); err != nil {
+		return classifySQLite("read SQLite schema tables", err)
+	}
+	for name := range requiredTables {
+		if _, exists := found[name]; !exists {
+			return fmt.Errorf("%w: required table %s is missing", ErrSchema, name)
+		}
+	}
+	for _, name := range []string{
+		"clients_current_name",
+		"assignments_current_client_network",
+		"assignments_current_network_address",
+		"client_leases_network_address",
+	} {
+		var definition string
+		if err := database.QueryRowContext(ctx, "SELECT sql FROM sqlite_schema WHERE type = 'index' AND name = ?", name).Scan(&definition); err != nil {
+			return fmt.Errorf("%w: required unique index %s is missing", ErrSchema, name)
+		}
+		if !strings.HasPrefix(strings.ToUpper(strings.TrimSpace(definition)), "CREATE UNIQUE INDEX") {
+			return fmt.Errorf("%w: index %s is not unique", ErrSchema, name)
+		}
 	}
 	return nil
 }

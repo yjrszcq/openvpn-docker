@@ -2,7 +2,10 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"net/url"
+	"sync"
 	"testing"
 	"time"
 
@@ -85,6 +88,133 @@ func TestDynamicLeaseRoundTripAndUpdate(t *testing.T) {
 	loaded, err := store.LoadClient(context.Background(), instance.ID, state.Client.ID)
 	if err != nil || loaded.Lease == nil || loaded.Lease.Address.String() != "10.42.0.201" || loaded.Assignment.Address != nil {
 		t.Fatalf("unexpected dynamic client: %+v err=%v", loaded, err)
+	}
+}
+
+func TestDynamicLeaseAddressIsUniqueWithinNetwork(t *testing.T) {
+	store, instance := storeWithInstance(t)
+	now := time.Date(2026, 7, 20, 13, 0, 0, 0, time.UTC)
+	newDynamic := func(id, name string) ClientState {
+		return ClientState{
+			Client:     domain.Client{ID: id, Name: name, Status: domain.ClientActive},
+			CreatedAt:  now,
+			Assignment: &AddressAssignment{ID: "dddddddd-dddd-4ddd-8ddd-" + id[len(id)-12:], NetworkID: instance.NetworkID, Kind: "dynamic", Status: AssignmentActive, CreatedAt: now, UpdatedAt: now},
+			Lease:      &ClientLease{NetworkID: instance.NetworkID, Address: address(t, "10.42.0.200"), UpdatedAt: now},
+		}
+	}
+	first := newDynamic("23232323-2323-4232-8232-232323232323", "first-lease")
+	if err := store.CreateClient(context.Background(), instance.ID, first); err != nil {
+		t.Fatal(err)
+	}
+	second := newDynamic("24242424-2424-4242-8242-242424242424", "second-lease")
+	if err := store.CreateClient(context.Background(), instance.ID, second); !errors.Is(err, ErrConstraint) {
+		t.Fatalf("duplicate dynamic lease error=%v", err)
+	}
+	var count int
+	if err := store.db.QueryRow("SELECT count(*) FROM clients WHERE id = ?", second.Client.ID).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("duplicate lease partially created client: count=%d err=%v", count, err)
+	}
+}
+
+func TestClientRejectsCrossInstanceAssignment(t *testing.T) {
+	store, first := storeWithInstance(t)
+	secondState := initialInstance(t)
+	secondState.ID = "25252525-2525-4252-8252-252525252525"
+	if err := store.CreateInstance(context.Background(), secondState); err != nil {
+		t.Fatal(err)
+	}
+	second, err := store.LoadInstance(context.Background(), secondState.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := staticClient(t, second.NetworkID, "26262626-2626-4262-8262-262626262626", "cross-instance", "10.42.0.10")
+	if err := store.CreateClient(context.Background(), first.ID, client); err == nil {
+		t.Fatal("cross-instance assignment was accepted")
+	}
+	var count int
+	if err := store.db.QueryRow("SELECT count(*) FROM clients WHERE id = ?", client.Client.ID).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("cross-instance assignment partially created client: count=%d err=%v", count, err)
+	}
+}
+
+func TestLoadClientRejectsLeaseWithoutDynamicAssignment(t *testing.T) {
+	store, instance := storeWithInstance(t)
+	client := staticClient(t, instance.NetworkID, "27272727-2727-4272-8272-272727272727", "static-with-lease", "10.42.0.10")
+	if err := store.CreateClient(context.Background(), instance.ID, client); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.Exec(`
+INSERT INTO client_leases(client_id, network_id, family, address, updated_at)
+VALUES(?, ?, 4, ?, '2026-07-20T13:01:00Z')`, client.Client.ID, instance.NetworkID, []byte{10, 42, 0, 200}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.LoadClient(context.Background(), instance.ID, client.Client.ID); !errors.Is(err, ErrSchema) {
+		t.Fatalf("logical lease corruption error=%v", err)
+	}
+}
+
+func TestMutationMapsCompetingWriterToBusy(t *testing.T) {
+	store, instance := storeWithInstance(t)
+	if _, err := store.db.Exec("PRAGMA busy_timeout = 1"); err != nil {
+		t.Fatal(err)
+	}
+	query := url.Values{"mode": []string{"rw"}, "_busy_timeout": []string{"1"}, "_txlock": []string{"immediate"}}
+	dsn := (&url.URL{Scheme: "file", Path: store.Path(), RawQuery: query.Encode()}).String()
+	other, err := sql.Open("sqlite3", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	transaction, err := other.BeginTx(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer transaction.Rollback()
+	client := staticClient(t, instance.NetworkID, "28282828-2828-4282-8282-282828282828", "busy", "10.42.0.11")
+	if err := store.CreateClient(context.Background(), instance.ID, client); !errors.Is(err, ErrBusy) {
+		t.Fatalf("competing writer error=%v", err)
+	}
+}
+
+func TestConcurrentLeaseUpdatesAreSerialized(t *testing.T) {
+	store, instance := storeWithInstance(t)
+	now := time.Date(2026, 7, 20, 13, 0, 0, 0, time.UTC)
+	state := ClientState{
+		Client:     domain.Client{ID: "29292929-2929-4292-8292-292929292929", Name: "concurrent-lease", Status: domain.ClientActive},
+		CreatedAt:  now,
+		Assignment: &AddressAssignment{ID: "30303030-3030-4303-8303-303030303030", NetworkID: instance.NetworkID, Kind: "dynamic", Status: AssignmentActive, CreatedAt: now, UpdatedAt: now},
+	}
+	if err := store.CreateClient(context.Background(), instance.ID, state); err != nil {
+		t.Fatal(err)
+	}
+	addresses := []string{"10.42.0.200", "10.42.0.201", "10.42.0.202", "10.42.0.203", "10.42.0.204", "10.42.0.205", "10.42.0.206", "10.42.0.207"}
+	errorsSeen := make(chan error, len(addresses))
+	var wait sync.WaitGroup
+	for index, raw := range addresses {
+		lease := ClientLease{NetworkID: instance.NetworkID, Address: address(t, raw), UpdatedAt: now.Add(time.Duration(index+1) * time.Second)}
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			errorsSeen <- store.RecordLease(context.Background(), state.Client.ID, lease)
+		}()
+	}
+	wait.Wait()
+	close(errorsSeen)
+	for err := range errorsSeen {
+		if err != nil {
+			t.Fatalf("concurrent lease update: %v", err)
+		}
+	}
+	loaded, err := store.LoadClient(context.Background(), instance.ID, state.Client.ID)
+	if err != nil || loaded.Lease == nil {
+		t.Fatalf("load concurrent lease: %+v err=%v", loaded, err)
+	}
+	found := false
+	for _, raw := range addresses {
+		found = found || loaded.Lease.Address.String() == raw
+	}
+	if !found {
+		t.Fatalf("final lease %s was not one of the serialized updates", loaded.Lease.Address)
 	}
 }
 

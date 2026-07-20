@@ -12,6 +12,8 @@ import (
 	"time"
 
 	sqlite3 "github.com/mattn/go-sqlite3"
+
+	"github.com/yjrszcq/openvpn-docker/internal/domain"
 )
 
 func databasePath(t *testing.T) string {
@@ -171,6 +173,53 @@ func TestOpenMigratesRevisionOne(t *testing.T) {
 	}
 }
 
+func TestOpenMigratesRevisionFourLeaseUniqueness(t *testing.T) {
+	store, instance := storeWithInstance(t)
+	path := store.Path()
+	if _, err := store.db.Exec("DROP INDEX client_leases_network_address"); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 7, 20, 13, 0, 0, 0, time.UTC)
+	clients := []ClientState{
+		{Client: domain.Client{ID: "31313131-3131-4313-8313-313131313131", Name: "old-lease", Status: domain.ClientActive}, CreatedAt: now, Assignment: &AddressAssignment{ID: "32323232-3232-4323-8323-323232323232", NetworkID: instance.NetworkID, Kind: "dynamic", Status: AssignmentActive, CreatedAt: now, UpdatedAt: now}},
+		{Client: domain.Client{ID: "33333333-3333-4333-8333-333333333334", Name: "new-lease", Status: domain.ClientActive}, CreatedAt: now, Assignment: &AddressAssignment{ID: "34343434-3434-4343-8343-343434343434", NetworkID: instance.NetworkID, Kind: "dynamic", Status: AssignmentActive, CreatedAt: now, UpdatedAt: now}},
+	}
+	for _, client := range clients {
+		if err := store.CreateClient(context.Background(), instance.ID, client); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for index, client := range clients {
+		if _, err := store.db.Exec(`
+INSERT INTO client_leases(client_id, network_id, family, address, updated_at)
+VALUES(?, ?, 4, ?, ?)`, client.Client.ID, instance.NetworkID, []byte{10, 42, 0, 200}, formatTime(now.Add(time.Duration(index)*time.Minute))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := store.db.Exec("UPDATE schema_metadata SET database_revision = 4 WHERE singleton = 1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	opened, err := Open(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer opened.Close()
+	if opened.Metadata().DatabaseRevision != CurrentRevision {
+		t.Fatalf("migrated revision=%d, want %d", opened.Metadata().DatabaseRevision, CurrentRevision)
+	}
+	var count int
+	if err := opened.db.QueryRow("SELECT count(*) FROM sqlite_schema WHERE type = 'index' AND name = 'client_leases_network_address'").Scan(&count); err != nil || count != 1 {
+		t.Fatalf("lease uniqueness index count=%d err=%v", count, err)
+	}
+	var survivor string
+	if err := opened.db.QueryRow("SELECT client_id FROM client_leases").Scan(&survivor); err != nil || survivor != clients[1].Client.ID {
+		t.Fatalf("deduplicated lease survivor=%q err=%v", survivor, err)
+	}
+}
+
 func TestCreateNeverOverwritesExistingDatabase(t *testing.T) {
 	path := databasePath(t)
 	store := createStore(t, path)
@@ -248,6 +297,56 @@ func TestOpenClassifiesCorruptAndUninitializedFiles(t *testing.T) {
 			t.Fatalf("uninitialized database error=%v", err)
 		}
 	})
+}
+
+func TestIntegrityCheckDetectsForeignKeyDamage(t *testing.T) {
+	path := databasePath(t)
+	store := createStore(t, path)
+	if _, err := store.db.Exec("PRAGMA foreign_keys = OFF"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.Exec(`
+INSERT INTO client_leases(client_id, network_id, family, address, updated_at)
+VALUES('missing-client', 'missing-network', 4, ?, '2026-07-20T00:00:00Z')`, []byte{10, 42, 0, 200}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.IntegrityCheck(context.Background()); !errors.Is(err, ErrCorrupt) {
+		t.Fatalf("foreign key damage error=%v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(context.Background(), path); !errors.Is(err, ErrCorrupt) {
+		t.Fatalf("open foreign-key-damaged database error=%v", err)
+	}
+}
+
+func TestOpenRejectsIncompleteAuthoritySchema(t *testing.T) {
+	tests := []struct {
+		name      string
+		statement string
+	}{
+		{name: "missing-table", statement: "DROP TABLE operations"},
+		{name: "missing-unique-index", statement: "DROP INDEX client_leases_network_address"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path := databasePath(t)
+			store := createStore(t, path)
+			if _, err := store.db.Exec(test.statement); err != nil {
+				t.Fatal(err)
+			}
+			if err := store.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Open(context.Background(), path); !errors.Is(err, ErrSchema) {
+				t.Fatalf("incomplete schema error=%v", err)
+			}
+		})
+	}
 }
 
 func TestOpenRejectsUnsupportedSchemaAndRevision(t *testing.T) {

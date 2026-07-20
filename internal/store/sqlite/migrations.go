@@ -15,6 +15,29 @@ var migrations = []migration{
 	{revision: 2, apply: migrateConfigurationState},
 	{revision: 3, apply: migrateClientState},
 	{revision: 4, apply: migrateAuditState},
+	{revision: 5, apply: migrateLeaseUniqueness},
+}
+
+func migrateLeaseUniqueness(ctx context.Context, transaction *sql.Tx) error {
+	_, err := transaction.ExecContext(ctx, `
+DELETE FROM client_leases
+WHERE rowid IN (
+    SELECT rowid FROM (
+        SELECT rowid,
+               row_number() OVER (
+                   PARTITION BY network_id, address
+                   ORDER BY updated_at DESC, client_id DESC
+               ) AS duplicate_rank
+        FROM client_leases
+    )
+    WHERE duplicate_rank > 1
+);
+CREATE UNIQUE INDEX client_leases_network_address
+ON client_leases(network_id, address)`)
+	if err != nil {
+		return classifySQLite("migrate client lease uniqueness", err)
+	}
+	return nil
 }
 
 func migrateAuditState(ctx context.Context, transaction *sql.Tx) error {
