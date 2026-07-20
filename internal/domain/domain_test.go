@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"net/netip"
 	"testing"
 
 	"github.com/yjrszcq/openvpn-docker/internal/domain"
@@ -33,6 +34,19 @@ func TestAddressFamiliesAndUnmapping(t *testing.T) {
 	}
 }
 
+func TestAddressConstructorsRejectInvalidValues(t *testing.T) {
+	if _, err := domain.NewAddress(netip.Addr{}); err == nil {
+		t.Fatal("invalid netip address was accepted")
+	}
+	if _, err := domain.NewAddress(netip.MustParseAddr("fe80::1%eth0")); err == nil {
+		t.Fatal("zoned address was accepted")
+	}
+	address := domain.AddressFrom4([4]byte{10, 42, 0, 2})
+	if address.Family() != domain.FamilyIPv4 || address.String() != "10.42.0.2" {
+		t.Fatalf("unexpected four-byte address: family=%d value=%s", address.Family(), address)
+	}
+}
+
 func TestNetworkRequiresCanonicalPrefix(t *testing.T) {
 	if _, err := domain.ParseNetwork("10.42.0.1/24"); err == nil {
 		t.Fatal("non-canonical network was accepted")
@@ -43,6 +57,22 @@ func TestNetworkRequiresCanonicalPrefix(t *testing.T) {
 	}
 	if network.Family() != domain.FamilyIPv4 || network.String() != "10.42.0.0/24" {
 		t.Fatalf("unexpected network: family=%d value=%s", network.Family(), network.String())
+	}
+}
+
+func TestNetworkConstructorNormalizesMappedIPv4(t *testing.T) {
+	if _, err := domain.NewNetwork(netip.Prefix{}); err == nil {
+		t.Fatal("invalid netip prefix was accepted")
+	}
+	mapped, err := domain.NewNetwork(netip.MustParsePrefix("::ffff:10.42.0.0/120"))
+	if err != nil {
+		t.Fatalf("normalize mapped IPv4 prefix: %v", err)
+	}
+	if mapped.Family() != domain.FamilyIPv4 || mapped.String() != "10.42.0.0/24" {
+		t.Fatalf("unexpected mapped prefix: family=%d value=%s", mapped.Family(), mapped)
+	}
+	if _, err := domain.NewNetwork(netip.MustParsePrefix("::ffff:0:0/80")); err == nil {
+		t.Fatal("mapped IPv4 prefix shorter than /96 was accepted")
 	}
 }
 

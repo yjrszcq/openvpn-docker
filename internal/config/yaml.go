@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/yjrszcq/openvpn-docker/internal/domain"
+	"github.com/yjrszcq/openvpn-docker/internal/ipam"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -167,16 +168,16 @@ func normalize(raw yamlConfig) (domain.Config, error) {
 	if network.Family() != domain.FamilyIPv4 {
 		return domain.Config{}, fmt.Errorf("ipv4.network must use IPv4")
 	}
-	if network.Prefix().Bits() > 30 {
-		return domain.Config{}, fmt.Errorf("ipv4.network must provide at least one client address")
+	capacity, err := ipam.ClientCapacity(network)
+	if err != nil {
+		return domain.Config{}, fmt.Errorf("ipv4.network: %w", err)
 	}
-	capacity := (uint64(1) << (32 - network.Prefix().Bits())) - 3
 	dynamicPoolSize := capacity / 2
 	if raw.IPv4.DynamicPoolSize != nil {
 		dynamicPoolSize = *raw.IPv4.DynamicPoolSize
 	}
-	if dynamicPoolSize > capacity {
-		return domain.Config{}, fmt.Errorf("ipv4.dynamicPoolSize must be between 0 and %d", capacity)
+	if _, err := ipam.NewIPv4Layout(network, dynamicPoolSize); err != nil {
+		return domain.Config{}, fmt.Errorf("ipv4.dynamicPoolSize: %w", err)
 	}
 	natInterface := "auto"
 	if raw.IPv4.NAT.Interface != nil {

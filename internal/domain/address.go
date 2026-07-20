@@ -26,10 +26,23 @@ func ParseAddress(input string) (Address, error) {
 	if err != nil {
 		return Address{}, fmt.Errorf("parse IP address %q: %w", input, err)
 	}
+	return NewAddress(value)
+}
+
+// NewAddress normalizes a valid standard-library address for domain use.
+func NewAddress(value netip.Addr) (Address, error) {
+	if !value.IsValid() {
+		return Address{}, fmt.Errorf("IP address is invalid")
+	}
 	if value.Zone() != "" {
-		return Address{}, fmt.Errorf("IP address %q must not contain a zone", input)
+		return Address{}, fmt.Errorf("IP address %q must not contain a zone", value)
 	}
 	return Address{value: value.Unmap()}, nil
+}
+
+// AddressFrom4 constructs an IPv4 address from its network-order bytes.
+func AddressFrom4(value [4]byte) Address {
+	return Address{value: netip.AddrFrom4(value)}
 }
 
 // Family returns the address family.
@@ -59,14 +72,26 @@ func ParseNetwork(input string) (Network, error) {
 	if err != nil {
 		return Network{}, fmt.Errorf("parse network %q: %w", input, err)
 	}
+	return NewNetwork(value)
+}
+
+// NewNetwork accepts only a valid canonical standard-library prefix.
+func NewNetwork(value netip.Prefix) (Network, error) {
+	if !value.IsValid() {
+		return Network{}, fmt.Errorf("network is invalid")
+	}
+	original := value
 	address := value.Addr().Unmap()
 	bits := value.Bits()
 	if address.Is4() && value.Addr().Is6() {
 		bits -= 96
 	}
+	if bits < 0 || bits > address.BitLen() {
+		return Network{}, fmt.Errorf("network %q has an invalid prefix length", original)
+	}
 	value = netip.PrefixFrom(address, bits)
 	if value != value.Masked() {
-		return Network{}, fmt.Errorf("network %q is not canonical", input)
+		return Network{}, fmt.Errorf("network %q is not canonical", original)
 	}
 	return Network{value: value}, nil
 }
