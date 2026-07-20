@@ -234,6 +234,80 @@ VALUES(?, ?, 4, ?, ?)`, client.Client.ID, instance.NetworkID, []byte{10, 42, 0, 
 	}
 }
 
+func TestOpenMigratesRevisionSevenWithoutLosingAddressState(t *testing.T) {
+	path := databasePath(t)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	database, err := connect(context.Background(), path, "rwc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := initialize(context.Background(), database, "4.0.0-test", time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, step := range migrations {
+		if step.revision > 7 {
+			break
+		}
+		transaction, err := database.BeginTx(context.Background(), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := step.apply(context.Background(), transaction); err != nil {
+			_ = transaction.Rollback()
+			t.Fatal(err)
+		}
+		if _, err := transaction.Exec("UPDATE schema_metadata SET database_revision = ? WHERE singleton = 1", step.revision); err != nil {
+			_ = transaction.Rollback()
+			t.Fatal(err)
+		}
+		if err := transaction.Commit(); err != nil {
+			t.Fatal(err)
+		}
+		metadata.DatabaseRevision = step.revision
+	}
+	legacy := &Store{db: database, path: path, metadata: metadata}
+	instance := initialInstance(t)
+	if err := legacy.CreateInstance(context.Background(), instance); err != nil {
+		t.Fatal(err)
+	}
+	instance, err = legacy.LoadInstance(context.Background(), instance.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	address, _ := domain.ParseAddress("10.42.0.10")
+	client := ClientState{Client: domain.Client{ID: "71717171-7171-4717-8717-717171717171", Name: "legacy", Status: domain.ClientActive}, CreatedAt: now, Assignment: &AddressAssignment{ID: "72727272-7272-4727-8727-727272727272", NetworkID: instance.NetworkID, Kind: "static", Address: &address, Status: AssignmentActive, CreatedAt: now, UpdatedAt: now}}
+	if err := legacy.CreateClient(context.Background(), instance.ID, client); err != nil {
+		t.Fatal(err)
+	}
+	if err := legacy.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	opened, err := Open(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer opened.Close()
+	loaded, err := opened.LoadClient(context.Background(), instance.ID, client.Client.ID)
+	if err != nil || loaded.Assignment == nil || loaded.Assignment.Address.String() != "10.42.0.10" {
+		t.Fatalf("migrated client=%+v err=%v", loaded, err)
+	}
+	if opened.Metadata().DatabaseRevision != CurrentRevision {
+		t.Fatalf("revision=%d", opened.Metadata().DatabaseRevision)
+	}
+}
+
 func TestCreateNeverOverwritesExistingDatabase(t *testing.T) {
 	path := databasePath(t)
 	store := createStore(t, path)

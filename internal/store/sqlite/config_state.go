@@ -104,7 +104,36 @@ func (store *Store) ApplyConfig(ctx context.Context, instanceID string, snapshot
 	if current == math.MaxUint64 || uint64(snapshot.Revision) != current+1 {
 		return fmt.Errorf("applied revision must advance from %d to %d", current, current+1)
 	}
-	if err := writeApplied(ctx, transaction, instanceID, snapshot); err != nil {
+	var currentNetworkID string
+	if err := transaction.QueryRowContext(ctx, "SELECT id FROM networks WHERE instance_id = ? AND family = 4 AND purpose = 'tunnel' AND enabled = 1", instanceID).Scan(&currentNetworkID); err != nil {
+		return fmt.Errorf("load current tunnel network: %w", err)
+	}
+	currentLayout, err := loadNetworkLayout(ctx, transaction, currentNetworkID)
+	if err != nil {
+		return err
+	}
+	networkChanged := currentLayout.Network != snapshot.Config.IPv4.Network || currentLayout.Dynamic.Capacity != snapshot.Config.IPv4.DynamicPoolSize
+	if networkChanged {
+		var assignments int
+		if err := transaction.QueryRowContext(ctx, `SELECT count(*) FROM address_assignments a JOIN clients c ON c.id = a.client_id WHERE c.instance_id = ? AND a.status IN ('active', 'retained')`, instanceID).Scan(&assignments); err != nil {
+			return classifySQLite("count current assignments", err)
+		}
+		if assignments != 0 {
+			return fmt.Errorf("direct applied config update cannot replace a network with current assignments")
+		}
+	}
+	if err := insertAppliedConfig(ctx, transaction, instanceID, snapshot); err != nil {
+		return err
+	}
+	if err := replaceRoutesAndDNS(ctx, transaction, instanceID, snapshot.Config); err != nil {
+		return err
+	}
+	if networkChanged {
+		if _, err := replaceNetwork(ctx, transaction, instanceID, "", snapshot.Config); err != nil {
+			return err
+		}
+	}
+	if err := advanceAppliedRevision(ctx, transaction, instanceID, snapshot.Revision); err != nil {
 		return err
 	}
 	operationID, err := domain.GenerateUUID()
@@ -223,6 +252,19 @@ func validateApplied(snapshot configservice.AppliedSnapshot) error {
 }
 
 func writeApplied(ctx context.Context, transaction *sql.Tx, instanceID string, snapshot configservice.AppliedSnapshot) error {
+	if err := insertAppliedConfig(ctx, transaction, instanceID, snapshot); err != nil {
+		return err
+	}
+	if err := replaceRoutesAndDNS(ctx, transaction, instanceID, snapshot.Config); err != nil {
+		return err
+	}
+	if _, err := insertNetwork(ctx, transaction, instanceID, "", snapshot.Config); err != nil {
+		return err
+	}
+	return advanceAppliedRevision(ctx, transaction, instanceID, snapshot.Revision)
+}
+
+func insertAppliedConfig(ctx context.Context, transaction *sql.Tx, instanceID string, snapshot configservice.AppliedSnapshot) error {
 	digest, _ := hex.DecodeString(snapshot.Digest)
 	configValue := snapshot.Config
 	if _, err := transaction.ExecContext(ctx, `
@@ -237,43 +279,13 @@ INSERT INTO applied_config(
 		configValue.Logging.Backups); err != nil {
 		return classifySQLite("insert applied configuration", err)
 	}
-	for _, statement := range []string{
-		"DELETE FROM pushed_routes WHERE instance_id = ?",
-		"DELETE FROM dns_servers WHERE instance_id = ?",
-		"DELETE FROM networks WHERE instance_id = ?",
-	} {
+	return nil
+}
+
+func replaceRoutesAndDNS(ctx context.Context, transaction *sql.Tx, instanceID string, configValue domain.Config) error {
+	for _, statement := range []string{"DELETE FROM pushed_routes WHERE instance_id = ?", "DELETE FROM dns_servers WHERE instance_id = ?"} {
 		if _, err := transaction.ExecContext(ctx, statement, instanceID); err != nil {
 			return classifySQLite("replace applied network state", err)
-		}
-	}
-	networkID, err := domain.GenerateUUID()
-	if err != nil {
-		return err
-	}
-	if _, err := transaction.ExecContext(ctx, `
-INSERT INTO networks(id, instance_id, family, network, prefix, purpose, enabled)
-VALUES(?, ?, 4, ?, ?, 'tunnel', 1)`, networkID, instanceID, packAddress(configValue.IPv4.Network.Prefix().Addr()), configValue.IPv4.Network.Prefix().Bits()); err != nil {
-		return classifySQLite("insert tunnel network", err)
-	}
-	layout, err := ipam.NewIPv4Layout(configValue.IPv4.Network, configValue.IPv4.DynamicPoolSize)
-	if err != nil {
-		return err
-	}
-	for _, pool := range []struct {
-		kind, policy string
-		rangeValue   ipam.AddressRange
-	}{{"static", "lowest-free", layout.Static}, {"dynamic", "openvpn-dynamic", layout.Dynamic}} {
-		if pool.rangeValue.Empty() {
-			continue
-		}
-		poolID, err := domain.GenerateUUID()
-		if err != nil {
-			return err
-		}
-		if _, err := transaction.ExecContext(ctx, `
-INSERT INTO address_pools(id, network_id, kind, first_address, last_address, policy)
-VALUES(?, ?, ?, ?, ?, ?)`, poolID, networkID, pool.kind, packAddress(pool.rangeValue.First.Netip()), packAddress(pool.rangeValue.Last.Netip()), pool.policy); err != nil {
-			return classifySQLite("insert address pool", err)
 		}
 	}
 	for position, route := range configValue.IPv4.Routes {
@@ -286,7 +298,57 @@ VALUES(?, ?, ?, ?, ?, ?)`, poolID, networkID, pool.kind, packAddress(pool.rangeV
 			return classifySQLite("insert DNS server", err)
 		}
 	}
-	if _, err := transaction.ExecContext(ctx, "UPDATE instances SET current_applied_revision = ? WHERE id = ?", snapshot.Revision, instanceID); err != nil {
+	return nil
+}
+
+func replaceNetwork(ctx context.Context, transaction *sql.Tx, instanceID, networkID string, configValue domain.Config) (string, error) {
+	if _, err := transaction.ExecContext(ctx, "UPDATE networks SET enabled = 0 WHERE instance_id = ? AND family = 4 AND purpose = 'tunnel' AND enabled = 1", instanceID); err != nil {
+		return "", classifySQLite("disable previous tunnel network", err)
+	}
+	return insertNetwork(ctx, transaction, instanceID, networkID, configValue)
+}
+
+func insertNetwork(ctx context.Context, transaction *sql.Tx, instanceID, networkID string, configValue domain.Config) (string, error) {
+	var err error
+	if networkID == "" {
+		networkID, err = domain.GenerateUUID()
+		if err != nil {
+			return "", err
+		}
+	} else if !domain.ValidUUID(networkID) {
+		return "", fmt.Errorf("invalid tunnel network UUID")
+	}
+	if _, err := transaction.ExecContext(ctx, `
+INSERT INTO networks(id, instance_id, family, network, prefix, purpose, enabled)
+VALUES(?, ?, 4, ?, ?, 'tunnel', 1)`, networkID, instanceID, packAddress(configValue.IPv4.Network.Prefix().Addr()), configValue.IPv4.Network.Prefix().Bits()); err != nil {
+		return "", classifySQLite("insert tunnel network", err)
+	}
+	layout, err := ipam.NewIPv4Layout(configValue.IPv4.Network, configValue.IPv4.DynamicPoolSize)
+	if err != nil {
+		return "", err
+	}
+	for _, pool := range []struct {
+		kind, policy string
+		rangeValue   ipam.AddressRange
+	}{{"static", "lowest-free", layout.Static}, {"dynamic", "openvpn-dynamic", layout.Dynamic}} {
+		if pool.rangeValue.Empty() {
+			continue
+		}
+		poolID, err := domain.GenerateUUID()
+		if err != nil {
+			return "", err
+		}
+		if _, err := transaction.ExecContext(ctx, `
+INSERT INTO address_pools(id, network_id, kind, first_address, last_address, policy)
+VALUES(?, ?, ?, ?, ?, ?)`, poolID, networkID, pool.kind, packAddress(pool.rangeValue.First.Netip()), packAddress(pool.rangeValue.Last.Netip()), pool.policy); err != nil {
+			return "", classifySQLite("insert address pool", err)
+		}
+	}
+	return networkID, nil
+}
+
+func advanceAppliedRevision(ctx context.Context, transaction *sql.Tx, instanceID string, revision configservice.Revision) error {
+	if _, err := transaction.ExecContext(ctx, "UPDATE instances SET current_applied_revision = ? WHERE id = ?", revision, instanceID); err != nil {
 		return classifySQLite("advance applied revision", err)
 	}
 	return nil

@@ -22,7 +22,7 @@ const (
 	DefaultPath     = "/etc/openvpn/meta/state.db"
 	DataSchema      = buildinfo.DataSchema
 	InitialRevision = 1
-	CurrentRevision = 7
+	CurrentRevision = 8
 	BusyTimeoutMS   = 30000
 )
 
@@ -440,6 +440,7 @@ WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`)
 		}
 	}
 	for _, name := range []string{
+		"networks_enabled_purpose",
 		"clients_current_name",
 		"assignments_current_client_network",
 		"assignments_current_network_address",

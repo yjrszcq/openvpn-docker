@@ -7,11 +7,16 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"time"
 
 	"github.com/yjrszcq/openvpn-docker/internal/apperror"
+	"github.com/yjrszcq/openvpn-docker/internal/artifact"
+	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
 	configurationservice "github.com/yjrszcq/openvpn-docker/internal/configuration"
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
+	"github.com/yjrszcq/openvpn-docker/internal/pki"
+	"github.com/yjrszcq/openvpn-docker/internal/render"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
 )
 
@@ -112,6 +117,66 @@ func runConfigPlan(args []string, stdout, stderr io.Writer) int {
 	return int(apperror.ExitSuccess)
 }
 
+func runConfigApply(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && isHelp(args[0]) {
+		fmt.Fprintln(stdout, "Usage: ovpn config apply [--yes] [--json]")
+		return int(apperror.ExitSuccess)
+	}
+	yes, jsonMode := false, false
+	for _, arg := range args {
+		switch arg {
+		case "--yes":
+			if yes {
+				return writeErrorMode(stderr, usageError("--yes may only be specified once"), jsonMode)
+			}
+			yes = true
+		case "--json":
+			if jsonMode {
+				return writeErrorMode(stderr, usageError("--json may only be specified once"), true)
+			}
+			jsonMode = true
+		default:
+			return writeErrorMode(stderr, usageError("usage: ovpn config apply [--yes] [--json]"), jsonMode)
+		}
+	}
+	desired, err := configservice.LoadFile(environmentOr("OVPN_CONFIG_FILE", configservice.DefaultPath))
+	if err != nil {
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitData, "invalid_config", "configuration is invalid", err), jsonMode)
+	}
+	if !yes {
+		confirmed, err := confirmAction(stderr, "Type yes to apply the configuration while OpenVPN is stopped: ")
+		if err != nil {
+			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "config apply requires an interactive confirmation or --yes", err), jsonMode)
+		}
+		if !confirmed {
+			return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "confirmation_required", "config apply was not confirmed"), jsonMode)
+		}
+	}
+	manager, store, err := openConfigurationManager(context.Background())
+	if err != nil {
+		return writeConfigurationApplyError(stderr, err, jsonMode)
+	}
+	defer store.Close()
+	lockContext, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	result, err := manager.Apply(lockContext, desired)
+	if err != nil {
+		return writeConfigurationApplyError(stderr, err, jsonMode)
+	}
+	if jsonMode {
+		if err := json.NewEncoder(stdout).Encode(result); err != nil {
+			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitFailure, "output_failure", "write configuration apply result", err), true)
+		}
+		return int(apperror.ExitSuccess)
+	}
+	if !result.Applied {
+		fmt.Fprintf(stdout, "Configuration is already in sync at revision %d.\n", result.Plan.Configuration.CurrentRevision)
+		return int(apperror.ExitSuccess)
+	}
+	fmt.Fprintf(stdout, "Applied configuration revision %d (operation %s).\nRestart OpenVPN to activate the new revision.\n", result.Plan.Configuration.TargetRevision, result.OperationID)
+	return int(apperror.ExitSuccess)
+}
+
 // parseJSONOnly returns 0 for human mode or 1 for JSON mode. On invalid input
 // it returns the already-written exit code and false.
 func parseJSONOnly(args []string, stdout, stderr io.Writer, command string) (int, bool) {
@@ -155,6 +220,35 @@ func openConfigurationState(ctx context.Context) (*storesqlite.Store, storesqlit
 		return nil, storesqlite.InstanceState{}, err
 	}
 	return store, instance, nil
+}
+
+func openConfigurationManager(ctx context.Context) (*configurationservice.Manager, *storesqlite.Store, error) {
+	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
+	store, err := storesqlite.Open(ctx, filepath.Join(dataDir, "meta", "state.db"))
+	if err != nil {
+		return nil, nil, err
+	}
+	closeError := func(err error) (*configurationservice.Manager, *storesqlite.Store, error) {
+		_ = store.Close()
+		return nil, nil, err
+	}
+	local, err := artifact.NewLocal(dataDir)
+	if err != nil {
+		return closeError(err)
+	}
+	contract, err := compatibility.Load(environmentOr("OVPN_COMPATIBILITY_FILE", compatibility.DefaultContractPath))
+	if err != nil {
+		return closeError(err)
+	}
+	renderer, err := render.New(environmentOr("OVPN_TEMPLATE_ROOT", render.DefaultTemplateRoot), contract)
+	if err != nil {
+		return closeError(err)
+	}
+	manager, err := configurationservice.NewManager(store, local, renderer, render.Paths{DataDir: dataDir, RuntimeDir: environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)})
+	if err != nil {
+		return closeError(err)
+	}
+	return manager, store, nil
 }
 
 func writeConfigurationPlan(writer io.Writer, plan configurationservice.Plan) {
@@ -205,5 +299,16 @@ func writeConfigurationError(stderr io.Writer, err error, jsonMode bool) int {
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "configuration_state_refused", "configuration state is invalid", err), jsonMode)
 	default:
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitFailure, "configuration_failed", "configuration operation failed", err), jsonMode)
+	}
+}
+
+func writeConfigurationApplyError(stderr io.Writer, err error, jsonMode bool) int {
+	switch {
+	case errors.Is(err, artifact.ErrLocked), errors.Is(err, storesqlite.ErrBusy):
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitTemporary, "configuration_busy", "OpenVPN must be stopped and configuration state unlocked", err), jsonMode)
+	case errors.Is(err, pki.ErrInvalidMaterial), errors.Is(err, artifact.ErrUnsafePath), errors.Is(err, storesqlite.ErrConstraint):
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "configuration_apply_refused", "configuration apply was refused by state or security policy", err), jsonMode)
+	default:
+		return writeConfigurationError(stderr, err, jsonMode)
 	}
 }

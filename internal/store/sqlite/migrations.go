@@ -18,6 +18,85 @@ var migrations = []migration{
 	{revision: 5, apply: migrateLeaseUniqueness},
 	{revision: 6, apply: migrateCAKeyArtifact},
 	{revision: 7, apply: migrateReusableArtifactKeys},
+	{revision: 8, apply: migrateHistoricalNetworks},
+}
+
+func migrateHistoricalNetworks(ctx context.Context, transaction *sql.Tx) error {
+	_, err := transaction.ExecContext(ctx, `
+ALTER TABLE address_pools RENAME TO address_pools_v7;
+ALTER TABLE address_assignments RENAME TO address_assignments_v7;
+ALTER TABLE client_leases RENAME TO client_leases_v7;
+ALTER TABLE networks RENAME TO networks_v7;
+DROP INDEX IF EXISTS networks_enabled_purpose;
+DROP INDEX assignments_current_client_network;
+DROP INDEX assignments_current_network_address;
+DROP INDEX client_leases_network_address;
+
+CREATE TABLE networks (
+    id TEXT PRIMARY KEY CHECK (length(id) = 36),
+    instance_id TEXT NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    family INTEGER NOT NULL CHECK (family = 4),
+    network BLOB NOT NULL CHECK (length(network) = 4),
+    prefix INTEGER NOT NULL CHECK (prefix BETWEEN 0 AND 30),
+    purpose TEXT NOT NULL CHECK (purpose = 'tunnel'),
+    enabled INTEGER NOT NULL CHECK (enabled IN (0, 1))
+) STRICT;
+CREATE UNIQUE INDEX networks_enabled_purpose
+ON networks(instance_id, family, purpose) WHERE enabled = 1;
+
+CREATE TABLE address_pools (
+    id TEXT PRIMARY KEY CHECK (length(id) = 36),
+    network_id TEXT NOT NULL REFERENCES networks(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('static', 'dynamic')),
+    first_address BLOB NOT NULL CHECK (length(first_address) = 4),
+    last_address BLOB NOT NULL CHECK (length(last_address) = 4),
+    policy TEXT NOT NULL CHECK (policy IN ('lowest-free', 'openvpn-dynamic')),
+    CHECK (first_address <= last_address),
+    UNIQUE (network_id, kind)
+) STRICT;
+
+CREATE TABLE address_assignments (
+    id TEXT PRIMARY KEY CHECK (length(id) = 36),
+    client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    network_id TEXT NOT NULL REFERENCES networks(id) ON DELETE RESTRICT,
+    kind TEXT NOT NULL CHECK (kind IN ('static', 'dynamic')),
+    address BLOB CHECK (address IS NULL OR length(address) = 4),
+    status TEXT NOT NULL CHECK (status IN ('active', 'retained', 'released')),
+    created_at TEXT NOT NULL CHECK (length(created_at) > 0),
+    updated_at TEXT NOT NULL CHECK (length(updated_at) > 0),
+    released_at TEXT,
+    CHECK ((kind = 'static' AND address IS NOT NULL) OR (kind = 'dynamic' AND address IS NULL)),
+    CHECK ((status = 'released' AND released_at IS NOT NULL) OR (status != 'released' AND released_at IS NULL))
+) STRICT;
+CREATE UNIQUE INDEX assignments_current_client_network
+ON address_assignments(client_id, network_id) WHERE status IN ('active', 'retained');
+CREATE UNIQUE INDEX assignments_current_network_address
+ON address_assignments(network_id, address) WHERE address IS NOT NULL AND status IN ('active', 'retained');
+
+CREATE TABLE client_leases (
+    client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    network_id TEXT NOT NULL REFERENCES networks(id) ON DELETE CASCADE,
+    family INTEGER NOT NULL CHECK (family = 4),
+    address BLOB NOT NULL CHECK (length(address) = 4),
+    updated_at TEXT NOT NULL CHECK (length(updated_at) > 0),
+    PRIMARY KEY (client_id, network_id)
+) STRICT;
+CREATE UNIQUE INDEX client_leases_network_address
+ON client_leases(network_id, address);
+
+INSERT INTO networks SELECT * FROM networks_v7;
+INSERT INTO address_pools SELECT * FROM address_pools_v7;
+INSERT INTO address_assignments SELECT * FROM address_assignments_v7;
+INSERT INTO client_leases SELECT * FROM client_leases_v7;
+
+DROP TABLE client_leases_v7;
+DROP TABLE address_assignments_v7;
+DROP TABLE address_pools_v7;
+DROP TABLE networks_v7;`)
+	if err != nil {
+		return classifySQLite("migrate historical network state", err)
+	}
+	return nil
 }
 
 func migrateReusableArtifactKeys(ctx context.Context, transaction *sql.Tx) error {

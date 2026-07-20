@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yjrszcq/openvpn-docker/internal/artifact"
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
 	configurationservice "github.com/yjrszcq/openvpn-docker/internal/configuration"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
@@ -67,6 +68,57 @@ func TestConfigQueryUsageAndJSONErrors(t *testing.T) {
 	code, stdout, stderr = run("config", "plan", "--json")
 	if code != 65 || stdout != "" || !strings.Contains(stderr, `"kind":"invalid_config"`) {
 		t.Fatalf("invalid plan code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestConfigApplyRequiresConfirmationAndCommitsOffline(t *testing.T) {
+	root, configPath := createConfigurationFixture(t)
+	runtimeDir := filepath.Join(t.TempDir(), "run")
+	t.Setenv("OVPN_DATA_DIR", root)
+	t.Setenv("OVPN_RUNTIME_DIR", runtimeDir)
+	t.Setenv("OVPN_CONFIG_FILE", configPath)
+	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
+	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
+
+	code, stdout, stderr := run("config", "apply")
+	if code != 78 || stdout != "" || !strings.Contains(stderr, "not confirmed") {
+		t.Fatalf("confirmation code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, stdout, stderr = run("config", "apply", "--yes", "--json")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"applied":true`) || !strings.Contains(stdout, `"target_revision":2`) {
+		t.Fatalf("apply code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	store, err := storesqlite.Open(context.Background(), filepath.Join(root, "meta", "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance, err := store.LoadOnlyInstance(context.Background())
+	_ = store.Close()
+	if err != nil || instance.Applied.Revision != 2 || instance.Applied.Config.Endpoint != "new.example.test" {
+		t.Fatalf("applied instance=%+v err=%v", instance, err)
+	}
+	code, stdout, stderr = run("config", "apply", "--yes", "--json")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"applied":false`) {
+		t.Fatalf("in-sync apply code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestConfigApplyMapsRuntimeLockToTemporaryFailure(t *testing.T) {
+	root, configPath := createConfigurationFixture(t)
+	runtimeDir := filepath.Join(t.TempDir(), "run")
+	t.Setenv("OVPN_DATA_DIR", root)
+	t.Setenv("OVPN_RUNTIME_DIR", runtimeDir)
+	t.Setenv("OVPN_CONFIG_FILE", configPath)
+	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
+	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
+	lock, err := artifact.AcquireLock(context.Background(), filepath.Join(runtimeDir, ".runtime.lock"), artifact.LockShared)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Release()
+	code, stdout, stderr := run("config", "apply", "--yes", "--json")
+	if code != 75 || stdout != "" || !strings.Contains(stderr, `"kind":"configuration_busy"`) {
+		t.Fatalf("locked apply code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 
