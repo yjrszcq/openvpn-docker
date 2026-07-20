@@ -28,11 +28,11 @@ func TestBrokerProxySerializesCommandsWaitsForReloadAndLogs(t *testing.T) {
 	go func() { done <- service.Serve(ctx) }()
 	waitForSocket(t, listenPath)
 
-	if response := brokerCommand(t, listenPath, "broker-health"); !strings.HasPrefix(response, "SUCCESS: broker connected") {
+	if response := mustBrokerCommand(t, listenPath, "broker-health"); !strings.HasPrefix(response, "SUCCESS: broker connected") {
 		t.Fatalf("health response=%q", response)
 	}
 	started := time.Now()
-	if response := brokerCommand(t, listenPath, "signal SIGHUP"); !strings.HasPrefix(response, "SUCCESS:") {
+	if response := mustBrokerCommand(t, listenPath, "signal SIGHUP"); !strings.HasPrefix(response, "SUCCESS:") {
 		t.Fatalf("reload response=%q", response)
 	}
 	if time.Since(started) < 35*time.Millisecond {
@@ -40,24 +40,32 @@ func TestBrokerProxySerializesCommandsWaitsForReloadAndLogs(t *testing.T) {
 	}
 
 	var wait sync.WaitGroup
-	errors := make(chan string, 12)
+	errorsSeen := make(chan string, 12)
 	for index := 0; index < 12; index++ {
 		wait.Add(1)
 		go func(value int) {
 			defer wait.Done()
-			response := brokerCommand(t, listenPath, fmt.Sprintf("echo-%d", value))
-			if !strings.HasPrefix(response, "SUCCESS:") {
-				errors <- response
+			response, err := brokerCommand(listenPath, fmt.Sprintf("echo-%d", value))
+			if err != nil {
+				errorsSeen <- err.Error()
+			} else if !strings.HasPrefix(response, "SUCCESS:") {
+				errorsSeen <- response
 			}
 		}(index)
 	}
 	wait.Wait()
-	close(errors)
-	for response := range errors {
+	close(errorsSeen)
+	for response := range errorsSeen {
 		t.Fatalf("concurrent response=%q", response)
 	}
 	if fake.maxActive() != 1 {
 		t.Fatalf("backend observed %d active commands", fake.maxActive())
+	}
+	if response := mustBrokerCommand(t, listenPath, "disconnect"); !strings.HasPrefix(response, "ERROR:") {
+		t.Fatalf("backend disconnect response=%q", response)
+	}
+	if response := mustBrokerCommand(t, listenPath, "broker-health"); !strings.HasPrefix(response, "SUCCESS: broker connected") {
+		t.Fatalf("reconnect health response=%q", response)
 	}
 	if _, err := os.Stat(logPath); err != nil {
 		t.Fatal(err)
@@ -70,7 +78,19 @@ func TestBrokerProxySerializesCommandsWaitsForReloadAndLogs(t *testing.T) {
 		t.Fatalf("raw log mode=%v err=%v", info.Mode().Perm(), err)
 	}
 
+	idle, err := net.DialTimeout("unix", listenPath, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bufio.NewReader(idle).ReadString('\n'); err != nil {
+		t.Fatal(err)
+	}
 	cancel()
+	_ = idle.SetReadDeadline(time.Now().Add(time.Second))
+	if _, err := bufio.NewReader(idle).ReadByte(); err == nil {
+		t.Fatal("idle frontend connection remained open after shutdown")
+	}
+	_ = idle.Close()
 	select {
 	case err := <-done:
 		if err != nil {
@@ -96,6 +116,26 @@ func TestBrokerRejectsUnsafeSocketReplacement(t *testing.T) {
 	}
 	if err := service.Serve(context.Background()); err == nil || !strings.Contains(err.Error(), "non-socket") {
 		t.Fatalf("unsafe replacement error=%v", err)
+	}
+}
+
+func TestBrokerRejectsActiveSocketReplacement(t *testing.T) {
+	root := t.TempDir()
+	listen := filepath.Join(root, "broker.sock")
+	active, err := net.Listen("unix", listen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer active.Close()
+	service, err := New(Config{Listen: listen, Backend: filepath.Join(root, "backend.sock"), RawLog: filepath.Join(root, "log"), MaxBytes: 1, Timeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Serve(context.Background()); err == nil || !strings.Contains(err.Error(), "active socket") {
+		t.Fatalf("active replacement error=%v", err)
+	}
+	if _, err := os.Lstat(listen); err != nil {
+		t.Fatalf("active socket was removed: %v", err)
 	}
 }
 
@@ -149,6 +189,11 @@ func (fake *fakeBackend) serve(connection net.Conn) {
 		case "status 3":
 			_, _ = fmt.Fprintln(connection, "TITLE,OpenVPN 2.x")
 			_, _ = fmt.Fprintln(connection, "END")
+		case "disconnect":
+			fake.mu.Lock()
+			fake.active--
+			fake.mu.Unlock()
+			return
 		default:
 			time.Sleep(2 * time.Millisecond)
 			_, _ = fmt.Fprintln(connection, "SUCCESS: "+command)
@@ -165,25 +210,33 @@ func (fake *fakeBackend) maxActive() int {
 	return fake.maximum
 }
 
-func brokerCommand(t *testing.T, path, command string) string {
+func mustBrokerCommand(t *testing.T, path, command string) string {
 	t.Helper()
-	connection, err := net.DialTimeout("unix", path, time.Second)
+	response, err := brokerCommand(path, command)
 	if err != nil {
 		t.Fatal(err)
+	}
+	return response
+}
+
+func brokerCommand(path, command string) (string, error) {
+	connection, err := net.DialTimeout("unix", path, time.Second)
+	if err != nil {
+		return "", err
 	}
 	defer connection.Close()
 	reader := bufio.NewReader(connection)
 	if _, err := reader.ReadString('\n'); err != nil {
-		t.Fatal(err)
+		return "", err
 	}
 	if _, err := fmt.Fprintln(connection, command); err != nil {
-		t.Fatal(err)
+		return "", err
 	}
 	response, err := reader.ReadString('\n')
 	if err != nil {
-		t.Fatal(err)
+		return "", err
 	}
-	return strings.TrimSpace(response)
+	return strings.TrimSpace(response), nil
 }
 
 func waitForSocket(t *testing.T, path string) {

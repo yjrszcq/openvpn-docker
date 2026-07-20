@@ -106,8 +106,8 @@ func parseStreamOptions(args []string, events bool) (streamCLIOptions, error) {
 			}
 			index++
 			value, err := strconv.Atoi(args[index])
-			if err != nil || value < 0 {
-				return options, fmt.Errorf("--lines must be non-negative")
+			if err != nil || value < 0 || value > runtimecontrol.MaxStreamLines {
+				return options, fmt.Errorf("--lines must be between 0 and %d", runtimecontrol.MaxStreamLines)
 			}
 			options.lines = value
 		default:

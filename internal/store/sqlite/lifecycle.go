@@ -158,6 +158,40 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	return &Store{db: database, path: path, metadata: metadata}, nil
 }
 
+// OpenRuntime opens an already-current database for short-lived runtime hooks.
+// Startup and administrative commands must use Open, which performs migrations
+// and a full integrity check before the service begins accepting connections.
+func OpenRuntime(ctx context.Context, path string) (*Store, error) {
+	if err := validatePath(path); err != nil {
+		return nil, err
+	}
+	if err := requireMode(path); err != nil {
+		return nil, err
+	}
+	database, err := connect(ctx, path, "rw")
+	if err != nil {
+		return nil, err
+	}
+	closeOnError := true
+	defer func() {
+		if closeOnError {
+			_ = database.Close()
+		}
+	}()
+	metadata, err := readMetadata(ctx, database)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateMetadata(metadata); err != nil {
+		return nil, err
+	}
+	if metadata.DatabaseRevision != CurrentRevision {
+		return nil, fmt.Errorf("%w: runtime requires database revision %d, found %d", ErrUnsupportedRevision, CurrentRevision, metadata.DatabaseRevision)
+	}
+	closeOnError = false
+	return &Store{db: database, path: path, metadata: metadata}, nil
+}
+
 // Close releases the adapter connection.
 func (store *Store) Close() error {
 	if store == nil || store.db == nil {

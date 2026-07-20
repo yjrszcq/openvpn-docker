@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yjrszcq/openvpn-docker/internal/artifact"
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
 	"github.com/yjrszcq/openvpn-docker/internal/domain"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
@@ -43,6 +44,18 @@ func TestRuntimeHelperProcess(t *testing.T) {
 		}
 		_ = os.Chmod(listen, 0o600)
 		_ = os.WriteFile(filepath.Join(markerDir, "broker-started"), []byte("ok"), 0o600)
+		if os.Getenv("OVPN_RUNTIME_BROKER_EXIT") == "1" {
+			deadline := time.Now().Add(2 * time.Second)
+			for time.Now().Before(deadline) {
+				if _, err := os.Stat(filepath.Join(markerDir, "openvpn-started")); err == nil {
+					break
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			_ = listener.Close()
+			_ = os.Remove(listen)
+			os.Exit(5)
+		}
 		signals := make(chan os.Signal, 1)
 		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
 		<-signals
@@ -116,6 +129,22 @@ func TestSupervisorStopsBrokerWhenOpenVPNExits(t *testing.T) {
 	}
 }
 
+func TestSupervisorStopsOpenVPNWhenBrokerExits(t *testing.T) {
+	markers := t.TempDir()
+	t.Setenv("OVPN_RUNTIME_HELPER", "1")
+	t.Setenv("OVPN_RUNTIME_MARKERS", markers)
+	t.Setenv("OVPN_RUNTIME_BROKER_EXIT", "1")
+	installHelperBuilder(t)
+	supervisor := testSupervisor(filepath.Join(t.TempDir(), "data"), filepath.Join(t.TempDir(), "run"))
+	err := supervisor.Run(context.Background(), nil, testInstance())
+	if err == nil || !strings.Contains(err.Error(), "management broker exited") {
+		t.Fatalf("unexpected critical exit: %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(markers, "openvpn-started")); statErr != nil {
+		t.Fatalf("OpenVPN never started before broker exit: %v", statErr)
+	}
+}
+
 func TestSupervisorRefusesUnsafeBackendPath(t *testing.T) {
 	runtimeDir := filepath.Join(t.TempDir(), "run")
 	if err := os.MkdirAll(runtimeDir, 0o750); err != nil {
@@ -128,6 +157,33 @@ func TestSupervisorRefusesUnsafeBackendPath(t *testing.T) {
 	err := supervisor.Run(context.Background(), nil, testInstance())
 	if err == nil || !strings.Contains(err.Error(), "non-socket") {
 		t.Fatalf("unsafe backend path was not refused: %v", err)
+	}
+}
+
+func TestSupervisorRefusesSecondServerProcess(t *testing.T) {
+	markers := t.TempDir()
+	t.Setenv("OVPN_RUNTIME_HELPER", "1")
+	t.Setenv("OVPN_RUNTIME_MARKERS", markers)
+	installHelperBuilder(t)
+	dataDir := filepath.Join(t.TempDir(), "data")
+	runtimeDir := filepath.Join(t.TempDir(), "run")
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- testSupervisor(dataDir, runtimeDir).Run(ctx, nil, testInstance()) }()
+	waitForFile(t, filepath.Join(markers, "openvpn-started"))
+	second := testSupervisor(dataDir, runtimeDir)
+	second.LockTimeout = 50 * time.Millisecond
+	if err := second.Run(context.Background(), nil, testInstance()); !errors.Is(err, artifact.ErrLocked) {
+		t.Fatalf("second supervisor error=%v", err)
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("first supervisor did not stop")
 	}
 }
 

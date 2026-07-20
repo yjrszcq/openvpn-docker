@@ -59,10 +59,18 @@ func Execute(ctx context.Context, dataDir string, input Input, now time.Time) (R
 	if !domain.ValidUUID(input.ClientID) {
 		return Result{}, fmt.Errorf("%w: common_name must be a client UUID", ErrInput)
 	}
+	for _, field := range []struct{ name, value string }{
+		{name: "ifconfig_pool_remote_ip", value: input.VirtualAddress},
+		{name: "trusted_ip", value: input.RemoteAddress},
+	} {
+		if len(field.value) > 255 || strings.ContainsAny(field.value, "\r\n") {
+			return Result{}, fmt.Errorf("%w: %s is invalid", ErrInput, field.name)
+		}
+	}
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
-	database, err := storesqlite.Open(ctx, filepath.Join(dataDir, "meta", "state.db"))
+	database, err := storesqlite.OpenRuntime(ctx, filepath.Join(dataDir, "meta", "state.db"))
 	if err != nil {
 		return Result{}, err
 	}

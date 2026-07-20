@@ -93,6 +93,7 @@ func TestExecuteRejectsInvalidInputs(t *testing.T) {
 	for _, input := range []Input{
 		{ScriptType: "route-up", ClientID: "11111111-1111-4111-8111-111111111111"},
 		{ScriptType: "client-connect", ClientID: "not-an-id"},
+		{ScriptType: "client-disconnect", ClientID: "11111111-1111-4111-8111-111111111111", RemoteAddress: "bad\naddress"},
 	} {
 		if _, err := Execute(context.Background(), t.TempDir(), input, time.Now()); !errors.Is(err, ErrInput) {
 			t.Fatalf("input=%+v err=%v", input, err)

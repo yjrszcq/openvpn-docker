@@ -102,6 +102,15 @@ func (service *Service) Close() error {
 
 func (service *Service) serveClient(ctx context.Context, connection net.Conn) {
 	defer connection.Close()
+	closed := make(chan struct{})
+	defer close(closed)
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = connection.Close()
+		case <-closed:
+		}
+	}()
 	if _, err := io.WriteString(connection, ">INFO:OpenVPN Management Broker Version 1\n"); err != nil {
 		return
 	}
@@ -496,6 +505,11 @@ func removeSocket(path string) error {
 	}
 	if info.Mode()&os.ModeSocket == 0 {
 		return fmt.Errorf("refusing to replace non-socket %s", path)
+	}
+	connection, dialErr := net.DialTimeout("unix", path, 50*time.Millisecond)
+	if dialErr == nil {
+		_ = connection.Close()
+		return fmt.Errorf("refusing to replace active socket %s", path)
 	}
 	return os.Remove(path)
 }

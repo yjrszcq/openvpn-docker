@@ -158,7 +158,7 @@ func TestRuntimeLogAndEventHistory(t *testing.T) {
 
 func TestRuntimeStreamUsageErrors(t *testing.T) {
 	code, stdout, stderr := run("runtime", "logs", "--lines", "-1")
-	if code != 64 || stdout != "" || !strings.Contains(stderr, "non-negative") {
+	if code != 64 || stdout != "" || !strings.Contains(stderr, "between 0") {
 		t.Fatalf("logs usage code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	code, stdout, stderr = run("runtime", "events", "--json", "--raw")

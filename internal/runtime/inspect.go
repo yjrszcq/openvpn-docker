@@ -134,7 +134,7 @@ func csvField(record []string, columns map[string]int, name string) (string, boo
 }
 
 func LoadIdentities(ctx context.Context, dataDir string) (map[string]string, error) {
-	database, err := storesqlite.Open(ctx, filepath.Join(dataDir, "meta", "state.db"))
+	database, err := storesqlite.OpenRuntime(ctx, filepath.Join(dataDir, "meta", "state.db"))
 	if err != nil {
 		return nil, err
 	}

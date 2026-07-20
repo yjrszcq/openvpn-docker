@@ -21,6 +21,20 @@ func databasePath(t *testing.T) string {
 	return filepath.Join(t.TempDir(), "meta", "state.db")
 }
 
+func TestRuntimeOpenRequiresCurrentRevision(t *testing.T) {
+	path := databasePath(t)
+	store := createStore(t, path)
+	if _, err := store.db.Exec("UPDATE schema_metadata SET database_revision = ?", CurrentRevision-1); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenRuntime(context.Background(), path); !errors.Is(err, ErrUnsupportedRevision) {
+		t.Fatalf("runtime old revision error=%v", err)
+	}
+}
+
 func createStore(t *testing.T, path string) *Store {
 	t.Helper()
 	store, err := Create(context.Background(), path, "4.0.0-test")

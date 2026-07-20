@@ -24,6 +24,7 @@ type Supervisor struct {
 	BrokerBinary   string
 	StartupTimeout time.Duration
 	StopTimeout    time.Duration
+	LockTimeout    time.Duration
 }
 
 var commandBuilder = exec.Command
@@ -34,6 +35,9 @@ func (supervisor Supervisor) Run(ctx context.Context, hup <-chan os.Signal, inst
 	}
 	if supervisor.StopTimeout <= 0 {
 		supervisor.StopTimeout = 5 * time.Second
+	}
+	if supervisor.LockTimeout <= 0 {
+		supervisor.LockTimeout = 250 * time.Millisecond
 	}
 	for _, value := range []string{supervisor.DataDir, supervisor.RuntimeDir} {
 		if value == "" || !filepath.IsAbs(value) || filepath.Clean(value) != value {
@@ -46,11 +50,16 @@ func (supervisor Supervisor) Run(ctx context.Context, hup <-chan os.Signal, inst
 	if err := secureRuntimeDirectory(supervisor.RuntimeDir); err != nil {
 		return err
 	}
-	lock, err := artifact.AcquireLock(ctx, filepath.Join(supervisor.RuntimeDir, ".runtime.lock"), artifact.LockShared)
+	serverLock, err := acquireLock(ctx, filepath.Join(supervisor.RuntimeDir, ".server.lock"), artifact.LockExclusive, supervisor.LockTimeout)
 	if err != nil {
 		return err
 	}
-	defer lock.Release()
+	defer serverLock.Release()
+	runtimeLock, err := acquireLock(ctx, filepath.Join(supervisor.RuntimeDir, ".runtime.lock"), artifact.LockShared, supervisor.LockTimeout)
+	if err != nil {
+		return err
+	}
+	defer runtimeLock.Release()
 	listen := filepath.Join(supervisor.RuntimeDir, "management.sock")
 	backend := filepath.Join(supervisor.RuntimeDir, "openvpn-management.sock")
 	if err := removeSocket(backend); err != nil {
@@ -106,6 +115,12 @@ func (supervisor Supervisor) Run(ctx context.Context, hup <-chan os.Signal, inst
 			return fmt.Errorf("management broker exited: %w", err)
 		}
 	}
+}
+
+func acquireLock(ctx context.Context, path string, mode artifact.LockMode, timeout time.Duration) (*artifact.FileLock, error) {
+	lockContext, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return artifact.AcquireLock(lockContext, path, mode)
 }
 
 func removeSocket(path string) error {

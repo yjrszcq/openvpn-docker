@@ -22,8 +22,10 @@ type StreamOptions struct {
 	Follow  bool
 }
 
+const MaxStreamLines = 1_000_000
+
 func StreamLines(ctx context.Context, options StreamOptions, emit func(string) error) error {
-	if options.Path == "" || !filepath.IsAbs(options.Path) || filepath.Clean(options.Path) != options.Path || options.Lines < 0 || emit == nil {
+	if options.Path == "" || !filepath.IsAbs(options.Path) || filepath.Clean(options.Path) != options.Path || options.Lines < 0 || options.Lines > MaxStreamLines || emit == nil {
 		return fmt.Errorf("invalid runtime stream options")
 	}
 	lines, current, err := streamHistory(options)
@@ -49,16 +51,26 @@ func StreamLines(ctx context.Context, options StreamOptions, emit func(string) e
 
 func streamHistory(options StreamOptions) ([]string, *os.File, error) {
 	queue := make([]string, 0, options.Lines)
+	next := 0
 	appendLine := func(value string) {
 		if options.Lines == 0 {
 			return
 		}
 		if len(queue) == options.Lines {
-			copy(queue, queue[1:])
-			queue[len(queue)-1] = value
+			queue[next] = value
+			next = (next + 1) % len(queue)
 			return
 		}
 		queue = append(queue, value)
+	}
+	ordered := func() []string {
+		if next == 0 {
+			return queue
+		}
+		values := make([]string, 0, len(queue))
+		values = append(values, queue[next:]...)
+		values = append(values, queue[:next]...)
+		return values
 	}
 	if options.Lines > 0 && options.Rotated {
 		paths, err := rotationPaths(options.Path)
@@ -82,7 +94,7 @@ func streamHistory(options StreamOptions) ([]string, *os.File, error) {
 	}
 	current, err := openRegular(options.Path)
 	if errors.Is(err, os.ErrNotExist) {
-		return queue, nil, nil
+		return ordered(), nil, nil
 	}
 	if err != nil {
 		return nil, nil, err
@@ -92,13 +104,13 @@ func streamHistory(options StreamOptions) ([]string, *os.File, error) {
 			_ = current.Close()
 			return nil, nil, err
 		}
-		return queue, current, nil
+		return ordered(), current, nil
 	}
 	if err := scanLines(current, appendLine); err != nil {
 		_ = current.Close()
 		return nil, nil, err
 	}
-	return queue, current, nil
+	return ordered(), current, nil
 }
 
 func rotationPaths(path string) ([]string, error) {
