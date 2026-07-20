@@ -24,3 +24,14 @@ func TestBuildPlanLeavesManualRepairableIssuesBlocked(t *testing.T) {
 		t.Fatalf("plan=%+v", plan)
 	}
 }
+
+func TestBuildPlanEnablesOnlyVerifiedRecoveryCandidates(t *testing.T) {
+	report := statecontrol.Report{State: statecontrol.DegradedRecoverable, Issues: []statecontrol.Issue{
+		{ID: "CA", Severity: statecontrol.SeverityRecoverable, Action: "RECOVER_CA_CERT"},
+		{ID: "CLIENT", Severity: statecontrol.SeverityRecoverable, Action: "RECOVER_CLIENT_IDENTITY", OwnerID: "11111111-1111-4111-8111-111111111111"},
+	}}
+	plan := BuildPlan(report, map[string]bool{"RECOVER_CA_CERT\x00": true})
+	if plan.Applicable || len(plan.Actions) != 1 || plan.Actions[0].Type != "RECOVER_CA_CERT" || len(plan.Blockers) != 1 {
+		t.Fatalf("plan=%+v", plan)
+	}
+}

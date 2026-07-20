@@ -15,6 +15,7 @@ import (
 	"github.com/yjrszcq/openvpn-docker/internal/derived"
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
 	"github.com/yjrszcq/openvpn-docker/internal/pki"
+	recoveryservice "github.com/yjrszcq/openvpn-docker/internal/recovery"
 	"github.com/yjrszcq/openvpn-docker/internal/render"
 	repairservice "github.com/yjrszcq/openvpn-docker/internal/repair"
 	statecontrol "github.com/yjrszcq/openvpn-docker/internal/state"
@@ -35,7 +36,10 @@ func runRepairPlan(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeErrorMode(stderr, err, jsonMode)
 	}
-	plan := repairservice.BuildPlan(statecontrol.Scan(context.Background(), options))
+	plan, err := buildRepairPlan(context.Background(), options)
+	if err != nil {
+		return writeRepairError(stderr, err, jsonMode)
+	}
 	return writeRepairPlan(plan, stdout, stderr, jsonMode)
 }
 
@@ -62,7 +66,10 @@ func runRepairApply(args []string, stdout, stderr io.Writer) int {
 		return writeErrorMode(stderr, err, jsonMode)
 	}
 	ctx := context.Background()
-	plan := repairservice.BuildPlan(statecontrol.Scan(ctx, options))
+	plan, err := buildRepairPlan(ctx, options)
+	if err != nil {
+		return writeRepairError(stderr, err, jsonMode)
+	}
 	if !plan.Applicable {
 		return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "repair_refused", "repair plan contains authority, recovery, or reissue blockers"), jsonMode)
 	}
@@ -87,7 +94,11 @@ func runRepairApply(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeRepairError(stderr, err, jsonMode)
 	}
-	service, err := repairservice.NewService(derivedService, runner)
+	recoverer, err := recoveryservice.NewService(store, local, options.DataDir)
+	if err != nil {
+		return writeRepairError(stderr, err, jsonMode)
+	}
+	service, err := repairservice.NewService(derivedService, runner, recoverer)
 	if err != nil {
 		return writeRepairError(stderr, err, jsonMode)
 	}
@@ -122,6 +133,34 @@ func runRepairApply(args []string, stdout, stderr io.Writer) int {
 		return int(apperror.ExitPolicy)
 	}
 	return int(apperror.ExitSuccess)
+}
+
+func buildRepairPlan(ctx context.Context, options statecontrol.Options) (repairservice.Plan, error) {
+	report := statecontrol.Scan(ctx, options)
+	ready := map[string]bool{}
+	if report.InstanceID != "" {
+		store, err := storesqlite.Open(ctx, filepath.Join(options.DataDir, "meta", "state.db"))
+		if err != nil {
+			return repairservice.Plan{}, err
+		}
+		defer store.Close()
+		local, err := artifact.NewLocal(options.DataDir)
+		if err != nil {
+			return repairservice.Plan{}, err
+		}
+		service, err := recoveryservice.NewService(store, local, options.DataDir)
+		if err != nil {
+			return repairservice.Plan{}, err
+		}
+		assessment, err := service.Assess(ctx, report)
+		if err != nil {
+			return repairservice.Plan{}, err
+		}
+		for _, candidate := range assessment.Ready {
+			ready[candidate.Action+"\x00"+candidate.OwnerID] = true
+		}
+	}
+	return repairservice.BuildPlan(report, ready), nil
 }
 
 func repairScanOptions() (statecontrol.Options, error) {

@@ -14,6 +14,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/yjrszcq/openvpn-docker/internal/domain"
 )
 
 const maxCryptoFileSize = 4 << 20
@@ -78,6 +80,48 @@ func ValidateCA(pkiDir string, now time.Time) (CertificateInfo, error) {
 		return CertificateInfo{}, err
 	}
 	return validateCA(ca, now)
+}
+
+// ValidateCACertificate validates in-memory public recovery evidence.
+func ValidateCACertificate(data []byte, now time.Time) (CertificateInfo, error) {
+	certificate, err := decodeCertificate(data)
+	if err != nil {
+		return CertificateInfo{}, err
+	}
+	return validateCA(certificate, now)
+}
+
+// ValidateClientMaterial validates in-memory profile evidence without writing
+// private material to a temporary file.
+func ValidateClientMaterial(caData, certificateData, keyData []byte, clientID string, now time.Time) (CertificateInfo, error) {
+	if !domain.ValidUUID(clientID) {
+		return CertificateInfo{}, fmt.Errorf("invalid client UUID")
+	}
+	ca, err := decodeCertificate(caData)
+	if err != nil {
+		return CertificateInfo{}, err
+	}
+	if _, err := validateCA(ca, now); err != nil {
+		return CertificateInfo{}, err
+	}
+	certificate, err := decodeCertificate(certificateData)
+	if err != nil {
+		return CertificateInfo{}, err
+	}
+	key, err := decodePrivateKey(keyData)
+	if err != nil {
+		return CertificateInfo{}, err
+	}
+	if certificate.Subject.CommonName != clientID {
+		return CertificateInfo{}, fmt.Errorf("%w: client certificate common name mismatch", ErrInvalidMaterial)
+	}
+	if err := verifyCertificate(certificate, ca, x509.ExtKeyUsageClientAuth, now); err != nil {
+		return CertificateInfo{}, fmt.Errorf("client certificate: %w", err)
+	}
+	if err := verifyKeyPair(certificate, key); err != nil {
+		return CertificateInfo{}, fmt.Errorf("client certificate/key: %w", err)
+	}
+	return certificateInfo(certificate), nil
 }
 
 // ValidateCAKeyPair verifies that the signing private key belongs to the
@@ -255,6 +299,11 @@ func ValidateTLSCryptKey(filePath string) error {
 	if err != nil {
 		return err
 	}
+	return ValidateTLSCryptData(data)
+}
+
+// ValidateTLSCryptData validates in-memory profile recovery evidence.
+func ValidateTLSCryptData(data []byte) error {
 	const begin = "-----BEGIN OpenVPN Static key V1-----"
 	const end = "-----END OpenVPN Static key V1-----"
 	inside := false
@@ -293,6 +342,10 @@ func readCertificate(filePath string) (*x509.Certificate, error) {
 	if err != nil {
 		return nil, err
 	}
+	return decodeCertificate(data)
+}
+
+func decodeCertificate(data []byte) (*x509.Certificate, error) {
 	for len(data) > 0 {
 		block, rest := pem.Decode(data)
 		if block == nil {
@@ -315,6 +368,11 @@ func readPrivateKey(filePath string) (crypto.PrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
+	return decodePrivateKey(data)
+}
+
+func decodePrivateKey(data []byte) (crypto.PrivateKey, error) {
+	var err error
 	for len(data) > 0 {
 		block, rest := pem.Decode(data)
 		if block == nil {

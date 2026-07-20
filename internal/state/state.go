@@ -167,23 +167,34 @@ func scanConfig(report *Report, path string, instance storesqlite.InstanceState)
 func scanAuthority(report *Report, dataDir, serverName string, instance storesqlite.InstanceState, now time.Time) bool {
 	pkiDir := filepath.Join(dataDir, "pki")
 	ca, err := pki.ValidateCA(pkiDir, now)
+	caValid := err == nil
 	if err != nil {
 		report.add(materialIssue("CA_CERT_INVALID", SeverityRecoverable, "RECOVER_CA_CERT", "pki/ca.crt", err))
 	} else if ca.Fingerprint != instance.CAFingerprint {
+		caValid = false
 		report.add(Issue{ID: "CA_FINGERPRINT_MISMATCH", Severity: SeverityCritical, Action: "RESTORE_BACKUP", Target: "pki/ca.crt", Detail: "CA fingerprint does not match SQLite authority"})
 	}
-	if _, err := pki.ValidateCAKeyPair(pkiDir, now); err != nil {
+	caKeyPath := filepath.Join(pkiDir, "private", "ca.key")
+	if err := requireRegularMode(caKeyPath, 0o600); err != nil {
 		severity, action := SeverityCritical, "RESTORE_BACKUP"
 		if errors.Is(err, os.ErrNotExist) {
 			severity, action = SeverityFatal, "RESTORE_CA_PRIVATE_KEY"
 		}
 		report.add(materialIssue("CA_PRIVATE_KEY_INVALID", severity, action, "pki/private/ca.key", err))
+	} else if caValid {
+		if _, err := pki.ValidateCAKeyPair(pkiDir, now); err != nil {
+			report.add(materialIssue("CA_PRIVATE_KEY_INVALID", SeverityCritical, "RESTORE_BACKUP", "pki/private/ca.key", err))
+		}
 	}
-	if _, err := pki.ValidateServer(pkiDir, serverName, now); err != nil {
-		report.add(materialIssue("SERVER_IDENTITY_INVALID", SeverityReissuable, "REISSUE_SERVER", "pki/issued/"+serverName+".crt", err))
+	if caValid {
+		if _, err := pki.ValidateServer(pkiDir, serverName, now); err != nil {
+			report.add(materialIssue("SERVER_IDENTITY_INVALID", SeverityReissuable, "REISSUE_SERVER", "pki/issued/"+serverName+".crt", err))
+		}
 	}
 	crlValid := true
-	if err := pki.ValidateCRLForCA(pkiDir, now); err != nil {
+	if !caValid {
+		crlValid = false
+	} else if err := pki.ValidateCRLForCA(pkiDir, now); err != nil {
 		crlValid = false
 		report.add(materialIssue("CRL_INVALID", SeverityRepairable, "REBUILD_CRL", "pki/crl.pem", err))
 	}
@@ -439,6 +450,17 @@ func requireRegular(path string) error {
 	}
 	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() == 0 {
 		return fmt.Errorf("path is not a non-empty regular file")
+	}
+	return nil
+}
+
+func requireRegularMode(path string, mode os.FileMode) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm() != mode || info.Size() == 0 {
+		return fmt.Errorf("path is not a non-empty regular file with mode %04o", mode)
 	}
 	return nil
 }
