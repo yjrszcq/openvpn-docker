@@ -14,7 +14,11 @@ case "$(uname -m)" in
 esac
 go_platform=${GO_PLATFORM:-$native_platform}
 
+local_go_version=''
 if command -v go >/dev/null 2>&1; then
+    local_go_version=$(go env GOVERSION 2>/dev/null || true)
+fi
+if [ "$local_go_version" = go1.26.5 ]; then
     exec go "$@"
 fi
 

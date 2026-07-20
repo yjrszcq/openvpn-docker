@@ -10,8 +10,9 @@ import (
 type AddressFamily uint8
 
 const (
-	FamilyIPv4 AddressFamily = 4
-	FamilyIPv6 AddressFamily = 6
+	FamilyUnknown AddressFamily = 0
+	FamilyIPv4    AddressFamily = 4
+	FamilyIPv6    AddressFamily = 6
 )
 
 // Address wraps a canonical netip address with an explicit family.
@@ -33,6 +34,9 @@ func ParseAddress(input string) (Address, error) {
 
 // Family returns the address family.
 func (a Address) Family() AddressFamily {
+	if !a.value.IsValid() {
+		return FamilyUnknown
+	}
 	if a.value.Is4() {
 		return FamilyIPv4
 	}
@@ -69,6 +73,9 @@ func ParseNetwork(input string) (Network, error) {
 
 // Family returns the network family.
 func (n Network) Family() AddressFamily {
+	if !n.value.IsValid() {
+		return FamilyUnknown
+	}
 	if n.value.Addr().Is4() {
 		return FamilyIPv4
 	}

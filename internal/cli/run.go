@@ -83,6 +83,9 @@ func runVersion(args []string, stdout, stderr io.Writer) int {
 		case "--json":
 			jsonMode = true
 		case "-h", "--help":
+			if len(args) != 1 {
+				return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "help does not accept additional arguments"))
+			}
 			fmt.Fprintln(stdout, "Usage: ovpn version [--short|--json]")
 			return int(apperror.ExitSuccess)
 		default:

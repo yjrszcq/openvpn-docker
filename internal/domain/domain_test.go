@@ -7,6 +7,12 @@ import (
 )
 
 func TestAddressFamiliesAndUnmapping(t *testing.T) {
+	if family := (domain.Address{}).Family(); family != domain.FamilyUnknown {
+		t.Fatalf("zero address family = %d, want unknown", family)
+	}
+	if family := (domain.Network{}).Family(); family != domain.FamilyUnknown {
+		t.Fatalf("zero network family = %d, want unknown", family)
+	}
 	tests := []struct {
 		input  string
 		family domain.AddressFamily

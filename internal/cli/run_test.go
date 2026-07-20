@@ -69,3 +69,14 @@ func TestUnknownNestedCommandIsUsageError(t *testing.T) {
 		t.Fatalf("unknown nested command code=%d stderr=%q", code, stderr)
 	}
 }
+
+func TestBrokerSkeleton(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := cli.RunBroker([]string{"--help"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "ovpn-broker") || stderr.Len() != 0 {
+		t.Fatalf("broker help code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	if code := cli.RunBroker([]string{"run"}, &stdout, &stderr); code != 64 {
+		t.Fatalf("broker invalid command code=%d, want 64", code)
+	}
+}

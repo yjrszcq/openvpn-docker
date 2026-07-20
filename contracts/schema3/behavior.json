@@ -44,8 +44,8 @@
   },
   "ipam": {
     "family": 4,
-    "minimum_prefix": 30,
-    "maximum_prefix": 0,
+    "smallest_network_prefix": 30,
+    "largest_network_prefix": 0,
     "server_offset": 1,
     "first_client_offset": 2,
     "reserved_addresses": ["network", "server", "broadcast"],
