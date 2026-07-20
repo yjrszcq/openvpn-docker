@@ -90,6 +90,22 @@ func TestServerInitUsageAndInvalidConfiguration(t *testing.T) {
 	}
 }
 
+func TestClientQueryUsageAndStructuredStateError(t *testing.T) {
+	code, stdout, stderr := run("client", "export", "--help")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "Usage: ovpn client export") {
+		t.Fatalf("export help code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, _, stderr = run("client", "export", "--name", "alpha", "--id", "11111111")
+	if code != 64 || !strings.Contains(stderr, "exactly one") {
+		t.Fatalf("mixed selector code=%d stderr=%q", code, stderr)
+	}
+	t.Setenv("OVPN_DATA_DIR", filepath.Join(t.TempDir(), "missing"))
+	code, stdout, stderr = run("client", "list", "--json")
+	if code != 78 || stdout != "" || !strings.Contains(stderr, `"kind":"client_state_refused"`) {
+		t.Fatalf("list state error code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
 func TestUnknownCommandIsUsageError(t *testing.T) {
 	code, _, stderr := run("unknown")
 	if code != 64 || !strings.Contains(stderr, "unknown command") {

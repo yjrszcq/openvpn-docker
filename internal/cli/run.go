@@ -54,6 +54,12 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "server" && args[1] == "init" {
 		return runServerInit(args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "client" && args[1] == "list" {
+		return runClientList(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "client" && args[1] == "export" {
+		return runClientExport(args[2:], stdout, stderr)
+	}
 
 	path := commandPath(args)
 	if len(path) == 0 {

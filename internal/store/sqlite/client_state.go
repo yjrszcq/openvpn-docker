@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -80,6 +81,45 @@ type ClientState struct {
 	Assignment *AddressAssignment
 	Lease      *ClientLease
 	Artifacts  []ArtifactMetadata
+}
+
+// ListClients returns current client aggregates in stable name/UUID order.
+// Deleted tombstones remain queryable by UUID internally but are not current
+// clients and therefore do not appear in the public list or selector surface.
+func (store *Store) ListClients(ctx context.Context, instanceID string) ([]ClientState, error) {
+	if !domain.ValidUUID(instanceID) {
+		return nil, fmt.Errorf("invalid instance UUID")
+	}
+	rows, err := store.db.QueryContext(ctx, `
+SELECT id FROM clients
+WHERE instance_id = ? AND status IN ('active', 'revoked')
+ORDER BY current_name, id`, instanceID)
+	if err != nil {
+		return nil, fmt.Errorf("list clients: %w", err)
+	}
+	ids := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	rowErr := rows.Err()
+	closeErr := rows.Close()
+	if rowErr != nil || closeErr != nil {
+		return nil, errors.Join(rowErr, closeErr)
+	}
+	values := make([]ClientState, 0, len(ids))
+	for _, id := range ids {
+		value, err := store.LoadClient(ctx, instanceID, id)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+	return values, nil
 }
 
 // CreateClient stores one complete client aggregate atomically.

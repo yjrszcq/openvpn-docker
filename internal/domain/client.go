@@ -32,7 +32,7 @@ func NewClient(id, name string, status ClientStatus) (Client, error) {
 	if !ValidUUID(id) {
 		return Client{}, fmt.Errorf("invalid client UUID %q", id)
 	}
-	if !clientNamePattern.MatchString(name) || ValidUUID(name) {
+	if !ValidClientName(name) {
 		return Client{}, fmt.Errorf("invalid client name %q", name)
 	}
 	switch status {
@@ -41,6 +41,11 @@ func NewClient(id, name string, status ClientStatus) (Client, error) {
 		return Client{}, fmt.Errorf("invalid client status %q", status)
 	}
 	return Client{ID: id, Name: name, Status: status}, nil
+}
+
+// ValidClientName reports whether name is a safe human-facing client label.
+func ValidClientName(name string) bool {
+	return clientNamePattern.MatchString(name) && !ValidUUID(name)
 }
 
 // ValidUUID reports whether value is the canonical application UUID format.

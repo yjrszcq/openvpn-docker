@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math"
 	"net/netip"
@@ -21,6 +22,32 @@ type InstanceState struct {
 	CAFingerprint [32]byte
 	NetworkID     string
 	Applied       configservice.AppliedSnapshot
+}
+
+// LoadOnlyInstance returns the sole instance owned by this data directory.
+func (store *Store) LoadOnlyInstance(ctx context.Context) (InstanceState, error) {
+	rows, err := store.db.QueryContext(ctx, "SELECT id FROM instances ORDER BY id")
+	if err != nil {
+		return InstanceState{}, fmt.Errorf("list instances: %w", err)
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
+			return InstanceState{}, err
+		}
+		ids = append(ids, id)
+	}
+	rowErr := rows.Err()
+	closeErr := rows.Close()
+	if rowErr != nil || closeErr != nil {
+		return InstanceState{}, errors.Join(rowErr, closeErr)
+	}
+	if len(ids) != 1 || !domain.ValidUUID(ids[0]) {
+		return InstanceState{}, fmt.Errorf("%w: expected exactly one instance, found %d", ErrSchema, len(ids))
+	}
+	return store.LoadInstance(ctx, ids[0])
 }
 
 // CreateInstance inserts one instance and its first applied configuration.
