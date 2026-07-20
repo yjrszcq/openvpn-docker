@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "supported_openvpn_versions": [
+    "2.7.5"
+  ],
+  "adapter": {
+    "name": "openvpn-2.7",
+    "template_family": "openvpn-2.7",
+    "config_test_cipher": "AES-256-GCM"
+  },
+  "required_features": [
+    {
+      "name": "tls-crypt",
+      "help_contains": ["--tls-crypt key"]
+    },
+    {
+      "name": "data-ciphers",
+      "help_contains": ["--data-ciphers list"]
+    },
+    {
+      "name": "crl-verify",
+      "help_contains": ["--crl-verify crl"]
+    },
+    {
+      "name": "topology-subnet",
+      "help_contains": ["--topology t", "'subnet'"]
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+port 1194
+proto udp6
+
+dev tun
+
+topology subnet
+server 10.88.0.0 255.255.255.0 nopool
+ifconfig-pool 10.88.0.129 10.88.0.254
+client-config-dir /test/openvpn/ccd
+script-security 2
+client-connect "/usr/local/bin/ovpn-hook pool-persist"
+client-disconnect "/usr/local/bin/ovpn-hook pool-persist"
+management /test/run/openvpn-management.sock unix
+management-client-user root
+
+
+ca /test/openvpn/pki/ca.crt
+cert /test/openvpn/pki/issued/openvpn-server.crt
+key /test/openvpn/pki/private/openvpn-server.key
+
+dh none
+
+tls-crypt /test/openvpn/secrets/tls-crypt.key
+crl-verify /test/openvpn/pki/crl.pem
+
+keepalive 10 120
+persist-key
+persist-tun
+
+data-ciphers AES-256-GCM:CHACHA20-POLY1305:AES-128-GCM
+
+client-to-client
+push "redirect-gateway def1"
+push "route 192.168.50.0 255.255.255.0"
+push "dhcp-option DNS 1.1.1.1"
+push "dhcp-option DNS 8.8.8.8"
+verb 3

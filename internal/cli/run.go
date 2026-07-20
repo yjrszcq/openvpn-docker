@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/yjrszcq/openvpn-docker/internal/apperror"
 	"github.com/yjrszcq/openvpn-docker/internal/buildinfo"
+	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
 )
 
@@ -40,6 +42,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "config" && args[1] == "validate" {
 		return runConfigValidate(args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "runtime" && args[1] == "capabilities" {
+		return runRuntimeCapabilities(args[2:], stdout, stderr)
+	}
 
 	path := commandPath(args)
 	if len(path) == 0 {
@@ -58,6 +63,68 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	return writeError(stderr, apperror.New(apperror.ExitFailure, "not_implemented", strings.Join(path, " ")+" is not implemented in the foundation build"))
+}
+
+func runRuntimeCapabilities(args []string, stdout, stderr io.Writer) int {
+	binary := os.Getenv("OVPN_OPENVPN_BIN")
+	if binary == "" {
+		binary = "openvpn"
+	}
+	return runRuntimeCapabilitiesWith(args, stdout, stderr, compatibility.DefaultContractPath, binary, compatibility.ExecRunner{})
+}
+
+func runRuntimeCapabilitiesWith(args []string, stdout, stderr io.Writer, contractPath, binary string, runner compatibility.CommandRunner) int {
+	jsonMode := false
+	for _, arg := range args {
+		if arg == "--json" {
+			jsonMode = true
+		}
+	}
+	for _, arg := range args {
+		switch arg {
+		case "--json":
+		case "-h", "--help":
+			if len(args) != 1 {
+				return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "help does not accept additional arguments"), jsonMode)
+			}
+			fmt.Fprintln(stdout, "Usage: ovpn runtime capabilities [--json]")
+			return int(apperror.ExitSuccess)
+		default:
+			return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn runtime capabilities [--json]"), jsonMode)
+		}
+	}
+	contract, err := compatibility.Load(contractPath)
+	if err != nil {
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "invalid_compatibility_contract", "compatibility contract is invalid", err), jsonMode)
+	}
+	capabilities, err := compatibility.Inspect(context.Background(), contract, binary, runner)
+	if err != nil {
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitUnavailable, "openvpn_unavailable", "OpenVPN runtime is unavailable", err), jsonMode)
+	}
+	if jsonMode {
+		if err := json.NewEncoder(stdout).Encode(capabilities); err != nil {
+			return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "output_failure", "write capabilities output", err))
+		}
+	} else {
+		status := "unsupported"
+		if capabilities.SupportedVersion {
+			status = "verified"
+		}
+		fmt.Fprintf(stdout, "OpenVPN: %s (%s)\n", capabilities.OpenVPNVersion, status)
+		if capabilities.Adapter == nil {
+			fmt.Fprintln(stdout, "adapter: unavailable")
+		} else {
+			fmt.Fprintf(stdout, "adapter: %s\ntemplate family: %s\n", *capabilities.Adapter, *capabilities.TemplateFamily)
+		}
+		for _, feature := range contract.RequiredFeatures {
+			key := strings.ReplaceAll(feature.Name, "-", "_")
+			fmt.Fprintf(stdout, "feature %s: %t\n", feature.Name, capabilities.Features[key])
+		}
+	}
+	if !capabilities.Supported() {
+		return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "unsupported_openvpn", "OpenVPN runtime does not satisfy the verified compatibility contract"), jsonMode)
+	}
+	return int(apperror.ExitSuccess)
 }
 
 func runConfigValidate(args []string, stdout, stderr io.Writer) int {
@@ -124,6 +191,11 @@ func isHelp(value string) bool { return value == "-h" || value == "--help" }
 func runVersion(args []string, stdout, stderr io.Writer) int {
 	short, jsonMode := false, false
 	for _, arg := range args {
+		if arg == "--json" {
+			jsonMode = true
+		}
+	}
+	for _, arg := range args {
 		switch arg {
 		case "--short":
 			short = true
@@ -131,16 +203,16 @@ func runVersion(args []string, stdout, stderr io.Writer) int {
 			jsonMode = true
 		case "-h", "--help":
 			if len(args) != 1 {
-				return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "help does not accept additional arguments"))
+				return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "help does not accept additional arguments"), jsonMode)
 			}
 			fmt.Fprintln(stdout, "Usage: ovpn version [--short|--json]")
 			return int(apperror.ExitSuccess)
 		default:
-			return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn version [--short|--json]"))
+			return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn version [--short|--json]"), jsonMode)
 		}
 	}
 	if short && jsonMode {
-		return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "--short and --json are mutually exclusive"))
+		return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "--short and --json are mutually exclusive"), jsonMode)
 	}
 	info := buildinfo.Current()
 	if short {
@@ -153,7 +225,7 @@ func runVersion(args []string, stdout, stderr io.Writer) int {
 		}
 		return int(apperror.ExitSuccess)
 	}
-	fmt.Fprintf(stdout, "ovpn %s\ndata schema: %d\ncommit: %s\nbuilt: %s\ngo: %s\n", info.Version, info.DataSchema, info.Commit, info.BuildDate, info.GoVersion)
+	fmt.Fprintf(stdout, "ovpn %s\ndata schema: %d\ncommit: %s\nbuilt: %s\ngo: %s\nsqlite: %s\nyaml: %s\n", info.Version, info.DataSchema, info.Commit, info.BuildDate, info.GoVersion, info.Dependencies.SQLite, info.Dependencies.YAML)
 	return int(apperror.ExitSuccess)
 }
 

@@ -46,8 +46,15 @@ func TestVersionJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &info); err != nil {
 		t.Fatalf("decode version JSON: %v", err)
 	}
-	if info.Version != "4.0.0-dev" || info.DataSchema != 4 || info.GoVersion == "" {
+	if info.Version != "4.0.0-dev" || info.DataSchema != 4 || info.GoVersion == "" || info.Dependencies.SQLite == "" || info.Dependencies.YAML == "" {
 		t.Fatalf("unexpected version info: %+v", info)
+	}
+}
+
+func TestVersionJSONUsageError(t *testing.T) {
+	code, stdout, stderr := run("version", "--json", "--short")
+	if code != 64 || stdout != "" || !strings.Contains(stderr, `"kind":"usage"`) {
+		t.Fatalf("version usage code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 
