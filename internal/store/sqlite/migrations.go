@@ -13,6 +13,71 @@ type migration struct {
 
 var migrations = []migration{
 	{revision: 2, apply: migrateConfigurationState},
+	{revision: 3, apply: migrateClientState},
+}
+
+func migrateClientState(ctx context.Context, transaction *sql.Tx) error {
+	_, err := transaction.ExecContext(ctx, `
+CREATE TABLE clients (
+    id TEXT PRIMARY KEY CHECK (length(id) = 36),
+    instance_id TEXT NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    current_name TEXT NOT NULL CHECK (length(current_name) BETWEEN 1 AND 64),
+    status TEXT NOT NULL CHECK (status IN ('active', 'revoked', 'deleted')),
+    created_at TEXT NOT NULL CHECK (length(created_at) > 0),
+    revoked_at TEXT,
+    deleted_at TEXT,
+    CHECK ((status = 'active' AND revoked_at IS NULL AND deleted_at IS NULL)
+        OR (status = 'revoked' AND revoked_at IS NOT NULL AND deleted_at IS NULL)
+        OR (status = 'deleted' AND deleted_at IS NOT NULL))
+) STRICT;
+CREATE UNIQUE INDEX clients_current_name
+ON clients(instance_id, current_name) WHERE status IN ('active', 'revoked');
+
+CREATE TABLE address_assignments (
+    id TEXT PRIMARY KEY CHECK (length(id) = 36),
+    client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    network_id TEXT NOT NULL REFERENCES networks(id) ON DELETE RESTRICT,
+    kind TEXT NOT NULL CHECK (kind IN ('static', 'dynamic')),
+    address BLOB CHECK (address IS NULL OR length(address) = 4),
+    status TEXT NOT NULL CHECK (status IN ('active', 'retained', 'released')),
+    created_at TEXT NOT NULL CHECK (length(created_at) > 0),
+    updated_at TEXT NOT NULL CHECK (length(updated_at) > 0),
+    released_at TEXT,
+    CHECK ((kind = 'static' AND address IS NOT NULL) OR (kind = 'dynamic' AND address IS NULL)),
+    CHECK ((status = 'released' AND released_at IS NOT NULL) OR (status != 'released' AND released_at IS NULL))
+) STRICT;
+CREATE UNIQUE INDEX assignments_current_client_network
+ON address_assignments(client_id, network_id) WHERE status IN ('active', 'retained');
+CREATE UNIQUE INDEX assignments_current_network_address
+ON address_assignments(network_id, address) WHERE address IS NOT NULL AND status IN ('active', 'retained');
+
+CREATE TABLE client_leases (
+    client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    network_id TEXT NOT NULL REFERENCES networks(id) ON DELETE CASCADE,
+    family INTEGER NOT NULL CHECK (family = 4),
+    address BLOB NOT NULL CHECK (length(address) = 4),
+    updated_at TEXT NOT NULL CHECK (length(updated_at) > 0),
+    PRIMARY KEY (client_id, network_id)
+) STRICT;
+
+CREATE TABLE artifacts (
+    id TEXT PRIMARY KEY CHECK (length(id) = 36),
+    instance_id TEXT NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    owner_kind TEXT NOT NULL CHECK (owner_kind IN ('instance', 'client')),
+    owner_id TEXT NOT NULL CHECK (length(owner_id) = 36),
+    kind TEXT NOT NULL CHECK (kind IN ('ca-cert', 'server-cert', 'server-key', 'client-cert', 'client-key', 'crl', 'tls-crypt', 'profile', 'ccd', 'server-config')),
+    backend TEXT NOT NULL CHECK (backend = 'local'),
+    artifact_key TEXT NOT NULL CHECK (length(artifact_key) > 0),
+    digest BLOB NOT NULL CHECK (length(digest) = 32),
+    certificate_serial TEXT,
+    certificate_fingerprint BLOB CHECK (certificate_fingerprint IS NULL OR length(certificate_fingerprint) = 32),
+    status TEXT NOT NULL CHECK (status IN ('active', 'stale', 'deleted')),
+    UNIQUE (backend, artifact_key)
+) STRICT`)
+	if err != nil {
+		return classifySQLite("migrate client state", err)
+	}
+	return nil
 }
 
 func migrate(ctx context.Context, database *sql.DB, metadata Metadata) (Metadata, error) {

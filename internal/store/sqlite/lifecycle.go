@@ -22,7 +22,7 @@ const (
 	DefaultPath     = "/etc/openvpn/meta/state.db"
 	DataSchema      = buildinfo.DataSchema
 	InitialRevision = 1
-	CurrentRevision = 2
+	CurrentRevision = 3
 	BusyTimeoutMS   = 30000
 )
 
