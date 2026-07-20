@@ -78,6 +78,12 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "state" && args[1] == "doctor" {
 		return runState(args[2:], stdout, stderr, true)
 	}
+	if len(args) >= 2 && args[0] == "repair" && args[1] == "plan" {
+		return runRepairPlan(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "repair" && args[1] == "apply" {
+		return runRepairApply(args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "server" && args[1] == "init" {
 		return runServerInit(args[2:], stdout, stderr)
 	}

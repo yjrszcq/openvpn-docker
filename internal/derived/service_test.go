@@ -23,6 +23,7 @@ import (
 	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
 	"github.com/yjrszcq/openvpn-docker/internal/domain"
+	"github.com/yjrszcq/openvpn-docker/internal/pki"
 	"github.com/yjrszcq/openvpn-docker/internal/render"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
 )
@@ -141,6 +142,59 @@ func TestRefreshServerIsTransactionalAndRepeatable(t *testing.T) {
 		t.Fatalf("pending artifact operations=%v err=%v", pending, err)
 	}
 	assertAuditTypes(t, fixture.state, fixture.instance.ID, "artifacts.refreshed", "operation.committed")
+}
+
+func TestRefreshCRLStagesEasyRSAOutputAndCommitsMetadata(t *testing.T) {
+	fixture := newServiceFixture(t)
+	encodedKey, err := x509.MarshalPKCS8PrivateKey(fixture.caKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(fixture.dataDir, "pki", "private", "ca.key"), pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: encodedKey}), 0o600)
+	for name, content := range map[string]string{"index.txt": "", "serial": "02\n", "crlnumber": "01\n"} {
+		writeFile(t, filepath.Join(fixture.dataDir, "pki", name), []byte(content), 0o600)
+	}
+	writeFile(t, filepath.Join(fixture.dataDir, "pki", "crl.pem"), []byte("invalid\n"), 0o644)
+	executor := executorFunc(func(invocation pki.Invocation) error {
+		var pkiDir string
+		for _, value := range invocation.Env {
+			if strings.HasPrefix(value, "EASYRSA_PKI=") {
+				pkiDir = strings.TrimPrefix(value, "EASYRSA_PKI=")
+			}
+		}
+		crlDER, err := x509.CreateRevocationList(rand.Reader, &x509.RevocationList{Number: big.NewInt(2), ThisUpdate: fixture.now.Add(-365 * 24 * time.Hour), NextUpdate: fixture.now.Add(365 * 24 * time.Hour)}, fixture.ca, fixture.caKey)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(pkiDir, "crl.pem"), pem.EncodeToMemory(&pem.Block{Type: "X509 CRL", Bytes: crlDER}), 0o644); err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Join(pkiDir, "crlnumber"), []byte("03\n"), 0o600)
+	})
+	runner, err := pki.NewRunner(pki.Config{EasyRSABinary: "easyrsa", OpenVPNBinary: "openvpn"}, executor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := fixture.service.RefreshCRL(context.Background(), fixture.instance.ID, runner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Written) != 2 || readText(t, fixture.artifacts, "pki/crlnumber") != "03\n" {
+		t.Fatalf("result=%+v", result)
+	}
+	if err := pki.ValidateCRLForCA(filepath.Join(fixture.dataDir, "pki"), fixture.now); err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := fixture.state.LoadInstanceArtifacts(context.Background(), fixture.instance.ID)
+	if err != nil || len(metadata) != 1 || metadata[0].Kind != "crl" {
+		t.Fatalf("metadata=%+v err=%v", metadata, err)
+	}
+}
+
+type executorFunc func(pki.Invocation) error
+
+func (function executorFunc) Run(_ context.Context, invocation pki.Invocation) error {
+	return function(invocation)
 }
 
 func TestRefreshClientGeneratesProfilesAndReconcilesCCD(t *testing.T) {

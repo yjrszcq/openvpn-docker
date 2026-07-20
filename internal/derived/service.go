@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -178,6 +179,60 @@ func (service *Service) RefreshClient(ctx context.Context, instanceID, clientID 
 	return service.apply(ctx, instanceID, "artifacts.client.refresh", writes, deletions, append(active, metadataFromWrites(writes)...))
 }
 
+// RefreshCRL rebuilds revocation output in an isolated PKI copy and installs
+// both the CRL and Easy-RSA's CRL counter through one durable artifact journal.
+func (service *Service) RefreshCRL(ctx context.Context, instanceID string, runner *pki.Runner) (RefreshResult, error) {
+	if !domain.ValidUUID(instanceID) || runner == nil {
+		return RefreshResult{}, fmt.Errorf("valid instance UUID and PKI runner are required")
+	}
+	lock, err := artifact.AcquireLock(ctx, filepath.Join(service.paths.DataDir, ".ovpn-data.lock"), artifact.LockExclusive)
+	if err != nil {
+		return RefreshResult{}, err
+	}
+	defer lock.Release()
+	instance, err := service.state.LoadInstance(ctx, instanceID)
+	if err != nil {
+		return RefreshResult{}, err
+	}
+	pkiDirectory := filepath.Join(service.paths.DataDir, "pki")
+	ca, err := pki.ValidateCAKeyPair(pkiDirectory, service.now())
+	if err != nil {
+		return RefreshResult{}, err
+	}
+	if ca.Fingerprint != instance.CAFingerprint {
+		return RefreshResult{}, fmt.Errorf("PKI CA fingerprint does not match SQLite instance state")
+	}
+	workspace, err := os.MkdirTemp("", "ovpn-crl-")
+	if err != nil {
+		return RefreshResult{}, fmt.Errorf("create CRL workspace: %w", err)
+	}
+	defer os.RemoveAll(workspace)
+	workspacePKI := filepath.Join(workspace, "pki")
+	if err := copyRegularTree(pkiDirectory, workspacePKI); err != nil {
+		return RefreshResult{}, err
+	}
+	if err := runner.GenerateCRL(ctx, workspacePKI); err != nil {
+		return RefreshResult{}, err
+	}
+	crl, err := os.ReadFile(filepath.Join(workspacePKI, "crl.pem"))
+	if err != nil {
+		return RefreshResult{}, err
+	}
+	crlNumber, err := os.ReadFile(filepath.Join(workspacePKI, "crlnumber"))
+	if err != nil {
+		return RefreshResult{}, fmt.Errorf("read generated CRL counter: %w", err)
+	}
+	metadata, err := newMetadata("instance", instanceID, "crl", "pki/crl.pem", crl)
+	if err != nil {
+		return RefreshResult{}, err
+	}
+	writes := []writeSpec{
+		{key: "pki/crl.pem", mode: 0o644, data: crl, metadata: metadata},
+		{key: "pki/crlnumber", mode: 0o600, data: crlNumber},
+	}
+	return service.apply(ctx, instanceID, "artifacts.crl.refresh", writes, nil, []storesqlite.ArtifactMetadata{metadata})
+}
+
 type writeSpec struct {
 	key      string
 	mode     os.FileMode
@@ -286,4 +341,52 @@ func referenceMetadata(clientID, kind, key string, reference artifact.Reference,
 		value.CertificateFingerprint = append([]byte(nil), certificate.Fingerprint[:]...)
 	}
 	return value, nil
+}
+
+func copyRegularTree(source, destination string) error {
+	root, err := os.Lstat(source)
+	if err != nil || !root.IsDir() || root.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("PKI source is unsafe: %w", err)
+	}
+	if err := os.Mkdir(destination, 0o700); err != nil {
+		return err
+	}
+	return filepath.WalkDir(source, func(current string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if current == source {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil || info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("PKI entry is unsafe: %s", current)
+		}
+		relative, err := filepath.Rel(source, current)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(destination, relative)
+		if entry.IsDir() {
+			return os.Mkdir(target, 0o700)
+		}
+		if !info.Mode().IsRegular() || info.Size() > artifact.MaxArtifactSize {
+			return fmt.Errorf("PKI entry is not a bounded regular file: %s", current)
+		}
+		input, err := os.Open(current)
+		if err != nil {
+			return err
+		}
+		mode := info.Mode().Perm()
+		if mode != 0o600 && mode != 0o644 {
+			mode = 0o600
+		}
+		output, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
+		if err != nil {
+			_ = input.Close()
+			return err
+		}
+		_, copyErr := io.Copy(output, io.LimitReader(input, artifact.MaxArtifactSize+1))
+		return errors.Join(copyErr, input.Close(), output.Close())
+	})
 }

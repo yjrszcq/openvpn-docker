@@ -59,9 +59,28 @@ func TestVersionJSONUsageError(t *testing.T) {
 }
 
 func TestUnimplementedCommandFailsExplicitly(t *testing.T) {
-	code, _, stderr := run("repair", "plan")
+	code, _, stderr := run("migrate", "plan")
 	if code != 1 || !strings.Contains(stderr, "not implemented") {
 		t.Fatalf("foundation command code=%d stderr=%q", code, stderr)
+	}
+}
+
+func TestRepairCLIPlanAndConfirmation(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("OVPN_DATA_DIR", root)
+	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
+	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
+	code, stdout, stderr := run("repair", "plan", "--json")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"state":"EMPTY"`) || !strings.Contains(stdout, `"actions":[]`) {
+		t.Fatalf("repair plan code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, stdout, stderr = run("repair", "apply")
+	if code != 78 || stdout != "" || !strings.Contains(stderr, "not confirmed") {
+		t.Fatalf("repair confirmation code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, _, stderr = run("repair", "apply", "--yes", "--yes")
+	if code != 64 || !strings.Contains(stderr, "specified once") {
+		t.Fatalf("repair duplicate option code=%d stderr=%q", code, stderr)
 	}
 }
 
