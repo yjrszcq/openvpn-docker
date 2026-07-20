@@ -190,6 +190,9 @@ func (service *Service) Initialize(ctx context.Context, options Options, inject 
 	if err := service.validateInstance(ctx, stage, options, instanceID); err != nil {
 		return Result{}, err
 	}
+	if err := syncTree(stage); err != nil {
+		return Result{}, fmt.Errorf("sync initialization stage: %w", err)
+	}
 	if err := callCrash(inject, CrashAfterStaged); err != nil {
 		preserveOnError = true
 		return Result{}, err
@@ -621,6 +624,45 @@ func syncDirectory(directory string) error {
 	}
 	defer file.Close()
 	return file.Sync()
+}
+
+func syncTree(root string) error {
+	directories := make([]string, 0, 16)
+	err := filepath.WalkDir(root, func(filePath string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("staged path %s is a symlink", filePath)
+		}
+		if info.IsDir() {
+			directories = append(directories, filePath)
+			return nil
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("staged path %s is not a regular file", filePath)
+		}
+		file, err := os.Open(filePath)
+		if err != nil {
+			return err
+		}
+		syncErr := file.Sync()
+		closeErr := file.Close()
+		return errors.Join(syncErr, closeErr)
+	})
+	if err != nil {
+		return err
+	}
+	for index := len(directories) - 1; index >= 0; index-- {
+		if err := syncDirectory(directories[index]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func callCrash(inject CrashInjector, point CrashPoint) error {

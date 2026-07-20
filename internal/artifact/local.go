@@ -169,12 +169,16 @@ func (store *LocalStore) OpenOperation(operationID string) (*Operation, error) {
 	if !domain.ValidUUID(operationID) {
 		return nil, fmt.Errorf("invalid artifact operation UUID")
 	}
-	directory := filepath.Join(store.root, operationsDir, operationID)
+	base, err := store.internalOperationsDir()
+	if err != nil {
+		return nil, err
+	}
+	directory := filepath.Join(base, operationID)
 	info, err := os.Lstat(directory)
 	if err != nil {
 		return nil, fmt.Errorf("open artifact operation: %w", err)
 	}
-	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm() != 0o700 {
 		return nil, fmt.Errorf("%w: operation directory is unsafe", ErrUnsafePath)
 	}
 	manifest, err := readManifest(filepath.Join(directory, "manifest.json"))
@@ -202,7 +206,8 @@ func (store *LocalStore) PendingOperations() ([]string, error) {
 	}
 	values := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		if entry.Type()&os.ModeSymlink != 0 || !entry.IsDir() || !domain.ValidUUID(entry.Name()) {
+		info, infoErr := entry.Info()
+		if infoErr != nil || entry.Type()&os.ModeSymlink != 0 || !entry.IsDir() || info.Mode().Perm() != 0o700 || !domain.ValidUUID(entry.Name()) {
 			return nil, fmt.Errorf("%w: invalid operation entry %s", ErrUnsafePath, entry.Name())
 		}
 		values = append(values, entry.Name())
@@ -261,6 +266,9 @@ func (operation *Operation) Stage(ctx context.Context, key string, mode os.FileM
 	if err := os.Rename(temporary, staged); err != nil {
 		_ = os.Remove(temporary)
 		return Reference{}, fmt.Errorf("install staged artifact: %w", err)
+	}
+	if err := syncDirectory(filepath.Dir(staged)); err != nil {
+		return Reference{}, err
 	}
 	var digest [32]byte
 	copy(digest[:], hash.Sum(nil))

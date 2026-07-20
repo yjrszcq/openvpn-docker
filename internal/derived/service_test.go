@@ -172,6 +172,10 @@ func TestRefreshClientGeneratesProfilesAndReconcilesCCD(t *testing.T) {
 	assertActiveArtifactKinds(t, staticLoaded.Artifacts, "ccd", "client-cert", "client-key", "profile")
 
 	dynamic := clientState(fixture, dynamicClientID, "phone", domain.ClientActive, "dynamic", nil)
+	dynamic.Artifacts = []storesqlite.ArtifactMetadata{{
+		ID: "24242424-2424-4242-8242-242424242424", OwnerKind: "client", OwnerID: dynamicClientID,
+		Kind: "ccd", Key: "ccd/" + dynamicClientID, Digest: sha256.Sum256([]byte("obsolete")), Status: storesqlite.ArtifactActive,
+	}}
 	createClient(t, fixture, dynamic)
 	installText(t, fixture.artifacts, "ccd/"+dynamicClientID, "obsolete")
 	if _, err := fixture.service.RefreshClient(ctx, fixture.instance.ID, dynamicClientID); err != nil {
@@ -183,8 +187,13 @@ func TestRefreshClientGeneratesProfilesAndReconcilesCCD(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertActiveArtifactKinds(t, dynamicLoaded.Artifacts, "client-cert", "client-key", "profile")
+	assertArtifactStatus(t, dynamicLoaded.Artifacts, "ccd/"+dynamicClientID, storesqlite.ArtifactDeleted)
 
 	revoked := clientState(fixture, revokedClientID, "tablet", domain.ClientRevoked, "dynamic", nil)
+	revoked.Artifacts = []storesqlite.ArtifactMetadata{{
+		ID: "34343434-3434-4343-8343-343434343434", OwnerKind: "client", OwnerID: revokedClientID,
+		Kind: "profile", Key: "clients/active/tablet.ovpn", Digest: sha256.Sum256([]byte("obsolete")), Status: storesqlite.ArtifactActive,
+	}}
 	createClient(t, fixture, revoked)
 	installText(t, fixture.artifacts, "clients/active/tablet.ovpn", "obsolete")
 	if _, err := fixture.service.RefreshClient(ctx, fixture.instance.ID, revokedClientID); err != nil {
@@ -195,6 +204,11 @@ func TestRefreshClientGeneratesProfilesAndReconcilesCCD(t *testing.T) {
 	}
 	assertMissing(t, filepath.Join(fixture.dataDir, "clients", "active", "tablet.ovpn"))
 	assertMissing(t, filepath.Join(fixture.dataDir, "ccd", revokedClientID))
+	revokedLoaded, err := fixture.state.LoadClient(ctx, fixture.instance.ID, revokedClientID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertArtifactStatus(t, revokedLoaded.Artifacts, "clients/active/tablet.ovpn", storesqlite.ArtifactDeleted)
 }
 
 func TestRefreshClientRollsBackFilesWhenMetadataCommitFails(t *testing.T) {
@@ -386,6 +400,19 @@ func assertActiveArtifactKinds(t *testing.T, artifacts []storesqlite.ArtifactMet
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("active artifact kinds=%v, want %v; all=%+v", got, want, artifacts)
 	}
+}
+
+func assertArtifactStatus(t *testing.T, artifacts []storesqlite.ArtifactMetadata, key string, want storesqlite.ArtifactStatus) {
+	t.Helper()
+	for _, value := range artifacts {
+		if value.Key == key {
+			if value.Status != want {
+				t.Fatalf("artifact %s status=%s, want %s", key, value.Status, want)
+			}
+			return
+		}
+	}
+	t.Fatalf("artifact metadata %s is missing", key)
 }
 
 func assertAuditTypes(t *testing.T, store *storesqlite.Store, instanceID string, want ...string) {

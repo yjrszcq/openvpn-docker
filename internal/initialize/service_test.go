@@ -225,6 +225,51 @@ func TestInitializationCrashPointsRecoverDeterministically(t *testing.T) {
 	}
 }
 
+func TestInitializationRecoversAfterEveryEntryMove(t *testing.T) {
+	for crashAfter := 1; crashAfter <= len(defaultEntries()); crashAfter++ {
+		t.Run(fmt.Sprintf("entry-%d", crashAfter), func(t *testing.T) {
+			service, _ := newInitializationService(t, "")
+			options := initializationOptions(t)
+			injected := errors.New("simulated entry crash")
+			moves := 0
+			_, err := service.Initialize(context.Background(), options, func(point CrashPoint) error {
+				if point == CrashAfterEntryMoved {
+					moves++
+					if moves == crashAfter {
+						return injected
+					}
+				}
+				return nil
+			})
+			if !errors.Is(err, injected) || moves != crashAfter {
+				t.Fatalf("entry crash error=%v moves=%d", err, moves)
+			}
+			recovered, err := service.Recover(context.Background(), options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !recovered.Recovered {
+				t.Fatalf("recovery result=%+v", recovered)
+			}
+			assertHealthyInstance(t, service, options, recovered)
+		})
+	}
+}
+
+func TestSyncTreeRejectsSymlinks(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(t.TempDir(), "outside")
+	if err := os.WriteFile(target, []byte("outside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(root, "unsafe")); err != nil {
+		t.Fatal(err)
+	}
+	if err := syncTree(root); err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("sync tree symlink error=%v", err)
+	}
+}
+
 func assertHealthyInstance(t *testing.T, service *Service, options Options, result Result) {
 	t.Helper()
 	if _, err := os.Stat(filepath.Join(options.DataDir, markerName)); !errors.Is(err, os.ErrNotExist) {

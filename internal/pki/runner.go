@@ -173,7 +173,28 @@ func (runner *Runner) GenerateTLSCrypt(ctx context.Context, filePath string) err
 		_ = os.Remove(temporary)
 		return err
 	}
-	return os.Rename(temporary, filePath)
+	file, err := os.Open(temporary)
+	if err != nil {
+		_ = os.Remove(temporary)
+		return err
+	}
+	syncErr := file.Sync()
+	closeErr := file.Close()
+	if syncErr != nil || closeErr != nil {
+		_ = os.Remove(temporary)
+		return errors.Join(syncErr, closeErr)
+	}
+	if err := os.Rename(temporary, filePath); err != nil {
+		_ = os.Remove(temporary)
+		return err
+	}
+	parent, err := os.Open(filepath.Dir(filePath))
+	if err != nil {
+		return err
+	}
+	syncErr = parent.Sync()
+	closeErr = parent.Close()
+	return errors.Join(syncErr, closeErr)
 }
 
 func (runner *Runner) runEasyRSA(ctx context.Context, pkiDir, commonName string, args ...string) error {

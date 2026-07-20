@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/yjrszcq/openvpn-docker/internal/artifact"
+	"github.com/yjrszcq/openvpn-docker/internal/domain"
 )
 
 const operationID = "41414141-4141-4414-8414-414141414141"
@@ -141,6 +142,32 @@ func TestOperationRejectsUnsafePathsModesAndSymlinks(t *testing.T) {
 	}
 }
 
+func TestOpenOperationRejectsUnsafeOperationDirectories(t *testing.T) {
+	t.Run("permissions", func(t *testing.T) {
+		store := newStore(t)
+		operation, err := store.BeginOperation(operationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(filepath.Join(store.Root(), ".operations", operation.ID()), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.OpenOperation(operationID); !errors.Is(err, artifact.ErrUnsafePath) {
+			t.Fatalf("unsafe operation directory error=%v", err)
+		}
+	})
+	t.Run("operation-root-symlink", func(t *testing.T) {
+		store := newStore(t)
+		outside := t.TempDir()
+		if err := os.Symlink(outside, filepath.Join(store.Root(), ".operations")); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.OpenOperation(operationID); !errors.Is(err, artifact.ErrUnsafePath) {
+			t.Fatalf("symlink operation root error=%v", err)
+		}
+	})
+}
+
 func TestSnapshotPreservesContentModeAndDigest(t *testing.T) {
 	store := newStore(t)
 	installArtifact(t, store, "pki/ca.crt", 0o644, "CA\n", operationID)
@@ -230,6 +257,125 @@ func TestOperationDeletionCommitsAndRollsBack(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(store.Root(), "ccd", "client-id")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("committed deletion remains: %v", err)
 	}
+}
+
+func TestReplacementRecoversAtEveryCrashPoint(t *testing.T) {
+	points := []artifact.CrashPoint{artifact.CrashAfterBackup, artifact.CrashAfterInstall, artifact.CrashAfterFilesInstalled, artifact.CrashAfterCommitMarker}
+	for _, point := range points {
+		t.Run(string(point), func(t *testing.T) {
+			store := newStore(t)
+			installArtifact(t, store, "server/server.conf", 0o600, "old", operationID)
+			id := generatedID(t)
+			operation, err := store.BeginOperation(id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := operation.Stage(context.Background(), "server/server.conf", 0o600, strings.NewReader("new")); err != nil {
+				t.Fatal(err)
+			}
+			injected := errors.New("simulated crash")
+			inject := func(got artifact.CrashPoint) error {
+				if got == point {
+					return injected
+				}
+				return nil
+			}
+			if point == artifact.CrashAfterCommitMarker {
+				if err := operation.Install(context.Background(), nil); err != nil {
+					t.Fatal(err)
+				}
+				err = operation.Commit(inject)
+			} else {
+				err = operation.Install(context.Background(), inject)
+			}
+			if !errors.Is(err, injected) {
+				t.Fatalf("crash error=%v", err)
+			}
+			reopened, err := store.OpenOperation(id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := "old"
+			if point == artifact.CrashAfterCommitMarker {
+				want = "new"
+				err = reopened.Commit(nil)
+			} else {
+				err = reopened.Rollback()
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			data, _, err := store.Read(context.Background(), "server/server.conf")
+			if err != nil || string(data) != want {
+				t.Fatalf("recovered replacement=%q want=%q err=%v", data, want, err)
+			}
+		})
+	}
+}
+
+func TestDeletionRecoversAtEveryCrashPoint(t *testing.T) {
+	points := []artifact.CrashPoint{artifact.CrashAfterBackup, artifact.CrashAfterInstall, artifact.CrashAfterFilesInstalled, artifact.CrashAfterCommitMarker}
+	for _, point := range points {
+		t.Run(string(point), func(t *testing.T) {
+			store := newStore(t)
+			installArtifact(t, store, "ccd/client-id", 0o600, "static", operationID)
+			id := generatedID(t)
+			operation, err := store.BeginOperation(id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := operation.Remove("ccd/client-id"); err != nil {
+				t.Fatal(err)
+			}
+			injected := errors.New("simulated crash")
+			inject := func(got artifact.CrashPoint) error {
+				if got == point {
+					return injected
+				}
+				return nil
+			}
+			if point == artifact.CrashAfterCommitMarker {
+				if err := operation.Install(context.Background(), nil); err != nil {
+					t.Fatal(err)
+				}
+				err = operation.Commit(inject)
+			} else {
+				err = operation.Install(context.Background(), inject)
+			}
+			if !errors.Is(err, injected) {
+				t.Fatalf("crash error=%v", err)
+			}
+			reopened, err := store.OpenOperation(id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if point == artifact.CrashAfterCommitMarker {
+				if err := reopened.Commit(nil); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := os.Lstat(filepath.Join(store.Root(), "ccd", "client-id")); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("committed deletion recovered target=%v", err)
+				}
+			} else {
+				if err := reopened.Rollback(); err != nil {
+					t.Fatal(err)
+				}
+				data, _, err := store.Read(context.Background(), "ccd/client-id")
+				if err != nil || string(data) != "static" {
+					t.Fatalf("rolled back deletion=%q err=%v", data, err)
+				}
+			}
+		})
+	}
+}
+
+func generatedID(t *testing.T) string {
+	t.Helper()
+	id, err := domain.GenerateUUID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
 }
 
 func installArtifact(t *testing.T, store *artifact.LocalStore, key string, mode os.FileMode, content, id string) {
