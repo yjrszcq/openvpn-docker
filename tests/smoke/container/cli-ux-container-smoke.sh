@@ -40,7 +40,7 @@ elif ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
 fi
 
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ovpn-cli-ux.XXXXXX")"
-mkdir -m 0750 "$WORK_DIR/data" "$WORK_DIR/config"
+mkdir -m 0750 "$WORK_DIR/data" "$WORK_DIR/config" "$WORK_DIR/bootstrap-data" "$WORK_DIR/bootstrap-config"
 cp "$ROOT_DIR/config.example.yaml" "$WORK_DIR/config/config.yaml"
 
 run_image() {
@@ -53,6 +53,29 @@ run_ovpn() {
     -v "$WORK_DIR/config:/etc/openvpn-config" \
     --entrypoint ovpn \
     "$IMAGE" "$@"
+}
+
+run_bootstrap() {
+  local endpoint="$1"
+  shift
+  docker run --rm \
+    -e OVPN_BOOTSTRAP_FROM_ENV=true \
+    -e "OVPN_BOOTSTRAP_ENDPOINT=$endpoint" \
+    -e OVPN_BOOTSTRAP_IPV4_NETWORK=10.44.0.0/24 \
+    -e OVPN_BOOTSTRAP_PROTOCOL=tcp \
+    -e OVPN_BOOTSTRAP_PORT=443 \
+    -e OVPN_BOOTSTRAP_DNS=1.1.1.1,8.8.8.8 \
+    -v "$WORK_DIR/bootstrap-data:/etc/openvpn" \
+    -v "$WORK_DIR/bootstrap-config:/etc/openvpn-config" \
+    --entrypoint ovpn \
+    "$IMAGE" "$@"
+}
+
+bootstrap_config_contains() {
+  docker run --rm \
+    -v "$WORK_DIR/bootstrap-config:/etc/openvpn-config:ro" \
+    --entrypoint grep \
+    "$IMAGE" -Fq "$1" /etc/openvpn-config/config.yaml
 }
 
 test "$(run_image -v)" = "$GO_RUNTIME_VERSION"
@@ -162,6 +185,29 @@ diff -u "$WORK_DIR/runtime-default.err" "$WORK_DIR/runtime-status.err"
 
 run_ovpn config apply --json >"$WORK_DIR/noop-apply.json"
 grep -Fq '"applied":false' "$WORK_DIR/noop-apply.json"
+
+run_bootstrap bootstrap.example.test server init >"$WORK_DIR/bootstrap-init.out"
+grep -Fq 'generated initial declarative configuration' "$WORK_DIR/bootstrap-init.out"
+bootstrap_config_contains 'endpoint: bootstrap.example.test'
+bootstrap_config_contains 'protocol: tcp'
+bootstrap_config_contains 'port: 443'
+test "$(docker run --rm -v "$WORK_DIR/bootstrap-config:/etc/openvpn-config:ro" --entrypoint stat "$IMAGE" -c %a /etc/openvpn-config/config.yaml)" = 600
+run_bootstrap bootstrap.example.test config validate --json >"$WORK_DIR/bootstrap-validate.json"
+grep -Fq '"valid":true' "$WORK_DIR/bootstrap-validate.json"
+run_bootstrap bootstrap.example.test state doctor --json >"$WORK_DIR/bootstrap-doctor.json"
+grep -Fq '"state":"HEALTHY"' "$WORK_DIR/bootstrap-doctor.json"
+
+set +e
+run_bootstrap changed.example.test server init >"$WORK_DIR/bootstrap-retry.out" 2>"$WORK_DIR/bootstrap-retry.err"
+bootstrap_retry_code=$?
+set -e
+test "$bootstrap_retry_code" -eq 78
+grep -Fq 'bootstrap environment ignored' "$WORK_DIR/bootstrap-retry.err"
+bootstrap_config_contains 'endpoint: bootstrap.example.test'
+if bootstrap_config_contains 'changed.example.test'; then
+  printf 'initialized bootstrap configuration was overwritten\n' >&2
+  exit 1
+fi
 
 set +e
 run_image completion powershell >"$WORK_DIR/invalid.out" 2>"$WORK_DIR/invalid.err"

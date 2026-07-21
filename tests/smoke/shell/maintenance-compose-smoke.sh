@@ -30,6 +30,10 @@ for variable in OVPN_GITHUB_TOKEN HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY; do
   fi
 done
 printf '%s\n' "$openvpn_service" | grep -Fq '/etc/openvpn-config'
+for variable in OVPN_BOOTSTRAP_FROM_ENV OVPN_BOOTSTRAP_ENDPOINT OVPN_BOOTSTRAP_IPV4_NETWORK; do
+  printf '%s\n' "$openvpn_service" | grep -Fq "$variable:"
+done
+printf '%s\n' "$openvpn_service" | grep -Fq 'OVPN_BOOTSTRAP_FROM_ENV: "false"'
 for variable in OVPN_ENDPOINT OVPN_NETWORK OVPN_TOPOLOGY OVPN_DYNAMIC_POOL_SIZE OVPN_LOG_MAX_BYTES OVPN_CRITICAL_MODE; do
   if printf '%s\n' "$openvpn_service" | grep -Fq "$variable:"; then
     echo "runtime service must use declarative YAML instead of $variable" >&2
@@ -51,6 +55,10 @@ printf '%s\n' "$maintenance_service" | grep -Fq 'restart: "no"'
 printf '%s\n' "$maintenance_service" | grep -Fq 'OVPN_MAINTENANCE: "true"'
 printf '%s\n' "$maintenance_service" | grep -Fq 'network_mode: host'
 printf '%s\n' "$maintenance_service" | grep -Fq '/etc/openvpn-config'
+if printf '%s\n' "$maintenance_service" | grep -Fq 'OVPN_BOOTSTRAP_'; then
+  echo 'maintenance service must not accept initialization bootstrap variables' >&2
+  exit 1
+fi
 for variable in OVPN_GITHUB_TOKEN HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY; do
   if printf '%s\n' "$maintenance_service" | grep -Fq "$variable:"; then
     echo "maintenance service must not expose online-update variable $variable" >&2

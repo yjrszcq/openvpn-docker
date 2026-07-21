@@ -36,6 +36,36 @@ maintenance 服务的 entrypoint 已经是 `ovpn`，因此 `<command>` 直接从
 `-V` 与 `--version` 输出完整版本报告。裸执行 `ovpn` 会显示包含全部 leaf usage 的
 精简命令树；`ovpn -h` 仍显示详细根帮助。
 
+## 一次性环境变量初始化
+
+全新空实例可以根据 Compose 环境变量生成第一份 YAML。这只是初始化输入，不是第二套
+长期配置模式。设置 `OVPN_BOOTSTRAP_FROM_ENV=true`，并提供两个必填值：
+
+| 环境变量 | YAML 字段 | 必填 |
+|---|---|---|
+| `OVPN_BOOTSTRAP_ENDPOINT` | `server.endpoint` | 是 |
+| `OVPN_BOOTSTRAP_IPV4_NETWORK` | `ipv4.network` | 是 |
+| `OVPN_BOOTSTRAP_PROTOCOL` | `server.transport.protocol` | 否 |
+| `OVPN_BOOTSTRAP_FAMILY` | `server.transport.family` | 否 |
+| `OVPN_BOOTSTRAP_PORT` | `server.transport.port` | 否 |
+| `OVPN_BOOTSTRAP_CLIENT_TO_CLIENT` | `server.clientToClient` | 否 |
+| `OVPN_BOOTSTRAP_DYNAMIC_POOL_SIZE` | `ipv4.dynamicPoolSize` | 否 |
+| `OVPN_BOOTSTRAP_NAT_ENABLED` | `ipv4.nat.enabled` | 否 |
+| `OVPN_BOOTSTRAP_NAT_INTERFACE` | `ipv4.nat.interface` | 否 |
+| `OVPN_BOOTSTRAP_REDIRECT_GATEWAY` | `ipv4.redirectGateway` | 否 |
+| `OVPN_BOOTSTRAP_DNS` | `ipv4.dns`，逗号分隔 | 否 |
+| `OVPN_BOOTSTRAP_ROUTES` | `ipv4.routes`，逗号分隔 | 否 |
+| `OVPN_BOOTSTRAP_LOG_MAX_BYTES` | `logging.maxBytes` | 否 |
+| `OVPN_BOOTSTRAP_LOG_BACKUPS` | `logging.backups` | 否 |
+
+程序应用普通 YAML 的默认值和严格验证，然后在 `OVPN_CONFIG_FILE` 原子安装 mode
+`0600` 的规范 YAML。已有 YAML 只有在规范化后与环境配置完全一致时才接受，以便安全
+重试失败的初始化；内容冲突会被拒绝。
+
+schema 4 创建后，bootstrap 变量只会被忽略并输出 warning。之后所有修改必须通过
+YAML 的 `config validate`、`config plan` 和离线 `config apply`。首次初始化成功后应
+删除 bootstrap 开关或将其设为 `false`。
+
 ## 输出与退出码
 
 查询和 plan 默认输出稳定的人类可读文本，并在标注处支持 `--json`。JSON 模式错误

@@ -48,6 +48,17 @@ $EDITOR openvpn-config/config.yaml
 除 `version: 1` 外，只有 `server.endpoint` 与 `ipv4.network` 必填。其他字段使用
 示例中说明的默认值；`dynamicPoolSize` 未设置时取可用客户端地址数的一半。
 
+也可以保持 `openvpn-config` 为空，在 `.env` 中设置以下值，自动生成初始 YAML：
+
+```dotenv
+OVPN_BOOTSTRAP_FROM_ENV=true
+OVPN_BOOTSTRAP_ENDPOINT=vpn.example.com
+OVPN_BOOTSTRAP_IPV4_NETWORK=10.42.0.0/24
+```
+
+可选的 `OVPN_BOOTSTRAP_*` 字段见
+[v4 命令参考](docs/cn/v4/commands.md#一次性环境变量初始化)。
+
 创建 `compose.yaml`：
 
 ```yaml
@@ -62,6 +73,10 @@ services:
     container_name: openvpn
     restart: unless-stopped
     network_mode: host
+    environment:
+      OVPN_BOOTSTRAP_FROM_ENV: "${OVPN_BOOTSTRAP_FROM_ENV:-false}"
+      OVPN_BOOTSTRAP_ENDPOINT: "${OVPN_BOOTSTRAP_ENDPOINT:-}"
+      OVPN_BOOTSTRAP_IPV4_NETWORK: "${OVPN_BOOTSTRAP_IPV4_NETWORK:-}"
     <<: *openvpn-data
     cap_add:
       - NET_ADMIN
@@ -94,8 +109,11 @@ docker compose up -d openvpn
 docker compose logs -f openvpn
 ```
 
-entrypoint 只会初始化空数据目录，新实例必须提供有效 YAML。初始化在 staging 中
-创建 SQLite、PKI、服务端身份、CRL、tls-crypt 和派生文件，验证后统一安装。
+entrypoint 只会初始化空数据目录，新实例必须提供有效 YAML 或启用 bootstrap 环境变量。
+环境初始化会先写入规范 YAML，再在 staging 中创建 SQLite、PKI、服务端身份、CRL、
+tls-crypt 和派生文件，验证后统一安装。首次启动成功后应将
+`OVPN_BOOTSTRAP_FROM_ENV=false`；后续环境变量变化会被忽略，绝不会覆盖 YAML 或
+SQLite。
 
 YAML 是期望配置，SQLite 保存最近一次经操作员确认的 applied revision。之后 YAML
 缺失或与 applied revision 不同时，`server run` 只告警并继续使用数据库快照，不会

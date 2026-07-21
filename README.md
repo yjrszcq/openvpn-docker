@@ -59,6 +59,18 @@ Only `server.endpoint` and `ipv4.network` are required beyond `version: 1`.
 Omitted values use the defaults documented in the example, except
 `dynamicPoolSize`, which defaults to half of the usable client addresses.
 
+Alternatively, leave `openvpn-config` empty and set these values in `.env` to
+generate the initial YAML automatically:
+
+```dotenv
+OVPN_BOOTSTRAP_FROM_ENV=true
+OVPN_BOOTSTRAP_ENDPOINT=vpn.example.com
+OVPN_BOOTSTRAP_IPV4_NETWORK=10.42.0.0/24
+```
+
+Optional `OVPN_BOOTSTRAP_*` fields are listed in the
+[v4 command reference](docs/en/v4/commands.md#one-time-environment-bootstrap).
+
 Create `compose.yaml`:
 
 ```yaml
@@ -73,6 +85,10 @@ services:
     container_name: openvpn
     restart: unless-stopped
     network_mode: host
+    environment:
+      OVPN_BOOTSTRAP_FROM_ENV: "${OVPN_BOOTSTRAP_FROM_ENV:-false}"
+      OVPN_BOOTSTRAP_ENDPOINT: "${OVPN_BOOTSTRAP_ENDPOINT:-}"
+      OVPN_BOOTSTRAP_IPV4_NETWORK: "${OVPN_BOOTSTRAP_IPV4_NETWORK:-}"
     <<: *openvpn-data
     cap_add:
       - NET_ADMIN
@@ -105,10 +121,13 @@ docker compose up -d openvpn
 docker compose logs -f openvpn
 ```
 
-The entrypoint initializes only an empty data directory and requires a valid
-YAML file for a new instance. Initialization creates the SQLite database, PKI,
-server identity, CRL, tls-crypt key, and derived runtime files as one staged
-operation.
+The entrypoint initializes only an empty data directory and requires either a
+valid YAML file or enabled bootstrap environment for a new instance.
+Environment bootstrap writes the canonical YAML first; initialization then
+creates the SQLite database, PKI, server identity, CRL, tls-crypt key, and
+derived runtime files as one staged operation. Set
+`OVPN_BOOTSTRAP_FROM_ENV=false` after the first successful start. Later
+environment changes are ignored and never override YAML or SQLite.
 
 YAML is the desired configuration; SQLite stores the last operator-confirmed
 applied revision. If YAML later becomes missing or differs from that revision,

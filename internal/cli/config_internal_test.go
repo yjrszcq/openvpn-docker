@@ -22,6 +22,15 @@ func TestDataDirectoryEmpty(t *testing.T) {
 	if err != nil || !empty {
 		t.Fatalf("empty directory empty=%v err=%v", empty, err)
 	}
+	for _, name := range []string{".ovpn-data.lock", ".ovpn-runtime.lock"} {
+		if err := os.WriteFile(filepath.Join(directory, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	empty, err = dataDirectoryEmpty(directory)
+	if err != nil || !empty {
+		t.Fatalf("lock-only directory empty=%v err=%v", empty, err)
+	}
 	if err := os.WriteFile(filepath.Join(directory, "schema-version"), []byte("3\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

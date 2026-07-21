@@ -39,6 +39,39 @@ prints only the project version while `-V` and `--version` print the full
 version report. Running `ovpn` without arguments prints a compact command tree
 with every leaf usage; `ovpn -h` retains the detailed root help.
 
+## One-time environment bootstrap
+
+A new empty instance can generate its first YAML file from Compose environment
+variables. This is an initialization input, not a second configuration mode.
+Set `OVPN_BOOTSTRAP_FROM_ENV=true` and provide the two required values:
+
+| Environment variable | YAML field | Required |
+|---|---|---|
+| `OVPN_BOOTSTRAP_ENDPOINT` | `server.endpoint` | yes |
+| `OVPN_BOOTSTRAP_IPV4_NETWORK` | `ipv4.network` | yes |
+| `OVPN_BOOTSTRAP_PROTOCOL` | `server.transport.protocol` | no |
+| `OVPN_BOOTSTRAP_FAMILY` | `server.transport.family` | no |
+| `OVPN_BOOTSTRAP_PORT` | `server.transport.port` | no |
+| `OVPN_BOOTSTRAP_CLIENT_TO_CLIENT` | `server.clientToClient` | no |
+| `OVPN_BOOTSTRAP_DYNAMIC_POOL_SIZE` | `ipv4.dynamicPoolSize` | no |
+| `OVPN_BOOTSTRAP_NAT_ENABLED` | `ipv4.nat.enabled` | no |
+| `OVPN_BOOTSTRAP_NAT_INTERFACE` | `ipv4.nat.interface` | no |
+| `OVPN_BOOTSTRAP_REDIRECT_GATEWAY` | `ipv4.redirectGateway` | no |
+| `OVPN_BOOTSTRAP_DNS` | `ipv4.dns`, comma-separated | no |
+| `OVPN_BOOTSTRAP_ROUTES` | `ipv4.routes`, comma-separated | no |
+| `OVPN_BOOTSTRAP_LOG_MAX_BYTES` | `logging.maxBytes` | no |
+| `OVPN_BOOTSTRAP_LOG_BACKUPS` | `logging.backups` | no |
+
+The normal YAML defaults and validation are applied, then a canonical mode
+`0600` file is installed at `OVPN_CONFIG_FILE`. An existing YAML file is
+accepted only when it normalizes to exactly the same configuration, allowing a
+failed initialization to be retried safely. A conflicting file is refused.
+
+After schema 4 exists, bootstrap variables are ignored with a warning. All
+later changes must use YAML with `config validate`, `config plan`, and offline
+`config apply`. Remove the bootstrap flag, or set it to `false`, after the first
+successful initialization.
+
 ## Output and exit codes
 
 Query and plan commands default to stable human-readable output and support

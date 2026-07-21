@@ -50,6 +50,21 @@ Initialization fails closed if YAML is missing or invalid, the data directory
 is non-empty but unrecognized, PKI generation fails, or staged state does not
 validate.
 
+For a first deployment without manually creating YAML, leave the configuration
+directory empty and set the Compose variables below. The entrypoint validates
+them, writes mode-`0600` canonical YAML, and then runs the same initialization:
+
+```dotenv
+OVPN_BOOTSTRAP_FROM_ENV=true
+OVPN_BOOTSTRAP_ENDPOINT=vpn.example.com
+OVPN_BOOTSTRAP_IPV4_NETWORK=10.42.0.0/24
+```
+
+After a successful start, set `OVPN_BOOTSTRAP_FROM_ENV=false`. Keeping it true
+only produces an ignored-bootstrap warning; it never updates the initialized
+instance. See the [command reference](commands.md#one-time-environment-bootstrap)
+for optional fields.
+
 ## Choose routing deliberately
 
 Private-network access:

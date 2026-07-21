@@ -27,7 +27,7 @@ var rootCommand = command{
 	children: []command{
 		group("server", "initialize, run, or render the OpenVPN server",
 			leaf("init", "initialize a schema 4 instance", "ovpn server init",
-				[]string{"Requires a valid declarative YAML configuration and an empty data directory."},
+				[]string{"Requires an empty data directory and either valid declarative YAML or one-time bootstrap environment."},
 				"ovpn server init"),
 			leaf("run", "supervise OpenVPN and its broker", "ovpn server run",
 				[]string{"Uses the last applied SQLite configuration; YAML drift is reported but not applied."},

@@ -226,6 +226,9 @@ func runServerRun(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "runtime_state_refused", "runtime state is invalid", err))
 	}
+	if bootstrapEnvironmentActive(os.LookupEnv) {
+		fmt.Fprintln(stderr, "ovpn: warning: bootstrap environment ignored: instance is already initialized; edit config.yaml and run config plan/apply")
+	}
 	configPath := environmentOr("OVPN_CONFIG_FILE", configservice.DefaultPath)
 	desired, configErr := configservice.LoadFile(configPath)
 	if configErr != nil {
@@ -299,7 +302,13 @@ func dataDirectoryEmpty(path string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return len(entries) == 0, nil
+	for _, entry := range entries {
+		if entry.Name() == ".ovpn-data.lock" || entry.Name() == ".ovpn-runtime.lock" {
+			continue
+		}
+		return false, nil
+	}
+	return true, nil
 }
 
 // RunHook dispatches the ovpn-hook multicall entrypoint.
@@ -332,6 +341,18 @@ func runServerInit(args []string, stdout, stderr io.Writer) int {
 	if len(args) != 0 {
 		return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn server init"))
 	}
+	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
+	configFile := environmentOr("OVPN_CONFIG_FILE", configservice.DefaultPath)
+	if err := prepareInitializationConfig(dataDir, configFile, stdout, stderr, os.LookupEnv); err != nil {
+		switch {
+		case errors.Is(err, configservice.ErrBootstrapInput), errors.Is(err, configservice.ErrBootstrapConflict):
+			return writeError(stderr, apperror.Wrap(apperror.ExitData, "invalid_config", "bootstrap configuration is invalid: "+err.Error(), err))
+		case errors.Is(err, configservice.ErrBootstrapWrite):
+			return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "bootstrap_config_failed", "write bootstrap configuration", err))
+		default:
+			return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "bootstrap_config_failed", "prepare bootstrap configuration", err))
+		}
+	}
 	contractPath := environmentOr("OVPN_COMPATIBILITY_FILE", compatibility.DefaultContractPath)
 	contract, err := compatibility.Load(contractPath)
 	if err != nil {
@@ -350,8 +371,8 @@ func runServerInit(args []string, stdout, stderr io.Writer) int {
 		return writeError(stderr, err)
 	}
 	result, err := service.Initialize(context.Background(), initialize.Options{
-		DataDir: environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir), RuntimeDir: environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir),
-		ConfigFile: environmentOr("OVPN_CONFIG_FILE", configservice.DefaultPath), ServerName: initialize.DefaultServerName, Version: buildinfo.Current().Version,
+		DataDir: dataDir, RuntimeDir: environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir),
+		ConfigFile: configFile, ServerName: initialize.DefaultServerName, Version: buildinfo.Current().Version,
 	}, nil)
 	if err != nil {
 		switch {
@@ -367,8 +388,44 @@ func runServerInit(args []string, stdout, stderr io.Writer) int {
 			return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "initialization_failed", "initialize schema 4 instance", err))
 		}
 	}
-	fmt.Fprintf(stdout, "initialized schema 4 instance %s at %s\n", result.InstanceID, environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir))
+	fmt.Fprintf(stdout, "initialized schema 4 instance %s at %s\n", result.InstanceID, dataDir)
 	return int(apperror.ExitSuccess)
+}
+
+func prepareInitializationConfig(dataDir, configFile string, stdout, stderr io.Writer, lookup configservice.EnvironmentLookup) error {
+	if !bootstrapEnvironmentActive(lookup) {
+		return nil
+	}
+	empty, err := dataDirectoryEmpty(dataDir)
+	if err != nil {
+		return fmt.Errorf("inspect data directory: %w", err)
+	}
+	if !empty {
+		fmt.Fprintln(stderr, "ovpn: warning: bootstrap environment ignored: instance data directory is not empty")
+		return nil
+	}
+	requested, err := configservice.BootstrapRequested(lookup)
+	if err != nil || !requested {
+		return err
+	}
+	created, err := configservice.EnsureBootstrapFile(configFile, lookup)
+	if err != nil {
+		return err
+	}
+	if created {
+		fmt.Fprintf(stdout, "generated initial declarative configuration at %s\n", configFile)
+	}
+	return nil
+}
+
+func bootstrapEnvironmentActive(lookup configservice.EnvironmentLookup) bool {
+	value, found := lookup(configservice.BootstrapFromEnvironmentVariable)
+	value = strings.TrimSpace(value)
+	if !found || value == "" {
+		return false
+	}
+	enabled, err := strconv.ParseBool(value)
+	return err != nil || enabled
 }
 
 func environmentOr(name, fallback string) string {

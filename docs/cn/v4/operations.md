@@ -46,6 +46,19 @@ docker compose exec openvpn ovpn runtime health
 YAML 缺失/错误、数据目录非空但无法识别、PKI 生成失败或 staging 状态验证失败时，
 初始化都会 fail closed。
 
+首次部署若不想手动创建 YAML，可保持配置目录为空并设置以下 Compose 变量。entrypoint
+会严格验证、写入 mode `0600` 的规范 YAML，再执行相同初始化流程：
+
+```dotenv
+OVPN_BOOTSTRAP_FROM_ENV=true
+OVPN_BOOTSTRAP_ENDPOINT=vpn.example.com
+OVPN_BOOTSTRAP_IPV4_NETWORK=10.42.0.0/24
+```
+
+首次启动成功后将 `OVPN_BOOTSTRAP_FROM_ENV=false`。继续保持 true 只会产生已忽略的
+bootstrap warning，绝不会修改已初始化实例。可选字段见
+[命令参考](commands.md#一次性环境变量初始化)。
+
 ## 明确选择路由方式
 
 只访问私网：
