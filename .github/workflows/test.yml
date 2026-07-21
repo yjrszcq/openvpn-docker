@@ -62,6 +62,7 @@ jobs:
             scripts/verify-go-licenses.sh \
             scripts/verify-release-metadata.sh \
             scripts/verify-go-toolchain.sh \
+            tests/helpers/fake-openssl.sh \
             tests/smoke/container/go-sqlite-handoff-smoke.sh \
             tests/smoke/container/backup-restore-container-smoke.sh \
             tests/smoke/container/client-lifecycle-container-smoke.sh \
@@ -86,6 +87,7 @@ jobs:
             scripts/verify-go-licenses.sh \
             scripts/verify-release-metadata.sh \
             scripts/verify-go-toolchain.sh \
+            tests/helpers/fake-openssl.sh \
             tests/smoke/container/go-sqlite-handoff-smoke.sh \
             tests/smoke/container/backup-restore-container-smoke.sh \
             tests/smoke/container/client-lifecycle-container-smoke.sh \
