@@ -46,41 +46,39 @@ if grep -Fq 'not found' <<<"$ldd_output"; then
   exit 1
 fi
 
-metadata="$(docker run --rm --entrypoint ovpn "$IMAGE" runtime version)"
-grep -Fq "\"image_version\": \"$IMAGE_VERSION\"" <<<"$metadata"
-grep -Fq "\"data_schema\": $DATA_SCHEMA" <<<"$metadata"
-grep -Fq '"runtime_strategy": "source-build"' <<<"$metadata"
-grep -Fq "\"openvpn_version\": \"$OPENVPN_VERSION\"" <<<"$metadata"
-grep -Fq "\"openvpn_source_version\": \"$OPENVPN_VERSION\"" <<<"$metadata"
-if grep -Eq 'management_version|management_source|platform_api' <<<"$metadata"; then
-  echo 'runtime metadata contains removed management version fields' >&2
+metadata="$(docker run --rm --entrypoint ovpn "$IMAGE" version --json)"
+grep -Fq "\"version\":\"$GO_RUNTIME_VERSION\"" <<<"$metadata"
+grep -Fq '"data_schema":4' <<<"$metadata"
+grep -Fq '"go_version":"go1.26.5"' <<<"$metadata"
+grep -Fq '"sqlite":"github.com/mattn/go-sqlite3 v1.14.48"' <<<"$metadata"
+grep -Fq '"yaml":"go.yaml.in/yaml/v3 v3.0.4"' <<<"$metadata"
+
+short_version="$(docker run --rm --entrypoint ovpn "$IMAGE" version --short)"
+if [ "$short_version" != "$GO_RUNTIME_VERSION" ]; then
+  printf 'unexpected ovpn version --short output: %s\n' "$short_version" >&2
   exit 1
 fi
 
-short_version="$(docker run --rm --entrypoint ovpn "$IMAGE" -v)"
-if [ "$short_version" != "$IMAGE_VERSION" ]; then
-  printf 'unexpected ovpn -v output: %s\n' "$short_version" >&2
-  exit 1
-fi
+test "$(docker run --rm --entrypoint ovpn-broker "$IMAGE" --version)" = "$GO_RUNTIME_VERSION"
 
-version_summary="$(docker run --rm --entrypoint ovpn "$IMAGE" --version)"
-expected_summary="$(printf 'image:           %s\nopenvpn:         %s\neasy-rsa:        3.2.2\ndata schema:     %s' \
-  "$IMAGE_VERSION" "$OPENVPN_VERSION" "$DATA_SCHEMA")"
-if [ "$version_summary" != "$expected_summary" ]; then
-  echo 'version summary does not match the four-field public format' >&2
-  printf 'expected:\n%s\nactual:\n%s\n' "$expected_summary" "$version_summary" >&2
-  exit 1
-fi
+for binary in /usr/local/bin/ovpn /usr/local/bin/ovpn-broker; do
+  ldd_output="$(docker run --rm --entrypoint ldd "$IMAGE" "$binary")"
+  if grep -Fq 'not found' <<<"$ldd_output"; then
+    printf '%s\n' "$ldd_output" >&2
+    echo "runtime Go binary has unresolved libraries: $binary" >&2
+    exit 1
+  fi
+done
 
 docker run --rm --entrypoint sh "$IMAGE" -ec '
   ! command -v curl >/dev/null
   command -v jq >/dev/null
   command -v tar >/dev/null
   command -v openssl >/dev/null
-  command -v python3 >/dev/null
-  python3 -m py_compile /usr/local/lib/openvpn-container/management-broker.py
-  python3 -m py_compile /usr/local/lib/openvpn-container/runtime-logs.py
-  python3 -m py_compile /usr/local/lib/openvpn-container/runtime-events.py
+  ! command -v python3 >/dev/null
+  test "$(readlink /usr/local/bin/docker-entrypoint)" = ovpn
+  test "$(readlink /usr/local/bin/ovpn-hook)" = ovpn
+  test ! -e /usr/local/lib/openvpn-container/go
   test ! -e /usr/local/lib/openvpn-bootstrap.sh
   test ! -e /usr/local/lib/openvpn-verify-management-release.sh
   test ! -e /usr/local/lib/openvpn-container/upgrade.sh

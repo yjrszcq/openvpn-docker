@@ -219,6 +219,16 @@ func runServerRun(args []string, stdout, stderr io.Writer) int {
 // container command start the Go runtime.
 func RunEntrypoint(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
+		dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
+		empty, err := dataDirectoryEmpty(dataDir)
+		if err != nil {
+			return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "runtime_state_refused", "inspect runtime data directory", err))
+		}
+		if empty {
+			if code := runServerInit(nil, stdout, stderr); code != int(apperror.ExitSuccess) {
+				return code
+			}
+		}
 		return Run([]string{"server", "run"}, stdout, stderr)
 	}
 	base := filepath.Base(args[0])
@@ -236,6 +246,17 @@ func RunEntrypoint(args []string, stdout, stderr io.Writer) int {
 		return int(apperror.ExitSuccess)
 	}
 	return Run(args, stdout, stderr)
+}
+
+func dataDirectoryEmpty(path string) (bool, error) {
+	entries, err := os.ReadDir(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return len(entries) == 0, nil
 }
 
 // RunHook dispatches the ovpn-hook multicall entrypoint.

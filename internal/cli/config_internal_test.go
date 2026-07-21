@@ -2,12 +2,34 @@ package cli
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
 	configurationservice "github.com/yjrszcq/openvpn-docker/internal/configuration"
 )
+
+func TestDataDirectoryEmpty(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing")
+	empty, err := dataDirectoryEmpty(missing)
+	if err != nil || !empty {
+		t.Fatalf("missing directory empty=%v err=%v", empty, err)
+	}
+	directory := t.TempDir()
+	empty, err = dataDirectoryEmpty(directory)
+	if err != nil || !empty {
+		t.Fatalf("empty directory empty=%v err=%v", empty, err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "schema-version"), []byte("3\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	empty, err = dataDirectoryEmpty(directory)
+	if err != nil || empty {
+		t.Fatalf("legacy directory empty=%v err=%v", empty, err)
+	}
+}
 
 func TestConfigurationApplyHumanOutputListsEveryProfile(t *testing.T) {
 	result := configurationservice.ApplyResult{

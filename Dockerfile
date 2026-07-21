@@ -116,7 +116,6 @@ RUN apt-get update \
         nano \
         openssl \
         procps \
-        python3-minimal \
         tini \
         socat \
         util-linux \
@@ -131,22 +130,26 @@ COPY rootfs/ /
 COPY compatibility/ /usr/local/share/openvpn-container/compatibility/
 COPY scripts/generate-build-info.sh /usr/local/bin/generate-build-info
 
+RUN install -m 0755 /usr/local/lib/openvpn-container/go/ovpn /usr/local/bin/ovpn \
+    && install -m 0755 /usr/local/lib/openvpn-container/go/ovpn-broker /usr/local/bin/ovpn-broker \
+    && ln -sfn ovpn /usr/local/bin/docker-entrypoint \
+    && ln -sfn ovpn /usr/local/bin/ovpn-hook \
+    && rm -rf /usr/local/lib/openvpn-container/go
+
 RUN openvpn --version >/tmp/openvpn-version \
     && grep -Fq "OpenVPN $OPENVPN_VERSION" /tmp/openvpn-version \
     && ldd /usr/local/sbin/openvpn >/tmp/openvpn-ldd \
     && ! grep -Fq 'not found' /tmp/openvpn-ldd \
     && rm /tmp/openvpn-version /tmp/openvpn-ldd
 
-RUN for binary in /usr/local/lib/openvpn-container/go/ovpn /usr/local/lib/openvpn-container/go/ovpn-broker; do \
+RUN for binary in /usr/local/bin/ovpn /usr/local/bin/ovpn-broker; do \
       test -x "$binary" || exit 1; \
       ldd "$binary" >"/tmp/$(basename "$binary").ldd" || exit 1; \
       ! grep -Fq 'not found' "/tmp/$(basename "$binary").ldd" || exit 1; \
     done \
     && rm /tmp/ovpn.ldd /tmp/ovpn-broker.ldd
 
-RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/ovpn-hook /usr/local/bin/docker-entrypoint \
-       /usr/local/lib/openvpn-container/cli.sh \
-    && mkdir -p /etc/openvpn /usr/local/share/openvpn-container \
+RUN mkdir -p /etc/openvpn /usr/local/share/openvpn-container \
     && IMAGE_VERSION="$IMAGE_VERSION" \
        DATA_SCHEMA="$DATA_SCHEMA" \
        BASE_IMAGE="$BASE_IMAGE" \
@@ -163,4 +166,3 @@ RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/ovpn-hook /usr/local/bin/docker-
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=1 CMD ["/usr/local/bin/ovpn", "runtime", "health"]
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint"]
-CMD ["ovpn", "start"]
