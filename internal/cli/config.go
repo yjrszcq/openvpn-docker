@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -173,7 +174,46 @@ func runConfigApply(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "Configuration is already in sync at revision %d.\n", result.Plan.Configuration.CurrentRevision)
 		return int(apperror.ExitSuccess)
 	}
-	fmt.Fprintf(stdout, "Applied configuration revision %d (operation %s).\nRestart OpenVPN to activate the new revision.\n", result.Plan.Configuration.TargetRevision, result.OperationID)
+	writeConfigurationApplyResult(stdout, result)
+	return int(apperror.ExitSuccess)
+}
+
+func runServerRender(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && isHelp(args[0]) {
+		fmt.Fprintln(stdout, "Usage: ovpn server render [--output FILE|-]")
+		return int(apperror.ExitSuccess)
+	}
+	output := ""
+	for index := 0; index < len(args); index++ {
+		if args[index] != "--output" || index+1 >= len(args) || output != "" {
+			return writeError(stderr, usageError("usage: ovpn server render [--output FILE|-]"))
+		}
+		output = args[index+1]
+		index++
+	}
+	store, instance, err := openConfigurationState(context.Background())
+	if err != nil {
+		return writeConfigurationError(stderr, err, false)
+	}
+	defer store.Close()
+	renderer, err := configurationRenderer()
+	if err != nil {
+		return writeConfigurationApplyError(stderr, err, false)
+	}
+	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
+	content, err := renderer.Server(instance.Applied.Config, render.Paths{DataDir: dataDir, RuntimeDir: environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)})
+	if err != nil {
+		return writeConfigurationApplyError(stderr, err, false)
+	}
+	if output == "" || output == "-" {
+		if _, err := stdout.Write(content); err != nil {
+			return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "output_failure", "write rendered server configuration", err))
+		}
+		return int(apperror.ExitSuccess)
+	}
+	if err := writeExportFile(output, content); err != nil {
+		return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "output_failure", "write rendered server configuration", err))
+	}
 	return int(apperror.ExitSuccess)
 }
 
@@ -236,11 +276,7 @@ func openConfigurationManager(ctx context.Context) (*configurationservice.Manage
 	if err != nil {
 		return closeError(err)
 	}
-	contract, err := compatibility.Load(environmentOr("OVPN_COMPATIBILITY_FILE", compatibility.DefaultContractPath))
-	if err != nil {
-		return closeError(err)
-	}
-	renderer, err := render.New(environmentOr("OVPN_TEMPLATE_ROOT", render.DefaultTemplateRoot), contract)
+	renderer, err := configurationRenderer()
 	if err != nil {
 		return closeError(err)
 	}
@@ -249,6 +285,18 @@ func openConfigurationManager(ctx context.Context) (*configurationservice.Manage
 		return closeError(err)
 	}
 	return manager, store, nil
+}
+
+func configurationRenderer() (render.Renderer, error) {
+	contract, err := compatibility.Load(environmentOr("OVPN_COMPATIBILITY_FILE", compatibility.DefaultContractPath))
+	if err != nil {
+		return render.Renderer{}, apperror.Wrap(apperror.ExitPolicy, "invalid_compatibility_contract", "compatibility contract is invalid", err)
+	}
+	renderer, err := render.New(environmentOr("OVPN_TEMPLATE_ROOT", render.DefaultTemplateRoot), contract)
+	if err != nil {
+		return render.Renderer{}, apperror.Wrap(apperror.ExitPolicy, "invalid_templates", "OpenVPN templates are invalid", err)
+	}
+	return renderer, nil
 }
 
 func writeConfigurationPlan(writer io.Writer, plan configurationservice.Plan) {
@@ -289,6 +337,23 @@ func formatAddressIntent(value configurationservice.AddressIntent) string {
 	return value.Mode
 }
 
+func writeConfigurationApplyResult(writer io.Writer, result configurationservice.ApplyResult) {
+	fmt.Fprintf(writer, "Applied configuration revision %d (operation %s).\n", result.Plan.Configuration.TargetRevision, result.OperationID)
+	if result.Activation.RestartRequired {
+		fmt.Fprintln(writer, "Restart required: yes (OpenVPN was not reloaded by config apply).")
+	} else {
+		fmt.Fprintln(writer, "Restart required: no.")
+	}
+	if len(result.Activation.ProfileRedistribution) == 0 {
+		fmt.Fprintln(writer, "Profiles to redistribute: none.")
+		return
+	}
+	fmt.Fprintf(writer, "Profiles to redistribute: %d\n", len(result.Activation.ProfileRedistribution))
+	for _, client := range result.Activation.ProfileRedistribution {
+		fmt.Fprintf(writer, "  %s [%s]\n", client.Name, client.ID)
+	}
+}
+
 func writeConfigurationError(stderr io.Writer, err error, jsonMode bool) int {
 	switch {
 	case errors.Is(err, configurationservice.ErrPlanConflict):
@@ -303,10 +368,14 @@ func writeConfigurationError(stderr io.Writer, err error, jsonMode bool) int {
 }
 
 func writeConfigurationApplyError(stderr io.Writer, err error, jsonMode bool) int {
+	var applicationError *apperror.Error
+	if errors.As(err, &applicationError) {
+		return writeErrorMode(stderr, err, jsonMode)
+	}
 	switch {
 	case errors.Is(err, artifact.ErrLocked), errors.Is(err, storesqlite.ErrBusy):
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitTemporary, "configuration_busy", "OpenVPN must be stopped and configuration state unlocked", err), jsonMode)
-	case errors.Is(err, pki.ErrInvalidMaterial), errors.Is(err, artifact.ErrUnsafePath), errors.Is(err, storesqlite.ErrConstraint):
+	case errors.Is(err, pki.ErrInvalidMaterial), errors.Is(err, artifact.ErrUnsafePath), errors.Is(err, storesqlite.ErrConstraint), errors.Is(err, os.ErrNotExist):
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "configuration_apply_refused", "configuration apply was refused by state or security policy", err), jsonMode)
 	default:
 		return writeConfigurationError(stderr, err, jsonMode)

@@ -85,7 +85,7 @@ func TestConfigApplyRequiresConfirmationAndCommitsOffline(t *testing.T) {
 		t.Fatalf("confirmation code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	code, stdout, stderr = run("config", "apply", "--yes", "--json")
-	if code != 0 || stderr != "" || !strings.Contains(stdout, `"applied":true`) || !strings.Contains(stdout, `"target_revision":2`) {
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"applied":true`) || !strings.Contains(stdout, `"target_revision":2`) || !strings.Contains(stdout, `"restart_required":true`) || !strings.Contains(stdout, `"profile_redistribution":[]`) {
 		t.Fatalf("apply code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	store, err := storesqlite.Open(context.Background(), filepath.Join(root, "meta", "state.db"))
@@ -100,6 +100,45 @@ func TestConfigApplyRequiresConfirmationAndCommitsOffline(t *testing.T) {
 	code, stdout, stderr = run("config", "apply", "--yes", "--json")
 	if code != 0 || stderr != "" || !strings.Contains(stdout, `"applied":false`) {
 		t.Fatalf("in-sync apply code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestServerRenderUsesAppliedSnapshotWithoutChangingState(t *testing.T) {
+	root, _ := createConfigurationFixture(t)
+	runtimeDir := filepath.Join(t.TempDir(), "run")
+	t.Setenv("OVPN_DATA_DIR", root)
+	t.Setenv("OVPN_RUNTIME_DIR", runtimeDir)
+	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
+	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
+
+	code, stdout, stderr := run("server", "render")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "server 10.42.0.0 255.255.255.0") || !strings.Contains(stdout, filepath.Join(root, "pki", "ca.crt")) {
+		t.Fatalf("render code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	output := filepath.Join(t.TempDir(), "server.conf")
+	code, stdout, stderr = run("server", "render", "--output", output)
+	if code != 0 || stdout != "" || stderr != "" {
+		t.Fatalf("render output code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	info, err := os.Stat(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("rendered output mode=%v", info.Mode().Perm())
+	}
+	code, _, stderr = run("server", "render", "--output", output)
+	if code != 1 || !strings.Contains(stderr, "write rendered server configuration") {
+		t.Fatalf("render overwrite code=%d stderr=%q", code, stderr)
+	}
+	store, err := storesqlite.Open(context.Background(), filepath.Join(root, "meta", "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance, err := store.LoadOnlyInstance(context.Background())
+	_ = store.Close()
+	if err != nil || instance.Applied.Revision != 1 {
+		t.Fatalf("render changed state=%+v err=%v", instance, err)
 	}
 }
 

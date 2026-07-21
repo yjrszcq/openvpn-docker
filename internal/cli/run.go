@@ -104,6 +104,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "server" && args[1] == "run" {
 		return runServerRun(args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "server" && args[1] == "render" {
+		return runServerRender(args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "client" && args[1] == "list" {
 		return runClientList(args[2:], stdout, stderr)
 	}

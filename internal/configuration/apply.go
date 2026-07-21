@@ -38,10 +38,16 @@ type Manager struct {
 }
 
 type ApplyResult struct {
-	Version     int    `json:"version"`
-	Applied     bool   `json:"applied"`
-	OperationID string `json:"operation_id,omitempty"`
-	Plan        Plan   `json:"plan"`
+	Version     int              `json:"version"`
+	Applied     bool             `json:"applied"`
+	OperationID string           `json:"operation_id,omitempty"`
+	Activation  ActivationReport `json:"activation"`
+	Plan        Plan             `json:"plan"`
+}
+
+type ActivationReport struct {
+	RestartRequired       bool        `json:"restart_required"`
+	ProfileRedistribution []ClientRef `json:"profile_redistribution"`
 }
 
 type writeSpec struct {
@@ -103,7 +109,14 @@ func (manager *Manager) applyLocked(ctx context.Context, desired domain.Config) 
 	if err != nil {
 		return ApplyResult{}, err
 	}
-	result := ApplyResult{Version: 1, Plan: plan}
+	result := ApplyResult{
+		Version: 1,
+		Activation: ActivationReport{
+			RestartRequired:       plan.Configuration.Impact.RestartRequired,
+			ProfileRedistribution: append(make([]ClientRef, 0, len(plan.ProfileRedistribution)), plan.ProfileRedistribution...),
+		},
+		Plan: plan,
+	}
 	if plan.Configuration.InSync {
 		return result, nil
 	}
