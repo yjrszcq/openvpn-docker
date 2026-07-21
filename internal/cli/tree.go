@@ -78,7 +78,7 @@ var rootCommand = command{
 					[]string{"A bare --ipv4 or -4 means auto, the lowest available static address."},
 					"ovpn client address set laptop -4 dynamic"),
 				leaf("edit", "edit multiple client IPv4 assignments atomically", "ovpn client address edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--yes|-y] [--json|-j]",
-					[]string{"Opens a private CSV in OVPN_EDITOR, EDITOR, or the default editor. Requires confirmation."},
+					[]string{"Opens a private CSV using OVPN_EDITOR, then EDITOR, then nano. Requires confirmation."},
 					"ovpn client address edit laptop phone", "ovpn client address edit -a -y"),
 				leaf("release", "release a revoked client's retained static IPv4", "ovpn client address release (NAME|--name|-n NAME|--id|-i ID) [--full-id|-u] [--json|-j]",
 					[]string{"The selected client must be revoked and still retain a static assignment."},

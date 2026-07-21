@@ -93,6 +93,26 @@ func TestProfileDestinationAndCommittedFailureReporting(t *testing.T) {
 	}
 }
 
+func TestSelectAddressEditorUsesOverridesThenNano(t *testing.T) {
+	t.Setenv("OVPN_EDITOR", "")
+	t.Setenv("EDITOR", "")
+	if editor, err := selectAddressEditor(); err != nil || editor != "nano" {
+		t.Fatalf("default editor=%q err=%v", editor, err)
+	}
+	t.Setenv("EDITOR", "vim")
+	if editor, err := selectAddressEditor(); err != nil || editor != "vim" {
+		t.Fatalf("EDITOR selection=%q err=%v", editor, err)
+	}
+	t.Setenv("OVPN_EDITOR", "/usr/bin/nano")
+	if editor, err := selectAddressEditor(); err != nil || editor != "/usr/bin/nano" {
+		t.Fatalf("OVPN_EDITOR selection=%q err=%v", editor, err)
+	}
+	t.Setenv("OVPN_EDITOR", "nano --softwrap")
+	if _, err := selectAddressEditor(); err == nil {
+		t.Fatal("editor command with arguments was accepted")
+	}
+}
+
 type failingWriter struct{}
 
 func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("write failed") }

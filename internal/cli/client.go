@@ -525,15 +525,9 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 }
 
 func runAddressEditor(path string) error {
-	editor := os.Getenv("OVPN_EDITOR")
-	if editor == "" {
-		editor = os.Getenv("EDITOR")
-	}
-	if editor == "" {
-		editor = "vi"
-	}
-	if strings.ContainsAny(editor, " \t\r\n") {
-		return fmt.Errorf("%w: editor must be a single executable path", clientservice.ErrInvalidRequest)
+	editor, err := selectAddressEditor()
+	if err != nil {
+		return err
 	}
 	resolved, err := exec.LookPath(editor)
 	if err != nil {
@@ -543,7 +537,27 @@ func runAddressEditor(path string) error {
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
+	if terminal, err := os.OpenFile("/dev/tty", os.O_RDWR, 0); err == nil {
+		defer terminal.Close()
+		command.Stdin = terminal
+		command.Stdout = terminal
+		command.Stderr = terminal
+	}
 	return command.Run()
+}
+
+func selectAddressEditor() (string, error) {
+	editor := os.Getenv("OVPN_EDITOR")
+	if editor == "" {
+		editor = os.Getenv("EDITOR")
+	}
+	if editor == "" {
+		editor = "nano"
+	}
+	if strings.ContainsAny(editor, " \t\r\n") {
+		return "", fmt.Errorf("%w: editor must be a single executable path", clientservice.ErrInvalidRequest)
+	}
+	return editor, nil
 }
 
 func parseClientExport(args []string) (clientservice.Selector, string, error) {
