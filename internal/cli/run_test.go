@@ -376,9 +376,11 @@ func TestClientCreateAndRenameUsage(t *testing.T) {
 func TestClientMutationUsageErrorsAreStructuredJSON(t *testing.T) {
 	commands := [][]string{
 		{"client", "create", "-j"},
+		{"client", "create", "laptop", "-j", "-o", "-"},
 		{"client", "rename", "laptop", "-j"},
 		{"client", "revoke", "-j"},
 		{"client", "reissue", "-j"},
+		{"client", "reissue", "laptop", "-j", "-o", "-"},
 		{"client", "delete", "-j"},
 		{"client", "address", "set", "laptop", "-j"},
 		{"client", "address", "edit", "-j"},

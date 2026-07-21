@@ -124,9 +124,10 @@ func runClientExport(args []string, stdout, stderr io.Writer) int {
 
 func runClientCreate(args []string, stdout, stderr io.Writer) int {
 	jsonRequested := containsArgument(args, "--json")
+	output, args, outputErr := takeOutputOption(args)
 	options, args, err := takeClientOutputOptions(args)
-	if err != nil || len(args) < 1 || len(args) > 3 || strings.HasPrefix(args[0], "-") {
-		return writeErrorMode(stderr, usageError("usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]] [--json]"), jsonRequested)
+	if outputErr != nil || err != nil || len(args) < 1 || len(args) > 3 || strings.HasPrefix(args[0], "-") || (options.JSON && output == "-") {
+		return writeErrorMode(stderr, usageError("usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]] [--output FILE|-] [--json]"), jsonRequested)
 	}
 	request := clientservice.CreateRequest{Name: args[0], IPv4: "auto"}
 	if len(args) >= 2 {
@@ -149,10 +150,20 @@ func runClientCreate(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
+	profileOutput, err := writeCommittedProfile(context.Background(), state, result, output, stdout)
+	if err != nil {
+		return writeCommittedProfileError(stderr, result, err, options.JSON)
+	}
+	if output == "-" {
+		return int(apperror.ExitSuccess)
+	}
 	if options.JSON {
-		return writeClientMutationJSON(stdout, stderr, result)
+		return writeClientMutationJSON(stdout, stderr, clientMutationOutput{MutationResult: result, ProfileOutput: profileOutput})
 	}
 	fmt.Fprintf(stdout, "created client %s [%s] with IPv4 %s\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID), formatIPv4(result.Client.IPv4))
+	if profileOutput != nil {
+		fmt.Fprintf(stdout, "profile written to %s\n", profileOutput.Destination)
+	}
 	return int(apperror.ExitSuccess)
 }
 
@@ -223,9 +234,10 @@ func runClientRevoke(args []string, stdout, stderr io.Writer) int {
 
 func runClientReissue(args []string, stdout, stderr io.Writer) int {
 	jsonRequested := containsArgument(args, "--json")
+	output, args, outputErr := takeOutputOption(args)
 	options, args, optionErr := takeClientOutputOptions(args)
-	if optionErr != nil {
-		return writeErrorMode(stderr, optionErr, jsonRequested)
+	if outputErr != nil || optionErr != nil || (options.JSON && output == "-") {
+		return writeErrorMode(stderr, usageError("usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 [auto|dynamic|ADDRESS]] [--output FILE|-] [--json]"), jsonRequested)
 	}
 	ipv4 := ""
 	filtered := make([]string, 0, len(args))
@@ -252,10 +264,20 @@ func runClientReissue(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
+	profileOutput, err := writeCommittedProfile(context.Background(), state, result, output, stdout)
+	if err != nil {
+		return writeCommittedProfileError(stderr, result, err, options.JSON)
+	}
+	if output == "-" {
+		return int(apperror.ExitSuccess)
+	}
 	if options.JSON {
-		return writeClientMutationJSON(stdout, stderr, result)
+		return writeClientMutationJSON(stdout, stderr, clientMutationOutput{MutationResult: result, ProfileOutput: profileOutput})
 	}
 	fmt.Fprintf(stdout, "reissued client %s [%s] with IPv4 %s; redistribute profile and disconnect prior session\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID), formatIPv4(result.Client.IPv4))
+	if profileOutput != nil {
+		fmt.Fprintf(stdout, "profile written to %s\n", profileOutput.Destination)
+	}
 	return int(apperror.ExitSuccess)
 }
 
@@ -777,6 +799,16 @@ type clientOutputOptions struct {
 	FullID bool
 }
 
+type clientProfileOutput struct {
+	Destination string `json:"destination"`
+	Written     bool   `json:"written"`
+}
+
+type clientMutationOutput struct {
+	clientservice.MutationResult
+	ProfileOutput *clientProfileOutput `json:"profile_output,omitempty"`
+}
+
 func takeClientOutputOptions(args []string) (clientOutputOptions, []string, error) {
 	options := clientOutputOptions{}
 	filtered := make([]string, 0, len(args))
@@ -797,6 +829,65 @@ func takeClientOutputOptions(args []string) (clientOutputOptions, []string, erro
 		}
 	}
 	return options, filtered, nil
+}
+
+func takeOutputOption(args []string) (string, []string, error) {
+	output := ""
+	filtered := make([]string, 0, len(args))
+	for index := 0; index < len(args); index++ {
+		if canonicalOption(args[index]) != "--output" {
+			filtered = append(filtered, args[index])
+			continue
+		}
+		if output != "" || index+1 >= len(args) {
+			return "", nil, usageError("--output requires exactly one destination")
+		}
+		value := args[index+1]
+		if value == "" || (strings.HasPrefix(value, "-") && value != "-") {
+			return "", nil, usageError("--output requires FILE or -")
+		}
+		output = value
+		index++
+	}
+	return output, filtered, nil
+}
+
+func writeCommittedProfile(ctx context.Context, state *storesqlite.Store, result clientservice.MutationResult, output string, stdout io.Writer) (*clientProfileOutput, error) {
+	if output == "" {
+		return nil, nil
+	}
+	local, err := artifact.NewLocal(environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir))
+	if err != nil {
+		return nil, err
+	}
+	service, err := clientservice.NewService(state, local)
+	if err != nil {
+		return nil, err
+	}
+	content, _, err := service.Export(ctx, clientservice.Selector{IDPrefix: result.Client.ID})
+	if err != nil {
+		return nil, err
+	}
+	return writeProfileDestination(output, content, stdout)
+}
+
+func writeProfileDestination(output string, content []byte, stdout io.Writer) (*clientProfileOutput, error) {
+	destination := output
+	if output == "-" {
+		destination = "stdout"
+		if _, err := stdout.Write(content); err != nil {
+			return nil, err
+		}
+	} else if err := writeExportFile(output, content); err != nil {
+		return nil, err
+	}
+	return &clientProfileOutput{Destination: destination, Written: true}, nil
+}
+
+func writeCommittedProfileError(stderr io.Writer, result clientservice.MutationResult, cause error, jsonMode bool) int {
+	err := apperror.Wrap(apperror.ExitFailure, "profile_output_failed", fmt.Sprintf("client %s [%s] was committed, but profile output failed", result.Client.Name, clientservice.ShortID(result.Client.ID)), cause)
+	errWithHint := apperror.WithHint(err, fmt.Sprintf("rerun 'ovpn client export --id %s --output FILE' to retrieve the committed profile", clientservice.ShortID(result.Client.ID)))
+	return writeErrorMode(stderr, errWithHint, jsonMode)
 }
 
 func writeClientMutationJSON(stdout, stderr io.Writer, result any) int {

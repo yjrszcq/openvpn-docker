@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -53,7 +54,48 @@ func TestWriteClientMutationJSONPreservesFullIDs(t *testing.T) {
 	if decoded.Version != 1 || decoded.Client.ID != result.Client.ID || decoded.OperationID != result.OperationID {
 		t.Fatalf("decoded result=%+v", decoded)
 	}
+	stdout.Reset()
+	envelope := clientMutationOutput{MutationResult: result, ProfileOutput: &clientProfileOutput{Destination: "client.ovpn", Written: true}}
+	if code := writeClientMutationJSON(&stdout, &stderr, envelope); code != 0 || !bytes.Contains(stdout.Bytes(), []byte(`"profile_output":{"destination":"client.ovpn","written":true}`)) {
+		t.Fatalf("envelope code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
 }
+
+func TestTakeOutputOptionSupportsFilesAndStdout(t *testing.T) {
+	output, remaining, err := takeOutputOption([]string{"laptop", "-o", "client.ovpn", "-4", "dynamic"})
+	if err != nil || output != "client.ovpn" || len(remaining) != 3 {
+		t.Fatalf("output=%q remaining=%v err=%v", output, remaining, err)
+	}
+	output, remaining, err = takeOutputOption([]string{"laptop", "--output", "-"})
+	if err != nil || output != "-" || len(remaining) != 1 {
+		t.Fatalf("stdout output=%q remaining=%v err=%v", output, remaining, err)
+	}
+	for _, args := range [][]string{{"laptop", "-o"}, {"laptop", "-o", "--json"}, {"laptop", "-o", "a", "--output", "b"}} {
+		if _, _, err := takeOutputOption(args); err == nil {
+			t.Fatalf("invalid output options were accepted: %v", args)
+		}
+	}
+}
+
+func TestProfileDestinationAndCommittedFailureReporting(t *testing.T) {
+	var stdout bytes.Buffer
+	output, err := writeProfileDestination("-", []byte("profile\n"), &stdout)
+	if err != nil || stdout.String() != "profile\n" || output.Destination != "stdout" || !output.Written {
+		t.Fatalf("stdout=%q output=%+v err=%v", stdout.String(), output, err)
+	}
+	if _, err := writeProfileDestination("-", []byte("profile"), failingWriter{}); err == nil {
+		t.Fatal("stdout write failure was accepted")
+	}
+	result := clientservice.MutationResult{Version: 1, Client: clientservice.View{ID: "11111111-2222-4333-8444-555555555555", Name: "laptop"}}
+	var stderr bytes.Buffer
+	if code := writeCommittedProfileError(&stderr, result, errors.New("disk full"), true); code != 1 || !bytes.Contains(stderr.Bytes(), []byte(`"kind":"profile_output_failed"`)) || !bytes.Contains(stderr.Bytes(), []byte("was committed")) {
+		t.Fatalf("code=%d stderr=%q", code, stderr.String())
+	}
+}
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("write failed") }
 
 func TestWriteExportFileIsPrivateAndNeverOverwrites(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "client.ovpn")
