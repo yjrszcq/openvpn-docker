@@ -358,7 +358,7 @@ func runServerInit(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		switch {
 		case errors.Is(err, initialize.ErrInvalidConfig):
-			return writeError(stderr, apperror.Wrap(apperror.ExitData, "invalid_config", "initialization configuration is invalid", err))
+			return writeError(stderr, apperror.Wrap(apperror.ExitData, "invalid_config", "initialization configuration is invalid: "+err.Error(), err))
 		case errors.Is(err, pki.ErrUnavailable):
 			return writeError(stderr, apperror.Wrap(apperror.ExitUnavailable, "dependency_unavailable", "initialization dependency is unavailable", err))
 		case errors.Is(err, artifact.ErrLocked):
@@ -552,11 +552,38 @@ func runVersion(args []string, stdout, stderr io.Writer) int {
 }
 
 func writeError(stderr io.Writer, err error) int {
-	return int(apperror.Write(stderr, err, false))
+	return int(apperror.Write(stderr, withCLIHint(err), false))
 }
 
 func writeErrorMode(stderr io.Writer, err error, jsonMode bool) int {
-	return int(apperror.Write(stderr, err, jsonMode))
+	return int(apperror.Write(stderr, withCLIHint(err), jsonMode))
+}
+
+func withCLIHint(err error) error {
+	var applicationError *apperror.Error
+	if !errors.As(err, &applicationError) || applicationError.Hint != "" {
+		return err
+	}
+	var hint string
+	switch applicationError.Kind {
+	case "usage":
+		hint = "run the command with -h for usage, defaults, and examples"
+	case "confirmation_required":
+		hint = "run from a TTY, or pass --yes/-y after reviewing the operation"
+	case "invalid_config":
+		hint = "correct the YAML and run 'ovpn config validate' again"
+	case "configuration_busy", "state_busy", "lock_conflict":
+		hint = "stop the OpenVPN service and retry the maintenance operation"
+	case "runtime_unavailable", "runtime_unhealthy":
+		hint = "run this command in the active OpenVPN service container and check 'ovpn runtime health'"
+	case "client_state_refused", "configuration_state_refused", "runtime_state_refused":
+		hint = "run 'ovpn state doctor' and follow the reported recovery action"
+	case "maintenance_required":
+		hint = "run the command through the openvpn-maintenance service"
+	case "migration_upgrade_required":
+		hint = "upgrade the source instance to schema 3 with sh-ver before retrying"
+	}
+	return apperror.WithHint(err, hint)
 }
 
 // RunBroker dispatches the independent broker process.

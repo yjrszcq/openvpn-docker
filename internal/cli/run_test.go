@@ -417,7 +417,7 @@ func TestClientAddressUsageAndBatchConfirmation(t *testing.T) {
 
 func TestUnknownCommandIsUsageError(t *testing.T) {
 	code, _, stderr := run("unknown")
-	if code != 64 || !strings.Contains(stderr, "unknown command") {
+	if code != 64 || !strings.Contains(stderr, "unknown command") || !strings.Contains(stderr, "hint:") {
 		t.Fatalf("unknown command code=%d stderr=%q", code, stderr)
 	}
 }

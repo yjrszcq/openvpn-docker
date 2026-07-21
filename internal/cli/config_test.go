@@ -66,8 +66,17 @@ func TestConfigQueryUsageAndJSONErrors(t *testing.T) {
 	t.Setenv("OVPN_DATA_DIR", root)
 	t.Setenv("OVPN_CONFIG_FILE", configPath)
 	code, stdout, stderr = run("config", "plan", "--json")
-	if code != 65 || stdout != "" || !strings.Contains(stderr, `"kind":"invalid_config"`) {
+	if code != 65 || stdout != "" || !strings.Contains(stderr, `"kind":"invalid_config"`) || !strings.Contains(stderr, `"hint":`) || !strings.Contains(stderr, "field unknown") {
 		t.Fatalf("invalid plan code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestClientListExplainsEmptyState(t *testing.T) {
+	root, _ := createConfigurationFixture(t)
+	t.Setenv("OVPN_DATA_DIR", root)
+	code, stdout, stderr := run("client", "list")
+	if code != 0 || stdout != "No clients.\n" || stderr != "" {
+		t.Fatalf("empty list code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 

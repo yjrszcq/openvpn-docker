@@ -21,9 +21,25 @@ func runRuntimeStatus(args []string, stdout, stderr io.Writer) int {
 		return int(apperror.ExitSuccess)
 	}
 	jsonRequested := containsArgument(args, "--json")
-	jsonMode := len(args) == 1 && canonicalOption(args[0]) == "--json"
-	if len(args) != 0 && !jsonMode {
-		return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn runtime status [--json]"), jsonRequested)
+	jsonMode, fullID := false, false
+	for _, arg := range args {
+		switch canonicalOption(arg) {
+		case "--json":
+			if jsonMode {
+				return writeErrorMode(stderr, usageError("--json may only be specified once"), true)
+			}
+			jsonMode = true
+		case "--full-id":
+			if fullID {
+				return writeErrorMode(stderr, usageError("--full-id may only be specified once"), jsonMode)
+			}
+			fullID = true
+		default:
+			return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn runtime status [--json] [--full-id]"), jsonRequested)
+		}
+	}
+	if jsonMode && fullID {
+		return writeErrorMode(stderr, usageError("--full-id only affects human output and cannot be combined with --json"), true)
 	}
 	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
 	identities, err := runtimecontrol.LoadIdentities(context.Background(), dataDir)
@@ -43,9 +59,9 @@ func runRuntimeStatus(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stdout, "daemon: %s\nmanagement: %s\nclients: %d\n", status.Daemon, status.Management, status.ClientCount)
 	for _, client := range status.Clients {
-		identity := client.ClientID
+		identity := displayClientID(client.ClientID, fullID)
 		if client.ClientName != "" {
-			identity = fmt.Sprintf("%s [%s]", client.ClientName, client.ClientID)
+			identity = fmt.Sprintf("%s [%s]", client.ClientName, displayClientID(client.ClientID, fullID))
 		}
 		fmt.Fprintf(stdout, "- %s virtual=%s remote=%s\n", identity, client.VirtualAddress, client.RemoteAddress)
 	}

@@ -92,7 +92,7 @@ func runConfigPlan(args []string, stdout, stderr io.Writer) int {
 	}
 	desired, err := configservice.LoadFile(environmentOr("OVPN_CONFIG_FILE", configservice.DefaultPath))
 	if err != nil {
-		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitData, "invalid_config", "configuration is invalid", err), jsonMode == 1)
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitData, "invalid_config", "configuration is invalid: "+err.Error(), err), jsonMode == 1)
 	}
 	store, _, err := openConfigurationState(context.Background())
 	if err != nil {
@@ -141,7 +141,7 @@ func runConfigApply(args []string, stdout, stderr io.Writer) int {
 	}
 	desired, err := configservice.LoadFile(environmentOr("OVPN_CONFIG_FILE", configservice.DefaultPath))
 	if err != nil {
-		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitData, "invalid_config", "configuration is invalid", err), jsonMode)
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitData, "invalid_config", "configuration is invalid: "+err.Error(), err), jsonMode)
 	}
 	if !yes {
 		confirmed, err := confirmAction(stderr, "Type yes to apply the configuration while OpenVPN is stopped: ")

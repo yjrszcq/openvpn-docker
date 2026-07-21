@@ -28,3 +28,15 @@ func TestUnknownErrorUsesFailureCode(t *testing.T) {
 		t.Fatalf("exit code = %d, want %d", code, apperror.ExitFailure)
 	}
 }
+
+func TestWriteHintInHumanAndJSONModes(t *testing.T) {
+	err := apperror.WithHint(apperror.New(apperror.ExitUsage, "usage", "invalid command"), "run with -h")
+	var output bytes.Buffer
+	if code := apperror.Write(&output, err, false); code != apperror.ExitUsage || output.String() != "ovpn: invalid command\nhint: run with -h\n" {
+		t.Fatalf("human hint code=%d output=%q", code, output.String())
+	}
+	output.Reset()
+	if code := apperror.Write(&output, err, true); code != apperror.ExitUsage || output.String() != "{\"error\":{\"code\":64,\"kind\":\"usage\",\"message\":\"invalid command\",\"hint\":\"run with -h\"}}\n" {
+		t.Fatalf("JSON hint code=%d output=%q", code, output.String())
+	}
+}

@@ -26,6 +26,7 @@ type Error struct {
 	Code    ExitCode
 	Kind    string
 	Message string
+	Hint    string
 	Cause   error
 }
 
@@ -46,6 +47,17 @@ func New(code ExitCode, kind, message string) *Error {
 // Wrap creates a public application error backed by an internal cause.
 func Wrap(code ExitCode, kind, message string, cause error) *Error {
 	return &Error{Code: code, Kind: kind, Message: message, Cause: cause}
+}
+
+// WithHint returns a copy of err with an actionable public hint.
+func WithHint(err error, hint string) error {
+	var applicationError *Error
+	if !errors.As(err, &applicationError) || hint == "" {
+		return err
+	}
+	copy := *applicationError
+	copy.Hint = hint
+	return &copy
 }
 
 // Code returns the stable exit status for err. Unknown errors are failures.
@@ -79,16 +91,23 @@ func Write(writer io.Writer, err error, jsonMode bool) ExitCode {
 				Code    int    `json:"code"`
 				Kind    string `json:"kind"`
 				Message string `json:"message"`
+				Hint    string `json:"hint,omitempty"`
 			} `json:"error"`
 		}{}
 		payload.Error.Code = int(code)
 		payload.Error.Kind = kind
 		payload.Error.Message = message
+		if applicationError != nil {
+			payload.Error.Hint = applicationError.Hint
+		}
 		if encodeErr := json.NewEncoder(writer).Encode(payload); encodeErr != nil {
 			return ExitFailure
 		}
 		return code
 	}
 	fmt.Fprintf(writer, "ovpn: %s\n", message)
+	if applicationError != nil && applicationError.Hint != "" {
+		fmt.Fprintf(writer, "hint: %s\n", applicationError.Hint)
+	}
 	return code
 }

@@ -71,6 +71,10 @@ func runClientList(args []string, stdout, stderr io.Writer) int {
 		}
 		return int(apperror.ExitSuccess)
 	}
+	if len(result.Clients) == 0 {
+		fmt.Fprintln(stdout, "No clients.")
+		return int(apperror.ExitSuccess)
+	}
 	writer := tabwriter.NewWriter(stdout, 0, 4, 2, ' ', 0)
 	if detail {
 		fmt.Fprintln(writer, "CLIENT ID\tNAME\tSTATUS\tIPV4 MODE\tIPV4 ADDRESS\tIPV4 STATE")
@@ -133,7 +137,8 @@ func runClientCreate(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "Usage: ovpn client create NAME [--ipv4|-4 [auto|dynamic|ADDRESS]]")
 		return int(apperror.ExitSuccess)
 	}
-	if len(args) < 1 || len(args) > 3 || strings.HasPrefix(args[0], "-") {
+	fullID, args, err := takeBooleanOption(args, "--full-id")
+	if err != nil || len(args) < 1 || len(args) > 3 || strings.HasPrefix(args[0], "-") {
 		return writeError(stderr, usageError("usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]]"))
 	}
 	request := clientservice.CreateRequest{Name: args[0], IPv4: "auto"}
@@ -157,7 +162,7 @@ func runClientCreate(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeClientMutationError(stderr, err)
 	}
-	fmt.Fprintf(stdout, "created client %s [%s] with IPv4 %s\n", result.Client.Name, result.Client.ID, formatIPv4(result.Client.IPv4))
+	fmt.Fprintf(stdout, "created client %s [%s] with IPv4 %s\n", result.Client.Name, displayClientID(result.Client.ID, fullID), formatIPv4(result.Client.IPv4))
 	return int(apperror.ExitSuccess)
 }
 
@@ -166,8 +171,9 @@ func runClientRename(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "Usage: ovpn client rename (NAME|--name|-n NAME|--id|-i ID) NEW_NAME")
 		return int(apperror.ExitSuccess)
 	}
+	fullID, args, optionErr := takeBooleanOption(args, "--full-id")
 	selector, positionals, err := parseMutationSelector(args)
-	if err != nil || len(positionals) != 1 {
+	if optionErr != nil || err != nil || len(positionals) != 1 {
 		return writeError(stderr, usageError("usage: ovpn client rename (NAME|--name NAME|--id ID) NEW_NAME"))
 	}
 	manager, state, err := openClientManager(context.Background())
@@ -179,7 +185,7 @@ func runClientRename(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeClientMutationError(stderr, err)
 	}
-	fmt.Fprintf(stdout, "renamed client to %s [%s]\n", result.Client.Name, result.Client.ID)
+	fmt.Fprintf(stdout, "renamed client to %s [%s]\n", result.Client.Name, displayClientID(result.Client.ID, fullID))
 	return int(apperror.ExitSuccess)
 }
 
@@ -188,7 +194,7 @@ func runClientRevoke(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "Usage: ovpn client revoke (NAME|--name|-n NAME|--id|-i ID) [--release-ipv4|-4]")
 		return int(apperror.ExitSuccess)
 	}
-	release := false
+	release, fullID := false, false
 	filtered := make([]string, 0, len(args))
 	for _, arg := range args {
 		option := canonicalOption(arg)
@@ -200,6 +206,13 @@ func runClientRevoke(args []string, stdout, stderr io.Writer) int {
 				return writeError(stderr, usageError("--release-ipv4 may only be specified once"))
 			}
 			release = true
+			continue
+		}
+		if option == "--full-id" {
+			if fullID {
+				return writeError(stderr, usageError("--full-id may only be specified once"))
+			}
+			fullID = true
 			continue
 		}
 		filtered = append(filtered, arg)
@@ -217,7 +230,7 @@ func runClientRevoke(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeClientMutationError(stderr, err)
 	}
-	fmt.Fprintf(stdout, "revoked client %s [%s]; runtime disconnect required\n", result.Client.Name, result.Client.ID)
+	fmt.Fprintf(stdout, "revoked client %s [%s]; runtime disconnect required\n", result.Client.Name, displayClientID(result.Client.ID, fullID))
 	return int(apperror.ExitSuccess)
 }
 
@@ -227,9 +240,17 @@ func runClientReissue(args []string, stdout, stderr io.Writer) int {
 		return int(apperror.ExitSuccess)
 	}
 	ipv4 := ""
+	fullID := false
 	filtered := make([]string, 0, len(args))
 	for index := 0; index < len(args); index++ {
 		if canonicalOption(args[index]) != "--ipv4" {
+			if canonicalOption(args[index]) == "--full-id" {
+				if fullID {
+					return writeError(stderr, usageError("--full-id may only be specified once"))
+				}
+				fullID = true
+				continue
+			}
 			filtered = append(filtered, args[index])
 			continue
 		}
@@ -251,7 +272,7 @@ func runClientReissue(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeClientMutationError(stderr, err)
 	}
-	fmt.Fprintf(stdout, "reissued client %s [%s] with IPv4 %s; redistribute profile and disconnect prior session\n", result.Client.Name, result.Client.ID, formatIPv4(result.Client.IPv4))
+	fmt.Fprintf(stdout, "reissued client %s [%s] with IPv4 %s; redistribute profile and disconnect prior session\n", result.Client.Name, displayClientID(result.Client.ID, fullID), formatIPv4(result.Client.IPv4))
 	return int(apperror.ExitSuccess)
 }
 
@@ -260,7 +281,7 @@ func runClientDelete(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "Usage: ovpn client delete (NAME|--name|-n NAME|--id|-i ID) [--yes|-y]")
 		return int(apperror.ExitSuccess)
 	}
-	yes := false
+	yes, fullID := false, false
 	filtered := make([]string, 0, len(args))
 	for _, arg := range args {
 		if canonicalOption(arg) == "--yes" {
@@ -268,6 +289,13 @@ func runClientDelete(args []string, stdout, stderr io.Writer) int {
 				return writeError(stderr, usageError("--yes may only be specified once"))
 			}
 			yes = true
+			continue
+		}
+		if canonicalOption(arg) == "--full-id" {
+			if fullID {
+				return writeError(stderr, usageError("--full-id may only be specified once"))
+			}
+			fullID = true
 			continue
 		}
 		filtered = append(filtered, arg)
@@ -294,7 +322,7 @@ func runClientDelete(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeClientMutationError(stderr, err)
 	}
-	fmt.Fprintf(stdout, "deleted client %s [%s]; UUID tombstone retained\n", result.Client.Name, result.Client.ID)
+	fmt.Fprintf(stdout, "deleted client %s [%s]; UUID tombstone retained\n", result.Client.Name, displayClientID(result.Client.ID, fullID))
 	return int(apperror.ExitSuccess)
 }
 
@@ -317,9 +345,17 @@ func runClientAddressSet(args []string, stdout, stderr io.Writer) int {
 	}
 	ipv4 := ""
 	ipv4Set := false
+	fullID := false
 	filtered := make([]string, 0, len(args))
 	for index := 0; index < len(args); index++ {
 		if canonicalOption(args[index]) != "--ipv4" {
+			if canonicalOption(args[index]) == "--full-id" {
+				if fullID {
+					return writeError(stderr, usageError("--full-id may only be specified once"))
+				}
+				fullID = true
+				continue
+			}
 			filtered = append(filtered, args[index])
 			continue
 		}
@@ -342,7 +378,7 @@ func runClientAddressSet(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeClientMutationError(stderr, err)
 	}
-	fmt.Fprintf(stdout, "updated IPv4 for %s [%s] to %s\n", result.Clients[0].Name, result.Clients[0].ID, formatIPv4(result.Clients[0].IPv4))
+	fmt.Fprintf(stdout, "updated IPv4 for %s [%s] to %s\n", result.Clients[0].Name, displayClientID(result.Clients[0].ID, fullID), formatIPv4(result.Clients[0].IPv4))
 	return int(apperror.ExitSuccess)
 }
 
@@ -351,8 +387,9 @@ func runClientAddressRelease(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "Usage: ovpn client address release (NAME|--name|-n NAME|--id|-i ID)")
 		return int(apperror.ExitSuccess)
 	}
+	fullID, args, optionErr := takeBooleanOption(args, "--full-id")
 	selector, positionals, err := parseMutationSelector(args)
-	if err != nil || len(positionals) != 0 {
+	if optionErr != nil || err != nil || len(positionals) != 0 {
 		return writeError(stderr, usageError("usage: ovpn client address release (NAME|--name NAME|--id ID)"))
 	}
 	manager, state, err := openClientManager(context.Background())
@@ -364,7 +401,7 @@ func runClientAddressRelease(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeClientMutationError(stderr, err)
 	}
-	fmt.Fprintf(stdout, "released IPv4 for revoked client %s [%s]\n", result.Clients[0].Name, result.Clients[0].ID)
+	fmt.Fprintf(stdout, "released IPv4 for revoked client %s [%s]\n", result.Clients[0].Name, displayClientID(result.Clients[0].ID, fullID))
 	return int(apperror.ExitSuccess)
 }
 
@@ -715,4 +752,27 @@ func writeClientMutationError(stderr io.Writer, err error) int {
 
 func usageError(message string) error {
 	return apperror.New(apperror.ExitUsage, "usage", message)
+}
+
+func takeBooleanOption(args []string, wanted string) (bool, []string, error) {
+	found := false
+	filtered := make([]string, 0, len(args))
+	for _, arg := range args {
+		if canonicalOption(arg) != wanted {
+			filtered = append(filtered, arg)
+			continue
+		}
+		if found {
+			return false, nil, usageError(wanted + " may only be specified once")
+		}
+		found = true
+	}
+	return found, filtered, nil
+}
+
+func displayClientID(id string, full bool) string {
+	if full {
+		return id
+	}
+	return clientservice.ShortID(id)
 }
