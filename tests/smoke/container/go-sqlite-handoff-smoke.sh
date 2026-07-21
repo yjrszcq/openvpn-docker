@@ -171,8 +171,8 @@ docker run --rm \
 client_status=$?
 set -e
 if [ "$client_status" -ne 124 ] || ! grep -Fq 'Initialization Sequence Completed' "$WORK_DIR/go-client.log"; then
-	cat "$WORK_DIR/go-client.log" >&2
-	docker logs "$SERVER_CONTAINER" >&2 || true
+  cat "$WORK_DIR/go-client.log" >&2
+  docker logs "$SERVER_CONTAINER" >&2 || true
   printf 'Go client returned %s\n' "$client_status" >&2
   exit 1
 fi

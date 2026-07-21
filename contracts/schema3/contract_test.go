@@ -79,11 +79,12 @@ func TestBehaviorContractBaseline(t *testing.T) {
 		seen[command.V3] = true
 	}
 
-	repositoryRoot := filepath.Join("..", "..")
+	seenPaths := make(map[string]bool, len(contract.SourcePaths))
 	for _, path := range contract.SourcePaths {
-		if _, err := os.Stat(filepath.Join(repositoryRoot, path)); err != nil {
-			t.Errorf("contract source %s: %v", path, err)
+		if path == "" || seenPaths[path] {
+			t.Errorf("invalid or duplicate historical source path %q", path)
 		}
+		seenPaths[path] = true
 	}
 }
 

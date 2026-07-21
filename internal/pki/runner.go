@@ -135,7 +135,11 @@ func (runner *Runner) ReissueClient(ctx context.Context, pkiDir, clientID string
 	if !domain.ValidUUID(clientID) {
 		return CertificateInfo{}, fmt.Errorf("invalid client UUID")
 	}
-	for _, relative := range []string{filepath.Join("reqs", clientID+".req"), filepath.Join("private", clientID+".key")} {
+	for _, relative := range []string{
+		filepath.Join("issued", clientID+".crt"),
+		filepath.Join("reqs", clientID+".req"),
+		filepath.Join("private", clientID+".key"),
+	} {
 		if err := os.Remove(filepath.Join(pkiDir, relative)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return CertificateInfo{}, fmt.Errorf("remove old client material: %w", err)
 		}

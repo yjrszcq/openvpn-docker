@@ -72,13 +72,15 @@ done
 
 docker run --rm --entrypoint sh "$IMAGE" -ec '
   ! command -v curl >/dev/null
-  command -v jq >/dev/null
+  ! command -v jq >/dev/null
   command -v tar >/dev/null
   command -v openssl >/dev/null
   ! command -v python3 >/dev/null
   test "$(readlink /usr/local/bin/docker-entrypoint)" = ovpn
   test "$(readlink /usr/local/bin/ovpn-hook)" = ovpn
   test ! -e /usr/local/lib/openvpn-container/go
+  test ! -e /usr/local/lib/openvpn-container
+  test ! -e /usr/local/share/openvpn-container/build-info.json
   test ! -e /usr/local/lib/openvpn-bootstrap.sh
   test ! -e /usr/local/lib/openvpn-verify-management-release.sh
   test ! -e /usr/local/lib/openvpn-container/upgrade.sh
@@ -88,6 +90,8 @@ docker run --rm --entrypoint sh "$IMAGE" -ec '
   test -s /usr/local/share/licenses/openvpn-container/LICENSE
   test -s /usr/local/share/licenses/openvpn-container/NOTICE
   test -s /usr/local/share/licenses/openvpn/COPYING
+  test -s /usr/local/share/openvpn-container/templates/openvpn-2.7/server.conf.tpl
+  test -s /usr/local/share/openvpn-container/templates/openvpn-2.7/client.ovpn.tpl
   grep -Fq "GNU GENERAL PUBLIC LICENSE" /usr/local/share/licenses/openvpn-container/LICENSE
   grep -Fq "GPL-2.0-only" /usr/local/share/licenses/openvpn-container/NOTICE
   grep -Fq "OpenVPN" /usr/local/share/licenses/openvpn/COPYING

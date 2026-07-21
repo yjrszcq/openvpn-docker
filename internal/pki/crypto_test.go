@@ -356,6 +356,38 @@ func TestRunnerIssuesAndRevokesClient(t *testing.T) {
 	}
 }
 
+func TestRunnerReissueRemovesExistingClientMaterial(t *testing.T) {
+	pkiDir := filepath.Join(t.TempDir(), "pki")
+	paths := []string{
+		filepath.Join(pkiDir, "issued", testClientID+".crt"),
+		filepath.Join(pkiDir, "reqs", testClientID+".req"),
+		filepath.Join(pkiDir, "private", testClientID+".key"),
+	}
+	for _, path := range paths {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("old"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	executor := &fakeExecutor{handler: func(Invocation) error {
+		for _, path := range paths {
+			if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("reissue retained %s: %v", path, err)
+			}
+		}
+		return fmt.Errorf("%w: stop after cleanup", ErrCommand)
+	}}
+	runner, err := NewRunner(Config{EasyRSABinary: "fake-easyrsa", OpenVPNBinary: "fake-openvpn"}, executor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runner.ReissueClient(context.Background(), pkiDir, testClientID); !errors.Is(err, ErrCommand) {
+		t.Fatalf("reissue error=%v", err)
+	}
+}
+
 func TestRunnerStopsOnExternalFailure(t *testing.T) {
 	executor := &fakeExecutor{handler: func(Invocation) error { return fmt.Errorf("%w: injected", ErrCommand) }}
 	runner, err := NewRunner(Config{EasyRSABinary: "fake-easyrsa", OpenVPNBinary: "fake-openvpn"}, executor)

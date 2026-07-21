@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-LIB_DIR="${OVPN_LIB_DIR:-/usr/local/lib/openvpn-container}"
-exec "$LIB_DIR/cli.sh" "$@"

@@ -10,8 +10,6 @@ grep -Fq 'COPY --from=builder /out/ /' "$dockerfile"
 grep -Fq 'COPY --from=go-builder /out/ /' "$dockerfile"
 grep -Fq 'make DESTDIR=/out install' "$dockerfile"
 grep -Fq 'fetch-openvpn-source /tmp/source' "$dockerfile"
-grep -Fq 'OVPN_RUNTIME_STRATEGY=source-build' "$dockerfile"
-grep -Fq 'OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION"' "$dockerfile"
 grep -Fq 'grep -Fq "OpenVPN $OPENVPN_VERSION" /tmp/openvpn-version' "$dockerfile"
 grep -Fq "! grep -Fq 'not found' /tmp/openvpn-ldd" "$dockerfile"
 grep -Fq 'GOPROXY=direct' "$dockerfile"
@@ -43,6 +41,18 @@ if ! grep -Eq '^[[:space:]]+vim([[:space:]]|\\\\)' "$dockerfile"; then
   echo 'runtime Dockerfile must install Vim for configured interactive editing' >&2
   exit 1
 fi
+
+for removed in python3 jq socat procps util-linux generate-build-info; do
+  if grep -Eq "^[[:space:]]+${removed}([[:space:]]|\\\\)|COPY .*${removed}" "$dockerfile"; then
+    echo "runtime Dockerfile still includes legacy dependency: $removed" >&2
+    exit 1
+  fi
+done
+if grep -Fq 'COPY rootfs/ /' "$dockerfile"; then
+  echo 'runtime Dockerfile must not copy the legacy rootfs control plane' >&2
+  exit 1
+fi
+grep -Fq 'COPY rootfs/usr/local/share/openvpn-container/templates/' "$dockerfile"
 
 if grep -Eq '^[[:space:]]+openvpn([[:space:]]|\\\\)' "$dockerfile"; then
   echo 'runtime Dockerfile must not install the Debian openvpn package' >&2
