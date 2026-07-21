@@ -1,0 +1,296 @@
+# OpenVPN CLI v4 命令参考
+
+本文定义 Go + SQLite schema 4 控制面的命令契约。
+
+## 调用方式与路径
+
+在线命令通过服务容器执行：
+
+```bash
+docker compose exec openvpn ovpn <command>
+```
+
+离线维护命令通过 one-shot maintenance 服务执行：
+
+```bash
+docker compose run --rm openvpn-maintenance <command>
+```
+
+maintenance 服务的 entrypoint 已经是 `ovpn`，因此 `<command>` 直接从
+`config`、`state`、`repair` 或 `migrate` 开始。
+
+| 用途 | 默认路径 | 覆盖变量 |
+|---|---|---|
+| 期望 YAML | `/etc/openvpn-config/config.yaml` | `OVPN_CONFIG_FILE` |
+| 持久化数据 | `/etc/openvpn` | `OVPN_DATA_DIR` |
+| runtime socket 与锁 | `/run/openvpn-container` | `OVPN_RUNTIME_DIR` |
+| SQLite 权威库 | `/etc/openvpn/meta/state.db` | 由 data dir 派生 |
+
+`OVPN_MAINTENANCE=true` 授权离线迁移。批量地址编辑器依次取
+`OVPN_EDITOR`、`EDITOR`，最后使用 `vi`。外部二进制与模板覆盖变量只用于测试和
+开发，不属于常规部署配置。
+
+## 输出与退出码
+
+查询和 plan 默认输出稳定的人类可读文本，并在标注处支持 `--json`。JSON 模式错误
+以结构化对象写入 stderr。`runtime events --json` 输出 JSONL；
+`runtime logs --raw` 保留 OpenVPN 原始文本。
+
+| 退出码 | 含义 |
+|---|---|
+| `0` | 成功 |
+| `1` | runtime 或操作失败 |
+| `64` | CLI 用法错误 |
+| `65` | 输入或配置数据错误 |
+| `69` | 外部依赖不可用 |
+| `75` | 锁、busy 状态或临时资源冲突 |
+| `78` | schema、状态、确认或安全策略拒绝 |
+
+`migrate apply`、`config apply`、`repair apply`、`client delete` 和批量地址
+编辑必须交互确认或带 `--yes`；非 TTY 未带 `--yes` 时直接拒绝。
+
+## 命令树
+
+```text
+ovpn
+├── server
+│   ├── init
+│   ├── run
+│   └── render [--output FILE|-]
+├── config
+│   ├── validate [--json]
+│   ├── show [--json]
+│   ├── export [--output FILE|-]
+│   ├── plan [--json]
+│   └── apply [--yes] [--json]
+├── client
+│   ├── create NAME [--ipv4 auto|dynamic|ADDRESS]
+│   ├── list [--detail] [--full-id] [--json]
+│   ├── export (--name NAME|--id ID) [--output FILE|-]
+│   ├── rename (--name NAME|--id ID) NEW_NAME
+│   ├── revoke (--name NAME|--id ID) [--release-ipv4]
+│   ├── reissue (--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]
+│   ├── delete (--name NAME|--id ID) [--yes]
+│   └── address
+│       ├── set (--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS
+│       ├── edit (--all|--name NAME...|--id ID...) [--yes]
+│       └── release (--name NAME|--id ID)
+├── state
+│   ├── show [--json]
+│   └── doctor [--json]
+├── repair
+│   ├── plan [--json]
+│   └── apply [--yes] [--json]
+├── migrate
+│   ├── plan [--json]
+│   └── apply [--yes] [--json]
+├── runtime
+│   ├── status [--json]
+│   ├── health
+│   ├── capabilities [--json]
+│   ├── logs [--lines N] [--follow] [--raw] [--full-id]
+│   └── events [--lines N] [--follow] [--json] [--full-id]
+└── version [--short|--json]
+```
+
+所有命令组和 leaf command 都接受 `--help` 或 `-h`。
+
+## Server 命令
+
+### `ovpn server init`
+
+从有效 YAML 初始化空的 schema 4 数据目录。在 staging 中创建并验证 SQLite、PKI、
+服务端凭据、CRL、tls-crypt、配置和派生文件后统一安装。非空目录或不支持的旧格式
+会被拒绝。
+
+镜像 entrypoint 只在挂载数据目录为空时自动调用初始化；显式 `server run` 不会为
+缺失状态执行初始化。
+
+### `ovpn server run`
+
+加载 applied SQLite 快照，恢复中断 operation，reconcile IPv4 forwarding/防火墙，
+启动 Go broker 与 OpenVPN，监督两个进程并转发 TERM、INT、HUP。
+
+YAML 缺失或发生漂移只会产生警告；runtime 继续使用最近 applied revision，启动时
+绝不会自动 apply。
+
+### `ovpn server render [--output FILE|-]`
+
+根据 applied SQLite 状态渲染服务端配置。默认写 stdout；`--output -` 显式表示
+stdout，文件目标必须满足安全输出规则。
+
+## 配置命令
+
+YAML v1 要求 `server.endpoint` 和 `ipv4.network`。解析严格拒绝未知/重复字段、
+null、多文档、类型错误、非规范网段、不支持值和 IPv6 隧道状态。
+
+### `ovpn config validate [--json]`
+
+只验证并规范化期望 YAML，不打开 SQLite，也不比较或修改 applied 状态。
+
+### `ovpn config show [--json]`
+
+显示 SQLite 中规范化的 applied 配置、revision 和 SHA-256 digest，不读取期望 YAML。
+
+### `ovpn config export [--output FILE|-]`
+
+从 applied SQLite 快照输出完整 YAML v1。schema 3 迁移实例若没有 v4 YAML，迁移后
+必须执行该命令。
+
+### `ovpn config plan [--json]`
+
+比较期望 YAML 与 applied revision，列出字段变化以及重启、地址重映射、防火墙
+reconcile、派生 artifact 和 profile 重分发影响。
+
+### `ovpn config apply [--yes] [--json]`
+
+要求 OpenVPN 已停止并获取独占 runtime lock。普通配置与 IPv4 网段/动态池变化在同一
+staging operation 中完成，统一更新 SQLite、重映射地址、生成派生文件并报告重启和
+重分发要求；不会在线 reload。
+
+## 客户端选择与身份
+
+每个客户端拥有不可变 UUID 和当前显示名称。操作已有客户端时必须选择且只能选择：
+
+```text
+--name NAME
+--id ID
+```
+
+名称区分大小写并精确匹配。ID 接受标准 UUID，或至少八位且唯一的十六进制 UUID
+前缀。active/revoked 名称唯一；deleted 保留 UUID tombstone，但旧名称可以由新 UUID
+复用。
+
+IPv4 意图统一表示为：
+
+- `auto`：分配最低可用静态地址。
+- `dynamic`：使用配置的动态池。
+- `ADDRESS`：使用指定且空闲的静态 IPv4。
+
+### `ovpn client create NAME [--ipv4 ...]`
+
+创建 UUID、Easy-RSA 证书/私钥、profile、地址 assignment、artifact metadata、
+operation 和 audit event。默认 IPv4 意图为 `auto`。
+
+### `ovpn client list [--detail] [--full-id] [--json]`
+
+列出当前客户端。`--detail` 增加 assignment 与 lease；文本模式默认缩短 ID，
+`--full-id` 显示完整 UUID；JSON 使用稳定对象。
+
+### `ovpn client export SELECTOR [--output FILE|-]`
+
+导出 active 客户端的当前 profile，默认写 stdout。输出属于私密凭据。
+
+### `ovpn client rename SELECTOR NEW_NAME`
+
+修改显示名称和 profile 文件名，不改变 UUID、证书身份、地址 assignment 或审计历史。
+
+### `ovpn client revoke SELECTOR [--release-ipv4]`
+
+吊销证书、重建 CRL、将 profile 标记为 revoked，并报告需要断开现有 runtime session。
+静态 IPv4 默认保留，带 `--release-ipv4` 时释放。
+
+### `ovpn client reissue SELECTOR [--ipv4 ...]`
+
+为同一 UUID 签发新私钥/证书，更新 CRL/profile，并可改变地址意图。必须重新导出和
+分发 profile，并断开旧 session。
+
+### `ovpn client delete SELECTOR [--yes]`
+
+必要时先吊销 active 证书，再删除本地凭据和 assignment，保留 UUID tombstone。
+已删除私钥只能从安全备份恢复。
+
+### `ovpn client address set SELECTOR --ipv4 ...`
+
+原子修改一个 active 客户端的 assignment 并同步 CCD。需要断开当前 session 才会使用
+新地址。
+
+### `ovpn client address edit TARGETS [--yes]`
+
+选择全部 active 客户端或重复指定 name/ID，然后打开私有 CSV：
+
+```text
+# client,ipv4
+laptop,auto
+phone,dynamic
+tablet,10.42.0.20
+```
+
+每个选中客户端必须恰好出现一次，值只能是 `auto`、`dynamic` 或静态 IPv4。
+`--name` 与 `--id` 不能混用。完整集合统一验证并原子提交，因此支持地址交换。
+
+### `ovpn client address release SELECTOR`
+
+释放 revoked 客户端保留的静态 assignment，不删除客户端、profile 历史、证书证据或
+tombstone。
+
+## 状态与修复
+
+### `ovpn state show [--json]`
+
+输出聚合状态：`HEALTHY`、`DEGRADED_REPAIRABLE`、`DEGRADED_RECOVERABLE`、
+`DEGRADED_REISSUABLE`、`CRITICAL` 或 `UNRECOVERABLE`。初始化流程会单独识别空目录。
+
+### `ovpn state doctor [--json]`
+
+检查 SQLite integrity/约束、applied 配置、PKI、artifact metadata、证书/私钥、CRL、
+profile、CCD 和中断 operation，输出 issue ID、证据、严重性和建议动作。缺失或损坏的
+权威数据库不会被猜测重建。
+
+### `ovpn repair plan [--json]`
+
+根据 state report 生成只读计划，将安全派生文件重建、可信证据恢复、blocker 和
+deferred work 分开列出。
+
+### `ovpn repair apply [--yes] [--json]`
+
+在独占锁下通过 staging、operation journal、验证和回滚执行允许的动作。SQLite 权威
+缺失/损坏或安全证据冲突仍要求恢复备份。
+
+## 迁移命令
+
+### `ovpn migrate plan [--json]`
+
+只读解析 schema 3，报告客户端、assignment、lease、audit event、artifact、规范化
+repair、profile 影响、快照路径、YAML export 和回滚说明。schema 1/2 会要求先用
+`sh-ver` 升到 schema 3；更新、未知或损坏来源也会拒绝。
+
+### `ovpn migrate apply [--yes] [--json]`
+
+要求 `OVPN_MAINTENANCE=true`、服务停止、显式确认和独占锁。命令先创建并校验完整
+schema 3 快照，再在 staging 中构建 schema 4，通过 `state doctor` 后原子安装；中断
+transaction 可确定完成或回滚。
+
+成功后必须 export YAML。回滚必须恢复完整且校验通过的快照，再运行 `sh-ver` 镜像。
+
+## Runtime 命令
+
+### `ovpn runtime status [--json]`
+
+通过 management broker 查询 daemon、management、在线客户端、虚拟地址和远端地址，
+要求服务正在运行。
+
+### `ovpn runtime health`
+
+仅在 broker 与 OpenVPN 健康时返回成功并输出 `healthy`；镜像 healthcheck 使用该命令。
+
+### `ovpn runtime capabilities [--json]`
+
+报告严格 compatibility contract 和实际探测到的 OpenVPN feature。
+
+### `ovpn runtime logs [options]`
+
+读取持久化 OpenVPN 日志。`--lines` 默认 100，`--follow` 跟随轮转，`--raw` 禁止
+UUID 到名称翻译，`--full-id` 在翻译输出中保留完整 UUID。
+
+### `ovpn runtime events [options]`
+
+读取 `events.jsonl`。文本模式面向人，`--json` 保持 JSONL，`--follow` 跟随新增事件，
+`--full-id` 保留完整 UUID。
+
+## 版本命令
+
+### `ovpn version [--short|--json]`
+
+输出项目 runtime/image 版本、data schema、Go 版本、VCS revision、构建时间和固定 Go
+module 版本。`--short` 只输出项目版本，`--json` 输出稳定版本对象。

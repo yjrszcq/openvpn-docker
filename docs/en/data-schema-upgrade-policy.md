@@ -1,37 +1,89 @@
 # Data Schema Upgrade Policy
 
-This version-independent policy defines the persistent-data compatibility contract. It remains in force when command manuals and image releases change.
+This policy defines persistent-data compatibility independently from command
+documentation and image releases.
 
-## Version independence
+## Independent version axes
 
-The image version, OpenVPN runtime version, and persistent data schema are independent. The schema is a monotonically increasing positive integer and changes only when the persistent format becomes incompatible. Multiple image and OpenVPN versions may use the same schema, and every image using that schema must interpret it identically.
+The project image version, OpenVPN runtime version, and integer data schema are
+independent. The data schema changes only when persistent interpretation is
+incompatible. Multiple project/OpenVPN releases may share one schema and must
+interpret that schema identically.
 
-Migration dispatch is based only on schema evidence stored in the data directory. It must not select persistent formats by image version, release tag, source commit, or OpenVPN version.
+Migration dispatch uses only evidence inside the data directory. It must not
+select a format by image tag, source revision, release date, or OpenVPN version.
+
+## Current schema 4 authority
+
+Schema 4 stores all structured authoritative state in
+`/etc/openvpn/meta/state.db`. PKI, private keys, CRL, tls-crypt, profiles, CCD,
+derived server configuration, and logs remain files. The database and those
+files are one backup/restore unit.
+
+Runtime paths must not maintain CSV/SQLite dual authority. Runtime lease data
+is explicitly disposable cache; business state and audit updates are committed
+transactionally in SQLite.
 
 ## Strict runtime gate
 
-Normal runtime code accepts only its current schema. Historical schemas may be read only by migration modules lazy-loaded by `ovpn migrate`; normal config, client, IP, state, repair, recovery, and server-start paths must not source or parse historical formats.
+Normal runtime code accepts only the current schema. Historic formats are read
+only by the explicit migration package. Config, client, state, repair,
+recovery, hook, and server startup paths must not parse legacy registries.
 
-An older schema prevents server startup and data-dependent commands with exit status `78`. Help, version, capabilities, and migration planning may remain available where they do not parse current-format state. Conflicting, malformed, unknown, or newer schema evidence is rejected rather than guessed.
+Old, newer, unknown, conflicting, or corrupt schema evidence is rejected with
+exit code `78`. Help, version, capabilities, and migration planning may remain
+available when they do not interpret current business state.
 
-Startup migration, repair-driven migration, and config-driven backfilling are forbidden. `state doctor` diagnoses only the current schema; use `migrate plan` for historical data.
+There is no startup migration, repair-triggered migration, or automatic format
+rewrite.
 
-## Continuous migrations
+## Supported migration ingress
 
-Every schema change provides one dedicated `N-to-N+1` migration. A multi-schema upgrade executes those steps in order. Historical migration code is loaded only by the migrate dispatcher and is never sourced by normal runtime code.
+The v4 image directly supports schema 3 to schema 4 only. Schema 1 and 2
+instances must first use the stable `sh-ver` image to reach schema 3. This
+deliberately bounds the Go runtime's legacy parser and keeps older migration
+logic on the maintenance branch that created those formats.
 
-The current image should retain a complete migration chain from every schema for which sufficient released-format evidence exists. A missing step or insufficient/conflicting evidence blocks migration.
+Future schema changes must add an explicit supported ingress policy. A direct
+`N` to `N+1` step is preferred, but the project may require an intermediate
+stable image when retaining every historical parser would expand the trusted
+runtime or weaken validation. Unsupported paths must fail with actionable
+instructions; they must never be guessed.
 
 ## Maintenance transaction
 
-All destructive migrations run while OpenVPN is stopped, through the current image's `openvpn-maintenance` service. `migrate plan` is read-only. `migrate apply` requires explicit confirmation and must acquire the exclusive runtime lock, create a durable snapshot and transaction marker, migrate a staging copy, validate the target schema and state, and commit atomically. Failure or interruption restores the original data.
+Destructive migration requires OpenVPN to be stopped and runs through the
+target image's `openvpn-maintenance` service. `migrate plan` is read-only.
+`migrate apply` requires confirmation, `OVPN_MAINTENANCE=true`, the exclusive
+runtime lock, a persistent full-data snapshot and digest, staging, target
+validation, and atomic installation.
 
-Migration uses only code embedded in the maintenance image and must not query or download project releases. The final report identifies credentials or profiles that were replaced and must be redistributed.
+Database audit and business state changes are committed together. Cross-file
+and SQLite changes use the operation journal and staging so an interruption can
+be completed or rolled back deterministically.
+
+The final report must identify the snapshot, digest, imported counts, state
+doctor result, YAML export step, and profile redistribution impact.
 
 ## Rollback
 
-Migrated data cannot be given to an older image that does not support its schema. An image rollback after migration requires restoring the matching pre-migration snapshot. Recreating an old container without restoring its data is not a supported rollback.
+A migrated directory must never be passed to an image that does not support its
+schema. Rolling back a successful schema 3 to 4 migration requires verifying
+and restoring the complete migration snapshot, then running the `sh-ver` image.
+Changing only the image is unsupported.
+
+For ordinary schema 4 backups, stop all writers and archive the complete data
+and configuration directories. Never restore only `state.db` or merge a backup
+into live artifacts.
 
 ## Definition of done
 
-A schema change is incomplete without the schema increment, one continuous migration step, representative source fixtures, target validation, failure and recovery tests, and updates to this policy and current operations documents. CI must verify every retained source schema to the current schema, current schema idempotence, and rejection of invalid or newer schemas.
+A schema change is incomplete without:
+
+- a schema increment and authoritative model definition;
+- explicit supported and rejected source schemas;
+- representative healthy, damaged, conflicting, large, and interrupted
+  fixtures;
+- staging, snapshot, digest, rollback, and crash recovery tests;
+- target `state doctor` and real runtime handoff verification;
+- updated command, operations, backup, migration, and rollback documentation.

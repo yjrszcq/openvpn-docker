@@ -1,37 +1,76 @@
 # Image Update Policy
 
-This permanent policy defines how project code and runtime changes are delivered. It remains in force when versioned command manuals are archived.
+This is the long-term policy for project code and runtime delivery.
 
 ## Version model
 
-The project has three independent version axes:
+The repository records separate release axes in `versions.env`:
 
-- `IMAGE_VERSION` identifies the project code and container image release.
-- `OPENVPN_VERSION` identifies the OpenVPN runtime built into that image.
-- The integer data schema identifies the persistent `/etc/openvpn` format.
+- `IMAGE_VERSION`: project control-plane and container release.
+- `DATA_SCHEMA`: persistent structured-state format.
+- `OPENVPN_VERSION`: OpenVPN Community Edition runtime built into the image.
+- `GO_RUNTIME_VERSION`: version reported by the Go binaries; for a stable
+  release it must equal `IMAGE_VERSION`.
 
-Management scripts, hooks, templates, broker code, and Web/API code are part of the image. There is no in-container code downloader, management bundle, active code selector, or online rollback mechanism.
+Build inputs also pin the Go builder image and OpenVPN source checksum.
+`compatibility/contract.json` lists exact OpenVPN runtime versions and features
+verified for the image. `OPENVPN_CANDIDATE_RANGE` only constrains automation;
+it is not a compatibility claim.
 
 ## Delivery boundary
 
-The image is the only code delivery unit. Ordinary updates pull or build a new image and recreate the container. An image may change project code, OpenVPN, system dependencies, or the base operating system. Runtime commands never install code or packages and never query project releases.
+The image is the only project-code delivery unit. The CLI, hook, supervisor,
+broker, templates, migration code, and compatibility contract are built into
+the image. Runtime does not download code, query project releases, or select an
+online management bundle.
 
-An image update must not silently rewrite configuration, credentials, or other persistent state. New templates are applied only through the normal explicit configuration and lifecycle commands.
+An image update may change project code, OpenVPN, the base system, or build
+dependencies. It must not silently apply YAML, rewrite credentials, migrate
+data, or modify structured state merely because a container started.
 
-## Data-schema boundary
+## Schema boundary
 
-When old and new images use the same data schema, the persistent format must be identical; code must not branch on image version to interpret that format. The operator may stop the old container and recreate it with the new image.
+Images sharing a data schema must interpret it identically. A same-schema
+update is performed by stopping the old service, selecting the new image,
+running read-only diagnosis, and starting the new service. Do not run migration
+for a same-schema update.
 
-When the new image requires a newer schema, its normal runtime rejects the old data with exit status `78`. The operator must stop OpenVPN and run `ovpn migrate` through the new image's `openvpn-maintenance` service. Migration uses only code built into that maintenance image and never accesses the network.
+When the target requires a newer schema, normal runtime refuses old state. The
+operator must stop OpenVPN and run the target image's explicit maintenance
+migration according to the [data schema upgrade policy](data-schema-upgrade-policy.md).
 
-Changing an incompatible persistent format requires incrementing the schema and adding the next continuous migration step. Details are governed by the [data schema upgrade policy](data-schema-upgrade-policy.md).
+## Tag policy
+
+GHCR receives project image tags (`4.0.0`, `4.0`, `4`, and `latest`) plus the
+verified OpenVPN tag. Docker Hub keeps the public OpenVPN-version tag used by
+existing deployments. Production users should always pin a concrete tag and
+verify `ovpn version --json` after update.
+
+Candidate images are built and tested before stable tags are created. A
+prerelease `IMAGE_VERSION` is not eligible for stable promotion. OpenVPN
+cross-minor updates require the configured approval boundary.
 
 ## Rollback boundary
 
-Replacing a same-schema image can be rolled back by recreating the container with the previous image. After a data migration, an image rollback alone is not a data rollback: restore the migration's matching pre-migration snapshot before running an older image that expects the old schema.
+A same-schema image can be rolled back by recreating the service with the prior
+image. After schema migration, image rollback alone is invalid: restore the
+matching complete pre-migration snapshot and use the image that supports that
+restored schema.
 
 ## Release requirements
 
-Every image release must pass static checks, schema gates, representative migrations, persistent-state handoff, runtime lifecycle tests, and the relevant network E2E matrix. `compatibility/contract.json` records the exact OpenVPN versions verified with the image; `OPENVPN_CANDIDATE_RANGE` only constrains which upstream versions automation may propose.
+Every stable release must pass:
 
-Image versions are changed in a dedicated release commit. A persistent format change is incomplete without a schema increment, migration, fixtures, policy updates, and migration tests.
+- Go format, vet, unit, race, build, module, and dependency-license gates;
+- workflow/Shell/source-integrity checks;
+- strict YAML, SQLite, PKI, lifecycle, repair, recovery, and migration tests;
+- real schema handoff and rollback from the supported previous format;
+- real UDP and TCP client connections;
+- amd64 and arm64 image builds and dynamic dependency audits;
+- image-content checks proving the absence of legacy runtime Shell and Python;
+- complete English/Chinese command, operations, migration, backup, and rollback
+  documentation.
+
+Image/schema version changes are made in the release-preparation phase. A
+stable release is blocked while any required gate, review finding, or release
+metadata inconsistency remains unresolved.
