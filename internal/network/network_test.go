@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,13 @@ import (
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
 	"github.com/yjrszcq/openvpn-docker/internal/domain"
 )
+
+func TestExecRunnerPreservesCommandExitStatus(t *testing.T) {
+	_, err := (ExecRunner{}).Run(context.Background(), "sh", "-c", "exit 1")
+	if !errors.Is(err, ErrUnavailable) || !commandAbsent(err) {
+		t.Fatalf("exit status was not preserved: %v", err)
+	}
+}
 
 const networkInstance = "80808080-8080-4808-8808-808080808080"
 

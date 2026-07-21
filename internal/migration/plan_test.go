@@ -24,6 +24,9 @@ func TestBuildPlanReportsCompleteSchema3Impact(t *testing.T) {
 	if plan.SnapshotPath != filepath.Join(fixture.root, filepath.FromSlash(SnapshotRelativePath)) || !plan.YAMLExportRequired || plan.YAMLExportCommand == "" || plan.RollbackInstruction == "" {
 		t.Fatalf("handoff is incomplete: %+v", plan)
 	}
+	if plan.SnapshotDigestPath != filepath.Join(fixture.root, filepath.FromSlash(SnapshotDigestRelativePath)) {
+		t.Fatalf("snapshot digest path=%q", plan.SnapshotDigestPath)
+	}
 }
 
 func TestBuildPlanRejectsMixedSchemaAuthority(t *testing.T) {

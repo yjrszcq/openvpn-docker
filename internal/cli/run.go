@@ -240,7 +240,7 @@ func RunEntrypoint(args []string, stdout, stderr io.Writer) int {
 
 // RunHook dispatches the ovpn-hook multicall entrypoint.
 func RunHook(args []string, stderr io.Writer) int {
-	if len(args) != 1 || args[0] != "pool-persist" {
+	if len(args) < 1 || len(args) > 2 || args[0] != "pool-persist" {
 		return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn-hook pool-persist"))
 	}
 	input := hook.Input{

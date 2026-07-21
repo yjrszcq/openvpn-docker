@@ -94,7 +94,7 @@ func runMigrationApply(args []string, stdout, stderr io.Writer) int {
 		}
 		return int(apperror.ExitSuccess)
 	}
-	fmt.Fprintf(stdout, "migration: applied\nschema: 3 -> 4\ninstance: %s\noperation: %s\nclients: %d\naudit events imported: %d\nstate doctor: %s\nsnapshot: %s\nnext: ovpn config export --output /etc/openvpn-config/config.yaml\nrollback: restore the complete snapshot, then run the sh-ver image\n", result.InstanceID, result.OperationID, result.Clients, result.AuditEvents, result.FinalState, result.SnapshotPath)
+	fmt.Fprintf(stdout, "migration: applied\nschema: 3 -> 4\ninstance: %s\noperation: %s\nclients: %d\naudit events imported: %d\nstate doctor: %s\nsnapshot: %s\nsnapshot digest: %s\nnext: ovpn config export --output /etc/openvpn-config/config.yaml\nrollback: verify and restore the complete snapshot, then run the sh-ver image\n", result.InstanceID, result.OperationID, result.Clients, result.AuditEvents, result.FinalState, result.SnapshotPath, result.SnapshotDigestPath)
 	return int(apperror.ExitSuccess)
 }
 

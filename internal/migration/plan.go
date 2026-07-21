@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	SnapshotRelativePath = "repair/migrations/schema3-pre-v4.tar.gz"
-	ManifestRelativePath = "repair/migrations/transaction.json"
+	SnapshotRelativePath       = "repair/migrations/schema3-pre-v4.tar.gz"
+	SnapshotDigestRelativePath = "repair/migrations/schema3-pre-v4.tar.gz.sha256"
+	ManifestRelativePath       = "repair/migrations/transaction.json"
 )
 
 type ImportSummary struct {
@@ -55,6 +56,7 @@ type Plan struct {
 	ProfilesToRedistribute []string          `json:"profiles_to_redistribute"`
 	LegacyFilesToRemove    []string          `json:"legacy_files_to_remove"`
 	SnapshotPath           string            `json:"snapshot_path,omitempty"`
+	SnapshotDigestPath     string            `json:"snapshot_digest_path,omitempty"`
 	YAMLExportRequired     bool              `json:"yaml_export_required"`
 	YAMLExportCommand      string            `json:"yaml_export_command,omitempty"`
 	RollbackInstruction    string            `json:"rollback_instruction,omitempty"`
@@ -98,7 +100,9 @@ func BuildPlan(ctx context.Context, root string, now time.Time) (Plan, error) {
 		NormalizedConfig: &view, Repairs: append([]Issue(nil), source.Repairs...), Conflicts: []Issue{},
 		Artifacts: make([]ArtifactMapping, 0, len(source.Artifacts)), ProfilesToRedistribute: []string{},
 		LegacyFilesToRemove: []string{"config/project.env", "config/schema-version", "meta/instance.json", "meta/instance-id", "meta/client-state.csv", "meta/client-ip.csv", "meta/audit.jsonl"},
-		SnapshotPath:        filepath.Join(root, filepath.FromSlash(SnapshotRelativePath)), YAMLExportRequired: true,
+		SnapshotPath:        filepath.Join(root, filepath.FromSlash(SnapshotRelativePath)),
+		SnapshotDigestPath:  filepath.Join(root, filepath.FromSlash(SnapshotDigestRelativePath)),
+		YAMLExportRequired:  true,
 		YAMLExportCommand:   "ovpn config export --output /etc/openvpn-config/config.yaml",
 		RollbackInstruction: "restore the complete migration snapshot, then run the sh-ver image",
 	}

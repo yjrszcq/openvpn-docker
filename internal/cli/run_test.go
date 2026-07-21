@@ -201,6 +201,10 @@ func TestHookUsageAndInvalidEnvironment(t *testing.T) {
 	if code := cli.RunHook([]string{"pool-persist"}, &stderr); code != 65 || !strings.Contains(stderr.String(), "hook input is invalid") {
 		t.Fatalf("hook input code=%d stderr=%q", code, stderr.String())
 	}
+	stderr.Reset()
+	if code := cli.RunHook([]string{"pool-persist", "/tmp/openvpn-client-connect"}, &stderr); code != 65 || !strings.Contains(stderr.String(), "hook input is invalid") {
+		t.Fatalf("OpenVPN positional hook code=%d stderr=%q", code, stderr.String())
+	}
 }
 
 func TestRuntimeLogAndEventHistory(t *testing.T) {

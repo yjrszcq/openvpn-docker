@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/yjrszcq/openvpn-docker/internal/artifact"
@@ -30,7 +31,7 @@ func TestApplyMigratesSchema3AndIsIdempotent(t *testing.T) {
 			t.Errorf("legacy path remains: %s err=%v", key, err)
 		}
 	}
-	for _, key := range []string{"meta/state.db", "server/server.conf", "clients/active/laptop.ovpn", SnapshotRelativePath} {
+	for _, key := range []string{"meta/state.db", "server/server.conf", "clients/active/laptop.ovpn", SnapshotRelativePath, SnapshotDigestRelativePath} {
 		if _, err := os.Stat(filepath.Join(fixture.root, filepath.FromSlash(key))); err != nil {
 			t.Errorf("missing %s: %v", key, err)
 		}
@@ -68,6 +69,56 @@ func TestApplyMigratesSchema3AndIsIdempotent(t *testing.T) {
 	second, err := Apply(context.Background(), options)
 	if err != nil || second.Applied || second.SourceSchema != 4 {
 		t.Fatalf("second=%+v err=%v", second, err)
+	}
+}
+
+func TestMigrationSnapshotRestoresExactSchema3Handoff(t *testing.T) {
+	fixture := makeLegacyFixture(t)
+	certificatePath := filepath.Join(fixture.root, "pki", "issued", testClientID+".crt")
+	before, err := os.ReadFile(certificatePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := migrationOptions(t, fixture)
+	result, err := Apply(context.Background(), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, err := fileDigest(result.SnapshotPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sidecar, err := os.ReadFile(result.SnapshotDigestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fields := strings.Fields(string(sidecar))
+	if len(fields) != 2 || fields[0] != digest || fields[1] != filepath.Base(result.SnapshotPath) {
+		t.Fatalf("invalid digest sidecar %q", sidecar)
+	}
+	if err := restoreSnapshot(fixture.root, result.SnapshotPath); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(fixture.root, "meta", "state.db")); !os.IsNotExist(err) {
+		t.Fatalf("SQLite remains after rollback: %v", err)
+	}
+	after, err := os.ReadFile(certificatePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(before) {
+		t.Fatal("rollback changed the UUID certificate")
+	}
+	source, err := ReadSchema3(context.Background(), fixture.root, fixture.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if source.Instance.ID != testInstanceID || len(source.Clients) != 1 || source.Clients[0].Client.ID != testClientID {
+		t.Fatalf("restored source=%+v", source)
+	}
+	plan, err := BuildPlan(context.Background(), fixture.root, fixture.now)
+	if err != nil || plan.Status != "ready" {
+		t.Fatalf("rollback plan=%+v err=%v", plan, err)
 	}
 }
 

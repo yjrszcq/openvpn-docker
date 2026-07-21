@@ -53,17 +53,18 @@ type ApplyOptions struct {
 }
 
 type ApplyResult struct {
-	Version      int    `json:"version"`
-	Applied      bool   `json:"applied"`
-	Recovered    bool   `json:"recovered"`
-	OperationID  string `json:"operation_id,omitempty"`
-	InstanceID   string `json:"instance_id,omitempty"`
-	SourceSchema int    `json:"source_schema"`
-	TargetSchema int    `json:"target_schema"`
-	SnapshotPath string `json:"snapshot_path,omitempty"`
-	FinalState   string `json:"final_state,omitempty"`
-	Clients      int    `json:"clients"`
-	AuditEvents  int    `json:"audit_events"`
+	Version            int    `json:"version"`
+	Applied            bool   `json:"applied"`
+	Recovered          bool   `json:"recovered"`
+	OperationID        string `json:"operation_id,omitempty"`
+	InstanceID         string `json:"instance_id,omitempty"`
+	SourceSchema       int    `json:"source_schema"`
+	TargetSchema       int    `json:"target_schema"`
+	SnapshotPath       string `json:"snapshot_path,omitempty"`
+	SnapshotDigestPath string `json:"snapshot_digest_path,omitempty"`
+	FinalState         string `json:"final_state,omitempty"`
+	Clients            int    `json:"clients"`
+	AuditEvents        int    `json:"audit_events"`
 }
 
 type transactionMarker struct {
@@ -140,6 +141,10 @@ func Apply(ctx context.Context, options ApplyOptions) (ApplyResult, error) {
 	if err != nil {
 		return ApplyResult{}, err
 	}
+	digestPath := filepath.Join(options.DataDir, filepath.FromSlash(SnapshotDigestRelativePath))
+	if err := writeAtomic(digestPath, []byte(snapshotDigest+"  "+filepath.Base(snapshotPath)+"\n"), 0o600); err != nil {
+		return ApplyResult{}, fmt.Errorf("write migration snapshot digest: %w", err)
+	}
 	stageRelative := "repair/migrations/stage-" + operationID
 	stage := filepath.Join(options.DataDir, filepath.FromSlash(stageRelative))
 	marker := transactionMarker{Version: 1, OperationID: operationID, State: "snapshot-ready", Stage: stageRelative, Snapshot: SnapshotRelativePath, SnapshotDigest: snapshotDigest, Installed: []string{}}
@@ -202,7 +207,7 @@ func Apply(ctx context.Context, options ApplyOptions) (ApplyResult, error) {
 	if err := syncDirectory(migrationDir); err != nil {
 		return ApplyResult{}, err
 	}
-	return ApplyResult{Version: 1, Applied: true, Recovered: recovered, OperationID: operationID, InstanceID: source.Instance.ID, SourceSchema: 3, TargetSchema: 4, SnapshotPath: snapshotPath, FinalState: string(statecontrol.Healthy), Clients: len(source.Clients), AuditEvents: len(source.Audit)}, nil
+	return ApplyResult{Version: 1, Applied: true, Recovered: recovered, OperationID: operationID, InstanceID: source.Instance.ID, SourceSchema: 3, TargetSchema: 4, SnapshotPath: snapshotPath, SnapshotDigestPath: digestPath, FinalState: string(statecontrol.Healthy), Clients: len(source.Clients), AuditEvents: len(source.Audit)}, nil
 }
 
 func validateApplyOptions(options ApplyOptions) error {

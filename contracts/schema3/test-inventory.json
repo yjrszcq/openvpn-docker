@@ -48,6 +48,7 @@
     {"path":"tests/smoke/container/client-lifecycle-container-smoke.sh","classification":"retain-black-box","replacement":"adapt","area":"client lifecycle"},
     {"path":"tests/smoke/container/config-load-smoke.sh","classification":"retain-migration-fixture","replacement":"adapt","area":"schema 3 configuration"},
     {"path":"tests/smoke/container/e2e-container-smoke.sh","classification":"retain-e2e","replacement":"adapt","area":"UDP/TCP real VPN"},
+    {"path":"tests/smoke/container/go-sqlite-handoff-smoke.sh","classification":"retain-migration-fixture","replacement":"retain","area":"schema 3 to Go SQLite handoff and rollback"},
     {"path":"tests/smoke/container/image-handoff-smoke.sh","classification":"retain-migration-fixture","replacement":"adapt","area":"cross-image handoff"},
     {"path":"tests/smoke/container/maintenance-container-smoke.sh","classification":"retain-black-box","replacement":"adapt","area":"maintenance runtime"},
     {"path":"tests/smoke/container/migration-lock-container-smoke.sh","classification":"retain-migration-fixture","replacement":"adapt","area":"migration locking"},

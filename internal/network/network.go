@@ -34,9 +34,9 @@ func (ExecRunner) Run(ctx context.Context, name string, args ...string) (string,
 	if err != nil {
 		message := strings.TrimSpace(string(output))
 		if message != "" {
-			return "", fmt.Errorf("%w: %s %s: %v: %s", ErrUnavailable, name, strings.Join(args, " "), err, message)
+			return "", fmt.Errorf("%w: %s %s: %w: %s", ErrUnavailable, name, strings.Join(args, " "), err, message)
 		}
-		return "", fmt.Errorf("%w: %s %s: %v", ErrUnavailable, name, strings.Join(args, " "), err)
+		return "", fmt.Errorf("%w: %s %s: %w", ErrUnavailable, name, strings.Join(args, " "), err)
 	}
 	return string(output), nil
 }
