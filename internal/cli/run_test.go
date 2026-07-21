@@ -264,7 +264,6 @@ func TestClientCreateAndRenameUsage(t *testing.T) {
 	}
 	for _, args := range [][]string{
 		{"client", "create"},
-		{"client", "create", "laptop", "--ipv4"},
 		{"client", "create", "laptop", "--unknown", "value"},
 		{"client", "rename", "--name", "laptop"},
 		{"client", "rename", "--name", "laptop", "--id", "11111111", "new"},
@@ -285,7 +284,6 @@ func TestClientLifecycleUsageAndDeleteConfirmation(t *testing.T) {
 	}
 	for _, args := range [][]string{
 		{"client", "revoke", "--name", "laptop", "--release-ip"},
-		{"client", "reissue", "--name", "laptop", "--ipv4"},
 		{"client", "reissue", "--name", "laptop", "--ipv4", "dynamic", "--ipv4", "auto"},
 		{"client", "delete", "--name", "laptop", "--yes", "--yes"},
 	} {

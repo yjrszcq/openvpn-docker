@@ -125,7 +125,7 @@ YAML 是期望配置，SQLite 保存最近一次经操作员确认的 applied re
 
 ```bash
 # 自动选择最低可用静态 IPv4
-docker compose exec openvpn ovpn client create laptop --ipv4 auto
+docker compose exec openvpn ovpn client create laptop --ipv4
 
 # 动态地址
 docker compose exec openvpn ovpn client create phone --ipv4 dynamic

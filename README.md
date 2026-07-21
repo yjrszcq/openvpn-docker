@@ -139,7 +139,7 @@ applies configuration implicitly.
 
 ```bash
 # Lowest available static IPv4 address
-docker compose exec openvpn ovpn client create laptop --ipv4 auto
+docker compose exec openvpn ovpn client create laptop --ipv4
 
 # Dynamic address
 docker compose exec openvpn ovpn client create phone --ipv4 dynamic

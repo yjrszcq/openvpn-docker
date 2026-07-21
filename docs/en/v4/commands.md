@@ -69,15 +69,15 @@ ovpn
 │   ├── plan [--json]
 │   └── apply [--yes] [--json]
 ├── client
-│   ├── create NAME [--ipv4 auto|dynamic|ADDRESS]
+│   ├── create NAME [--ipv4 [auto|dynamic|ADDRESS]]
 │   ├── list [--detail] [--full-id] [--json]
 │   ├── export (NAME|--name NAME|--id ID) [--output FILE|-]
 │   ├── rename (NAME|--name NAME|--id ID) NEW_NAME
 │   ├── revoke (NAME|--name NAME|--id ID) [--release-ipv4]
-│   ├── reissue (NAME|--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]
+│   ├── reissue (NAME|--name NAME|--id ID) [--ipv4 [auto|dynamic|ADDRESS]]
 │   ├── delete (NAME|--name NAME|--id ID) [--yes]
 │   └── address
-│       ├── set (NAME|--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS
+│       ├── set (NAME|--name NAME|--id ID) --ipv4 [auto|dynamic|ADDRESS]
 │       ├── edit (--all|NAME...|--name NAME...|--id ID...) [--yes]
 │       └── release (NAME|--name NAME|--id ID)
 ├── state
@@ -188,6 +188,9 @@ IPv4 intent is expressed uniformly as:
 - `dynamic`: use the configured dynamic pool.
 - `ADDRESS`: use the specified free static IPv4 address.
 
+When `--ipv4` is present without a value, it means `auto`. Omitting the option
+entirely keeps each command's documented default behavior.
+
 ### `ovpn client create NAME [--ipv4 ...]`
 
 Creates the UUID, Easy-RSA certificate and key, profile, address assignment,
@@ -220,7 +223,8 @@ retained unless `--release-ipv4` is supplied.
 
 Issues a new key/certificate for the same UUID, updates CRL/profile state, and
 optionally changes the address intent. Export and redistribute the new profile;
-the prior session must be disconnected.
+the prior session must be disconnected. Omitting `--ipv4` retains the current
+assignment intent; specifying `--ipv4` without a value changes it to `auto`.
 
 ### `ovpn client delete SELECTOR [--yes]`
 
@@ -231,7 +235,8 @@ recoverable only from a secure backup.
 ### `ovpn client address set SELECTOR --ipv4 ...`
 
 Changes one active client's assignment atomically and updates the CCD artifact.
-Disconnect the current session so the new assignment takes effect.
+`--ipv4` without a value selects `auto`. Disconnect the current session so the
+new assignment takes effect.
 
 ### `ovpn client address edit TARGETS [--yes]`
 

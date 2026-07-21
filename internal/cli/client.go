@@ -121,18 +121,23 @@ func runClientExport(args []string, stdout, stderr io.Writer) int {
 
 func runClientCreate(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client create NAME [--ipv4 auto|dynamic|ADDRESS]")
+		fmt.Fprintln(stdout, "Usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]]")
 		return int(apperror.ExitSuccess)
 	}
-	if len(args) < 1 || len(args) > 3 || len(args) == 2 || strings.HasPrefix(args[0], "-") {
-		return writeError(stderr, usageError("usage: ovpn client create NAME [--ipv4 auto|dynamic|ADDRESS]"))
+	if len(args) < 1 || len(args) > 3 || strings.HasPrefix(args[0], "-") {
+		return writeError(stderr, usageError("usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]]"))
 	}
 	request := clientservice.CreateRequest{Name: args[0], IPv4: "auto"}
-	if len(args) == 3 {
-		if args[1] != "--ipv4" || args[2] == "" {
-			return writeError(stderr, usageError("usage: ovpn client create NAME [--ipv4 auto|dynamic|ADDRESS]"))
+	if len(args) >= 2 {
+		if args[1] != "--ipv4" {
+			return writeError(stderr, usageError("usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]]"))
 		}
-		request.IPv4 = args[2]
+		if len(args) == 3 {
+			if args[2] == "" || strings.HasPrefix(args[2], "-") {
+				return writeError(stderr, usageError("usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]]"))
+			}
+			request.IPv4 = args[2]
+		}
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
@@ -205,7 +210,7 @@ func runClientRevoke(args []string, stdout, stderr io.Writer) int {
 
 func runClientReissue(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]")
+		fmt.Fprintln(stdout, "Usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 [auto|dynamic|ADDRESS]]")
 		return int(apperror.ExitSuccess)
 	}
 	ipv4 := ""
@@ -215,15 +220,14 @@ func runClientReissue(args []string, stdout, stderr io.Writer) int {
 			filtered = append(filtered, args[index])
 			continue
 		}
-		if ipv4 != "" || index+1 >= len(args) || args[index+1] == "" {
-			return writeError(stderr, usageError("usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]"))
+		if ipv4 != "" {
+			return writeError(stderr, usageError("usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 [auto|dynamic|ADDRESS]]"))
 		}
-		ipv4 = args[index+1]
-		index++
+		ipv4, index = optionalIPv4Value(args, index)
 	}
 	selector, positionals, err := parseMutationSelector(filtered)
 	if err != nil || len(positionals) != 0 {
-		return writeError(stderr, usageError("usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]"))
+		return writeError(stderr, usageError("usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 [auto|dynamic|ADDRESS]]"))
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
@@ -295,25 +299,26 @@ func confirmAction(stderr io.Writer, prompt string) (bool, error) {
 
 func runClientAddressSet(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client address set (NAME|--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS")
+		fmt.Fprintln(stdout, "Usage: ovpn client address set (NAME|--name NAME|--id ID) --ipv4 [auto|dynamic|ADDRESS]")
 		return int(apperror.ExitSuccess)
 	}
 	ipv4 := ""
+	ipv4Set := false
 	filtered := make([]string, 0, len(args))
 	for index := 0; index < len(args); index++ {
 		if args[index] != "--ipv4" {
 			filtered = append(filtered, args[index])
 			continue
 		}
-		if ipv4 != "" || index+1 >= len(args) || args[index+1] == "" {
-			return writeError(stderr, usageError("usage: ovpn client address set (NAME|--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS"))
+		if ipv4Set {
+			return writeError(stderr, usageError("usage: ovpn client address set (NAME|--name NAME|--id ID) --ipv4 [auto|dynamic|ADDRESS]"))
 		}
-		ipv4 = args[index+1]
-		index++
+		ipv4Set = true
+		ipv4, index = optionalIPv4Value(args, index)
 	}
 	selector, positionals, err := parseMutationSelector(filtered)
-	if err != nil || len(positionals) != 0 || ipv4 == "" {
-		return writeError(stderr, usageError("usage: ovpn client address set (NAME|--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS"))
+	if err != nil || len(positionals) != 0 || !ipv4Set {
+		return writeError(stderr, usageError("usage: ovpn client address set (NAME|--name NAME|--id ID) --ipv4 [auto|dynamic|ADDRESS]"))
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
@@ -608,6 +613,13 @@ func parseMutationSelector(args []string) (clientservice.Selector, []string, err
 		positionals = positionals[1:]
 	}
 	return selector, positionals, nil
+}
+
+func optionalIPv4Value(args []string, optionIndex int) (string, int) {
+	if optionIndex+1 < len(args) && args[optionIndex+1] != "" && !strings.HasPrefix(args[optionIndex+1], "-") {
+		return args[optionIndex+1], optionIndex + 1
+	}
+	return "auto", optionIndex
 }
 
 func formatIPv4(value clientservice.IPv4View) string {

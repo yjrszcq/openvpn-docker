@@ -65,15 +65,15 @@ ovpn
 │   ├── plan [--json]
 │   └── apply [--yes] [--json]
 ├── client
-│   ├── create NAME [--ipv4 auto|dynamic|ADDRESS]
+│   ├── create NAME [--ipv4 [auto|dynamic|ADDRESS]]
 │   ├── list [--detail] [--full-id] [--json]
 │   ├── export (NAME|--name NAME|--id ID) [--output FILE|-]
 │   ├── rename (NAME|--name NAME|--id ID) NEW_NAME
 │   ├── revoke (NAME|--name NAME|--id ID) [--release-ipv4]
-│   ├── reissue (NAME|--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]
+│   ├── reissue (NAME|--name NAME|--id ID) [--ipv4 [auto|dynamic|ADDRESS]]
 │   ├── delete (NAME|--name NAME|--id ID) [--yes]
 │   └── address
-│       ├── set (NAME|--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS
+│       ├── set (NAME|--name NAME|--id ID) --ipv4 [auto|dynamic|ADDRESS]
 │       ├── edit (--all|NAME...|--name NAME...|--id ID...) [--yes]
 │       └── release (NAME|--name NAME|--id ID)
 ├── state
@@ -171,6 +171,9 @@ IPv4 意图统一表示为：
 - `dynamic`：使用配置的动态池。
 - `ADDRESS`：使用指定且空闲的静态 IPv4。
 
+出现 `--ipv4` 但未提供值时等同于 `--ipv4 auto`。完全省略该选项时，保留各命令
+文档中说明的原有默认行为。
+
 ### `ovpn client create NAME [--ipv4 ...]`
 
 创建 UUID、Easy-RSA 证书/私钥、profile、地址 assignment、artifact metadata、
@@ -197,7 +200,8 @@ operation 和 audit event。默认 IPv4 意图为 `auto`。
 ### `ovpn client reissue SELECTOR [--ipv4 ...]`
 
 为同一 UUID 签发新私钥/证书，更新 CRL/profile，并可改变地址意图。必须重新导出和
-分发 profile，并断开旧 session。
+分发 profile，并断开旧 session。省略 `--ipv4` 时保留当前 assignment 意图；仅写
+`--ipv4` 而不提供值时改为 `auto`。
 
 ### `ovpn client delete SELECTOR [--yes]`
 
@@ -206,8 +210,8 @@ operation 和 audit event。默认 IPv4 意图为 `auto`。
 
 ### `ovpn client address set SELECTOR --ipv4 ...`
 
-原子修改一个 active 客户端的 assignment 并同步 CCD。需要断开当前 session 才会使用
-新地址。
+原子修改一个 active 客户端的 assignment 并同步 CCD。`--ipv4` 不带值时使用 `auto`。
+需要断开当前 session 才会使用新地址。
 
 ### `ovpn client address edit TARGETS [--yes]`
 

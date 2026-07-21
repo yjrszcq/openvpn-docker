@@ -88,7 +88,7 @@ flush unrelated rules.
 Create and export:
 
 ```bash
-docker compose exec openvpn ovpn client create laptop --ipv4 auto
+docker compose exec openvpn ovpn client create laptop --ipv4
 docker compose exec openvpn ovpn client create phone --ipv4 dynamic
 docker compose exec openvpn ovpn client create tablet --ipv4 10.42.0.20
 
@@ -116,7 +116,7 @@ docker compose exec openvpn \
   ovpn client revoke office-laptop
 
 docker compose exec openvpn \
-  ovpn client reissue office-laptop --ipv4 auto
+  ovpn client reissue office-laptop --ipv4
 docker compose exec -T openvpn \
   ovpn client export office-laptop --output - > office-laptop.ovpn
 
@@ -134,7 +134,7 @@ removes local credentials; retain backups if recovery may be required.
 docker compose exec openvpn \
   ovpn client address set --name laptop --ipv4 dynamic
 docker compose exec openvpn \
-  ovpn client address set --name phone --ipv4 auto
+  ovpn client address set phone --ipv4
 docker compose exec openvpn \
   ovpn client address set --name tablet --ipv4 10.42.0.30
 ```

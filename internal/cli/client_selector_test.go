@@ -44,3 +44,17 @@ func TestAddressEditDefaultsPositionalsToNames(t *testing.T) {
 		t.Fatalf("mixed positional and ID code=%d stderr=%q", code, stderr.String())
 	}
 }
+
+func TestIPv4OptionDefaultsMissingValueToAuto(t *testing.T) {
+	for _, args := range [][]string{{"--ipv4"}, {"--ipv4", "--name", "laptop"}} {
+		value, index := optionalIPv4Value(args, 0)
+		if value != "auto" || index != 0 {
+			t.Fatalf("args=%v value=%q index=%d", args, value, index)
+		}
+	}
+
+	value, index := optionalIPv4Value([]string{"--ipv4", "dynamic"}, 0)
+	if value != "dynamic" || index != 1 {
+		t.Fatalf("explicit value=%q index=%d", value, index)
+	}
+}
