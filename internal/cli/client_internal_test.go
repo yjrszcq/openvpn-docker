@@ -2,10 +2,12 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	clientservice "github.com/yjrszcq/openvpn-docker/internal/client"
@@ -110,6 +112,23 @@ func TestSelectAddressEditorUsesOverridesThenNano(t *testing.T) {
 	t.Setenv("OVPN_EDITOR", "nano --softwrap")
 	if _, err := selectAddressEditor(); err == nil {
 		t.Fatal("editor command with arguments was accepted")
+	}
+}
+
+func TestRuntimeReconcileIsBestEffort(t *testing.T) {
+	client := clientservice.View{ID: "11111111-2222-4333-8444-555555555555", Name: "laptop", Status: domain.ClientActive}
+	if result := reconcileClientRuntime(context.Background(), client, false); result.Status != "not_required" || result.Warning != "" {
+		t.Fatalf("not-required result=%+v", result)
+	}
+	t.Setenv("OVPN_RUNTIME_DIR", t.TempDir())
+	result := reconcileClientRuntime(context.Background(), client, true)
+	if result.Status != "pending" || !strings.Contains(result.Warning, "runtime disconnect --id 111111112222") {
+		t.Fatalf("pending result=%+v", result)
+	}
+	var stdout, stderr bytes.Buffer
+	writeRuntimeReconcileHuman(&stdout, &stderr, result, false)
+	if stdout.Len() != 0 || !strings.Contains(stderr.String(), "warning:") {
+		t.Fatalf("stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
 }
 

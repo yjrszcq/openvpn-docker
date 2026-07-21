@@ -171,18 +171,27 @@ YAML
     return 1
   fi
 
-  local disconnect_result
-  disconnect_result="$(docker exec "$server" ovpn runtime disconnect "$client" --json)"
-  if ! grep -Fq '"was_connected":true' <<<"$disconnect_result" || ! grep -Fq '"disconnected":true' <<<"$disconnect_result"; then
-    printf '%s\n' "$disconnect_result" >&2
-    return 1
+  if [ "$protocol" = udp ]; then
+    local address_result
+    address_result="$(docker exec "$server" ovpn client address set "$client" --ipv4 dynamic --json)"
+    if ! grep -Fq '"status":"disconnected"' <<<"$address_result"; then
+      printf '%s\n' "$address_result" >&2
+      return 1
+    fi
+  else
+    local disconnect_result
+    disconnect_result="$(docker exec "$server" ovpn runtime disconnect "$client" --json)"
+    if ! grep -Fq '"was_connected":true' <<<"$disconnect_result" || ! grep -Fq '"disconnected":true' <<<"$disconnect_result"; then
+      printf '%s\n' "$disconnect_result" >&2
+      return 1
+    fi
   fi
 
   set +e
   wait "$client_process"
   local status=$?
   set -e
-  if [ "$status" -ne 124 ] || ! grep -Fq 'Initialization Sequence Completed' "$protocol_dir/client.log"; then
+  if { [ "$status" -ne 0 ] && [ "$status" -ne 124 ]; } || ! grep -Fq 'Initialization Sequence Completed' "$protocol_dir/client.log"; then
     cat "$protocol_dir/client.log" >&2
     docker logs "$server" >&2 || true
     return 1

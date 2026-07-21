@@ -411,7 +411,7 @@ func TestClientMutationJSONSuccessUsesVersionedFullIDs(t *testing.T) {
 		t.Fatalf("rename JSON code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	code, stdout, stderr = run("client", "address", "set", "laptop", "-4", "dynamic", "-j")
-	if code != 0 || stderr != "" || !strings.Contains(stdout, `"version":1`) || !strings.Contains(stdout, `"kick_required":["20000000-0000-4000-8000-000000000002"]`) {
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"version":1`) || !strings.Contains(stdout, `"kick_required":["20000000-0000-4000-8000-000000000002"]`) || !strings.Contains(stdout, `"status":"pending"`) {
 		t.Fatalf("address JSON code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }

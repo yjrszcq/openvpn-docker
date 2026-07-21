@@ -20,6 +20,7 @@ import (
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
 	"github.com/yjrszcq/openvpn-docker/internal/pki"
 	"github.com/yjrszcq/openvpn-docker/internal/render"
+	runtimecontrol "github.com/yjrszcq/openvpn-docker/internal/runtime"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
 )
 
@@ -227,10 +228,12 @@ func runClientRevoke(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
+	runtimeResult := reconcileClientRuntime(context.Background(), result.Client, result.KickRequired)
 	if options.JSON {
-		return writeClientMutationJSON(stdout, stderr, result)
+		return writeClientMutationJSON(stdout, stderr, clientMutationOutput{MutationResult: result, Runtime: &runtimeResult})
 	}
-	fmt.Fprintf(stdout, "revoked client %s [%s]; runtime disconnect required\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID))
+	fmt.Fprintf(stdout, "revoked client %s [%s]\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID))
+	writeRuntimeReconcileHuman(stdout, stderr, runtimeResult, options.FullID)
 	return int(apperror.ExitSuccess)
 }
 
@@ -266,20 +269,23 @@ func runClientReissue(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
+	runtimeResult := reconcileClientRuntime(context.Background(), result.Client, result.KickRequired)
 	profileOutput, err := writeCommittedProfile(context.Background(), state, result, output, stdout)
 	if err != nil {
 		return writeCommittedProfileError(stderr, result, output, err, options.JSON)
 	}
 	if output == "-" {
+		writeRuntimeReconcileHuman(io.Discard, stderr, runtimeResult, options.FullID)
 		return int(apperror.ExitSuccess)
 	}
 	if options.JSON {
-		return writeClientMutationJSON(stdout, stderr, clientMutationOutput{MutationResult: result, ProfileOutput: profileOutput})
+		return writeClientMutationJSON(stdout, stderr, clientMutationOutput{MutationResult: result, ProfileOutput: profileOutput, Runtime: &runtimeResult})
 	}
-	fmt.Fprintf(stdout, "reissued client %s [%s] with IPv4 %s; redistribute profile and disconnect prior session\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID), formatIPv4(result.Client.IPv4))
+	fmt.Fprintf(stdout, "reissued client %s [%s] with IPv4 %s; redistribute profile\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID), formatIPv4(result.Client.IPv4))
 	if profileOutput != nil {
 		fmt.Fprintf(stdout, "profile written to %s\n", profileOutput.Destination)
 	}
+	writeRuntimeReconcileHuman(stdout, stderr, runtimeResult, options.FullID)
 	return int(apperror.ExitSuccess)
 }
 
@@ -342,10 +348,12 @@ func runClientDelete(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
+	runtimeResult := reconcileClientRuntime(context.Background(), result.Client, result.KickRequired)
 	if options.JSON {
-		return writeClientMutationJSON(stdout, stderr, result)
+		return writeClientMutationJSON(stdout, stderr, clientMutationOutput{MutationResult: result, Runtime: &runtimeResult})
 	}
 	fmt.Fprintf(stdout, "deleted client %s [%s]; UUID tombstone retained\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID))
+	writeRuntimeReconcileHuman(stdout, stderr, runtimeResult, options.FullID)
 	return int(apperror.ExitSuccess)
 }
 
@@ -394,10 +402,14 @@ func runClientAddressSet(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
+	runtimeResults := reconcileAddressRuntime(context.Background(), result)
 	if options.JSON {
-		return writeClientMutationJSON(stdout, stderr, result)
+		return writeClientMutationJSON(stdout, stderr, clientAddressOutput{AddressResult: result, Runtime: runtimeResults})
 	}
 	fmt.Fprintf(stdout, "updated IPv4 for %s [%s] to %s\n", result.Clients[0].Name, displayClientID(result.Clients[0].ID, options.FullID), formatIPv4(result.Clients[0].IPv4))
+	for _, runtimeResult := range runtimeResults {
+		writeRuntimeReconcileHuman(stdout, stderr, runtimeResult, options.FullID)
+	}
 	return int(apperror.ExitSuccess)
 }
 
@@ -418,7 +430,7 @@ func runClientAddressRelease(args []string, stdout, stderr io.Writer) int {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	if options.JSON {
-		return writeClientMutationJSON(stdout, stderr, result)
+		return writeClientMutationJSON(stdout, stderr, clientAddressOutput{AddressResult: result, Runtime: reconcileAddressRuntime(context.Background(), result)})
 	}
 	fmt.Fprintf(stdout, "released IPv4 for revoked client %s [%s]\n", result.Clients[0].Name, displayClientID(result.Clients[0].ID, options.FullID))
 	return int(apperror.ExitSuccess)
@@ -519,10 +531,14 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
+	runtimeResults := reconcileAddressRuntime(context.Background(), result)
 	if options.JSON {
-		return writeClientMutationJSON(stdout, stderr, result)
+		return writeClientMutationJSON(stdout, stderr, clientAddressOutput{AddressResult: result, Runtime: runtimeResults})
 	}
-	fmt.Fprintf(stdout, "updated IPv4 assignments for %d clients; runtime disconnect required for each\n", len(result.Clients))
+	fmt.Fprintf(stdout, "updated IPv4 assignments for %d clients\n", len(result.Clients))
+	for _, runtimeResult := range runtimeResults {
+		writeRuntimeReconcileHuman(stdout, stderr, runtimeResult, false)
+	}
 	return int(apperror.ExitSuccess)
 }
 
@@ -823,6 +839,20 @@ type clientProfileOutput struct {
 type clientMutationOutput struct {
 	clientservice.MutationResult
 	ProfileOutput *clientProfileOutput `json:"profile_output,omitempty"`
+	Runtime       *clientRuntimeResult `json:"runtime,omitempty"`
+}
+
+type clientAddressOutput struct {
+	clientservice.AddressResult
+	Runtime []clientRuntimeResult `json:"runtime"`
+}
+
+type clientRuntimeResult struct {
+	ClientID    string `json:"client_id"`
+	ClientName  string `json:"client_name"`
+	Status      string `json:"status"`
+	Connections int    `json:"connections"`
+	Warning     string `json:"warning,omitempty"`
 }
 
 func takeClientOutputOptions(args []string) (clientOutputOptions, []string, error) {
@@ -908,6 +938,60 @@ func writeCommittedProfileError(stderr io.Writer, result clientservice.MutationR
 	err := apperror.Wrap(apperror.ExitFailure, "profile_output_failed", fmt.Sprintf("client %s [%s] was committed, but profile output to %s failed", result.Client.Name, clientservice.ShortID(result.Client.ID), destination), cause)
 	errWithHint := apperror.WithHint(err, fmt.Sprintf("rerun 'ovpn client export --id %s --output FILE' to retrieve the committed profile", clientservice.ShortID(result.Client.ID)))
 	return writeErrorMode(stderr, errWithHint, jsonMode)
+}
+
+func reconcileClientRuntime(ctx context.Context, client clientservice.View, required bool) clientRuntimeResult {
+	result := clientRuntimeResult{ClientID: client.ID, ClientName: client.Name, Status: "not_required"}
+	if !required {
+		return result
+	}
+	runtimeDir := environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)
+	disconnect, err := runtimecontrol.Disconnect(ctx, runtimecontrol.SocketPath(runtimeDir), client.ID, client.Name)
+	if err != nil {
+		result.Status = "pending"
+		result.Warning = "OpenVPN runtime is unavailable; retry with 'ovpn runtime disconnect --id " + clientservice.ShortID(client.ID) + "' in the active server container"
+		return result
+	}
+	result.Connections = disconnect.Connections
+	if disconnect.Disconnected {
+		result.Status = "disconnected"
+	} else {
+		result.Status = "already_offline"
+	}
+	return result
+}
+
+func reconcileAddressRuntime(ctx context.Context, result clientservice.AddressResult) []clientRuntimeResult {
+	required := make(map[string]bool, len(result.KickRequired))
+	for _, clientID := range result.KickRequired {
+		required[clientID] = true
+	}
+	values := make([]clientRuntimeResult, 0, len(result.Clients))
+	runtimeUnavailable := false
+	for _, client := range result.Clients {
+		if runtimeUnavailable && required[client.ID] {
+			values = append(values, clientRuntimeResult{ClientID: client.ID, ClientName: client.Name, Status: "pending", Warning: "OpenVPN runtime is unavailable; retry with 'ovpn runtime disconnect --id " + clientservice.ShortID(client.ID) + "' in the active server container"})
+			continue
+		}
+		value := reconcileClientRuntime(ctx, client, required[client.ID])
+		if value.Status == "pending" {
+			runtimeUnavailable = true
+		}
+		values = append(values, value)
+	}
+	return values
+}
+
+func writeRuntimeReconcileHuman(stdout, stderr io.Writer, result clientRuntimeResult, fullID bool) {
+	identity := fmt.Sprintf("%s [%s]", result.ClientName, displayClientID(result.ClientID, fullID))
+	switch result.Status {
+	case "disconnected":
+		fmt.Fprintf(stdout, "runtime: disconnected %s (%d connection(s))\n", identity, result.Connections)
+	case "already_offline":
+		fmt.Fprintf(stdout, "runtime: %s was already offline\n", identity)
+	case "pending":
+		fmt.Fprintf(stderr, "ovpn: warning: %s\n", result.Warning)
+	}
 }
 
 func writeClientMutationJSON(stdout, stderr io.Writer, result any) int {
