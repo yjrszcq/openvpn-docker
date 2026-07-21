@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -43,7 +44,7 @@ func TestReconcileCreatesIdempotentInstanceChainsAndNAT(t *testing.T) {
 	if got := runner.countRule("nat", "POSTROUTING", jumpRule(comment+":nat", nat)); got != 1 {
 		t.Fatalf("NAT jump count=%d", got)
 	}
-	if len(runner.rules["filter/"+filter]) != 2 || len(runner.rules["nat/"+nat]) != 1 {
+	if len(runner.rules["filter/"+filter]) != 3 || len(runner.rules["nat/"+nat]) != 2 {
 		t.Fatalf("instance rules=%v", runner.rules)
 	}
 	if len(runner.ipCalls) != 2 || !reflect.DeepEqual(runner.ipCalls[0], []string{"-4", "route", "show", "default"}) {
@@ -146,6 +147,47 @@ func TestInstancesNeverRemoveEachOthersChains(t *testing.T) {
 	}
 }
 
+func TestCleanupRefusesForeignSameNameChain(t *testing.T) {
+	runner := newFakeRunner()
+	forward := filepath.Join(t.TempDir(), "ip_forward")
+	if err := os.WriteFile(forward, []byte("1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	reconciler := testReconciler(t, runner, forward)
+	filter, _, _, _ := identities(networkInstance)
+	key := "filter/" + filter
+	runner.chains[key] = true
+	foreign := encodeRule([]string{"-s", "198.51.100.0/24", "-j", "ACCEPT"})
+	runner.rules[key] = []string{foreign}
+	err := reconciler.Cleanup(context.Background(), networkInstance)
+	if err == nil || !strings.Contains(err.Error(), "unowned network chain") {
+		t.Fatalf("foreign chain error=%v", err)
+	}
+	if !runner.chains[key] || len(runner.rules[key]) != 1 || runner.rules[key][0] != foreign {
+		t.Fatalf("foreign chain was modified: chains=%v rules=%v", runner.chains, runner.rules[key])
+	}
+}
+
+func TestCleanupRecognizesLegacyOwnedJumpWithoutMarker(t *testing.T) {
+	runner := newFakeRunner()
+	forward := filepath.Join(t.TempDir(), "ip_forward")
+	if err := os.WriteFile(forward, []byte("1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	reconciler := testReconciler(t, runner, forward)
+	filter, _, comment, _ := legacyIdentities(networkInstance)
+	key := "filter/" + filter
+	runner.chains[key] = true
+	runner.rules[key] = []string{encodeRule([]string{"-s", "10.42.0.0/24", "-j", "ACCEPT"})}
+	runner.rules["filter/FORWARD"] = []string{jumpRule(comment+":forward", filter)}
+	if err := reconciler.Cleanup(context.Background(), networkInstance); err != nil {
+		t.Fatal(err)
+	}
+	if runner.chains[key] || len(runner.rules["filter/FORWARD"]) != 0 {
+		t.Fatalf("legacy owned state remains: chains=%v rules=%v", runner.chains, runner.rules)
+	}
+}
+
 func testReconciler(t *testing.T, runner CommandRunner, forwarding string) *Reconciler {
 	t.Helper()
 	value, err := New(Config{IPBinary: "ip-test", IPTablesBinary: "iptables-test", ForwardingFile: forwarding, Runner: runner})
@@ -218,6 +260,22 @@ func (runner *fakeRunner) Run(_ context.Context, name string, args ...string) (s
 		delete(runner.rules, key)
 	case "-A":
 		runner.rules[key] = append(runner.rules[key], encodeRule(args[5:]))
+	case "-I":
+		if len(args) < 7 {
+			return "", fmt.Errorf("invalid insert command")
+		}
+		position, err := strconv.Atoi(args[5])
+		if err != nil || position < 1 {
+			return "", fmt.Errorf("invalid insert position")
+		}
+		rule := encodeRule(args[6:])
+		index := position - 1
+		if index > len(runner.rules[key]) {
+			index = len(runner.rules[key])
+		}
+		runner.rules[key] = append(runner.rules[key], "")
+		copy(runner.rules[key][index+1:], runner.rules[key][index:])
+		runner.rules[key][index] = rule
 	case "-C":
 		if runner.countRule(table, chain, encodeRule(args[5:])) == 0 {
 			return "", fakeExit(1)

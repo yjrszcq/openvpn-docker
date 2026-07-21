@@ -24,10 +24,15 @@ import (
 type ApplyStore interface {
 	StateStore
 	LoadInstanceArtifacts(context.Context, string) ([]storesqlite.ArtifactMetadata, error)
+	PendingOperations(context.Context, string) ([]storesqlite.Operation, error)
 	PrepareOperation(context.Context, storesqlite.Operation) error
 	AdvanceOperation(context.Context, string, storesqlite.OperationState, json.RawMessage, string, time.Time) error
 	CommitConfigurationOperation(context.Context, storesqlite.ConfigurationCommit) error
 }
+
+var ErrRecoveryRequired = errors.New("interrupted operation recovery is required")
+
+const applyLockTimeout = time.Second
 
 type Manager struct {
 	state     ApplyStore
@@ -79,16 +84,48 @@ func NewManager(state ApplyStore, artifacts *artifact.LocalStore, renderer rende
 	return &Manager{state: state, artifacts: artifacts, renderer: renderer, paths: paths, now: func() time.Time { return time.Now().UTC() }}, nil
 }
 
-// Apply obtains the exclusive runtime lock before the data lock. The running
-// supervisor holds the same runtime lock shared for its complete lifetime, so
-// an apply can never overlap OpenVPN startup or execution.
-func (manager *Manager) Apply(ctx context.Context, desired domain.Config) (ApplyResult, error) {
-	runtimeLock, err := artifact.AcquireLock(ctx, filepath.Join(manager.paths.RuntimeDir, ".runtime.lock"), artifact.LockExclusive)
+// ApplyPersistent acquires both cross-resource locks before opening SQLite, so
+// even an adapter migration cannot occur while the supervisor is running.
+func ApplyPersistent(ctx context.Context, desired domain.Config, renderer render.Renderer, paths render.Paths) (ApplyResult, error) {
+	if paths.DataDir == "" || !filepath.IsAbs(paths.DataDir) || filepath.Clean(paths.DataDir) != paths.DataDir || paths.RuntimeDir == "" || !filepath.IsAbs(paths.RuntimeDir) || filepath.Clean(paths.RuntimeDir) != paths.RuntimeDir {
+		return ApplyResult{}, fmt.Errorf("configuration data and runtime paths are invalid")
+	}
+	runtimeLock, err := acquireApplyLock(ctx, filepath.Join(paths.RuntimeDir, ".runtime.lock"))
 	if err != nil {
 		return ApplyResult{}, err
 	}
 	defer runtimeLock.Release()
-	dataLock, err := artifact.AcquireLock(ctx, filepath.Join(manager.paths.DataDir, ".ovpn-data.lock"), artifact.LockExclusive)
+	dataLock, err := acquireApplyLock(ctx, filepath.Join(paths.DataDir, ".ovpn-data.lock"))
+	if err != nil {
+		return ApplyResult{}, err
+	}
+	defer dataLock.Release()
+	state, err := storesqlite.Open(ctx, filepath.Join(paths.DataDir, "meta", "state.db"))
+	if err != nil {
+		return ApplyResult{}, err
+	}
+	defer state.Close()
+	local, err := artifact.NewLocal(paths.DataDir)
+	if err != nil {
+		return ApplyResult{}, err
+	}
+	manager, err := NewManager(state, local, renderer, paths)
+	if err != nil {
+		return ApplyResult{}, err
+	}
+	return manager.applyLocked(ctx, desired)
+}
+
+// Apply obtains the exclusive runtime lock before the data lock. The running
+// supervisor holds the same runtime lock shared for its complete lifetime, so
+// an apply can never overlap OpenVPN startup or execution.
+func (manager *Manager) Apply(ctx context.Context, desired domain.Config) (ApplyResult, error) {
+	runtimeLock, err := acquireApplyLock(ctx, filepath.Join(manager.paths.RuntimeDir, ".runtime.lock"))
+	if err != nil {
+		return ApplyResult{}, err
+	}
+	defer runtimeLock.Release()
+	dataLock, err := acquireApplyLock(ctx, filepath.Join(manager.paths.DataDir, ".ovpn-data.lock"))
 	if err != nil {
 		return ApplyResult{}, err
 	}
@@ -96,10 +133,30 @@ func (manager *Manager) Apply(ctx context.Context, desired domain.Config) (Apply
 	return manager.applyLocked(ctx, desired)
 }
 
+func acquireApplyLock(ctx context.Context, path string) (*artifact.FileLock, error) {
+	lockContext, cancel := context.WithTimeout(ctx, applyLockTimeout)
+	defer cancel()
+	return artifact.AcquireLock(lockContext, path, artifact.LockExclusive)
+}
+
 func (manager *Manager) applyLocked(ctx context.Context, desired domain.Config) (ApplyResult, error) {
 	instance, err := manager.state.LoadOnlyInstance(ctx)
 	if err != nil {
 		return ApplyResult{}, err
+	}
+	pending, err := manager.state.PendingOperations(ctx, instance.ID)
+	if err != nil {
+		return ApplyResult{}, err
+	}
+	if len(pending) != 0 {
+		return ApplyResult{}, fmt.Errorf("%w: found %d pending operation(s)", ErrRecoveryRequired, len(pending))
+	}
+	artifactPending, err := manager.artifacts.PendingOperations()
+	if err != nil {
+		return ApplyResult{}, err
+	}
+	if len(artifactPending) != 0 {
+		return ApplyResult{}, fmt.Errorf("%w: found %d pending artifact operation(s)", ErrRecoveryRequired, len(artifactPending))
 	}
 	clients, err := manager.state.ListClients(ctx, instance.ID)
 	if err != nil {

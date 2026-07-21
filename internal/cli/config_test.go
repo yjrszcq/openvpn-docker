@@ -161,6 +161,38 @@ func TestConfigApplyMapsRuntimeLockToTemporaryFailure(t *testing.T) {
 	}
 }
 
+func TestConfigApplyRequiresInterruptedOperationRecovery(t *testing.T) {
+	root, configPath := createConfigurationFixture(t)
+	runtimeDir := filepath.Join(t.TempDir(), "run")
+	t.Setenv("OVPN_DATA_DIR", root)
+	t.Setenv("OVPN_RUNTIME_DIR", runtimeDir)
+	t.Setenv("OVPN_CONFIG_FILE", configPath)
+	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
+	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
+	store, err := storesqlite.Open(context.Background(), filepath.Join(root, "meta", "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance, err := store.LoadOnlyInstance(context.Background())
+	if err != nil {
+		_ = store.Close()
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	operation := storesqlite.Operation{ID: "93939393-9393-4939-8939-939393939393", InstanceID: instance.ID, Kind: "client.create", State: storesqlite.OperationPrepared, PayloadVersion: 1, RecoveryPayload: json.RawMessage(`{"version":1}`), CreatedAt: now, UpdatedAt: now}
+	if err := store.PrepareOperation(context.Background(), operation); err != nil {
+		_ = store.Close()
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr := run("config", "apply", "--yes", "--json")
+	if code != 78 || stdout != "" || !strings.Contains(stderr, `"kind":"operation_recovery_required"`) {
+		t.Fatalf("pending apply code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
 func createConfigurationFixture(t *testing.T) (string, string) {
 	t.Helper()
 	root := t.TempDir()

@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/yjrszcq/openvpn-docker/internal/apperror"
 	"github.com/yjrszcq/openvpn-docker/internal/artifact"
@@ -153,14 +152,12 @@ func runConfigApply(args []string, stdout, stderr io.Writer) int {
 			return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "confirmation_required", "config apply was not confirmed"), jsonMode)
 		}
 	}
-	manager, store, err := openConfigurationManager(context.Background())
+	renderer, err := configurationRenderer()
 	if err != nil {
 		return writeConfigurationApplyError(stderr, err, jsonMode)
 	}
-	defer store.Close()
-	lockContext, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	result, err := manager.Apply(lockContext, desired)
+	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
+	result, err := configurationservice.ApplyPersistent(context.Background(), desired, renderer, render.Paths{DataDir: dataDir, RuntimeDir: environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)})
 	if err != nil {
 		return writeConfigurationApplyError(stderr, err, jsonMode)
 	}
@@ -262,31 +259,6 @@ func openConfigurationState(ctx context.Context) (*storesqlite.Store, storesqlit
 	return store, instance, nil
 }
 
-func openConfigurationManager(ctx context.Context) (*configurationservice.Manager, *storesqlite.Store, error) {
-	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
-	store, err := storesqlite.Open(ctx, filepath.Join(dataDir, "meta", "state.db"))
-	if err != nil {
-		return nil, nil, err
-	}
-	closeError := func(err error) (*configurationservice.Manager, *storesqlite.Store, error) {
-		_ = store.Close()
-		return nil, nil, err
-	}
-	local, err := artifact.NewLocal(dataDir)
-	if err != nil {
-		return closeError(err)
-	}
-	renderer, err := configurationRenderer()
-	if err != nil {
-		return closeError(err)
-	}
-	manager, err := configurationservice.NewManager(store, local, renderer, render.Paths{DataDir: dataDir, RuntimeDir: environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)})
-	if err != nil {
-		return closeError(err)
-	}
-	return manager, store, nil
-}
-
 func configurationRenderer() (render.Renderer, error) {
 	contract, err := compatibility.Load(environmentOr("OVPN_COMPATIBILITY_FILE", compatibility.DefaultContractPath))
 	if err != nil {
@@ -358,6 +330,8 @@ func writeConfigurationError(stderr io.Writer, err error, jsonMode bool) int {
 	switch {
 	case errors.Is(err, configurationservice.ErrPlanConflict):
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "configuration_conflict", "configuration cannot be applied", err), jsonMode)
+	case errors.Is(err, configurationservice.ErrRecoveryRequired):
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "operation_recovery_required", "interrupted operation recovery is required before config apply", err), jsonMode)
 	case errors.Is(err, storesqlite.ErrBusy):
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitTemporary, "state_busy", "configuration state is busy", err), jsonMode)
 	case errors.Is(err, storesqlite.ErrMissing), errors.Is(err, storesqlite.ErrCorrupt), errors.Is(err, storesqlite.ErrSchema), errors.Is(err, storesqlite.ErrUnsupportedRevision), errors.Is(err, storesqlite.ErrUnsupportedSchema):

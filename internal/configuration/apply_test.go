@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -107,6 +108,68 @@ func TestApplyRefusesRunningSupervisorLock(t *testing.T) {
 	loaded, err := store.LoadOnlyInstance(context.Background())
 	if err != nil || loaded.Applied.Revision != instance.Applied.Revision {
 		t.Fatalf("locked apply changed state=%+v err=%v", loaded, err)
+	}
+}
+
+func TestApplyRefusesPendingOperationBeforePlanningNewMutation(t *testing.T) {
+	manager, store, _, _, instance := applyFixture(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	operationID, err := domain.GenerateUUID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := json.RawMessage(`{"version":1}`)
+	if err := store.PrepareOperation(context.Background(), storesqlite.Operation{ID: operationID, InstanceID: instance.ID, Kind: "client.create", State: storesqlite.OperationPrepared, PayloadVersion: 1, RecoveryPayload: payload, CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	desired := parseApplyConfig(t, strings.Replace(applyYAML("vpn.example.test", "10.42.0.0/24"), "vpn.example.test", "new.example.test", 1))
+	if _, err := manager.Apply(context.Background(), desired); !errors.Is(err, ErrRecoveryRequired) {
+		t.Fatalf("pending operation error=%v", err)
+	}
+	loaded, err := store.LoadOnlyInstance(context.Background())
+	if err != nil || loaded.Applied.Revision != 1 {
+		t.Fatalf("pending refusal changed state=%+v err=%v", loaded, err)
+	}
+}
+
+func TestApplyPersistentChecksRuntimeLockBeforeOpeningSQLite(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data-without-database")
+	runtimeDir := filepath.Join(t.TempDir(), "run")
+	lock, err := artifact.AcquireLock(context.Background(), filepath.Join(runtimeDir, ".runtime.lock"), artifact.LockShared)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Release()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	_, err = ApplyPersistent(ctx, domain.Config{}, render.Renderer{}, render.Paths{DataDir: dataDir, RuntimeDir: runtimeDir})
+	if !errors.Is(err, artifact.ErrLocked) {
+		t.Fatalf("apply opened missing SQLite before checking runtime lock: %v", err)
+	}
+}
+
+func TestApplyRefusesOrphanArtifactOperation(t *testing.T) {
+	manager, store, root, _, instance := applyFixture(t)
+	local, err := artifact.NewLocal(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	operationID, err := domain.GenerateUUID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	operation, err := local.BeginOperation(operationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer operation.Rollback()
+	desired := parseApplyConfig(t, strings.Replace(applyYAML("vpn.example.test", "10.42.0.0/24"), "vpn.example.test", "new.example.test", 1))
+	if _, err := manager.Apply(context.Background(), desired); !errors.Is(err, ErrRecoveryRequired) {
+		t.Fatalf("orphan artifact operation error=%v", err)
+	}
+	loaded, err := store.LoadOnlyInstance(context.Background())
+	if err != nil || loaded.Applied.Revision != instance.Applied.Revision {
+		t.Fatalf("orphan refusal changed state=%+v err=%v", loaded, err)
 	}
 }
 
