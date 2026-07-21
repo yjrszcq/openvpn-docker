@@ -14,35 +14,34 @@ grep -Fq 'workflow_call:' "$WORKFLOWS/test.yml"
 grep -Fq 'mvdan/shfmt:v3.10.0' "$WORKFLOWS/test.yml"
 grep -Fq 'rhysd/actionlint:1.7.7' "$WORKFLOWS/test.yml"
 grep -Fq 'koalaman/shellcheck:v0.10.0' "$WORKFLOWS/test.yml"
-grep -Fq 'OVPN_E2E_REQUIRED=1' "$WORKFLOWS/test.yml"
-grep -Fq 'OVPN_LIFECYCLE_REQUIRED=1' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/ipam-layout-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/management-broker-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/runtime-logs-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/runtime-events-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'rootfs/usr/local/lib/openvpn-container/events.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/management-hook-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/uuid-registry-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/schema-gate-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/migration-isolation-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/migration-transaction-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/registry-migration-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/schema2-uuid-migration-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/container/schema-migration-container-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'Verify schema 1 and schema 2 migration fixtures' "$WORKFLOWS/test.yml"
+grep -Fq 'actions/setup-go@v6' "$WORKFLOWS/test.yml"
+grep -Fq 'go-version: 1.26.5' "$WORKFLOWS/test.yml"
+grep -Fq 'GOPROXY: direct' "$WORKFLOWS/test.yml"
+grep -Fq 'gofmt -l cmd internal' "$WORKFLOWS/test.yml"
+grep -Fq 'go vet ./...' "$WORKFLOWS/test.yml"
+grep -Fq 'go test -race ./...' "$WORKFLOWS/test.yml"
+grep -Fq 'scripts/verify-go-licenses.sh' "$WORKFLOWS/test.yml"
+grep -Fq 'tests/smoke/container/runtime-image-smoke.sh' "$WORKFLOWS/test.yml"
+grep -Fq 'tests/smoke/container/go-sqlite-handoff-smoke.sh' "$WORKFLOWS/test.yml"
+grep -Fq 'Real schema 3 migration and rollback' "$WORKFLOWS/test.yml"
 grep -Fq 'fetch-depth: 0' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/client-ip-set-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/ipam-repair-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/network-migration-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'OVPN_NETWORK_MIGRATION_REQUIRED=1' "$WORKFLOWS/test.yml"
 grep -Fq 'linux/amd64,linux/arm64' "$WORKFLOWS/test.yml"
 # shellcheck disable=SC2016 # Assert literal workflow build-argument expressions.
-grep -Fq -- '--build-arg "DATA_SCHEMA=$DATA_SCHEMA"' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/container/image-handoff-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'Previous-image persistent-state handoff' "$WORKFLOWS/test.yml"
-grep -Fq 'OVPN_MIGRATION_LOCK_REQUIRED=1' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/data-schema-policy-smoke.sh' "$WORKFLOWS/test.yml"
+grep -Fq -- '--build-arg "GO_BUILD_IMAGE=$GO_BUILD_IMAGE"' "$WORKFLOWS/test.yml"
+# shellcheck disable=SC2016 # Assert literal workflow build-argument expressions.
+grep -Fq -- '--build-arg "GO_RUNTIME_VERSION=$GO_RUNTIME_VERSION"' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/license-smoke.sh' "$WORKFLOWS/test.yml"
+for retired in \
+  management-broker-smoke.sh \
+  management-hook-smoke.sh \
+  schema2-uuid-migration-smoke.sh \
+  schema-migration-container-smoke.sh \
+  image-handoff-smoke.sh; do
+  if grep -Fq "$retired" "$WORKFLOWS/test.yml"; then
+    echo "implementation-coupled test remains in CI: $retired" >&2
+    exit 1
+  fi
+done
 grep -Fq 'candidate-ovpn' "$WORKFLOWS/candidate.yml"
 grep -Fq 'packages: write' "$WORKFLOWS/candidate.yml"
 grep -Fq "GHCR_TOKEN: \${{ github.token }}" "$WORKFLOWS/candidate.yml"
