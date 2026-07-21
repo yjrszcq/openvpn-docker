@@ -202,7 +202,7 @@ func TestCreateAndRenameClientTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if created.Version != 1 || created.OperationID == "" || created.Client.Name != "laptop" || created.Client.Status != "active" || created.Client.IPv4.Mode != "static" || created.Client.IPv4.Address == nil || *created.Client.IPv4.Address != "10.42.0.2" {
+	if created.Version != 1 || created.OperationID == "" || !created.ProfileRedistributionRequired || created.Client.Name != "laptop" || created.Client.Status != "active" || created.Client.IPv4.Mode != "static" || created.Client.IPv4.Address == nil || *created.Client.IPv4.Address != "10.42.0.2" {
 		t.Fatalf("created result=%+v", created)
 	}
 	profile := readMutationArtifact(t, fixture.artifacts, "clients/active/laptop.ovpn")
@@ -222,7 +222,7 @@ func TestCreateAndRenameClientTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if renamed.Client.ID != created.Client.ID || renamed.Client.Name != "office-laptop" || renamed.Client.IPv4.Address == nil || *renamed.Client.IPv4.Address != "10.42.0.2" {
+	if !renamed.ProfileRedistributionRequired || renamed.Client.ID != created.Client.ID || renamed.Client.Name != "office-laptop" || renamed.Client.IPv4.Address == nil || *renamed.Client.IPv4.Address != "10.42.0.2" {
 		t.Fatalf("renamed result=%+v", renamed)
 	}
 	assertMutationMissing(t, filepath.Join(fixture.root, "clients", "active", "laptop.ovpn"))
@@ -348,7 +348,7 @@ func TestRevokeRetainsAssignmentAndReissueRestoresArtifacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !revoked.KickRequired || revoked.Client.Status != "revoked" || revoked.Client.IPv4.State != "retained" || revoked.Client.IPv4.Address == nil || *revoked.Client.IPv4.Address != "10.42.0.20" {
+	if !revoked.KickRequired || revoked.ProfileRedistributionRequired || revoked.Client.Status != "revoked" || revoked.Client.IPv4.State != "retained" || revoked.Client.IPv4.Address == nil || *revoked.Client.IPv4.Address != "10.42.0.20" {
 		t.Fatalf("revoked result=%+v", revoked)
 	}
 	assertMutationMissing(t, filepath.Join(fixture.root, "clients", "active", "laptop.ovpn"))
@@ -362,7 +362,7 @@ func TestRevokeRetainsAssignmentAndReissueRestoresArtifacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reissued.KickRequired || reissued.Client.Status != "active" || reissued.Client.IPv4.State != "active" || reissued.Client.IPv4.Address == nil || *reissued.Client.IPv4.Address != "10.42.0.20" {
+	if !reissued.KickRequired || !reissued.ProfileRedistributionRequired || reissued.Client.Status != "active" || reissued.Client.IPv4.State != "active" || reissued.Client.IPv4.Address == nil || *reissued.Client.IPv4.Address != "10.42.0.20" {
 		t.Fatalf("reissued result=%+v", reissued)
 	}
 	certificateAfter := readMutationArtifact(t, fixture.artifacts, "pki/issued/"+created.Client.ID+".crt")

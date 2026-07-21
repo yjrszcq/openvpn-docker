@@ -152,7 +152,7 @@ func runClientCreate(args []string, stdout, stderr io.Writer) int {
 	}
 	profileOutput, err := writeCommittedProfile(context.Background(), state, result, output, stdout)
 	if err != nil {
-		return writeCommittedProfileError(stderr, result, err, options.JSON)
+		return writeCommittedProfileError(stderr, result, output, err, options.JSON)
 	}
 	if output == "-" {
 		return int(apperror.ExitSuccess)
@@ -163,6 +163,8 @@ func runClientCreate(args []string, stdout, stderr io.Writer) int {
 	fmt.Fprintf(stdout, "created client %s [%s] with IPv4 %s\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID), formatIPv4(result.Client.IPv4))
 	if profileOutput != nil {
 		fmt.Fprintf(stdout, "profile written to %s\n", profileOutput.Destination)
+	} else {
+		fmt.Fprintf(stdout, "next: ovpn client export --id %s --output FILE\n", clientservice.ShortID(result.Client.ID))
 	}
 	return int(apperror.ExitSuccess)
 }
@@ -186,7 +188,7 @@ func runClientRename(args []string, stdout, stderr io.Writer) int {
 	if options.JSON {
 		return writeClientMutationJSON(stdout, stderr, result)
 	}
-	fmt.Fprintf(stdout, "renamed client to %s [%s]\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID))
+	fmt.Fprintf(stdout, "renamed client to %s [%s]; redistribute the updated profile\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID))
 	return int(apperror.ExitSuccess)
 }
 
@@ -266,7 +268,7 @@ func runClientReissue(args []string, stdout, stderr io.Writer) int {
 	}
 	profileOutput, err := writeCommittedProfile(context.Background(), state, result, output, stdout)
 	if err != nil {
-		return writeCommittedProfileError(stderr, result, err, options.JSON)
+		return writeCommittedProfileError(stderr, result, output, err, options.JSON)
 	}
 	if output == "-" {
 		return int(apperror.ExitSuccess)
@@ -898,8 +900,12 @@ func writeProfileDestination(output string, content []byte, stdout io.Writer) (*
 	return &clientProfileOutput{Destination: destination, Written: true}, nil
 }
 
-func writeCommittedProfileError(stderr io.Writer, result clientservice.MutationResult, cause error, jsonMode bool) int {
-	err := apperror.Wrap(apperror.ExitFailure, "profile_output_failed", fmt.Sprintf("client %s [%s] was committed, but profile output failed", result.Client.Name, clientservice.ShortID(result.Client.ID)), cause)
+func writeCommittedProfileError(stderr io.Writer, result clientservice.MutationResult, output string, cause error, jsonMode bool) int {
+	destination := output
+	if output == "-" {
+		destination = "stdout"
+	}
+	err := apperror.Wrap(apperror.ExitFailure, "profile_output_failed", fmt.Sprintf("client %s [%s] was committed, but profile output to %s failed", result.Client.Name, clientservice.ShortID(result.Client.ID), destination), cause)
 	errWithHint := apperror.WithHint(err, fmt.Sprintf("rerun 'ovpn client export --id %s --output FILE' to retrieve the committed profile", clientservice.ShortID(result.Client.ID)))
 	return writeErrorMode(stderr, errWithHint, jsonMode)
 }

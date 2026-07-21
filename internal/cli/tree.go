@@ -62,7 +62,7 @@ var rootCommand = command{
 				[]string{"A positional selector is an exact client name. File output is never overwritten."},
 				"ovpn client export laptop -o laptop.ovpn"),
 			leaf("rename", "rename a client without changing its UUID", "ovpn client rename (NAME|--name|-n NAME|--id|-i ID) NEW_NAME [--full-id|-u] [--json|-j]",
-				[]string{"A positional selector is an exact client name; ID prefixes require --id or -i."},
+				[]string{"A positional selector is an exact client name; ID prefixes require --id or -i.", "The regenerated profile must be redistributed after a real rename."},
 				"ovpn client rename laptop office-laptop"),
 			leaf("revoke", "revoke a client certificate", "ovpn client revoke (NAME|--name|-n NAME|--id|-i ID) [--release-ipv4|-4] [--full-id|-u] [--json|-j]",
 				[]string{"Static IPv4 is retained by default. Use -4 to release it during revocation."},

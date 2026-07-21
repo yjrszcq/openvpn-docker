@@ -229,7 +229,7 @@ func (manager *Manager) Reissue(ctx context.Context, selector Selector, ipv4 str
 	if err != nil {
 		return MutationResult{}, err
 	}
-	return MutationResult{Version: 1, OperationID: operationID, Client: newView(loaded), KickRequired: true}, nil
+	return MutationResult{Version: 1, OperationID: operationID, Client: newView(loaded), KickRequired: true, ProfileRedistributionRequired: true}, nil
 }
 
 func (manager *Manager) Delete(ctx context.Context, selector Selector) (MutationResult, error) {

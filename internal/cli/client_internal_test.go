@@ -88,7 +88,7 @@ func TestProfileDestinationAndCommittedFailureReporting(t *testing.T) {
 	}
 	result := clientservice.MutationResult{Version: 1, Client: clientservice.View{ID: "11111111-2222-4333-8444-555555555555", Name: "laptop"}}
 	var stderr bytes.Buffer
-	if code := writeCommittedProfileError(&stderr, result, errors.New("disk full"), true); code != 1 || !bytes.Contains(stderr.Bytes(), []byte(`"kind":"profile_output_failed"`)) || !bytes.Contains(stderr.Bytes(), []byte("was committed")) {
+	if code := writeCommittedProfileError(&stderr, result, "client.ovpn", errors.New("disk full"), true); code != 1 || !bytes.Contains(stderr.Bytes(), []byte(`"kind":"profile_output_failed"`)) || !bytes.Contains(stderr.Bytes(), []byte("was committed")) || !bytes.Contains(stderr.Bytes(), []byte("client.ovpn")) {
 		t.Fatalf("code=%d stderr=%q", code, stderr.String())
 	}
 }

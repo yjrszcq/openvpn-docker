@@ -67,20 +67,31 @@ run_ovpn() {
 }
 
 run_ovpn server init >"$WORK_DIR/init.out"
-run_ovpn client create alpha --ipv4 auto >"$WORK_DIR/create.out"
-client_id="$(sed -n 's/.*\[\([0-9a-f-]*\)\].*/\1/p' "$WORK_DIR/create.out")"
+run_ovpn client create alpha --ipv4 auto --output /etc/openvpn/alpha-created.ovpn --json >"$WORK_DIR/create.json"
+client_id="$(sed -n 's/.*"id":"\([^"]*\)".*/\1/p' "$WORK_DIR/create.json")"
 [[ "$client_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
+grep -Fq '"version":1' "$WORK_DIR/create.json"
+grep -Fq '"profile_redistribution_required":true' "$WORK_DIR/create.json"
+grep -Fq '"profile_output":{"destination":"/etc/openvpn/alpha-created.ovpn","written":true}' "$WORK_DIR/create.json"
+test -s "$WORK_DIR/data/alpha-created.ovpn"
 prefix="${client_id:0:8}"
 
 run_ovpn client export --id "$prefix" --output - >"$WORK_DIR/alpha.ovpn"
 grep -Fq "# ovpn-client-id: $client_id" "$WORK_DIR/alpha.ovpn"
-run_ovpn client rename --id "$prefix" beta
-run_ovpn client address set --name beta --ipv4 10.70.0.10
-run_ovpn client revoke --name beta --release-ipv4
-run_ovpn client reissue --id "$prefix" --ipv4 dynamic
-run_ovpn client delete --id "$prefix" --yes
-run_ovpn client create beta --ipv4 auto >"$WORK_DIR/reuse.out"
-replacement_id="$(sed -n 's/.*\[\([0-9a-f-]*\)\].*/\1/p' "$WORK_DIR/reuse.out")"
+run_ovpn client rename --id "$prefix" beta --json >"$WORK_DIR/rename.json"
+grep -Fq '"profile_redistribution_required":true' "$WORK_DIR/rename.json"
+run_ovpn client address set --name beta --ipv4 10.70.0.10 --json >"$WORK_DIR/address-set.json"
+grep -Fq "\"kick_required\":[\"$client_id\"]" "$WORK_DIR/address-set.json"
+run_ovpn client revoke --name beta --release-ipv4 --json >"$WORK_DIR/revoke.json"
+grep -Fq '"kick_required":true' "$WORK_DIR/revoke.json"
+run_ovpn client reissue --id "$prefix" --ipv4 dynamic --output /etc/openvpn/beta-reissued.ovpn --json >"$WORK_DIR/reissue.json"
+grep -Fq '"profile_redistribution_required":true' "$WORK_DIR/reissue.json"
+grep -Fq '"profile_output":{"destination":"/etc/openvpn/beta-reissued.ovpn","written":true}' "$WORK_DIR/reissue.json"
+test -s "$WORK_DIR/data/beta-reissued.ovpn"
+run_ovpn client delete --id "$prefix" --yes --json >"$WORK_DIR/delete.json"
+grep -Fq '"status":"deleted"' "$WORK_DIR/delete.json"
+run_ovpn client create beta --ipv4 auto --json >"$WORK_DIR/reuse.json"
+replacement_id="$(sed -n 's/.*"id":"\([^"]*\)".*/\1/p' "$WORK_DIR/reuse.json")"
 test -n "$replacement_id"
 test "$replacement_id" != "$client_id"
 run_ovpn client list --detail --json >"$WORK_DIR/list.json"
