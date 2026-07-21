@@ -3,6 +3,7 @@ package migration
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/yjrszcq/openvpn-docker/internal/artifact"
 	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
+	"github.com/yjrszcq/openvpn-docker/internal/domain"
 	"github.com/yjrszcq/openvpn-docker/internal/render"
 	statecontrol "github.com/yjrszcq/openvpn-docker/internal/state"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
@@ -72,8 +74,77 @@ func TestApplyMigratesSchema3AndIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestApplyImportsLargeClientSet(t *testing.T) {
+	fixture := makeLegacyFixture(t)
+	for index := 0; index < 48; index++ {
+		id := fmt.Sprintf("%08x-1000-4000-8000-%012x", index+1, index+1)
+		addLegacyClient(t, fixture, id, fmt.Sprintf("zbulk-%03d", index), domain.ClientActive, int64(100+index))
+	}
+	options := migrationOptions(t, fixture)
+	result, err := Apply(context.Background(), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Clients != 49 {
+		t.Fatalf("client count=%d", result.Clients)
+	}
+	store, err := storesqlite.Open(context.Background(), filepath.Join(fixture.root, "meta", "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	instance, err := store.LoadOnlyInstance(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	clients, err := store.ListClients(context.Background(), instance.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(clients) != 49 {
+		t.Fatalf("stored clients=%d", len(clients))
+	}
+}
+
+func TestApplyImportsRevokedAndDeletedLifecycle(t *testing.T) {
+	fixture := makeLegacyFixture(t)
+	revokedID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	deletedID := "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+	addLegacyClient(t, fixture, revokedID, "z-revoked", domain.ClientRevoked, 50)
+	addDeletedLegacyClient(t, fixture, deletedID, "zz-deleted")
+	writeLegacy(t, fixture.root, "meta/audit.jsonl", fmt.Sprintf("{\"timestamp\":\"2026-07-21T01:00:00Z\",\"event\":\"client_lifecycle\",\"operation\":\"revoke\",\"outcome\":\"applied\",\"client_id\":\"%s\",\"client_name\":\"z-revoked\",\"legacy\":false}\n{\"timestamp\":\"2026-07-21T02:00:00Z\",\"event\":\"client_lifecycle\",\"operation\":\"delete\",\"outcome\":\"applied\",\"client_id\":\"%s\",\"client_name\":\"zz-deleted\",\"legacy\":false}\n", revokedID, deletedID), 0o600)
+	options := migrationOptions(t, fixture)
+	if _, err := Apply(context.Background(), options); err != nil {
+		t.Fatal(err)
+	}
+	store, err := storesqlite.Open(context.Background(), filepath.Join(fixture.root, "meta", "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	instance, err := store.LoadOnlyInstance(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	revoked, err := store.LoadClient(context.Background(), instance.ID, revokedID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := store.LoadClient(context.Background(), instance.ID, deletedID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revoked.Client.Status != domain.ClientRevoked || revoked.RevokedAt == nil || revoked.Assignment == nil || revoked.Assignment.Status != storesqlite.AssignmentRetained || len(revoked.Artifacts) != 3 {
+		t.Fatalf("revoked=%+v", revoked)
+	}
+	if deleted.Client.Status != domain.ClientDeleted || deleted.DeletedAt == nil || deleted.Assignment != nil || len(deleted.Artifacts) != 0 {
+		t.Fatalf("deleted=%+v", deleted)
+	}
+}
+
 func TestMigrationSnapshotRestoresExactSchema3Handoff(t *testing.T) {
 	fixture := makeLegacyFixture(t)
+	writeLegacy(t, fixture.root, "data/opaque-state", "preserve-me\n", 0o600)
 	certificatePath := filepath.Join(fixture.root, "pki", "issued", testClientID+".crt")
 	before, err := os.ReadFile(certificatePath)
 	if err != nil {
@@ -109,6 +180,9 @@ func TestMigrationSnapshotRestoresExactSchema3Handoff(t *testing.T) {
 	if string(after) != string(before) {
 		t.Fatal("rollback changed the UUID certificate")
 	}
+	if opaque, err := os.ReadFile(filepath.Join(fixture.root, "data", "opaque-state")); err != nil || string(opaque) != "preserve-me\n" {
+		t.Fatalf("opaque backup unit state=%q err=%v", opaque, err)
+	}
 	source, err := ReadSchema3(context.Background(), fixture.root, fixture.now)
 	if err != nil {
 		t.Fatal(err)
@@ -119,6 +193,56 @@ func TestMigrationSnapshotRestoresExactSchema3Handoff(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), fixture.root, fixture.now)
 	if err != nil || plan.Status != "ready" {
 		t.Fatalf("rollback plan=%+v err=%v", plan, err)
+	}
+}
+
+func TestApplyRejectsSymlinkInSnapshotUnitBeforeMarker(t *testing.T) {
+	fixture := makeLegacyFixture(t)
+	if err := os.MkdirAll(filepath.Join(fixture.root, "server"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../config/project.env", filepath.Join(fixture.root, "server", "unsafe")); err != nil {
+		t.Fatal(err)
+	}
+	options := migrationOptions(t, fixture)
+	if _, err := Apply(context.Background(), options); err == nil {
+		t.Fatal("snapshot symlink was accepted")
+	}
+	for _, key := range []string{SnapshotRelativePath, ManifestRelativePath} {
+		if _, err := os.Lstat(filepath.Join(fixture.root, filepath.FromSlash(key))); !os.IsNotExist(err) {
+			t.Fatalf("transaction state %s remains: %v", key, err)
+		}
+	}
+}
+
+func TestMigrationMarkerRejectsSymlinkAndInvalidState(t *testing.T) {
+	root := t.TempDir()
+	operationID := "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+	marker := transactionMarker{Version: 1, OperationID: operationID, State: "snapshot-ready", Stage: "repair/migrations/stage-" + operationID, Snapshot: SnapshotRelativePath, SnapshotDigest: strings.Repeat("a", 64), Installed: []string{}}
+	if err := writeMarker(root, marker); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, filepath.FromSlash(ManifestRelativePath))
+	target := filepath.Join(root, "target.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readMarker(root); err == nil {
+		t.Fatal("symlink marker was accepted")
+	}
+	marker.State = "unknown"
+	if err := validateMarker(marker); err == nil {
+		t.Fatal("unknown marker state was accepted")
 	}
 }
 

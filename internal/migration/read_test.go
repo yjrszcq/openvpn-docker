@@ -17,6 +17,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yjrszcq/openvpn-docker/internal/domain"
 )
 
 const (
@@ -25,8 +27,11 @@ const (
 )
 
 type legacyFixture struct {
-	root string
-	now  time.Time
+	root  string
+	now   time.Time
+	ca    *x509.Certificate
+	caKey ed25519.PrivateKey
+	tls   []byte
 }
 
 func TestReadSchema3HealthySourceWithoutMutation(t *testing.T) {
@@ -215,7 +220,56 @@ func makeLegacyFixture(t *testing.T) legacyFixture {
 	profile := []byte("client\n# ovpn-client-id: " + testClientID + "\n# ovpn-client-name: laptop\n<ca>\n" + strings.TrimSpace(string(caPEM)) + "\n</ca>\n<cert>\n" + strings.TrimSpace(string(clientPEM)) + "\n</cert>\n<key>\n" + strings.TrimSpace(string(clientKeyPEM)) + "\n</key>\n<tls-crypt>\n" + strings.TrimSpace(string(tls)) + "\n</tls-crypt>\n")
 	writeLegacyBytes(t, root, "clients/active/laptop.ovpn", profile, 0o600)
 	writeLegacy(t, root, "cache/client-leases/"+testClientID, "10.42.0.200\n", 0o600)
-	return legacyFixture{root: root, now: now}
+	return legacyFixture{root: root, now: now, ca: ca, caKey: caKey, tls: tls}
+}
+
+func addLegacyClient(t *testing.T, fixture legacyFixture, id, name string, status domain.ClientStatus, serial int64) {
+	t.Helper()
+	client, key := makeLegacyLeaf(t, fixture.ca, fixture.caKey, id, serial, x509.ExtKeyUsageClientAuth, fixture.now)
+	certificate := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: client.Raw})
+	privateKey := marshalLegacyKey(t, key)
+	writeLegacyBytes(t, fixture.root, "pki/issued/"+id+".crt", certificate, 0o644)
+	writeLegacyBytes(t, fixture.root, "pki/private/"+id+".key", privateKey, 0o600)
+	appendLegacy(t, fixture.root, "meta/client-state.csv", fmt.Sprintf("%s,%s,%s\n", id, name, status))
+	appendLegacy(t, fixture.root, "meta/client-ip.csv", fmt.Sprintf("%s,%s,\n", id, name))
+	indexStatus := "V"
+	profileDirectory := "active"
+	revokedAt := ""
+	if status == domain.ClientRevoked {
+		indexStatus = "R"
+		profileDirectory = "revoked"
+		revokedAt = "260721010000Z"
+	}
+	appendLegacy(t, fixture.root, "pki/index.txt", fmt.Sprintf("%s\t270721000000Z\t%s\t%X\tunknown\t/CN=%s\n", indexStatus, revokedAt, serial, id))
+	profile := []byte("client\n# ovpn-client-id: " + id + "\n# ovpn-client-name: " + name + "\n<ca>\n" + strings.TrimSpace(string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: fixture.ca.Raw}))) + "\n</ca>\n<cert>\n" + strings.TrimSpace(string(certificate)) + "\n</cert>\n<key>\n" + strings.TrimSpace(string(privateKey)) + "\n</key>\n<tls-crypt>\n" + strings.TrimSpace(string(fixture.tls)) + "\n</tls-crypt>\n")
+	writeLegacyBytes(t, fixture.root, "clients/"+profileDirectory+"/"+name+".ovpn", profile, 0o600)
+	if status == domain.ClientRevoked {
+		crlDER, err := x509.CreateRevocationList(rand.Reader, &x509.RevocationList{Number: big.NewInt(2), ThisUpdate: fixture.now.Add(-time.Minute), NextUpdate: fixture.now.Add(time.Hour), RevokedCertificateEntries: []x509.RevocationListEntry{{SerialNumber: big.NewInt(serial), RevocationTime: fixture.now}}}, fixture.ca, fixture.caKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeLegacyBytes(t, fixture.root, "pki/crl.pem", pem.EncodeToMemory(&pem.Block{Type: "X509 CRL", Bytes: crlDER}), 0o644)
+	}
+}
+
+func addDeletedLegacyClient(t *testing.T, fixture legacyFixture, id, name string) {
+	t.Helper()
+	appendLegacy(t, fixture.root, "meta/client-state.csv", fmt.Sprintf("%s,%s,deleted\n", id, name))
+}
+
+func appendLegacy(t *testing.T, root, key, value string) {
+	t.Helper()
+	file, err := os.OpenFile(filepath.Join(root, filepath.FromSlash(key)), os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.WriteString(value); err != nil {
+		file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func makeLegacyLeaf(t *testing.T, ca *x509.Certificate, caKey ed25519.PrivateKey, name string, serial int64, usage x509.ExtKeyUsage, now time.Time) (*x509.Certificate, ed25519.PrivateKey) {
