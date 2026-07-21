@@ -57,10 +57,9 @@ jobs:
           cat candidate-policy.env >> "$GITHUB_STEP_SUMMARY"
 
   verify:
-    name: Run candidate-range compatibility gate
+    name: Run candidate verification gate
     needs: policy
     if: >-
-      needs.policy.outputs.in_range == 'true' &&
       needs.policy.outputs.image_required == 'true' &&
       inputs.skip-test != true
     uses: ./.github/workflows/test.yml
@@ -76,7 +75,7 @@ jobs:
       always() &&
       needs.policy.outputs.image_required == 'true' &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
-      (needs.policy.outputs.in_range == 'false' || needs.verify.result == 'success' || needs.verify.result == 'skipped')
+      (needs.verify.result == 'success' || needs.verify.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: read

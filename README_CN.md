@@ -186,8 +186,10 @@ docker compose stop openvpn
 docker compose run --rm openvpn-maintenance migrate plan
 docker compose run --rm openvpn-maintenance migrate apply --yes
 docker compose run --rm openvpn-maintenance state doctor
-docker compose run --rm openvpn-maintenance \
-  config export --output /etc/openvpn-config/config.yaml
+umask 077
+docker compose run --rm -T openvpn-maintenance \
+  config export --output - > openvpn-config/config.yaml.new &&
+  mv openvpn-config/config.yaml.new openvpn-config/config.yaml
 docker compose up -d openvpn
 ```
 

@@ -46,8 +46,9 @@ verified OpenVPN tag. Docker Hub keeps the public OpenVPN-version tag used by
 existing deployments. Production users should always pin a concrete tag and
 verify `ovpn version --json` after update.
 
-Candidate images are built and tested before stable tags are created. A
-prerelease `IMAGE_VERSION` is not eligible for stable promotion. OpenVPN
+Every candidate image is tested before publication. The candidate range may
+block stable promotion, but it does not suppress the tested candidate image.
+A prerelease `IMAGE_VERSION` is not eligible for stable promotion. OpenVPN
 cross-minor updates require the configured approval boundary.
 
 ## Rollback boundary

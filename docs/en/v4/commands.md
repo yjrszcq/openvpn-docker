@@ -147,7 +147,8 @@ from SQLite. It does not read desired YAML.
 
 Writes a complete YAML v1 document from the applied SQLite snapshot. This is
 required after schema 3 migration if the instance did not already have v4
-YAML.
+YAML. A file output is created with mode `0600` and is never overwritten; use
+stdout plus a temporary host file when replacing an existing YAML document.
 
 ### `ovpn config plan [--json]`
 

@@ -180,8 +180,10 @@ YAML 发生漂移但未 apply 时，重启仍使用旧 applied revision 并输�
 从 applied 状态恢复完整 YAML：
 
 ```bash
-docker compose run --rm openvpn-maintenance \
-  config export --output /etc/openvpn-config/config.yaml
+umask 077
+docker compose run --rm -T openvpn-maintenance \
+  config export --output - > openvpn-config/config.yaml.new &&
+  mv openvpn-config/config.yaml.new openvpn-config/config.yaml
 ```
 
 ## 状态诊断与修复
@@ -240,8 +242,10 @@ docker compose run --rm openvpn-maintenance migrate plan
 docker compose run --rm openvpn-maintenance migrate plan --json
 docker compose run --rm openvpn-maintenance migrate apply --yes
 docker compose run --rm openvpn-maintenance state doctor
-docker compose run --rm openvpn-maintenance \
-  config export --output /etc/openvpn-config/config.yaml
+umask 077
+docker compose run --rm -T openvpn-maintenance \
+  config export --output - > openvpn-config/config.yaml.new &&
+  mv openvpn-config/config.yaml.new openvpn-config/config.yaml
 docker compose up -d openvpn
 docker compose exec openvpn ovpn runtime health
 ```

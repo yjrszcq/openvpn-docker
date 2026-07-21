@@ -40,8 +40,9 @@ GHCR 接收项目镜像 tag（`4.0.0`、`4.0`、`4`、`latest`）以及验证过
 Docker Hub 继续提供现有部署使用的 OpenVPN 版本 tag。生产环境必须固定明确 tag，并在
 更新后检查 `ovpn version --json`。
 
-候选镜像先构建和测试，再创建 stable tag。prerelease `IMAGE_VERSION` 不允许稳定提升；
-OpenVPN 跨 minor 更新需要经过配置的审批边界。
+每个候选镜像都必须先测试再发布。候选范围可以阻止 stable 提升，但不会阻止已测试的
+候选镜像发布。prerelease `IMAGE_VERSION` 不允许稳定提升；OpenVPN 跨 minor 更新需要
+经过配置的审批边界。
 
 ## 回滚边界
 

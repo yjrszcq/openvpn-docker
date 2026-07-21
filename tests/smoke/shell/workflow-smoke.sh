@@ -50,13 +50,30 @@ for retired in \
     exit 1
   fi
 done
+# shellcheck disable=SC2016 # Assert the literal versioned candidate tag.
 grep -Fq 'candidate-$IMAGE_VERSION' "$WORKFLOWS/candidate.yml"
+# shellcheck disable=SC2016 # Assert the literal versioned candidate tag.
 grep -Fq 'candidate-$IMAGE_VERSION' "$WORKFLOWS/release.yml"
 grep -Fq 'org.opencontainers.image.licenses=GPL-2.0-only' "$WORKFLOWS/candidate.yml"
 grep -Fq 'packages: write' "$WORKFLOWS/candidate.yml"
 grep -Fq "GHCR_TOKEN: \${{ github.token }}" "$WORKFLOWS/candidate.yml"
 grep -Fq 'scripts/release-policy.sh' "$WORKFLOWS/candidate.yml"
 grep -Fq 'image_required=false' "$WORKFLOWS/candidate.yml"
+candidate_verify_block="$(sed -n '/^  verify:/,/^  candidate:/p' "$WORKFLOWS/candidate.yml")"
+if grep -Fq 'needs.policy.outputs.in_range' <<<"$candidate_verify_block"; then
+  echo 'candidate verification is incorrectly bypassed outside the promotion range' >&2
+  exit 1
+fi
+candidate_publish_block="$(sed -n '/^  candidate:/,$p' "$WORKFLOWS/candidate.yml")"
+if grep -Fq 'needs.policy.outputs.in_range' <<<"$candidate_publish_block"; then
+  echo 'candidate publication is incorrectly suppressed outside the promotion range' >&2
+  exit 1
+fi
+grep -Fq "needs.verify.result == 'success' || needs.verify.result == 'skipped'" "$WORKFLOWS/candidate.yml"
+if grep -Fq "needs.policy.outputs.in_range == 'false'" "$WORKFLOWS/candidate.yml"; then
+  echo 'candidate publication still bypasses verification outside the promotion range' >&2
+  exit 1
+fi
 if grep -Eq 'MANAGEMENT_VERSION|PLATFORM_API|MANAGEMENT_SIGNING' \
   "$WORKFLOWS/test.yml" "$WORKFLOWS/candidate.yml"; then
   echo 'image workflows still contain online management release metadata' >&2
