@@ -85,25 +85,28 @@ flush unrelated rules.
 
 ## Day-to-day client lifecycle
 
+The examples below use the short aliases where practical. The long forms in
+the command reference remain equivalent.
+
 Create and export:
 
 ```bash
-docker compose exec openvpn ovpn client create laptop --ipv4
-docker compose exec openvpn ovpn client create phone --ipv4 dynamic
-docker compose exec openvpn ovpn client create tablet --ipv4 10.42.0.20
+docker compose exec openvpn ovpn client create laptop -4
+docker compose exec openvpn ovpn client create phone -4 dynamic
+docker compose exec openvpn ovpn client create tablet -4 10.42.0.20
 
 docker compose exec -T openvpn \
-  ovpn client export laptop --output - > laptop.ovpn
+  ovpn client export laptop -o - > laptop.ovpn
 chmod 600 laptop.ovpn
 ```
 
 List and select by immutable ID:
 
 ```bash
-docker compose exec openvpn ovpn client list --detail
-docker compose exec openvpn ovpn client list --full-id
+docker compose exec openvpn ovpn client list -d
+docker compose exec openvpn ovpn client list -u
 docker compose exec -T openvpn \
-  ovpn client export --id 844854e4 --output - > laptop.ovpn
+  ovpn client export -i 844854e4 -o - > laptop.ovpn
 ```
 
 Rename, revoke, reissue, and delete:
@@ -116,12 +119,12 @@ docker compose exec openvpn \
   ovpn client revoke office-laptop
 
 docker compose exec openvpn \
-  ovpn client reissue office-laptop --ipv4
+  ovpn client reissue office-laptop -4
 docker compose exec -T openvpn \
-  ovpn client export office-laptop --output - > office-laptop.ovpn
+  ovpn client export office-laptop -o - > office-laptop.ovpn
 
 docker compose exec openvpn \
-  ovpn client delete office-laptop --yes
+  ovpn client delete office-laptop -y
 ```
 
 After revoke, reissue, or an address change, disconnect any prior session.
@@ -132,18 +135,18 @@ removes local credentials; retain backups if recovery may be required.
 
 ```bash
 docker compose exec openvpn \
-  ovpn client address set --name laptop --ipv4 dynamic
+  ovpn client address set -n laptop -4 dynamic
 docker compose exec openvpn \
-  ovpn client address set phone --ipv4
+  ovpn client address set phone -4
 docker compose exec openvpn \
-  ovpn client address set --name tablet --ipv4 10.42.0.30
+  ovpn client address set -n tablet -4 10.42.0.30
 ```
 
 Batch changes require an interactive editor or `--yes`:
 
 ```bash
 docker compose exec openvpn \
-  ovpn client address edit --name laptop --name phone --yes
+  ovpn client address edit -n laptop -n phone -y
 ```
 
 The file contains one `client,ipv4` row per selected active client. Use
@@ -154,7 +157,7 @@ Release a revoked client's retained static address:
 
 ```bash
 docker compose exec openvpn \
-  ovpn client address release --name retired-device
+  ovpn client address release -n retired-device
 ```
 
 ## Declarative configuration changes
@@ -173,7 +176,7 @@ Then stop OpenVPN and apply through the maintenance service:
 docker compose stop openvpn
 docker compose run --rm openvpn-maintenance config validate
 docker compose run --rm openvpn-maintenance config plan
-docker compose run --rm openvpn-maintenance config apply --yes
+docker compose run --rm openvpn-maintenance config apply -y
 docker compose run --rm openvpn-maintenance state doctor
 docker compose up -d openvpn
 docker compose exec openvpn ovpn runtime health
@@ -193,7 +196,7 @@ Recover a complete desired YAML from applied state:
 ```bash
 umask 077
 docker compose run --rm -T openvpn-maintenance \
-  config export --output - > openvpn-config/config.yaml.new &&
+  config export -o - > openvpn-config/config.yaml.new &&
   mv openvpn-config/config.yaml.new openvpn-config/config.yaml
 ```
 
@@ -204,7 +207,7 @@ view when a repair or restore is being considered:
 
 ```bash
 docker compose exec openvpn ovpn state show
-docker compose exec openvpn ovpn state doctor --json
+docker compose exec openvpn ovpn state doctor -j
 
 docker compose stop openvpn
 docker compose run --rm openvpn-maintenance state doctor
@@ -214,7 +217,7 @@ docker compose run --rm openvpn-maintenance repair plan
 Apply only the reported eligible actions:
 
 ```bash
-docker compose run --rm openvpn-maintenance repair apply --yes
+docker compose run --rm openvpn-maintenance repair apply -y
 docker compose run --rm openvpn-maintenance state doctor
 ```
 
@@ -227,13 +230,13 @@ trusted backup.
 
 ```bash
 docker compose exec openvpn ovpn runtime status
-docker compose exec openvpn ovpn runtime status --json
-docker compose exec openvpn ovpn runtime capabilities --json
-docker compose exec openvpn ovpn runtime logs --lines 200
-docker compose exec openvpn ovpn runtime logs --lines 0 --follow
-docker compose exec openvpn ovpn runtime logs --raw --full-id
-docker compose exec openvpn ovpn runtime events --lines 200 --json
-docker compose exec openvpn ovpn runtime events --lines 0 --follow
+docker compose exec openvpn ovpn runtime status -j
+docker compose exec openvpn ovpn runtime capabilities -j
+docker compose exec openvpn ovpn runtime logs -l 200
+docker compose exec openvpn ovpn runtime logs -l 0 -f
+docker compose exec openvpn ovpn runtime logs -r -u
+docker compose exec openvpn ovpn runtime events -l 200 -j
+docker compose exec openvpn ovpn runtime events -l 0 -f
 ```
 
 Logs are persistent and rotate according to applied configuration. Events are a

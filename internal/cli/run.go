@@ -521,17 +521,17 @@ func writeErrorMode(stderr io.Writer, err error, jsonMode bool) int {
 // RunBroker dispatches the independent broker process.
 func RunBroker(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 || (len(args) == 1 && isHelp(args[0])) {
-		fmt.Fprintln(stdout, "Usage: ovpn-broker --listen PATH --backend PATH --raw-log PATH --max-bytes N --backups N [--timeout DURATION]")
+		fmt.Fprintln(stdout, "Usage: ovpn-broker --listen|-l PATH --backend|-b PATH --raw-log|-r PATH --max-bytes|-m N --backups|-B N [--timeout|-t DURATION]")
 		return int(apperror.ExitSuccess)
 	}
-	if len(args) == 1 && args[0] == "--version" {
+	if len(args) == 1 && canonicalBrokerOption(args[0]) == "--version" {
 		fmt.Fprintln(stdout, buildinfo.Current().Version)
 		return int(apperror.ExitSuccess)
 	}
 	config := broker.Config{Timeout: 5 * time.Second}
 	seen := make(map[string]bool)
 	for index := 0; index < len(args); index++ {
-		name := args[index]
+		name := canonicalBrokerOption(args[index])
 		if index+1 >= len(args) || seen[name] {
 			return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "invalid or repeated broker option"))
 		}
@@ -571,4 +571,27 @@ func RunBroker(args []string, stdout, stderr io.Writer) int {
 		return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "broker_failed", "management broker failed", err))
 	}
 	return int(apperror.ExitSuccess)
+}
+
+func canonicalBrokerOption(value string) string {
+	switch value {
+	case "-h":
+		return "--help"
+	case "-v":
+		return "--version"
+	case "-l":
+		return "--listen"
+	case "-b":
+		return "--backend"
+	case "-r":
+		return "--raw-log"
+	case "-m":
+		return "--max-bytes"
+	case "-B":
+		return "--backups"
+	case "-t":
+		return "--timeout"
+	default:
+		return value
+	}
 }

@@ -50,6 +50,27 @@ maintenance 服务的 entrypoint 已经是 `ovpn`，因此 `<command>` 直接从
 `migrate apply`、`config apply`、`repair apply`、`client delete` 和批量地址
 编辑必须交互确认或带 `--yes`；非 TTY 未带 `--yes` 时直接拒绝。
 
+每个公开多字母参数都有单 token 短参数。长短形式等价；同时指定会被视为重复并拒绝。
+不支持短参数聚合或将值直接粘在短参数后。`-6` 为未来 IPv6 行为保留。
+
+| 长参数 | 短参数 |
+|---|---|
+| `--help` | `-h` |
+| `--json` | `-j` |
+| `--output` | `-o` |
+| `--yes` | `-y` |
+| `--name` | `-n` |
+| `--id` | `-i` |
+| `--ipv4` | `-4` |
+| `--release-ipv4` | `client revoke` 中使用 `-4` |
+| `--all` | `-a` |
+| `--detail` | `-d` |
+| `--full-id` | `-u` |
+| `--lines` | `-l` |
+| `--follow` | `-f` |
+| `--raw` | `-r` |
+| `--short` | `-s` |
+
 ## 命令树
 
 ```text
@@ -57,44 +78,48 @@ ovpn
 ├── server
 │   ├── init
 │   ├── run
-│   └── render [--output FILE|-]
+│   └── render [--output|-o FILE|-]
 ├── config
-│   ├── validate [--json]
-│   ├── show [--json]
-│   ├── export [--output FILE|-]
-│   ├── plan [--json]
-│   └── apply [--yes] [--json]
+│   ├── validate [--json|-j]
+│   ├── show [--json|-j]
+│   ├── export [--output|-o FILE|-]
+│   ├── plan [--json|-j]
+│   └── apply [--yes|-y] [--json|-j]
 ├── client
-│   ├── create NAME [--ipv4 [auto|dynamic|ADDRESS]]
-│   ├── list [--detail] [--full-id] [--json]
-│   ├── export (NAME|--name NAME|--id ID) [--output FILE|-]
-│   ├── rename (NAME|--name NAME|--id ID) NEW_NAME
-│   ├── revoke (NAME|--name NAME|--id ID) [--release-ipv4]
-│   ├── reissue (NAME|--name NAME|--id ID) [--ipv4 [auto|dynamic|ADDRESS]]
-│   ├── delete (NAME|--name NAME|--id ID) [--yes]
+│   ├── create NAME [--ipv4|-4 [auto|dynamic|ADDRESS]]
+│   ├── list [--detail|-d] [--full-id|-u] [--json|-j]
+│   ├── export (NAME|--name|-n NAME|--id|-i ID) [--output|-o FILE|-]
+│   ├── rename (NAME|--name|-n NAME|--id|-i ID) NEW_NAME
+│   ├── revoke (NAME|--name|-n NAME|--id|-i ID) [--release-ipv4|-4]
+│   ├── reissue (NAME|--name|-n NAME|--id|-i ID) [--ipv4|-4 [auto|dynamic|ADDRESS]]
+│   ├── delete (NAME|--name|-n NAME|--id|-i ID) [--yes|-y]
 │   └── address
-│       ├── set (NAME|--name NAME|--id ID) --ipv4 [auto|dynamic|ADDRESS]
-│       ├── edit (--all|NAME...|--name NAME...|--id ID...) [--yes]
-│       └── release (NAME|--name NAME|--id ID)
+│       ├── set (NAME|--name|-n NAME|--id|-i ID) --ipv4|-4 [auto|dynamic|ADDRESS]
+│       ├── edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--yes|-y]
+│       └── release (NAME|--name|-n NAME|--id|-i ID)
 ├── state
-│   ├── show [--json]
-│   └── doctor [--json]
+│   ├── show [--json|-j]
+│   └── doctor [--json|-j]
 ├── repair
-│   ├── plan [--json]
-│   └── apply [--yes] [--json]
+│   ├── plan [--json|-j]
+│   └── apply [--yes|-y] [--json|-j]
 ├── migrate
-│   ├── plan [--json]
-│   └── apply [--yes] [--json]
+│   ├── plan [--json|-j]
+│   └── apply [--yes|-y] [--json|-j]
 ├── runtime
-│   ├── status [--json]
+│   ├── status [--json|-j]
 │   ├── health
-│   ├── capabilities [--json]
-│   ├── logs [--lines N] [--follow] [--raw] [--full-id]
-│   └── events [--lines N] [--follow] [--json] [--full-id]
-└── version [--short|--json]
+│   ├── capabilities [--json|-j]
+│   ├── logs [--lines|-l N] [--follow|-f] [--raw|-r] [--full-id|-u]
+│   └── events [--lines|-l N] [--follow|-f] [--json|-j] [--full-id|-u]
+└── version [--short|-s|--json|-j]
 ```
 
 所有命令组和 leaf command 都接受 `--help` 或 `-h`。
+
+内部独立二进制 `ovpn-broker` 使用自己的别名空间：`--version/-v`、
+`--listen/-l`、`--backend/-b`、`--raw-log/-r`、`--max-bytes/-m`、
+`--backups/-B` 和 `--timeout/-t`。
 
 ## Server 命令
 

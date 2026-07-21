@@ -54,13 +54,22 @@ grep -Fq "\"go_version\":\"go$go_version\"" <<<"$metadata"
 grep -Fq '"sqlite":"github.com/mattn/go-sqlite3 v1.14.48"' <<<"$metadata"
 grep -Fq '"yaml":"go.yaml.in/yaml/v3 v3.0.4"' <<<"$metadata"
 
-short_version="$(docker run --rm --entrypoint ovpn "$IMAGE" version --short)"
+short_version="$(docker run --rm --entrypoint ovpn "$IMAGE" version -s)"
 if [ "$short_version" != "$GO_RUNTIME_VERSION" ]; then
-  printf 'unexpected ovpn version --short output: %s\n' "$short_version" >&2
+  printf 'unexpected ovpn version -s output: %s\n' "$short_version" >&2
   exit 1
 fi
 
 test "$(docker run --rm --entrypoint ovpn-broker "$IMAGE" --version)" = "$GO_RUNTIME_VERSION"
+test "$(docker run --rm --entrypoint ovpn-broker "$IMAGE" -v)" = "$GO_RUNTIME_VERSION"
+docker run --rm --entrypoint ovpn-broker "$IMAGE" -h | grep -Fq -- '--listen|-l PATH'
+set +e
+broker_error="$(docker run --rm --entrypoint ovpn-broker "$IMAGE" \
+  -l /tmp/same -b /tmp/same -r /tmp/raw -m 1 -B 1 -t 1s 2>&1)"
+broker_code=$?
+set -e
+test "$broker_code" -eq 65
+grep -Fq 'broker configuration is invalid' <<<"$broker_error"
 test "$(docker image inspect "$IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')" = "$IMAGE_VERSION"
 test "$(docker image inspect "$IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.licenses" }}')" = GPL-2.0-only
 

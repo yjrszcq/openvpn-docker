@@ -29,6 +29,22 @@ for file in "${FILES[@]}"; do
   done < <(perl -ne 'while (/\]\(([^)]+)\)/g) { print "$1\n" }' "$file")
 done
 
+for mapping in \
+  '--help.*-h' '--json.*-j' '--output.*-o' '--yes.*-y' \
+  '--name.*-n' '--id.*-i' '--ipv4.*-4' '--release-ipv4.*-4' \
+  '--all.*-a' '--detail.*-d' '--full-id.*-u' '--lines.*-l' \
+  '--follow.*-f' '--raw.*-r' '--short.*-s'; do
+  rg -q -- "$mapping" docs/en/v4/commands.md
+  rg -q -- "$mapping" docs/cn/v4/commands.md
+done
+
+for mapping in \
+  '--version/-v' '--listen/-l' '--backend/-b' '--raw-log/-r' \
+  '--max-bytes/-m' '--backups/-B' '--timeout/-t'; do
+  grep -Fq -- "$mapping" docs/en/v4/commands.md
+  grep -Fq -- "$mapping" docs/cn/v4/commands.md
+done
+
 for command in \
   'server init' 'server run' 'server render' \
   'config validate' 'config show' 'config export' 'config plan' 'config apply' \

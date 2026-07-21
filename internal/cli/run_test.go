@@ -346,6 +346,26 @@ func TestBrokerSkeleton(t *testing.T) {
 	if code := cli.RunBroker([]string{"run"}, &stdout, &stderr); code != 64 {
 		t.Fatalf("broker invalid command code=%d, want 64", code)
 	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := cli.RunBroker([]string{"-h"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "-l PATH") || stderr.Len() != 0 {
+		t.Fatalf("broker short help code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := cli.RunBroker([]string{"-v"}, &stdout, &stderr); code != 0 || strings.TrimSpace(stdout.String()) == "" || stderr.Len() != 0 {
+		t.Fatalf("broker short version code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := cli.RunBroker([]string{"-l", "/tmp/listen", "--listen", "/tmp/other", "-b", "/tmp/backend", "-r", "/tmp/raw", "-m", "1", "-B", "1", "-t", "1s"}, &stdout, &stderr); code != 64 || !strings.Contains(stderr.String(), "repeated") {
+		t.Fatalf("broker mixed duplicate code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if code := cli.RunBroker([]string{"-l", "/tmp/same", "-b", "/tmp/same", "-r", "/tmp/raw", "-m", "1", "-B", "1", "-t", "1s"}, &stdout, &stderr); code != 65 || !strings.Contains(stderr.String(), "broker configuration is invalid") {
+		t.Fatalf("broker all-short parse code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
 }
 
 func TestConfigValidate(t *testing.T) {

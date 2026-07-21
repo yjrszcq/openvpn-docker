@@ -54,6 +54,29 @@ standard error. `runtime events --json` emits one JSON object per line.
 address editing require interactive confirmation or `--yes`. A non-TTY call
 without `--yes` is refused.
 
+Every public multi-letter option has a single-token short alias. Long and short
+forms are equivalent; specifying both repeats the same logical option and is
+rejected. Short options cannot be clustered or joined to their values. `-6` is
+reserved for future IPv6 behavior.
+
+| Long option | Short |
+|---|---|
+| `--help` | `-h` |
+| `--json` | `-j` |
+| `--output` | `-o` |
+| `--yes` | `-y` |
+| `--name` | `-n` |
+| `--id` | `-i` |
+| `--ipv4` | `-4` |
+| `--release-ipv4` | `-4` within `client revoke` |
+| `--all` | `-a` |
+| `--detail` | `-d` |
+| `--full-id` | `-u` |
+| `--lines` | `-l` |
+| `--follow` | `-f` |
+| `--raw` | `-r` |
+| `--short` | `-s` |
+
 ## Command tree
 
 ```text
@@ -61,44 +84,48 @@ ovpn
 ├── server
 │   ├── init
 │   ├── run
-│   └── render [--output FILE|-]
+│   └── render [--output|-o FILE|-]
 ├── config
-│   ├── validate [--json]
-│   ├── show [--json]
-│   ├── export [--output FILE|-]
-│   ├── plan [--json]
-│   └── apply [--yes] [--json]
+│   ├── validate [--json|-j]
+│   ├── show [--json|-j]
+│   ├── export [--output|-o FILE|-]
+│   ├── plan [--json|-j]
+│   └── apply [--yes|-y] [--json|-j]
 ├── client
-│   ├── create NAME [--ipv4 [auto|dynamic|ADDRESS]]
-│   ├── list [--detail] [--full-id] [--json]
-│   ├── export (NAME|--name NAME|--id ID) [--output FILE|-]
-│   ├── rename (NAME|--name NAME|--id ID) NEW_NAME
-│   ├── revoke (NAME|--name NAME|--id ID) [--release-ipv4]
-│   ├── reissue (NAME|--name NAME|--id ID) [--ipv4 [auto|dynamic|ADDRESS]]
-│   ├── delete (NAME|--name NAME|--id ID) [--yes]
+│   ├── create NAME [--ipv4|-4 [auto|dynamic|ADDRESS]]
+│   ├── list [--detail|-d] [--full-id|-u] [--json|-j]
+│   ├── export (NAME|--name|-n NAME|--id|-i ID) [--output|-o FILE|-]
+│   ├── rename (NAME|--name|-n NAME|--id|-i ID) NEW_NAME
+│   ├── revoke (NAME|--name|-n NAME|--id|-i ID) [--release-ipv4|-4]
+│   ├── reissue (NAME|--name|-n NAME|--id|-i ID) [--ipv4|-4 [auto|dynamic|ADDRESS]]
+│   ├── delete (NAME|--name|-n NAME|--id|-i ID) [--yes|-y]
 │   └── address
-│       ├── set (NAME|--name NAME|--id ID) --ipv4 [auto|dynamic|ADDRESS]
-│       ├── edit (--all|NAME...|--name NAME...|--id ID...) [--yes]
-│       └── release (NAME|--name NAME|--id ID)
+│       ├── set (NAME|--name|-n NAME|--id|-i ID) --ipv4|-4 [auto|dynamic|ADDRESS]
+│       ├── edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--yes|-y]
+│       └── release (NAME|--name|-n NAME|--id|-i ID)
 ├── state
-│   ├── show [--json]
-│   └── doctor [--json]
+│   ├── show [--json|-j]
+│   └── doctor [--json|-j]
 ├── repair
-│   ├── plan [--json]
-│   └── apply [--yes] [--json]
+│   ├── plan [--json|-j]
+│   └── apply [--yes|-y] [--json|-j]
 ├── migrate
-│   ├── plan [--json]
-│   └── apply [--yes] [--json]
+│   ├── plan [--json|-j]
+│   └── apply [--yes|-y] [--json|-j]
 ├── runtime
-│   ├── status [--json]
+│   ├── status [--json|-j]
 │   ├── health
-│   ├── capabilities [--json]
-│   ├── logs [--lines N] [--follow] [--raw] [--full-id]
-│   └── events [--lines N] [--follow] [--json] [--full-id]
-└── version [--short|--json]
+│   ├── capabilities [--json|-j]
+│   ├── logs [--lines|-l N] [--follow|-f] [--raw|-r] [--full-id|-u]
+│   └── events [--lines|-l N] [--follow|-f] [--json|-j] [--full-id|-u]
+└── version [--short|-s|--json|-j]
 ```
 
 All command groups and leaf commands accept `--help` or `-h`.
+
+`ovpn-broker` is an internal standalone binary with its own aliases:
+`--version/-v`, `--listen/-l`, `--backend/-b`, `--raw-log/-r`,
+`--max-bytes/-m`, `--backups/-B`, and `--timeout/-t`.
 
 ## Server commands
 
