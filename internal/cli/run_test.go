@@ -373,6 +373,47 @@ func TestClientCreateAndRenameUsage(t *testing.T) {
 	}
 }
 
+func TestClientMutationUsageErrorsAreStructuredJSON(t *testing.T) {
+	commands := [][]string{
+		{"client", "create", "-j"},
+		{"client", "rename", "laptop", "-j"},
+		{"client", "revoke", "-j"},
+		{"client", "reissue", "-j"},
+		{"client", "delete", "-j"},
+		{"client", "address", "set", "laptop", "-j"},
+		{"client", "address", "edit", "-j"},
+		{"client", "address", "release", "-j"},
+	}
+	for _, args := range commands {
+		code, stdout, stderr := run(args...)
+		if code != 64 || stdout != "" || !strings.Contains(stderr, `"kind":"usage"`) {
+			t.Fatalf("args=%v code=%d stdout=%q stderr=%q", args, code, stdout, stderr)
+		}
+	}
+	t.Setenv("OVPN_DATA_DIR", filepath.Join(t.TempDir(), "missing"))
+	code, stdout, stderr := run("client", "create", "laptop", "-j")
+	if code != 78 || stdout != "" || !strings.Contains(stderr, `"kind":"client_state_refused"`) {
+		t.Fatalf("mutation state error code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestClientMutationJSONSuccessUsesVersionedFullIDs(t *testing.T) {
+	root := createClientPreflightFixture(t)
+	t.Setenv("OVPN_DATA_DIR", root)
+	t.Setenv("OVPN_RUNTIME_DIR", filepath.Join(t.TempDir(), "run"))
+	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
+	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
+
+	code, stdout, stderr := run("client", "rename", "laptop", "laptop", "-j")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"version":1`) || !strings.Contains(stdout, `"id":"20000000-0000-4000-8000-000000000002"`) {
+		t.Fatalf("rename JSON code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, stdout, stderr = run("client", "address", "set", "laptop", "-4", "dynamic", "-j")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"version":1`) || !strings.Contains(stdout, `"kick_required":["20000000-0000-4000-8000-000000000002"]`) {
+		t.Fatalf("address JSON code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
 func TestClientLifecycleUsageAndDeleteConfirmation(t *testing.T) {
 	for _, command := range []string{"revoke", "reissue", "delete"} {
 		code, stdout, stderr := run("client", command, "--help")

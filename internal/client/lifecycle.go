@@ -101,7 +101,7 @@ func (manager *Manager) Revoke(ctx context.Context, selector Selector, releaseAd
 	if err != nil {
 		return MutationResult{}, err
 	}
-	return MutationResult{OperationID: operationID, Client: newView(loaded), KickRequired: true}, nil
+	return MutationResult{Version: 1, OperationID: operationID, Client: newView(loaded), KickRequired: true}, nil
 }
 
 func (manager *Manager) Reissue(ctx context.Context, selector Selector, ipv4 string) (MutationResult, error) {
@@ -229,7 +229,7 @@ func (manager *Manager) Reissue(ctx context.Context, selector Selector, ipv4 str
 	if err != nil {
 		return MutationResult{}, err
 	}
-	return MutationResult{OperationID: operationID, Client: newView(loaded), KickRequired: true}, nil
+	return MutationResult{Version: 1, OperationID: operationID, Client: newView(loaded), KickRequired: true}, nil
 }
 
 func (manager *Manager) Delete(ctx context.Context, selector Selector) (MutationResult, error) {
@@ -307,7 +307,7 @@ func (manager *Manager) Delete(ctx context.Context, selector Selector) (Mutation
 	if err != nil {
 		return MutationResult{}, err
 	}
-	return MutationResult{OperationID: operationID, Client: newView(loaded), KickRequired: state.Client.Status == domain.ClientActive}, nil
+	return MutationResult{Version: 1, OperationID: operationID, Client: newView(loaded), KickRequired: state.Client.Status == domain.ClientActive}, nil
 }
 
 type lifecycleRollback func(error, json.RawMessage) error

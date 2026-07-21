@@ -50,6 +50,7 @@ type CreateRequest struct {
 }
 
 type MutationResult struct {
+	Version      int    `json:"version"`
 	OperationID  string `json:"operation_id"`
 	Client       View   `json:"client"`
 	KickRequired bool   `json:"kick_required"`
@@ -220,7 +221,7 @@ func (manager *Manager) Create(ctx context.Context, request CreateRequest) (Muta
 	if err != nil {
 		return MutationResult{}, err
 	}
-	return MutationResult{OperationID: operationID, Client: newView(loaded)}, nil
+	return MutationResult{Version: 1, OperationID: operationID, Client: newView(loaded)}, nil
 }
 
 func (manager *Manager) Rename(ctx context.Context, selector Selector, newName string) (MutationResult, error) {
@@ -237,7 +238,7 @@ func (manager *Manager) Rename(ctx context.Context, selector Selector, newName s
 		return MutationResult{}, err
 	}
 	if state.Client.Name == newName {
-		return MutationResult{Client: newView(state)}, nil
+		return MutationResult{Version: 1, Client: newView(state)}, nil
 	}
 	clients, err := manager.state.ListClients(ctx, instance.ID)
 	if err != nil {
@@ -310,7 +311,7 @@ func (manager *Manager) Rename(ctx context.Context, selector Selector, newName s
 	if err != nil {
 		return MutationResult{}, err
 	}
-	return MutationResult{OperationID: operationID, Client: newView(loaded)}, nil
+	return MutationResult{Version: 1, OperationID: operationID, Client: newView(loaded)}, nil
 }
 
 func (manager *Manager) prepare(ctx context.Context, operationID, instanceID, kind string, payload json.RawMessage, now time.Time) error {

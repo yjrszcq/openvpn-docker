@@ -1,9 +1,14 @@
 package cli
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+
+	clientservice "github.com/yjrszcq/openvpn-docker/internal/client"
+	"github.com/yjrszcq/openvpn-docker/internal/domain"
 )
 
 func TestDisplayClientID(t *testing.T) {
@@ -16,13 +21,37 @@ func TestDisplayClientID(t *testing.T) {
 	}
 }
 
-func TestTakeBooleanOptionCanonicalizesAliases(t *testing.T) {
-	found, remaining, err := takeBooleanOption([]string{"laptop", "-u"}, "--full-id")
-	if err != nil || !found || len(remaining) != 1 || remaining[0] != "laptop" {
-		t.Fatalf("found=%t remaining=%v err=%v", found, remaining, err)
+func TestTakeClientOutputOptionsCanonicalizesAliases(t *testing.T) {
+	options, remaining, err := takeClientOutputOptions([]string{"laptop", "-u", "-j"})
+	if err != nil || !options.FullID || !options.JSON || len(remaining) != 1 || remaining[0] != "laptop" {
+		t.Fatalf("options=%+v remaining=%v err=%v", options, remaining, err)
 	}
-	if _, _, err := takeBooleanOption([]string{"-u", "--full-id"}, "--full-id"); err == nil {
+	if _, _, err := takeClientOutputOptions([]string{"-u", "--full-id"}); err == nil {
 		t.Fatal("mixed duplicate full-id option was accepted")
+	}
+	if _, _, err := takeClientOutputOptions([]string{"-j", "--json"}); err == nil {
+		t.Fatal("mixed duplicate JSON option was accepted")
+	}
+}
+
+func TestWriteClientMutationJSONPreservesFullIDs(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	result := clientservice.MutationResult{
+		Version:     1,
+		OperationID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+		Client: clientservice.View{
+			ID: "11111111-2222-4333-8444-555555555555", Name: "laptop", Status: domain.ClientActive,
+		},
+	}
+	if code := writeClientMutationJSON(&stdout, &stderr, result); code != 0 || stderr.Len() != 0 {
+		t.Fatalf("code=%d stderr=%q", code, stderr.String())
+	}
+	var decoded clientservice.MutationResult
+	if err := json.Unmarshal(stdout.Bytes(), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Version != 1 || decoded.Client.ID != result.Client.ID || decoded.OperationID != result.OperationID {
+		t.Fatalf("decoded result=%+v", decoded)
 	}
 }
 

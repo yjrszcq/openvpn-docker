@@ -202,7 +202,7 @@ func TestCreateAndRenameClientTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if created.OperationID == "" || created.Client.Name != "laptop" || created.Client.Status != "active" || created.Client.IPv4.Mode != "static" || created.Client.IPv4.Address == nil || *created.Client.IPv4.Address != "10.42.0.2" {
+	if created.Version != 1 || created.OperationID == "" || created.Client.Name != "laptop" || created.Client.Status != "active" || created.Client.IPv4.Mode != "static" || created.Client.IPv4.Address == nil || *created.Client.IPv4.Address != "10.42.0.2" {
 		t.Fatalf("created result=%+v", created)
 	}
 	profile := readMutationArtifact(t, fixture.artifacts, "clients/active/laptop.ovpn")
@@ -525,7 +525,7 @@ func TestAddressSetSynchronizesCCDAndClearsLease(t *testing.T) {
 		t.Fatal(err)
 	}
 	dynamic, err := fixture.manager.AddressSet(context.Background(), Selector{Name: "phone"}, "dynamic")
-	if err != nil || dynamic.Clients[0].IPv4.Mode != "dynamic" || len(dynamic.KickRequired) != 1 {
+	if err != nil || dynamic.Version != 1 || dynamic.Clients[0].IPv4.Mode != "dynamic" || len(dynamic.KickRequired) != 1 {
 		t.Fatalf("dynamic address result=%+v err=%v", dynamic, err)
 	}
 	assertMutationMissing(t, filepath.Join(fixture.root, "ccd", created.Client.ID))

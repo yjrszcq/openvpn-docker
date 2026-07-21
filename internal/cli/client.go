@@ -123,56 +123,69 @@ func runClientExport(args []string, stdout, stderr io.Writer) int {
 }
 
 func runClientCreate(args []string, stdout, stderr io.Writer) int {
-	fullID, args, err := takeBooleanOption(args, "--full-id")
+	jsonRequested := containsArgument(args, "--json")
+	options, args, err := takeClientOutputOptions(args)
 	if err != nil || len(args) < 1 || len(args) > 3 || strings.HasPrefix(args[0], "-") {
-		return writeError(stderr, usageError("usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]]"))
+		return writeErrorMode(stderr, usageError("usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]] [--json]"), jsonRequested)
 	}
 	request := clientservice.CreateRequest{Name: args[0], IPv4: "auto"}
 	if len(args) >= 2 {
 		if canonicalOption(args[1]) != "--ipv4" {
-			return writeError(stderr, usageError("usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]]"))
+			return writeErrorMode(stderr, usageError("usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]] [--json]"), options.JSON)
 		}
 		if len(args) == 3 {
 			if args[2] == "" || strings.HasPrefix(args[2], "-") {
-				return writeError(stderr, usageError("usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]]"))
+				return writeErrorMode(stderr, usageError("usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]] [--json]"), options.JSON)
 			}
 			request.IPv4 = args[2]
 		}
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
 	result, err := manager.Create(context.Background(), request)
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
-	fmt.Fprintf(stdout, "created client %s [%s] with IPv4 %s\n", result.Client.Name, displayClientID(result.Client.ID, fullID), formatIPv4(result.Client.IPv4))
+	if options.JSON {
+		return writeClientMutationJSON(stdout, stderr, result)
+	}
+	fmt.Fprintf(stdout, "created client %s [%s] with IPv4 %s\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID), formatIPv4(result.Client.IPv4))
 	return int(apperror.ExitSuccess)
 }
 
 func runClientRename(args []string, stdout, stderr io.Writer) int {
-	fullID, args, optionErr := takeBooleanOption(args, "--full-id")
+	jsonRequested := containsArgument(args, "--json")
+	options, args, optionErr := takeClientOutputOptions(args)
 	selector, positionals, err := parseMutationSelector(args)
 	if optionErr != nil || err != nil || len(positionals) != 1 {
-		return writeError(stderr, usageError("usage: ovpn client rename (NAME|--name NAME|--id ID) NEW_NAME"))
+		return writeErrorMode(stderr, usageError("usage: ovpn client rename (NAME|--name NAME|--id ID) NEW_NAME [--json]"), jsonRequested)
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
 	result, err := manager.Rename(context.Background(), selector, positionals[0])
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
-	fmt.Fprintf(stdout, "renamed client to %s [%s]\n", result.Client.Name, displayClientID(result.Client.ID, fullID))
+	if options.JSON {
+		return writeClientMutationJSON(stdout, stderr, result)
+	}
+	fmt.Fprintf(stdout, "renamed client to %s [%s]\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID))
 	return int(apperror.ExitSuccess)
 }
 
 func runClientRevoke(args []string, stdout, stderr io.Writer) int {
-	release, fullID := false, false
+	jsonRequested := containsArgument(args, "--json")
+	options, args, optionErr := takeClientOutputOptions(args)
+	if optionErr != nil {
+		return writeErrorMode(stderr, optionErr, jsonRequested)
+	}
+	release := false
 	filtered := make([]string, 0, len(args))
 	for _, arg := range args {
 		option := canonicalOption(arg)
@@ -181,110 +194,104 @@ func runClientRevoke(args []string, stdout, stderr io.Writer) int {
 		}
 		if option == "--release-ipv4" {
 			if release {
-				return writeError(stderr, usageError("--release-ipv4 may only be specified once"))
+				return writeErrorMode(stderr, usageError("--release-ipv4 may only be specified once"), options.JSON)
 			}
 			release = true
-			continue
-		}
-		if option == "--full-id" {
-			if fullID {
-				return writeError(stderr, usageError("--full-id may only be specified once"))
-			}
-			fullID = true
 			continue
 		}
 		filtered = append(filtered, arg)
 	}
 	selector, positionals, err := parseMutationSelector(filtered)
 	if err != nil || len(positionals) != 0 {
-		return writeError(stderr, usageError("usage: ovpn client revoke (NAME|--name NAME|--id ID) [--release-ipv4]"))
+		return writeErrorMode(stderr, usageError("usage: ovpn client revoke (NAME|--name NAME|--id ID) [--release-ipv4] [--json]"), options.JSON)
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
 	result, err := manager.Revoke(context.Background(), selector, release)
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
-	fmt.Fprintf(stdout, "revoked client %s [%s]; runtime disconnect required\n", result.Client.Name, displayClientID(result.Client.ID, fullID))
+	if options.JSON {
+		return writeClientMutationJSON(stdout, stderr, result)
+	}
+	fmt.Fprintf(stdout, "revoked client %s [%s]; runtime disconnect required\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID))
 	return int(apperror.ExitSuccess)
 }
 
 func runClientReissue(args []string, stdout, stderr io.Writer) int {
+	jsonRequested := containsArgument(args, "--json")
+	options, args, optionErr := takeClientOutputOptions(args)
+	if optionErr != nil {
+		return writeErrorMode(stderr, optionErr, jsonRequested)
+	}
 	ipv4 := ""
-	fullID := false
 	filtered := make([]string, 0, len(args))
 	for index := 0; index < len(args); index++ {
 		if canonicalOption(args[index]) != "--ipv4" {
-			if canonicalOption(args[index]) == "--full-id" {
-				if fullID {
-					return writeError(stderr, usageError("--full-id may only be specified once"))
-				}
-				fullID = true
-				continue
-			}
 			filtered = append(filtered, args[index])
 			continue
 		}
 		if ipv4 != "" {
-			return writeError(stderr, usageError("usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 [auto|dynamic|ADDRESS]]"))
+			return writeErrorMode(stderr, usageError("usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 [auto|dynamic|ADDRESS]] [--json]"), options.JSON)
 		}
 		ipv4, index = optionalIPv4Value(args, index)
 	}
 	selector, positionals, err := parseMutationSelector(filtered)
 	if err != nil || len(positionals) != 0 {
-		return writeError(stderr, usageError("usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 [auto|dynamic|ADDRESS]]"))
+		return writeErrorMode(stderr, usageError("usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 [auto|dynamic|ADDRESS]] [--json]"), options.JSON)
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
 	result, err := manager.Reissue(context.Background(), selector, ipv4)
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
-	fmt.Fprintf(stdout, "reissued client %s [%s] with IPv4 %s; redistribute profile and disconnect prior session\n", result.Client.Name, displayClientID(result.Client.ID, fullID), formatIPv4(result.Client.IPv4))
+	if options.JSON {
+		return writeClientMutationJSON(stdout, stderr, result)
+	}
+	fmt.Fprintf(stdout, "reissued client %s [%s] with IPv4 %s; redistribute profile and disconnect prior session\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID), formatIPv4(result.Client.IPv4))
 	return int(apperror.ExitSuccess)
 }
 
 func runClientDelete(args []string, stdout, stderr io.Writer) int {
-	yes, fullID := false, false
+	jsonRequested := containsArgument(args, "--json")
+	options, args, optionErr := takeClientOutputOptions(args)
+	if optionErr != nil {
+		return writeErrorMode(stderr, optionErr, jsonRequested)
+	}
+	yes := false
 	filtered := make([]string, 0, len(args))
 	for _, arg := range args {
 		if canonicalOption(arg) == "--yes" {
 			if yes {
-				return writeError(stderr, usageError("--yes may only be specified once"))
+				return writeErrorMode(stderr, usageError("--yes may only be specified once"), options.JSON)
 			}
 			yes = true
-			continue
-		}
-		if canonicalOption(arg) == "--full-id" {
-			if fullID {
-				return writeError(stderr, usageError("--full-id may only be specified once"))
-			}
-			fullID = true
 			continue
 		}
 		filtered = append(filtered, arg)
 	}
 	selector, positionals, err := parseMutationSelector(filtered)
 	if err != nil || len(positionals) != 0 {
-		return writeError(stderr, usageError("usage: ovpn client delete (NAME|--name NAME|--id ID) --yes"))
+		return writeErrorMode(stderr, usageError("usage: ovpn client delete (NAME|--name NAME|--id ID) [--yes] [--json]"), options.JSON)
 	}
 	service, queryState, err := openClientService(context.Background())
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	_, target, err := service.Select(context.Background(), selector)
 	closeErr := queryState.Close()
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	if closeErr != nil {
-		return writeClientMutationError(stderr, closeErr)
+		return writeClientMutationError(stderr, closeErr, options.JSON)
 	}
 	if !yes {
 		ipv4 := "none"
@@ -294,24 +301,27 @@ func runClientDelete(args []string, stdout, stderr io.Writer) int {
 				ipv4 += ":" + target.Assignment.Address.String()
 			}
 		}
-		confirmed, err := confirmAction(stderr, fmt.Sprintf("Type yes to permanently delete client %s [%s] (status %s, IPv4 %s): ", target.Client.Name, displayClientID(target.Client.ID, fullID), target.Client.Status, ipv4))
+		confirmed, err := confirmAction(stderr, fmt.Sprintf("Type yes to permanently delete client %s [%s] (status %s, IPv4 %s): ", target.Client.Name, displayClientID(target.Client.ID, options.FullID), target.Client.Status, ipv4))
 		if err != nil {
-			return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "client delete requires an interactive confirmation or --yes", err))
+			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "client delete requires an interactive confirmation or --yes", err), options.JSON)
 		}
 		if !confirmed {
-			return writeError(stderr, apperror.New(apperror.ExitPolicy, "confirmation_required", "client delete was not confirmed"))
+			return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "confirmation_required", "client delete was not confirmed"), options.JSON)
 		}
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
 	result, err := manager.Delete(context.Background(), selector)
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
-	fmt.Fprintf(stdout, "deleted client %s [%s]; UUID tombstone retained\n", result.Client.Name, displayClientID(result.Client.ID, fullID))
+	if options.JSON {
+		return writeClientMutationJSON(stdout, stderr, result)
+	}
+	fmt.Fprintf(stdout, "deleted client %s [%s]; UUID tombstone retained\n", result.Client.Name, displayClientID(result.Client.ID, options.FullID))
 	return int(apperror.ExitSuccess)
 }
 
@@ -328,65 +338,77 @@ func confirmAction(stderr io.Writer, prompt string) (bool, error) {
 }
 
 func runClientAddressSet(args []string, stdout, stderr io.Writer) int {
+	jsonRequested := containsArgument(args, "--json")
+	options, args, optionErr := takeClientOutputOptions(args)
+	if optionErr != nil {
+		return writeErrorMode(stderr, optionErr, jsonRequested)
+	}
 	ipv4 := ""
 	ipv4Set := false
-	fullID := false
 	filtered := make([]string, 0, len(args))
 	for index := 0; index < len(args); index++ {
 		if canonicalOption(args[index]) != "--ipv4" {
-			if canonicalOption(args[index]) == "--full-id" {
-				if fullID {
-					return writeError(stderr, usageError("--full-id may only be specified once"))
-				}
-				fullID = true
-				continue
-			}
 			filtered = append(filtered, args[index])
 			continue
 		}
 		if ipv4Set {
-			return writeError(stderr, usageError("usage: ovpn client address set (NAME|--name NAME|--id ID) --ipv4 [auto|dynamic|ADDRESS]"))
+			return writeErrorMode(stderr, usageError("usage: ovpn client address set (NAME|--name NAME|--id ID) --ipv4 [auto|dynamic|ADDRESS] [--json]"), options.JSON)
 		}
 		ipv4Set = true
 		ipv4, index = optionalIPv4Value(args, index)
 	}
 	selector, positionals, err := parseMutationSelector(filtered)
 	if err != nil || len(positionals) != 0 || !ipv4Set {
-		return writeError(stderr, usageError("usage: ovpn client address set (NAME|--name NAME|--id ID) --ipv4 [auto|dynamic|ADDRESS]"))
+		return writeErrorMode(stderr, usageError("usage: ovpn client address set (NAME|--name NAME|--id ID) --ipv4 [auto|dynamic|ADDRESS] [--json]"), options.JSON)
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
 	result, err := manager.AddressSet(context.Background(), selector, ipv4)
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
-	fmt.Fprintf(stdout, "updated IPv4 for %s [%s] to %s\n", result.Clients[0].Name, displayClientID(result.Clients[0].ID, fullID), formatIPv4(result.Clients[0].IPv4))
+	if options.JSON {
+		return writeClientMutationJSON(stdout, stderr, result)
+	}
+	fmt.Fprintf(stdout, "updated IPv4 for %s [%s] to %s\n", result.Clients[0].Name, displayClientID(result.Clients[0].ID, options.FullID), formatIPv4(result.Clients[0].IPv4))
 	return int(apperror.ExitSuccess)
 }
 
 func runClientAddressRelease(args []string, stdout, stderr io.Writer) int {
-	fullID, args, optionErr := takeBooleanOption(args, "--full-id")
+	jsonRequested := containsArgument(args, "--json")
+	options, args, optionErr := takeClientOutputOptions(args)
 	selector, positionals, err := parseMutationSelector(args)
 	if optionErr != nil || err != nil || len(positionals) != 0 {
-		return writeError(stderr, usageError("usage: ovpn client address release (NAME|--name NAME|--id ID)"))
+		return writeErrorMode(stderr, usageError("usage: ovpn client address release (NAME|--name NAME|--id ID) [--json]"), jsonRequested)
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
 	result, err := manager.AddressRelease(context.Background(), selector)
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
-	fmt.Fprintf(stdout, "released IPv4 for revoked client %s [%s]\n", result.Clients[0].Name, displayClientID(result.Clients[0].ID, fullID))
+	if options.JSON {
+		return writeClientMutationJSON(stdout, stderr, result)
+	}
+	fmt.Fprintf(stdout, "released IPv4 for revoked client %s [%s]\n", result.Clients[0].Name, displayClientID(result.Clients[0].ID, options.FullID))
 	return int(apperror.ExitSuccess)
 }
 
 func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
+	jsonRequested := containsArgument(args, "--json")
+	options, args, optionErr := takeClientOutputOptions(args)
+	if optionErr != nil {
+		return writeErrorMode(stderr, optionErr, jsonRequested)
+	}
+	if options.FullID {
+		return writeErrorMode(stderr, usageError("--full-id is not applicable to batch address edit output"), options.JSON)
+	}
 	request := clientservice.AddressEditRequest{}
 	positionalNames := make([]string, 0)
 	yes, selectorKind := false, ""
@@ -395,21 +417,21 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 		switch option {
 		case "--all":
 			if request.All {
-				return writeError(stderr, usageError("--all may only be specified once"))
+				return writeErrorMode(stderr, usageError("--all may only be specified once"), options.JSON)
 			}
 			request.All = true
 		case "--yes":
 			if yes {
-				return writeError(stderr, usageError("--yes may only be specified once"))
+				return writeErrorMode(stderr, usageError("--yes may only be specified once"), options.JSON)
 			}
 			yes = true
 		case "--name", "--id":
 			if index+1 >= len(args) {
-				return writeError(stderr, usageError("client selector requires a value"))
+				return writeErrorMode(stderr, usageError("client selector requires a value"), options.JSON)
 			}
 			kind := strings.TrimPrefix(option, "--")
 			if selectorKind != "" && selectorKind != kind {
-				return writeError(stderr, usageError("--name and --id cannot be mixed"))
+				return writeErrorMode(stderr, usageError("--name and --id cannot be mixed"), options.JSON)
 			}
 			selectorKind = kind
 			index++
@@ -422,33 +444,33 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 			request.Selectors = append(request.Selectors, selector)
 		default:
 			if strings.HasPrefix(args[index], "-") {
-				return writeError(stderr, usageError("usage: ovpn client address edit (--all|NAME...|--name NAME...|--id ID...) [--yes]"))
+				return writeErrorMode(stderr, usageError("usage: ovpn client address edit (--all|NAME...|--name NAME...|--id ID...) [--yes] [--json]"), options.JSON)
 			}
 			positionalNames = append(positionalNames, args[index])
 		}
 	}
 	if len(positionalNames) > 0 {
 		if request.All || selectorKind != "" {
-			return writeError(stderr, usageError("positional names cannot be mixed with --all, --name, or --id"))
+			return writeErrorMode(stderr, usageError("positional names cannot be mixed with --all, --name, or --id"), options.JSON)
 		}
 		for _, name := range positionalNames {
 			request.Selectors = append(request.Selectors, clientservice.Selector{Name: name})
 		}
 	}
 	if request.All == (len(request.Selectors) > 0) {
-		return writeError(stderr, usageError("select exactly one of --all, positional names, --name, or --id"))
+		return writeErrorMode(stderr, usageError("select exactly one of --all, positional names, --name, or --id"), options.JSON)
 	}
 	service, queryState, err := openClientService(context.Background())
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	targets, err := service.SelectActive(context.Background(), request.All, request.Selectors)
 	closeErr := queryState.Close()
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	if closeErr != nil {
-		return writeClientMutationError(stderr, closeErr)
+		return writeClientMutationError(stderr, closeErr, options.JSON)
 	}
 	if !yes {
 		names := make([]string, 0, len(targets))
@@ -457,21 +479,24 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 		}
 		confirmed, err := confirmAction(stderr, fmt.Sprintf("Type yes to edit IPv4 assignments for %d client(s) (%s): ", len(targets), strings.Join(names, ", ")))
 		if err != nil {
-			return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "batch address edit requires an interactive confirmation or --yes", err))
+			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "batch address edit requires an interactive confirmation or --yes", err), options.JSON)
 		}
 		if !confirmed {
-			return writeError(stderr, apperror.New(apperror.ExitPolicy, "confirmation_required", "batch address edit was not confirmed"))
+			return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "confirmation_required", "batch address edit was not confirmed"), options.JSON)
 		}
 	}
 	request.Edit = runAddressEditor
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
 	result, err := manager.AddressEdit(context.Background(), request)
 	if err != nil {
-		return writeClientMutationError(stderr, err)
+		return writeClientMutationError(stderr, err, options.JSON)
+	}
+	if options.JSON {
+		return writeClientMutationJSON(stdout, stderr, result)
 	}
 	fmt.Fprintf(stdout, "updated IPv4 assignments for %d clients; runtime disconnect required for each\n", len(result.Clients))
 	return int(apperror.ExitSuccess)
@@ -724,22 +749,22 @@ func writeClientError(stderr io.Writer, err error, jsonMode bool) int {
 	}
 }
 
-func writeClientMutationError(stderr io.Writer, err error) int {
+func writeClientMutationError(stderr io.Writer, err error, jsonMode bool) int {
 	var applicationError *apperror.Error
 	if errors.As(err, &applicationError) {
-		return writeError(stderr, err)
+		return writeErrorMode(stderr, err, jsonMode)
 	}
 	switch {
 	case errors.Is(err, artifact.ErrLocked):
-		return writeError(stderr, apperror.Wrap(apperror.ExitTemporary, "lock_conflict", "client mutation lock is unavailable", err))
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitTemporary, "lock_conflict", "client mutation lock is unavailable", err), jsonMode)
 	case errors.Is(err, pki.ErrUnavailable):
-		return writeError(stderr, apperror.Wrap(apperror.ExitUnavailable, "dependency_unavailable", "client mutation dependency is unavailable", err))
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitUnavailable, "dependency_unavailable", "client mutation dependency is unavailable", err), jsonMode)
 	case errors.Is(err, clientservice.ErrInvalidRequest), errors.Is(err, clientservice.ErrConflict), errors.Is(err, clientservice.ErrNotFound), errors.Is(err, clientservice.ErrAmbiguous), errors.Is(err, storesqlite.ErrConstraint):
-		return writeError(stderr, apperror.Wrap(apperror.ExitData, "client_request", err.Error(), err))
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitData, "client_request", err.Error(), err), jsonMode)
 	case errors.Is(err, clientservice.ErrArtifactMismatch), errors.Is(err, pki.ErrInvalidMaterial), errors.Is(err, artifact.ErrUnsafePath), errors.Is(err, storesqlite.ErrSchema), errors.Is(err, storesqlite.ErrCorrupt), errors.Is(err, storesqlite.ErrUnsupportedSchema), errors.Is(err, storesqlite.ErrUnsupportedRevision), errors.Is(err, storesqlite.ErrMissing), errors.Is(err, storesqlite.ErrPermission):
-		return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "client_state_refused", err.Error(), err))
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "client_state_refused", err.Error(), err), jsonMode)
 	default:
-		return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "client_mutation_failed", "client mutation failed", err))
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitFailure, "client_mutation_failed", "client mutation failed", err), jsonMode)
 	}
 }
 
@@ -747,20 +772,38 @@ func usageError(message string) error {
 	return apperror.New(apperror.ExitUsage, "usage", message)
 }
 
-func takeBooleanOption(args []string, wanted string) (bool, []string, error) {
-	found := false
+type clientOutputOptions struct {
+	JSON   bool
+	FullID bool
+}
+
+func takeClientOutputOptions(args []string) (clientOutputOptions, []string, error) {
+	options := clientOutputOptions{}
 	filtered := make([]string, 0, len(args))
 	for _, arg := range args {
-		if canonicalOption(arg) != wanted {
+		switch canonicalOption(arg) {
+		case "--json":
+			if options.JSON {
+				return options, nil, usageError("--json may only be specified once")
+			}
+			options.JSON = true
+		case "--full-id":
+			if options.FullID {
+				return options, nil, usageError("--full-id may only be specified once")
+			}
+			options.FullID = true
+		default:
 			filtered = append(filtered, arg)
-			continue
 		}
-		if found {
-			return false, nil, usageError(wanted + " may only be specified once")
-		}
-		found = true
 	}
-	return found, filtered, nil
+	return options, filtered, nil
+}
+
+func writeClientMutationJSON(stdout, stderr io.Writer, result any) int {
+	if err := json.NewEncoder(stdout).Encode(result); err != nil {
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitFailure, "output_failure", "write client mutation result", err), true)
+	}
+	return int(apperror.ExitSuccess)
 }
 
 func displayClientID(id string, full bool) string {

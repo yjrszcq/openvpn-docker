@@ -20,6 +20,7 @@ import (
 )
 
 type AddressResult struct {
+	Version      int      `json:"version"`
 	OperationID  string   `json:"operation_id"`
 	Clients      []View   `json:"clients"`
 	KickRequired []string `json:"kick_required"`
@@ -224,7 +225,7 @@ func (manager *Manager) commitAddressChanges(ctx context.Context, instance store
 	if err := manager.finishLifecycle(ctx, operationID, fileOperation, workspace, payload, rollback, commit); err != nil {
 		return AddressResult{}, err
 	}
-	result := AddressResult{OperationID: operationID, Clients: make([]View, 0, len(targets)), KickRequired: []string{}}
+	result := AddressResult{Version: 1, OperationID: operationID, Clients: make([]View, 0, len(targets)), KickRequired: []string{}}
 	for _, state := range targets {
 		loaded, err := manager.state.LoadClient(ctx, instance.ID, state.Client.ID)
 		if err != nil {
