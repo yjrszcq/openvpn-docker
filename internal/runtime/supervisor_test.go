@@ -187,6 +187,50 @@ func TestSupervisorRefusesSecondServerProcess(t *testing.T) {
 	}
 }
 
+func TestSupervisorReconcilesBeforeStartAndCleansAfterStop(t *testing.T) {
+	markers := t.TempDir()
+	t.Setenv("OVPN_RUNTIME_HELPER", "1")
+	t.Setenv("OVPN_RUNTIME_MARKERS", markers)
+	installHelperBuilder(t)
+	network := &recordingNetwork{}
+	supervisor := testSupervisor(filepath.Join(t.TempDir(), "data"), filepath.Join(t.TempDir(), "run"))
+	supervisor.Network = network
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- supervisor.Run(ctx, nil, testInstance()) }()
+	waitForFile(t, filepath.Join(markers, "openvpn-started"))
+	if network.reconciled != 1 || network.cleaned != 0 {
+		t.Fatalf("network before stop reconciled=%d cleaned=%d", network.reconciled, network.cleaned)
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if network.cleaned != 1 {
+		t.Fatalf("network cleanup count=%d", network.cleaned)
+	}
+}
+
+func TestSupervisorDoesNotStartProcessesWhenNetworkReconcileFails(t *testing.T) {
+	markers := t.TempDir()
+	t.Setenv("OVPN_RUNTIME_HELPER", "1")
+	t.Setenv("OVPN_RUNTIME_MARKERS", markers)
+	installHelperBuilder(t)
+	network := &recordingNetwork{err: errors.New("network denied")}
+	supervisor := testSupervisor(filepath.Join(t.TempDir(), "data"), filepath.Join(t.TempDir(), "run"))
+	supervisor.Network = network
+	err := supervisor.Run(context.Background(), nil, testInstance())
+	if err == nil || !strings.Contains(err.Error(), "network denied") {
+		t.Fatalf("network error=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(markers, "broker-started")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("broker started after network failure: %v", err)
+	}
+	if network.reconciled != 1 || network.cleaned != 0 {
+		t.Fatalf("network calls reconciled=%d cleaned=%d", network.reconciled, network.cleaned)
+	}
+}
+
 func installHelperBuilder(t *testing.T) {
 	t.Helper()
 	previous := commandBuilder
@@ -202,7 +246,28 @@ func installHelperBuilder(t *testing.T) {
 }
 
 func testSupervisor(dataDir, runtimeDir string) Supervisor {
-	return Supervisor{DataDir: dataDir, RuntimeDir: runtimeDir, OpenVPNBinary: "fake-openvpn", BrokerBinary: "fake-broker", StartupTimeout: time.Second, StopTimeout: time.Second}
+	return Supervisor{DataDir: dataDir, RuntimeDir: runtimeDir, OpenVPNBinary: "fake-openvpn", BrokerBinary: "fake-broker", StartupTimeout: time.Second, StopTimeout: time.Second, Network: noOpNetwork{}}
+}
+
+type noOpNetwork struct{}
+
+func (noOpNetwork) Reconcile(context.Context, string, domain.Config) error { return nil }
+func (noOpNetwork) Cleanup(context.Context, string) error                  { return nil }
+
+type recordingNetwork struct {
+	reconciled int
+	cleaned    int
+	err        error
+}
+
+func (network *recordingNetwork) Reconcile(context.Context, string, domain.Config) error {
+	network.reconciled++
+	return network.err
+}
+
+func (network *recordingNetwork) Cleanup(context.Context, string) error {
+	network.cleaned++
+	return nil
 }
 
 func testInstance() storesqlite.InstanceState {

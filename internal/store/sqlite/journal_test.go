@@ -15,15 +15,14 @@ func TestAuthoritativeMutationsAppendAtomicAudit(t *testing.T) {
 		t.Fatal(err)
 	}
 	updatedYAML := strings.Replace(storedConfigYAML, "vpn.example.test", "audit.example.test", 1)
-	if err := store.ApplyConfig(context.Background(), instance.ID, appliedSnapshot(t, 2, updatedYAML)); err == nil {
-		// The existing assignment intentionally prevents network replacement.
-		t.Fatal("config replacement bypassed assignment FK")
+	if err := store.ApplyConfig(context.Background(), instance.ID, appliedSnapshot(t, 2, updatedYAML)); err != nil {
+		t.Fatalf("non-network configuration update failed: %v", err)
 	}
 	events, err := store.AuditEvents(context.Background(), instance.ID, 0, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(events) != 2 || events[0].Type != "instance.created" || events[1].Type != "client.created" || events[0].Sequence >= events[1].Sequence {
+	if len(events) != 3 || events[0].Type != "instance.created" || events[1].Type != "client.created" || events[2].Type != "config.applied" || events[0].Sequence >= events[1].Sequence || events[1].Sequence >= events[2].Sequence {
 		t.Fatalf("unexpected audit events: %+v", events)
 	}
 	for _, event := range events {

@@ -14,8 +14,15 @@ import (
 	"time"
 
 	"github.com/yjrszcq/openvpn-docker/internal/artifact"
+	"github.com/yjrszcq/openvpn-docker/internal/domain"
+	networkcontrol "github.com/yjrszcq/openvpn-docker/internal/network"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
 )
+
+type NetworkCoordinator interface {
+	Reconcile(context.Context, string, domain.Config) error
+	Cleanup(context.Context, string) error
+}
 
 type Supervisor struct {
 	DataDir        string
@@ -25,6 +32,7 @@ type Supervisor struct {
 	StartupTimeout time.Duration
 	StopTimeout    time.Duration
 	LockTimeout    time.Duration
+	Network        NetworkCoordinator
 }
 
 var commandBuilder = exec.Command
@@ -60,6 +68,27 @@ func (supervisor Supervisor) Run(ctx context.Context, hup <-chan os.Signal, inst
 		return err
 	}
 	defer runtimeLock.Release()
+	coordinator := supervisor.Network
+	if coordinator == nil {
+		coordinator, err = networkcontrol.New(networkcontrol.Config{
+			IPBinary:       environmentOr("OVPN_IP_BIN", "ip"),
+			IPTablesBinary: environmentOr("OVPN_IPTABLES_BIN", "iptables"),
+			ForwardingFile: environmentOr("OVPN_IP_FORWARD_FILE", "/proc/sys/net/ipv4/ip_forward"),
+		})
+		if err != nil {
+			return err
+		}
+	}
+	if err := coordinator.Reconcile(ctx, instance.ID, instance.Applied.Config); err != nil {
+		return fmt.Errorf("reconcile IPv4 network: %w", err)
+	}
+	defer func() {
+		cleanupContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := coordinator.Cleanup(cleanupContext, instance.ID); err != nil {
+			fmt.Fprintf(os.Stderr, "ovpn: warning: IPv4 network cleanup failed: %v\n", err)
+		}
+	}()
 	listen := filepath.Join(supervisor.RuntimeDir, "management.sock")
 	backend := filepath.Join(supervisor.RuntimeDir, "openvpn-management.sock")
 	if err := removeSocket(backend); err != nil {
@@ -115,6 +144,13 @@ func (supervisor Supervisor) Run(ctx context.Context, hup <-chan os.Signal, inst
 			return fmt.Errorf("management broker exited: %w", err)
 		}
 	}
+}
+
+func environmentOr(name, fallback string) string {
+	if value := os.Getenv(name); value != "" {
+		return value
+	}
+	return fallback
 }
 
 func acquireLock(ctx context.Context, path string, mode artifact.LockMode, timeout time.Duration) (*artifact.FileLock, error) {

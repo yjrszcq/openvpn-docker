@@ -24,6 +24,7 @@ import (
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
 	"github.com/yjrszcq/openvpn-docker/internal/hook"
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
+	networkcontrol "github.com/yjrszcq/openvpn-docker/internal/network"
 	"github.com/yjrszcq/openvpn-docker/internal/pki"
 	recoveryservice "github.com/yjrszcq/openvpn-docker/internal/recovery"
 	"github.com/yjrszcq/openvpn-docker/internal/render"
@@ -196,6 +197,9 @@ func runServerRun(args []string, stdout, stderr io.Writer) int {
 	if err := supervisor.Run(ctx, hup, instance); err != nil {
 		if errors.Is(err, artifact.ErrLocked) {
 			return writeError(stderr, apperror.Wrap(apperror.ExitTemporary, "lock_conflict", "runtime lock is unavailable", err))
+		}
+		if errors.Is(err, networkcontrol.ErrUnavailable) {
+			return writeError(stderr, apperror.Wrap(apperror.ExitUnavailable, "network_unavailable", "IPv4 network dependency is unavailable", err))
 		}
 		return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "runtime_failed", "OpenVPN runtime failed", err))
 	}
