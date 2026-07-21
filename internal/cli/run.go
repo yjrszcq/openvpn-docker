@@ -205,10 +205,6 @@ func requestedHelpPath(args []string) ([]string, bool) {
 }
 
 func runServerRun(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn server run")
-		return int(apperror.ExitSuccess)
-	}
 	if len(args) != 0 {
 		return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn server run"))
 	}
@@ -327,10 +323,6 @@ func RunHook(args []string, stderr io.Writer) int {
 }
 
 func runServerInit(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn server init")
-		return int(apperror.ExitSuccess)
-	}
 	if len(args) != 0 {
 		return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn server init"))
 	}
@@ -401,12 +393,6 @@ func runRuntimeCapabilitiesWith(args []string, stdout, stderr io.Writer, contrac
 	for _, arg := range args {
 		switch canonicalOption(arg) {
 		case "--json":
-		case "-h", "--help":
-			if len(args) != 1 {
-				return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "help does not accept additional arguments"), jsonMode)
-			}
-			fmt.Fprintln(stdout, "Usage: ovpn runtime capabilities [--json|-j]")
-			return int(apperror.ExitSuccess)
 		default:
 			return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn runtime capabilities [--json]"), jsonMode)
 		}
@@ -458,12 +444,6 @@ func runConfigValidate(args []string, stdout, stderr io.Writer) int {
 	for _, arg := range args {
 		switch canonicalOption(arg) {
 		case "--json":
-		case "-h", "--help":
-			if len(args) != 1 {
-				return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "help does not accept additional arguments"), jsonMode)
-			}
-			fmt.Fprintln(stdout, "Usage: ovpn config validate [--json|-j]")
-			return int(apperror.ExitSuccess)
 		default:
 			return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn config validate [--json]"), jsonMode)
 		}
@@ -523,12 +503,6 @@ func runVersion(args []string, stdout, stderr io.Writer) int {
 				return writeErrorMode(stderr, usageError("--json may only be specified once"), true)
 			}
 			jsonMode = true
-		case "-h", "--help":
-			if len(args) != 1 {
-				return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "help does not accept additional arguments"), jsonMode)
-			}
-			fmt.Fprintln(stdout, "Usage: ovpn version [--short|-s|--json|-j]")
-			return int(apperror.ExitSuccess)
 		default:
 			return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn version [--short|--json]"), jsonMode)
 		}

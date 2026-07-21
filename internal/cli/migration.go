@@ -19,10 +19,6 @@ import (
 )
 
 func runMigrationPlan(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn migrate plan [--json|-j]")
-		return int(apperror.ExitSuccess)
-	}
 	jsonRequested := containsArgument(args, "--json")
 	jsonMode := len(args) == 1 && canonicalOption(args[0]) == "--json"
 	if len(args) != 0 && !jsonMode {
@@ -51,10 +47,6 @@ func runMigrationPlan(args []string, stdout, stderr io.Writer) int {
 }
 
 func runMigrationApply(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn migrate apply [--yes|-y] [--json|-j]")
-		return int(apperror.ExitSuccess)
-	}
 	yes, jsonMode, err := parseMigrationApplyOptions(args)
 	if err != nil {
 		return writeErrorMode(stderr, err, containsArgument(args, "--json"))

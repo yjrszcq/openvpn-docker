@@ -23,10 +23,6 @@ import (
 )
 
 func runRepairPlan(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn repair plan [--json|-j]")
-		return int(apperror.ExitSuccess)
-	}
 	jsonRequested := containsArgument(args, "--json")
 	jsonMode := len(args) == 1 && canonicalOption(args[0]) == "--json"
 	if len(args) != 0 && !jsonMode {
@@ -44,10 +40,6 @@ func runRepairPlan(args []string, stdout, stderr io.Writer) int {
 }
 
 func runRepairApply(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn repair apply [--yes|-y] [--json|-j]")
-		return int(apperror.ExitSuccess)
-	}
 	yes, jsonMode, err := parseRepairApplyOptions(args)
 	if err != nil {
 		return writeErrorMode(stderr, err, containsArgument(args, "--json"))

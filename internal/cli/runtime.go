@@ -16,10 +16,6 @@ import (
 )
 
 func runRuntimeStatus(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn runtime status [--json|-j]")
-		return int(apperror.ExitSuccess)
-	}
 	jsonRequested := containsArgument(args, "--json")
 	jsonMode, fullID := false, false
 	for _, arg := range args {
@@ -69,10 +65,6 @@ func runRuntimeStatus(args []string, stdout, stderr io.Writer) int {
 }
 
 func runRuntimeHealth(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn runtime health")
-		return int(apperror.ExitSuccess)
-	}
 	if len(args) != 0 {
 		return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn runtime health"))
 	}
@@ -134,10 +126,6 @@ func parseStreamOptions(args []string, events bool) (streamCLIOptions, error) {
 }
 
 func runRuntimeLogs(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn runtime logs [--lines|-l N] [--follow|-f] [--raw|-r] [--full-id|-u]")
-		return int(apperror.ExitSuccess)
-	}
 	options, err := parseStreamOptions(args, false)
 	if err != nil {
 		return writeError(stderr, apperror.Wrap(apperror.ExitUsage, "usage", "invalid runtime logs options: "+err.Error(), err))
@@ -170,10 +158,6 @@ func runRuntimeLogs(args []string, stdout, stderr io.Writer) int {
 }
 
 func runRuntimeEvents(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn runtime events [--lines|-l N] [--follow|-f] [--json|-j] [--full-id|-u]")
-		return int(apperror.ExitSuccess)
-	}
 	options, err := parseStreamOptions(args, true)
 	if err != nil {
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitUsage, "usage", "invalid runtime events options: "+err.Error(), err), containsArgument(args, "--json"))

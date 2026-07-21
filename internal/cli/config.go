@@ -52,10 +52,6 @@ func runConfigShow(args []string, stdout, stderr io.Writer) int {
 }
 
 func runConfigExport(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn config export [--output|-o FILE|-]")
-		return int(apperror.ExitSuccess)
-	}
 	output := ""
 	for index := 0; index < len(args); index++ {
 		if canonicalOption(args[index]) != "--output" || index+1 >= len(args) || output != "" {
@@ -118,10 +114,6 @@ func runConfigPlan(args []string, stdout, stderr io.Writer) int {
 }
 
 func runConfigApply(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn config apply [--yes|-y] [--json|-j]")
-		return int(apperror.ExitSuccess)
-	}
 	yes, jsonMode := false, false
 	for _, arg := range args {
 		switch canonicalOption(arg) {
@@ -176,10 +168,6 @@ func runConfigApply(args []string, stdout, stderr io.Writer) int {
 }
 
 func runServerRender(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn server render [--output|-o FILE|-]")
-		return int(apperror.ExitSuccess)
-	}
 	output := ""
 	for index := 0; index < len(args); index++ {
 		if canonicalOption(args[index]) != "--output" || index+1 >= len(args) || output != "" {
@@ -229,12 +217,6 @@ func parseJSONOnly(args []string, stdout, stderr io.Writer, command string) (int
 	for _, arg := range args {
 		switch canonicalOption(arg) {
 		case "--json":
-		case "-h", "--help":
-			if len(args) != 1 {
-				return writeErrorMode(stderr, usageError("usage: "+command+" [--json]"), jsonMode), false
-			}
-			fmt.Fprintf(stdout, "Usage: %s [--json|-j]\n", command)
-			return int(apperror.ExitSuccess), false
 		default:
 			return writeErrorMode(stderr, usageError("usage: "+command+" [--json]"), jsonMode), false
 		}
