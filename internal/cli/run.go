@@ -38,6 +38,18 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		writeHelp(stdout, nil)
 		return int(apperror.ExitSuccess)
 	}
+	switch args[0] {
+	case "-v":
+		if len(args) != 1 {
+			return writeError(stderr, usageError("usage: ovpn -v"))
+		}
+		return runVersion([]string{"--short"}, stdout, stderr)
+	case "-V", "--version":
+		if len(args) != 1 {
+			return writeError(stderr, usageError("usage: ovpn "+args[0]))
+		}
+		return runVersion(nil, stdout, stderr)
+	}
 	if isHelp(args[0]) {
 		if len(args) != 1 {
 			return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn [command]"))
@@ -62,6 +74,16 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	if args[0] == "version" {
 		return runVersion(args[1:], stdout, stderr)
+	}
+	if len(args) == 1 {
+		switch args[0] {
+		case "client":
+			return runClientList(nil, stdout, stderr)
+		case "state":
+			return runState(nil, stdout, stderr, true)
+		case "runtime":
+			return runRuntimeStatus(nil, stdout, stderr)
+		}
 	}
 	if len(args) >= 2 && args[0] == "config" && args[1] == "validate" {
 		return runConfigValidate(args[2:], stdout, stderr)

@@ -19,7 +19,11 @@ var rootCommand = command{
 	name:    "ovpn",
 	summary: "manage an OpenVPN schema 4 instance",
 	usage:   "ovpn <command> [options]",
-	details: []string{"Run 'ovpn help COMMAND' or 'ovpn COMMAND -h' for command help."},
+	details: []string{
+		"Run 'ovpn help COMMAND' or 'ovpn COMMAND -h' for command help.",
+		"Use -v for the short version, or -V/--version for the full version report.",
+		"Client, state, and runtime groups default to list, doctor, and status respectively.",
+	},
 	children: []command{
 		group("server", "initialize, run, or render the OpenVPN server",
 			leaf("init", "initialize a schema 4 instance", "ovpn server init",

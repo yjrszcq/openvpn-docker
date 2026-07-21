@@ -103,6 +103,46 @@ func TestVersionJSON(t *testing.T) {
 	}
 }
 
+func TestTopLevelVersionAliases(t *testing.T) {
+	code, stdout, stderr := run("-v")
+	if code != 0 || strings.TrimSpace(stdout) != "4.0.0" || stderr != "" {
+		t.Fatalf("short alias code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	for _, alias := range []string{"-V", "--version"} {
+		code, aliasOutput, aliasError := run(alias)
+		if code != 0 || aliasError != "" || !strings.Contains(aliasOutput, "ovpn 4.0.0") || !strings.Contains(aliasOutput, "data schema: 4") {
+			t.Errorf("alias %s code=%d stdout=%q stderr=%q", alias, code, aliasOutput, aliasError)
+		}
+	}
+	for _, alias := range []string{"-v", "-V", "--version"} {
+		code, _, stderr = run(alias, "extra")
+		if code != 64 || stderr == "" {
+			t.Errorf("alias %s accepted extra argument: code=%d stderr=%q", alias, code, stderr)
+		}
+	}
+}
+
+func TestSafeGroupDefaults(t *testing.T) {
+	dataDir := t.TempDir()
+	t.Setenv("OVPN_DATA_DIR", dataDir)
+	t.Setenv("OVPN_RUNTIME_DIR", filepath.Join(dataDir, "run"))
+	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
+	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
+
+	code, stdout, stderr := run("client")
+	if code != 78 || stdout != "" || !strings.Contains(stderr, "SQLite database is missing") {
+		t.Fatalf("client default code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, stdout, stderr = run("state")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "state: EMPTY") {
+		t.Fatalf("state default code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, stdout, stderr = run("runtime")
+	if code != 78 || stdout != "" || !strings.Contains(stderr, "runtime state is invalid") {
+		t.Fatalf("runtime default code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
 func TestVersionJSONUsageError(t *testing.T) {
 	code, stdout, stderr := run("version", "--json", "--short")
 	if code != 64 || stdout != "" || !strings.Contains(stderr, `"kind":"usage"`) {
@@ -110,7 +150,7 @@ func TestVersionJSONUsageError(t *testing.T) {
 	}
 }
 
-func TestUnimplementedCommandFailsExplicitly(t *testing.T) {
+func TestAmbiguousGroupStillFailsExplicitly(t *testing.T) {
 	code, _, stderr := run("server")
 	if code != 1 || !strings.Contains(stderr, "not implemented") {
 		t.Fatalf("foundation command code=%d stderr=%q", code, stderr)
