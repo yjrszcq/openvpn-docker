@@ -37,6 +37,58 @@ func TestNestedHelp(t *testing.T) {
 	}
 }
 
+func TestHelpFormsShareDetailedLeafOutput(t *testing.T) {
+	paths := [][]string{
+		{"server", "init"},
+		{"config", "apply"},
+		{"client", "create"},
+		{"client", "address", "edit"},
+		{"state", "doctor"},
+		{"repair", "apply"},
+		{"migrate", "apply"},
+		{"runtime", "logs"},
+		{"version"},
+	}
+	for _, path := range paths {
+		byTopic := append([]string{"help"}, path...)
+		code, topicOutput, stderr := run(byTopic...)
+		if code != 0 || stderr != "" {
+			t.Fatalf("help %v code=%d stderr=%q", path, code, stderr)
+		}
+		byFlag := append(append([]string(nil), path...), "-h")
+		code, flagOutput, stderr := run(byFlag...)
+		if code != 0 || stderr != "" || flagOutput != topicOutput {
+			t.Fatalf("flag help %v code=%d stderr=%q\ntopic=%q\nflag=%q", path, code, stderr, topicOutput, flagOutput)
+		}
+		if !strings.Contains(topicOutput, "Usage: ovpn "+strings.Join(path, " ")) || !strings.Contains(topicOutput, "Examples:") {
+			t.Errorf("help %v lacks usage/examples: %q", path, topicOutput)
+		}
+	}
+}
+
+func TestEveryCommandHasUsefulHelp(t *testing.T) {
+	paths := [][]string{
+		{"server"}, {"server", "init"}, {"server", "run"}, {"server", "render"},
+		{"config"}, {"config", "validate"}, {"config", "show"}, {"config", "export"}, {"config", "plan"}, {"config", "apply"},
+		{"client"}, {"client", "create"}, {"client", "list"}, {"client", "export"}, {"client", "rename"}, {"client", "revoke"}, {"client", "reissue"}, {"client", "delete"},
+		{"client", "address"}, {"client", "address", "set"}, {"client", "address", "edit"}, {"client", "address", "release"},
+		{"state"}, {"state", "show"}, {"state", "doctor"},
+		{"repair"}, {"repair", "plan"}, {"repair", "apply"},
+		{"migrate"}, {"migrate", "plan"}, {"migrate", "apply"},
+		{"runtime"}, {"runtime", "status"}, {"runtime", "health"}, {"runtime", "capabilities"}, {"runtime", "logs"}, {"runtime", "events"},
+		{"version"},
+	}
+	for _, path := range paths {
+		code, stdout, stderr := run(append([]string{"help"}, path...)...)
+		if code != 0 || stderr != "" || !strings.Contains(stdout, "Usage:") {
+			t.Errorf("help %v code=%d stdout=%q stderr=%q", path, code, stdout, stderr)
+		}
+		if len(path) > 0 && strings.Contains(stdout, "  "+path[len(path)-1]+"  ") && len(stdout) < 40 {
+			t.Errorf("help %v is not useful: %q", path, stdout)
+		}
+	}
+}
+
 func TestVersionJSON(t *testing.T) {
 	code, stdout, stderr := run("version", "--json")
 	if code != 0 || stderr != "" {

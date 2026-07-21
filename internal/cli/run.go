@@ -53,6 +53,13 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		writeHelp(stdout, path)
 		return int(apperror.ExitSuccess)
 	}
+	if helpPath, ok := requestedHelpPath(args); ok {
+		if _, found := findCommand(helpPath); !found {
+			return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "unknown help topic "+strings.Join(helpPath, " ")))
+		}
+		writeHelp(stdout, helpPath)
+		return int(apperror.ExitSuccess)
+	}
 	if args[0] == "version" {
 		return runVersion(args[1:], stdout, stderr)
 	}
@@ -161,6 +168,18 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	return writeError(stderr, apperror.New(apperror.ExitFailure, "not_implemented", strings.Join(path, " ")+" is not implemented in the foundation build"))
+}
+
+func requestedHelpPath(args []string) ([]string, bool) {
+	if len(args) < 2 || !isHelp(args[len(args)-1]) {
+		return nil, false
+	}
+	for _, arg := range args[:len(args)-1] {
+		if strings.HasPrefix(arg, "-") {
+			return nil, false
+		}
+	}
+	return args[:len(args)-1], true
 }
 
 func runServerRun(args []string, stdout, stderr io.Writer) int {
