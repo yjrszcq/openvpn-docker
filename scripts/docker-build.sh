@@ -12,6 +12,8 @@ for name in \
   IMAGE_VERSION \
   DATA_SCHEMA \
   BASE_IMAGE \
+  GO_BUILD_IMAGE \
+  GO_RUNTIME_VERSION \
   OPENVPN_VERSION \
   OPENVPN_SOURCE_SHA256 \
   EASYRSA_VERSION \
@@ -56,6 +58,8 @@ exec docker build \
   --build-arg "https_proxy=$build_https_proxy" \
   --build-arg "no_proxy=$build_no_proxy" \
   --build-arg "BASE_IMAGE=$BASE_IMAGE" \
+  --build-arg "GO_BUILD_IMAGE=$GO_BUILD_IMAGE" \
+  --build-arg "GO_RUNTIME_VERSION=$GO_RUNTIME_VERSION" \
   --build-arg "IMAGE_VERSION=$IMAGE_VERSION" \
   --build-arg "DATA_SCHEMA=$DATA_SCHEMA" \
   --build-arg "OPENVPN_VERSION=$OPENVPN_VERSION" \

@@ -1,4 +1,41 @@
-ARG BASE_IMAGE
+ARG BASE_IMAGE=debian:trixie-slim
+ARG GO_BUILD_IMAGE=golang:1.26.5-trixie
+
+FROM ${GO_BUILD_IMAGE} AS go-builder
+
+ARG GO_RUNTIME_VERSION
+ARG VCS_REF=unknown
+ARG BUILD_DATE=unknown
+
+ENV CGO_ENABLED=1 \
+    GOPROXY=direct
+
+RUN test -n "$GO_RUNTIME_VERSION" \
+    && test -n "$VCS_REF" \
+    && test -n "$BUILD_DATE"
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY cmd/ cmd/
+COPY internal/ internal/
+
+RUN mkdir -p /out/usr/local/lib/openvpn-container/go \
+    && go build -buildvcs=false -trimpath \
+       -ldflags "-s -w -X github.com/yjrszcq/openvpn-docker/internal/buildinfo.Version=$GO_RUNTIME_VERSION -X github.com/yjrszcq/openvpn-docker/internal/buildinfo.Commit=$VCS_REF -X github.com/yjrszcq/openvpn-docker/internal/buildinfo.BuildDate=$BUILD_DATE" \
+       -o /out/usr/local/lib/openvpn-container/go/ovpn ./cmd/ovpn \
+    && go build -buildvcs=false -trimpath \
+       -ldflags "-s -w -X github.com/yjrszcq/openvpn-docker/internal/buildinfo.Version=$GO_RUNTIME_VERSION -X github.com/yjrszcq/openvpn-docker/internal/buildinfo.Commit=$VCS_REF -X github.com/yjrszcq/openvpn-docker/internal/buildinfo.BuildDate=$BUILD_DATE" \
+       -o /out/usr/local/lib/openvpn-container/go/ovpn-broker ./cmd/ovpn-broker \
+    && for binary in /out/usr/local/lib/openvpn-container/go/ovpn /out/usr/local/lib/openvpn-container/go/ovpn-broker; do \
+         ldd "$binary" >"/tmp/$(basename "$binary").ldd" || exit 1; \
+         ! grep -Fq 'not found' "/tmp/$(basename "$binary").ldd" || exit 1; \
+         go version -m "$binary" >"/tmp/$(basename "$binary").buildinfo" || exit 1; \
+         grep -Fq 'CGO_ENABLED=1' "/tmp/$(basename "$binary").buildinfo" || exit 1; \
+       done
+
 FROM ${BASE_IMAGE} AS builder
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -88,6 +125,7 @@ RUN apt-get update \
 
 COPY --from=builder /out/ /
 COPY --from=builder /work/openvpn/COPYING /usr/local/share/licenses/openvpn/COPYING
+COPY --from=go-builder /out/ /
 COPY LICENSE NOTICE /usr/local/share/licenses/openvpn-container/
 COPY rootfs/ /
 COPY compatibility/ /usr/local/share/openvpn-container/compatibility/
@@ -98,6 +136,13 @@ RUN openvpn --version >/tmp/openvpn-version \
     && ldd /usr/local/sbin/openvpn >/tmp/openvpn-ldd \
     && ! grep -Fq 'not found' /tmp/openvpn-ldd \
     && rm /tmp/openvpn-version /tmp/openvpn-ldd
+
+RUN for binary in /usr/local/lib/openvpn-container/go/ovpn /usr/local/lib/openvpn-container/go/ovpn-broker; do \
+      test -x "$binary" || exit 1; \
+      ldd "$binary" >"/tmp/$(basename "$binary").ldd" || exit 1; \
+      ! grep -Fq 'not found' "/tmp/$(basename "$binary").ldd" || exit 1; \
+    done \
+    && rm /tmp/ovpn.ldd /tmp/ovpn-broker.ldd
 
 RUN chmod +x /usr/local/bin/ovpn /usr/local/bin/ovpn-hook /usr/local/bin/docker-entrypoint \
        /usr/local/lib/openvpn-container/cli.sh \

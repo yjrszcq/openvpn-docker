@@ -5,13 +5,20 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 dockerfile="$ROOT_DIR/Dockerfile"
 
 grep -Fq 'FROM ${BASE_IMAGE} AS builder' "$dockerfile"
+grep -Fq 'FROM ${GO_BUILD_IMAGE} AS go-builder' "$dockerfile"
 grep -Fq 'COPY --from=builder /out/ /' "$dockerfile"
+grep -Fq 'COPY --from=go-builder /out/ /' "$dockerfile"
 grep -Fq 'make DESTDIR=/out install' "$dockerfile"
 grep -Fq 'fetch-openvpn-source /tmp/source' "$dockerfile"
 grep -Fq 'OVPN_RUNTIME_STRATEGY=source-build' "$dockerfile"
 grep -Fq 'OVPN_RUNTIME_OPENVPN_VERSION="$OPENVPN_VERSION"' "$dockerfile"
 grep -Fq 'grep -Fq "OpenVPN $OPENVPN_VERSION" /tmp/openvpn-version' "$dockerfile"
 grep -Fq "! grep -Fq 'not found' /tmp/openvpn-ldd" "$dockerfile"
+grep -Fq 'GOPROXY=direct' "$dockerfile"
+grep -Fq 'go build -buildvcs=false -trimpath' "$dockerfile"
+grep -Fq 'internal/buildinfo.Version=$GO_RUNTIME_VERSION' "$dockerfile"
+grep -Fq '/usr/local/lib/openvpn-container/go/ovpn-broker' "$dockerfile"
+grep -Fq "grep -Fq 'CGO_ENABLED=1'" "$dockerfile"
 
 for removed in embedded-management openvpn-bootstrap.sh trusted-management-keys \
   MANAGEMENT_SIGNING_PUBLIC_KEY_B64 MANAGEMENT_VERSION PLATFORM_API; do

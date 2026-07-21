@@ -38,6 +38,8 @@ assert_proxy_args() {
 assert_version_args() {
   grep -Fxq "IMAGE_VERSION=$IMAGE_VERSION" "$ARGS_FILE"
   grep -Fxq "DATA_SCHEMA=$DATA_SCHEMA" "$ARGS_FILE"
+  grep -Fxq "GO_BUILD_IMAGE=$GO_BUILD_IMAGE" "$ARGS_FILE"
+  grep -Fxq "GO_RUNTIME_VERSION=$GO_RUNTIME_VERSION" "$ARGS_FILE"
 }
 
 PATH="$FAKE_BIN:$PATH" \
