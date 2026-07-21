@@ -80,8 +80,8 @@ func TestConfigApplyRequiresConfirmationAndCommitsOffline(t *testing.T) {
 	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
 	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
 
-	code, stdout, stderr := run("config", "apply")
-	if code != 78 || stdout != "" || !strings.Contains(stderr, "not confirmed") {
+	code, stdout, stderr := run("config", "apply", "--json")
+	if code != 78 || stdout != "" || !strings.Contains(stderr, `"kind":"confirmation_required"`) || strings.Contains(stderr, "Type yes") {
 		t.Fatalf("confirmation code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	code, stdout, stderr = run("config", "apply", "--yes", "--json")

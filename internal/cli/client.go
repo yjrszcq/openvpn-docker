@@ -282,11 +282,7 @@ func runClientDelete(args []string, stdout, stderr io.Writer) int {
 }
 
 func confirmAction(stderr io.Writer, prompt string) (bool, error) {
-	info, err := os.Stdin.Stat()
-	if err != nil {
-		return false, err
-	}
-	if info.Mode()&os.ModeCharDevice == 0 {
+	if !isTerminal(os.Stdin) {
 		return false, fmt.Errorf("stdin is not a TTY")
 	}
 	fmt.Fprint(stderr, prompt)

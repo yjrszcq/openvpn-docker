@@ -108,7 +108,7 @@ func TestRepairCLIPlanAndConfirmation(t *testing.T) {
 		t.Fatalf("repair plan code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	code, stdout, stderr = run("repair", "apply")
-	if code != 78 || stdout != "" || !strings.Contains(stderr, "not confirmed") {
+	if code != 78 || stdout != "" || !strings.Contains(stderr, "requires an interactive confirmation or --yes") || strings.Contains(stderr, "Type yes") {
 		t.Fatalf("repair confirmation code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	code, _, stderr = run("repair", "apply", "--yes", "--yes")
