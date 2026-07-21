@@ -33,12 +33,22 @@ Default paths:
 `EDITOR`, selects the batch address editor. Binary/template overrides are test
 and development interfaces, not normal deployment configuration.
 
+`ovpn client`, `ovpn state`, and `ovpn runtime` are safe shortcuts for
+`client list`, `state doctor`, and `runtime status`. At the top level, `-v`
+prints only the project version while `-V` and `--version` print the full
+version report.
+
 ## Output and exit codes
 
 Query and plan commands default to stable human-readable output and support
 `--json` where listed. JSON errors are written as structured objects to
 standard error. `runtime events --json` emits one JSON object per line.
 `runtime logs --raw` preserves original OpenVPN log text.
+
+Human client output uses 12 hexadecimal UUID characters by default;
+`--full-id/-u` prints the canonical UUID. JSON always contains full UUIDs.
+All client mutations return versioned JSON with the operation ID, client state,
+profile redistribution impact, and post-commit runtime convergence state.
 
 | Code | Meaning |
 |---|---|
@@ -53,6 +63,11 @@ standard error. `runtime events --json` emits one JSON object per line.
 `migrate apply`, `config apply`, `repair apply`, `client delete`, and batch
 address editing require interactive confirmation or `--yes`. A non-TTY call
 without `--yes` is refused.
+
+Mutations perform read-only validation, target selection, and planning before
+asking for confirmation. Invalid requests never prompt, and a no-op plan exits
+successfully without requiring `--yes`. Human errors include an actionable
+hint where one is safe; JSON errors retain their stable object form.
 
 Every public multi-letter option has a single-token short alias. Long and short
 forms are equivalent; specifying both repeats the same logical option and is
@@ -92,17 +107,17 @@ ovpn
 │   ├── plan [--json|-j]
 │   └── apply [--yes|-y] [--json|-j]
 ├── client
-│   ├── create NAME [--ipv4|-4 [auto|dynamic|ADDRESS]]
+│   ├── create NAME [--ipv4|-4 [auto|dynamic|ADDRESS]] [--output|-o FILE|-] [--full-id|-u] [--json|-j]
 │   ├── list [--detail|-d] [--full-id|-u] [--json|-j]
 │   ├── export (NAME|--name|-n NAME|--id|-i ID) [--output|-o FILE|-]
-│   ├── rename (NAME|--name|-n NAME|--id|-i ID) NEW_NAME
-│   ├── revoke (NAME|--name|-n NAME|--id|-i ID) [--release-ipv4|-4]
-│   ├── reissue (NAME|--name|-n NAME|--id|-i ID) [--ipv4|-4 [auto|dynamic|ADDRESS]]
-│   ├── delete (NAME|--name|-n NAME|--id|-i ID) [--yes|-y]
+│   ├── rename (NAME|--name|-n NAME|--id|-i ID) NEW_NAME [--full-id|-u] [--json|-j]
+│   ├── revoke (NAME|--name|-n NAME|--id|-i ID) [--release-ipv4|-4] [--full-id|-u] [--json|-j]
+│   ├── reissue (NAME|--name|-n NAME|--id|-i ID) [--ipv4|-4 [auto|dynamic|ADDRESS]] [--output|-o FILE|-] [--full-id|-u] [--json|-j]
+│   ├── delete (NAME|--name|-n NAME|--id|-i ID) [--yes|-y] [--full-id|-u] [--json|-j]
 │   └── address
-│       ├── set (NAME|--name|-n NAME|--id|-i ID) --ipv4|-4 [auto|dynamic|ADDRESS]
-│       ├── edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--yes|-y]
-│       └── release (NAME|--name|-n NAME|--id|-i ID)
+│       ├── set (NAME|--name|-n NAME|--id|-i ID) --ipv4|-4 [auto|dynamic|ADDRESS] [--full-id|-u] [--json|-j]
+│       ├── edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--yes|-y] [--json|-j]
+│       └── release (NAME|--name|-n NAME|--id|-i ID) [--full-id|-u] [--json|-j]
 ├── state
 │   ├── show [--json|-j]
 │   └── doctor [--json|-j]
@@ -113,11 +128,13 @@ ovpn
 │   ├── plan [--json|-j]
 │   └── apply [--yes|-y] [--json|-j]
 ├── runtime
-│   ├── status [--json|-j]
+│   ├── status [--json|-j] [--full-id|-u]
+│   ├── disconnect (NAME|--name|-n NAME|--id|-i ID) [--json|-j] [--full-id|-u]
 │   ├── health
 │   ├── capabilities [--json|-j]
 │   ├── logs [--lines|-l N] [--follow|-f] [--raw|-r] [--full-id|-u]
 │   └── events [--lines|-l N] [--follow|-f] [--json|-j] [--full-id|-u]
+├── completion (bash|zsh|fish)
 └── version [--short|-s|--json|-j]
 ```
 
@@ -218,11 +235,13 @@ IPv4 intent is expressed uniformly as:
 When `--ipv4` is present without a value, it means `auto`. Omitting the option
 entirely keeps each command's documented default behavior.
 
-### `ovpn client create NAME [--ipv4 ...]`
+### `ovpn client create NAME [--ipv4 ...] [--output FILE|-] [--json]`
 
 Creates the UUID, Easy-RSA certificate and key, profile, address assignment,
 artifact metadata, operation record, and audit event. The default IPv4 intent
-is `auto`.
+is `auto`. `--output` exports the committed profile in the same command. File
+targets are mode `0600` and never overwritten; `--output -` writes only the
+profile to stdout and cannot be combined with JSON.
 
 ### `ovpn client list [--detail] [--full-id] [--json]`
 
@@ -235,35 +254,38 @@ stable object representation.
 Exports an active client's current profile. The default output is standard
 output. Treat the result as a private credential.
 
-### `ovpn client rename SELECTOR NEW_NAME`
+### `ovpn client rename SELECTOR NEW_NAME [--json]`
 
 Changes the display name and profile filename without changing the UUID,
 certificate identity, address assignment, or audit history.
 
-### `ovpn client revoke SELECTOR [--release-ipv4]`
+### `ovpn client revoke SELECTOR [--release-ipv4] [--json]`
 
-Revokes the certificate, regenerates the CRL, marks the profile revoked, and
-reports that a current runtime session must be disconnected. Static IPv4 is
-retained unless `--release-ipv4` is supplied.
+Revokes the certificate, regenerates the CRL, and marks the profile revoked.
+Static IPv4 is retained unless `--release-ipv4` is supplied. After the durable
+commit, the command tries to disconnect any current session. Runtime failure
+is reported as a warning/pending result and does not roll back the revocation.
 
-### `ovpn client reissue SELECTOR [--ipv4 ...]`
+### `ovpn client reissue SELECTOR [--ipv4 ...] [--output FILE|-] [--json]`
 
 Issues a new key/certificate for the same UUID, updates CRL/profile state, and
-optionally changes the address intent. Export and redistribute the new profile;
-the prior session must be disconnected. Omitting `--ipv4` retains the current
-assignment intent; specifying `--ipv4` without a value changes it to `auto`.
+optionally changes the address intent. Omitting `--ipv4` retains the current
+assignment intent; specifying it without a value changes it to `auto`. The old
+session is disconnected after commit, and `--output` can return the replacement
+profile directly. The replacement profile must be redistributed.
 
 ### `ovpn client delete SELECTOR [--yes]`
 
 Revokes an active certificate when needed, removes local credentials and
-assignment state, and retains the UUID tombstone. Deleted private keys are
-recoverable only from a secure backup.
+assignment state, and retains the UUID tombstone. It also attempts to remove a
+stale session for active or previously revoked clients. Deleted private keys
+are recoverable only from a secure backup.
 
 ### `ovpn client address set SELECTOR --ipv4 ...`
 
 Changes one active client's assignment atomically and updates the CCD artifact.
-`--ipv4` without a value selects `auto`. Disconnect the current session so the
-new assignment takes effect.
+`--ipv4` without a value selects `auto`. The command disconnects the current
+session after commit so the new assignment can take effect.
 
 ### `ovpn client address edit TARGETS [--yes]`
 
@@ -279,7 +301,8 @@ tablet,10.42.0.20
 Every selected client must appear exactly once. Values are `auto`, `dynamic`,
 or a static IPv4 address. Positional names, `--name`, `--id`, and `--all` cannot
 be mixed. The complete set is validated and committed atomically, so address
-swaps are supported.
+swaps are supported. The editor is selected from `OVPN_EDITOR`, then `EDITOR`,
+then installed `nano`; selected live sessions are disconnected after commit.
 
 ### `ovpn client address release SELECTOR`
 
@@ -339,6 +362,13 @@ snapshot and then running the `sh-ver` image.
 Queries the management broker for daemon state, management state, connected
 clients, virtual addresses, and remote addresses. It requires a running server.
 
+### `ovpn runtime disconnect SELECTOR [--json] [--full-id]`
+
+Disconnects current sessions for the selected immutable client UUID through
+the management broker. An already-offline client is a successful no-op.
+Deleted tombstones can be selected by ID to retry cleanup after a prior runtime
+outage. This command does not revoke credentials or prevent reconnection.
+
 ### `ovpn runtime health`
 
 Returns success and prints `healthy` only when the broker and OpenVPN runtime
@@ -358,6 +388,23 @@ UUID shortening in translated output.
 
 Reads `events.jsonl`. Text output is human-readable. `--json` preserves JSONL,
 `--follow` follows appended events, and `--full-id` prevents UUID shortening.
+
+## Completion command
+
+### `ovpn completion (bash|zsh|fish)`
+
+Writes a shell completion script to stdout. Commands and options are generated
+from the same static command tree used by help. Explicit `--name/-n` and
+`--id/-i` selector values query the current client list at completion time;
+private artifacts are never read. Install examples:
+
+```bash
+mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
+  ~/.config/fish/completions
+ovpn completion bash > ~/.local/share/bash-completion/completions/ovpn
+ovpn completion zsh > ~/.zfunc/_ovpn
+ovpn completion fish > ~/.config/fish/completions/ovpn.fish
+```
 
 ## Version command
 

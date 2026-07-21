@@ -1,0 +1,36 @@
+# OpenVPN schema 4 declarative configuration example.
+# Copy this file to the configured OVPN_CONFIG_FILE path and change the
+# public endpoint before initializing a new instance. This file contains no
+# credentials or private key material.
+version: 1
+
+server:
+  # Public hostname or IP address used by clients.
+  endpoint: vpn.example.com
+  transport:
+    # protocol: udp or tcp
+    protocol: udp
+    # family controls the public transport socket: auto, ipv4, or ipv6.
+    # IPv6 tunnel addresses are not implemented yet.
+    family: auto
+    port: 1194
+  clientToClient: true
+
+ipv4:
+  # Use a canonical IPv4 network from /30 through /0.
+  network: 10.42.0.0/24
+  # Omit dynamicPoolSize to reserve half of the usable client addresses for
+  # dynamic leases. Set 0 to disable the dynamic pool.
+  dynamicPoolSize: 64
+  nat:
+    enabled: false
+    # auto selects the outbound interface from the system route table.
+    interface: auto
+  redirectGateway: false
+  # Add IPv4 DNS servers and canonical IPv4 routes as needed.
+  dns: []
+  routes: []
+
+logging:
+  maxBytes: 10485760
+  backups: 5

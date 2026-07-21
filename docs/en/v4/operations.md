@@ -28,7 +28,8 @@ Both services must use the same target image and mount the same
 ## Initial deployment
 
 1. Create the data and configuration directories with restricted permissions.
-2. Write `openvpn-config/config.yaml` and validate the endpoint, IPv4 network,
+2. Copy the repository's root `config.example.yaml` to
+   `openvpn-config/config.yaml`, then validate the endpoint, IPv4 network,
    routing, and NAT choices.
 3. Start the service. The entrypoint initializes only an empty data directory.
 4. Verify state and runtime health before issuing clients.
@@ -36,6 +37,7 @@ Both services must use the same target image and mount the same
 ```bash
 mkdir -p openvpn-data openvpn-config
 chmod 750 openvpn-data openvpn-config
+cp config.example.yaml openvpn-config/config.yaml
 $EDITOR openvpn-config/config.yaml
 
 docker compose up -d openvpn
@@ -88,16 +90,15 @@ flush unrelated rules.
 The examples below use the short aliases where practical. The long forms in
 the command reference remain equivalent.
 
-Create and export:
+Create and export in one command when the profile should be written to the
+operator's current directory:
 
 ```bash
-docker compose exec openvpn ovpn client create laptop -4
+docker compose exec -T openvpn \
+  ovpn client create laptop -4 -o - > laptop.ovpn
+chmod 600 laptop.ovpn
 docker compose exec openvpn ovpn client create phone -4 dynamic
 docker compose exec openvpn ovpn client create tablet -4 10.42.0.20
-
-docker compose exec -T openvpn \
-  ovpn client export laptop -o - > laptop.ovpn
-chmod 600 laptop.ovpn
 ```
 
 List and select by immutable ID:
@@ -118,18 +119,20 @@ docker compose exec openvpn \
 docker compose exec openvpn \
   ovpn client revoke office-laptop
 
-docker compose exec openvpn \
-  ovpn client reissue office-laptop -4
 docker compose exec -T openvpn \
-  ovpn client export office-laptop -o - > office-laptop.ovpn
+  ovpn client reissue office-laptop -4 -o - > office-laptop.ovpn
+chmod 600 office-laptop.ovpn
 
 docker compose exec openvpn \
   ovpn client delete office-laptop -y
 ```
 
-After revoke, reissue, or an address change, disconnect any prior session.
-After reissue, redistribute the new profile. Delete retains a UUID tombstone but
-removes local credentials; retain backups if recovery may be required.
+Revoke, reissue, delete, and address mutations attempt to disconnect affected
+sessions after their durable commit. If the broker is unavailable, the command
+still succeeds and reports a pending warning; retry with
+`ovpn runtime disconnect NAME` after runtime health is restored. After reissue,
+redistribute the new profile. Delete retains a UUID tombstone but removes local
+credentials; retain backups if recovery may be required.
 
 ## Address management
 
@@ -151,7 +154,8 @@ docker compose exec openvpn \
 
 The file contains one `client,ipv4` row per selected active client. Use
 `auto`, `dynamic`, or a static address. The whole file is validated and
-committed atomically.
+committed atomically. The editor is selected from `OVPN_EDITOR`, then `EDITOR`,
+then installed `nano`.
 
 Release a revoked client's retained static address:
 
@@ -231,6 +235,8 @@ trusted backup.
 ```bash
 docker compose exec openvpn ovpn runtime status
 docker compose exec openvpn ovpn runtime status -j
+docker compose exec openvpn ovpn runtime disconnect laptop
+docker compose exec openvpn ovpn runtime disconnect -i 844854e4 -j
 docker compose exec openvpn ovpn runtime capabilities -j
 docker compose exec openvpn ovpn runtime logs -l 200
 docker compose exec openvpn ovpn runtime logs -l 0 -f
@@ -242,6 +248,21 @@ docker compose exec openvpn ovpn runtime events -l 0 -f
 Logs are persistent and rotate according to applied configuration. Events are a
 user-facing JSONL stream. SQLite `audit_events` are authoritative business
 audit records and are not a substitute for runtime logs.
+
+## Shell completion
+
+Generate scripts from the same command contract used by `ovpn help`:
+
+```bash
+mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
+  ~/.config/fish/completions
+ovpn completion bash > ~/.local/share/bash-completion/completions/ovpn
+ovpn completion zsh > ~/.zfunc/_ovpn
+ovpn completion fish > ~/.config/fish/completions/ovpn.fish
+```
+
+Start a new shell after installation. Name and ID completion performs a
+read-only client list query only after an explicit selector option.
 
 ## Upgrade from schema 3
 

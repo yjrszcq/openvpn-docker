@@ -47,37 +47,17 @@ mkdir -p openvpn-data openvpn-config
 chmod 750 openvpn-data openvpn-config
 ```
 
-Create `openvpn-config/config.yaml`:
+Copy the strict, commented [example configuration](config.example.yaml), then
+change its public endpoint and network choices:
 
-```yaml
-version: 1
-
-server:
-  endpoint: vpn.example.com
-  transport:
-    protocol: udp
-    family: auto
-    port: 1194
-  clientToClient: true
-
-ipv4:
-  network: 10.42.0.0/24
-  dynamicPoolSize: 64
-  nat:
-    enabled: false
-    interface: auto
-  redirectGateway: false
-  dns: []
-  routes: []
-
-logging:
-  maxBytes: 10485760
-  backups: 5
+```bash
+cp config.example.yaml openvpn-config/config.yaml
+$EDITOR openvpn-config/config.yaml
 ```
 
 Only `server.endpoint` and `ipv4.network` are required beyond `version: 1`.
-Omitted values use the defaults shown above, except `dynamicPoolSize`, which
-defaults to half of the usable client addresses.
+Omitted values use the defaults documented in the example, except
+`dynamicPoolSize`, which defaults to half of the usable client addresses.
 
 Create `compose.yaml`:
 
@@ -138,8 +118,9 @@ applies configuration implicitly.
 ### Create and export a client
 
 ```bash
-# Lowest available static IPv4 address
-docker compose exec openvpn ovpn client create laptop --ipv4
+# Lowest available static IPv4 address, with the profile returned directly
+docker compose exec -T openvpn \
+  ovpn client create laptop --ipv4 --output - > laptop.ovpn
 
 # Dynamic address
 docker compose exec openvpn ovpn client create phone --ipv4 dynamic
@@ -147,8 +128,7 @@ docker compose exec openvpn ovpn client create phone --ipv4 dynamic
 # Explicit static address
 docker compose exec openvpn ovpn client create tablet --ipv4 10.42.0.20
 
-docker compose exec -T openvpn \
-  ovpn client export laptop --output - > laptop.ovpn
+chmod 600 laptop.ovpn
 ```
 
 Import the resulting profile into an OpenVPN client. Profiles contain private
@@ -183,6 +163,7 @@ the same `config apply`; there is no separate online network migration command.
 ```bash
 docker compose exec openvpn ovpn client list --detail
 docker compose exec openvpn ovpn runtime status
+docker compose exec openvpn ovpn runtime disconnect laptop
 docker compose exec openvpn ovpn runtime logs --lines 100 --follow
 docker compose exec openvpn ovpn runtime events --lines 100 --json
 
@@ -196,6 +177,23 @@ or `--id ID`. When neither selector option is present, the positional value is
 treated as the client name. `--id` accepts an unambiguous UUID prefix of at least
 eight hexadecimal characters. Mutating commands that can destroy or broadly
 rewrite state require interactive confirmation or `--yes`.
+
+`ovpn client`, `ovpn state`, and `ovpn runtime` default to `list`, `doctor`,
+and `status`. Client mutations support `--json`; create and reissue can return
+the new profile with `--output`. Revoke, reissue, delete, and address changes
+try to disconnect affected live sessions after the durable commit. A runtime
+warning means the state change succeeded and `runtime disconnect` can be used
+as a manual retry.
+
+Generate shell completion without an external CLI framework:
+
+```bash
+mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
+  ~/.config/fish/completions
+ovpn completion bash > ~/.local/share/bash-completion/completions/ovpn
+ovpn completion zsh > ~/.zfunc/_ovpn
+ovpn completion fish > ~/.config/fish/completions/ovpn.fish
+```
 
 ## Schema 3 migration
 

@@ -26,13 +26,15 @@ docker compose run --rm openvpn-maintenance state doctor
 ## 首次部署
 
 1. 创建权限受限的数据与配置目录。
-2. 编写 `openvpn-config/config.yaml`，确认 endpoint、IPv4 网段、路由和 NAT。
+2. 将仓库根目录的 `config.example.yaml` 复制为
+   `openvpn-config/config.yaml`，再确认 endpoint、IPv4 网段、路由和 NAT。
 3. 启动服务；entrypoint 只初始化空数据目录。
 4. 签发客户端前检查 state 和 runtime health。
 
 ```bash
 mkdir -p openvpn-data openvpn-config
 chmod 750 openvpn-data openvpn-config
+cp config.example.yaml openvpn-config/config.yaml
 $EDITOR openvpn-config/config.yaml
 
 docker compose up -d openvpn
@@ -81,16 +83,14 @@ ipv4:
 
 以下示例在合适的位置使用短参数；命令参考中的长参数与其完全等价。
 
-创建并导出：
+需要把 profile 写到操作员当前目录时，可在同一命令中创建并导出：
 
 ```bash
-docker compose exec openvpn ovpn client create laptop -4
+docker compose exec -T openvpn \
+  ovpn client create laptop -4 -o - > laptop.ovpn
+chmod 600 laptop.ovpn
 docker compose exec openvpn ovpn client create phone -4 dynamic
 docker compose exec openvpn ovpn client create tablet -4 10.42.0.20
-
-docker compose exec -T openvpn \
-  ovpn client export laptop -o - > laptop.ovpn
-chmod 600 laptop.ovpn
 ```
 
 查看并使用不可变 ID：
@@ -111,17 +111,18 @@ docker compose exec openvpn \
 docker compose exec openvpn \
   ovpn client revoke office-laptop
 
-docker compose exec openvpn \
-  ovpn client reissue office-laptop -4
 docker compose exec -T openvpn \
-  ovpn client export office-laptop -o - > office-laptop.ovpn
+  ovpn client reissue office-laptop -4 -o - > office-laptop.ovpn
+chmod 600 office-laptop.ovpn
 
 docker compose exec openvpn \
   ovpn client delete office-laptop -y
 ```
 
-吊销、重签或地址变化后需要断开旧 session；重签后必须分发新 profile。删除保留 UUID
-tombstone，但会删除本地凭据，需要恢复能力时必须保留备份。
+revoke、reissue、delete 和地址 mutation 会在持久化提交后尝试断开受影响 session。
+若 broker 不可用，命令仍成功并报告 pending warning；runtime 恢复健康后用
+`ovpn runtime disconnect NAME` 重试。重签后必须重分发新 profile。delete 会保留
+UUID tombstone，但删除本地凭据；若需要恢复能力，应保留备份。
 
 ## 地址管理
 
@@ -142,7 +143,8 @@ docker compose exec openvpn \
 ```
 
 文件中每个选中 active 客户端占一行 `client,ipv4`，值使用 `auto`、`dynamic` 或静态
-地址。完整文件统一验证并原子提交。
+地址。完整文件统一验证并原子提交。编辑器依次取 `OVPN_EDITOR`、`EDITOR`，最后
+使用已安装的 `nano`。
 
 释放 revoked 客户端保留的静态地址：
 
@@ -216,6 +218,8 @@ SQLite 权威库。数据库处于 `CRITICAL`/`UNRECOVERABLE` 时必须恢复可
 ```bash
 docker compose exec openvpn ovpn runtime status
 docker compose exec openvpn ovpn runtime status -j
+docker compose exec openvpn ovpn runtime disconnect laptop
+docker compose exec openvpn ovpn runtime disconnect -i 844854e4 -j
 docker compose exec openvpn ovpn runtime capabilities -j
 docker compose exec openvpn ovpn runtime logs -l 200
 docker compose exec openvpn ovpn runtime logs -l 0 -f
@@ -226,6 +230,21 @@ docker compose exec openvpn ovpn runtime events -l 0 -f
 
 日志按 applied 配置持久化轮转；events 是面向用户的 JSONL。SQLite `audit_events` 是
 权威业务审计，不能替代 runtime 日志。
+
+## Shell completion
+
+从与 `ovpn help` 相同的命令契约生成脚本：
+
+```bash
+mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
+  ~/.config/fish/completions
+ovpn completion bash > ~/.local/share/bash-completion/completions/ovpn
+ovpn completion zsh > ~/.zfunc/_ovpn
+ovpn completion fish > ~/.config/fish/completions/ovpn.fish
+```
+
+安装后启动新 shell。只有在显式 selector 参数后补全 name/ID 时，脚本才执行只读
+client list 查询。
 
 ## 从 schema 3 升级
 

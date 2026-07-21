@@ -37,36 +37,16 @@ mkdir -p openvpn-data openvpn-config
 chmod 750 openvpn-data openvpn-config
 ```
 
-创建 `openvpn-config/config.yaml`：
+复制经过严格解析验证、带注释的[示例配置](config.example.yaml)，再修改公网 endpoint
+和网络选项：
 
-```yaml
-version: 1
-
-server:
-  endpoint: vpn.example.com
-  transport:
-    protocol: udp
-    family: auto
-    port: 1194
-  clientToClient: true
-
-ipv4:
-  network: 10.42.0.0/24
-  dynamicPoolSize: 64
-  nat:
-    enabled: false
-    interface: auto
-  redirectGateway: false
-  dns: []
-  routes: []
-
-logging:
-  maxBytes: 10485760
-  backups: 5
+```bash
+cp config.example.yaml openvpn-config/config.yaml
+$EDITOR openvpn-config/config.yaml
 ```
 
 除 `version: 1` 外，只有 `server.endpoint` 与 `ipv4.network` 必填。其他字段使用
-上述默认值；`dynamicPoolSize` 未设置时取可用客户端地址数的一半。
+示例中说明的默认值；`dynamicPoolSize` 未设置时取可用客户端地址数的一半。
 
 创建 `compose.yaml`：
 
@@ -124,8 +104,9 @@ YAML 是期望配置，SQLite 保存最近一次经操作员确认的 applied re
 ### 创建并导出客户端
 
 ```bash
-# 自动选择最低可用静态 IPv4
-docker compose exec openvpn ovpn client create laptop --ipv4
+# 自动选择最低可用静态 IPv4，并直接输出 profile
+docker compose exec -T openvpn \
+  ovpn client create laptop --ipv4 --output - > laptop.ovpn
 
 # 动态地址
 docker compose exec openvpn ovpn client create phone --ipv4 dynamic
@@ -133,8 +114,7 @@ docker compose exec openvpn ovpn client create phone --ipv4 dynamic
 # 指定静态地址
 docker compose exec openvpn ovpn client create tablet --ipv4 10.42.0.20
 
-docker compose exec -T openvpn \
-  ovpn client export laptop --output - > laptop.ovpn
+chmod 600 laptop.ovpn
 ```
 
 将 profile 导入 OpenVPN 客户端。profile 内含私钥，必须按凭据安全传输和保存。
@@ -166,6 +146,7 @@ plan 会列出重启、地址重映射、防火墙 reconcile、派生文件和 p
 ```bash
 docker compose exec openvpn ovpn client list --detail
 docker compose exec openvpn ovpn runtime status
+docker compose exec openvpn ovpn runtime disconnect laptop
 docker compose exec openvpn ovpn runtime logs --lines 100 --follow
 docker compose exec openvpn ovpn runtime events --lines 100 --json
 
@@ -177,6 +158,22 @@ docker compose run --rm openvpn-maintenance repair apply --yes
 已有客户端可用位置参数 `NAME`、显式 `--name NAME` 或 `--id ID` 选择。未提供
 `--name` 或 `--id` 时，位置参数默认按客户端名称处理。`--id` 接受至少八位且唯一的
 UUID 十六进制前缀。可能删除或批量改写状态的命令需要交互确认或 `--yes`。
+
+`ovpn client`、`ovpn state`、`ovpn runtime` 分别默认执行 `list`、`doctor`、
+`status`。所有客户端 mutation 支持 `--json`；create/reissue 可同时用 `--output`
+返回新 profile。revoke、reissue、delete 和地址变更在持久化提交后会尝试断开受影响的
+在线 session。若出现 runtime warning，说明状态变更已经成功，可用
+`runtime disconnect` 手动重试。
+
+无需额外 CLI 框架即可生成 shell completion：
+
+```bash
+mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
+  ~/.config/fish/completions
+ovpn completion bash > ~/.local/share/bash-completion/completions/ovpn
+ovpn completion zsh > ~/.zfunc/_ovpn
+ovpn completion fish > ~/.config/fish/completions/ovpn.fish
+```
 
 ## schema 3 迁移
 

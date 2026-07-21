@@ -28,14 +28,22 @@ maintenance 服务的 entrypoint 已经是 `ovpn`，因此 `<command>` 直接从
 | SQLite 权威库 | `/etc/openvpn/meta/state.db` | 由 data dir 派生 |
 
 `OVPN_MAINTENANCE=true` 授权离线迁移。批量地址编辑器依次取
-`OVPN_EDITOR`、`EDITOR`，最后使用 `vi`。外部二进制与模板覆盖变量只用于测试和
+`OVPN_EDITOR`、`EDITOR`，最后使用 `nano`。外部二进制与模板覆盖变量只用于测试和
 开发，不属于常规部署配置。
+
+`ovpn client`、`ovpn state`、`ovpn runtime` 是 `client list`、
+`state doctor`、`runtime status` 的安全快捷方式。顶层 `-v` 只输出项目版本，
+`-V` 与 `--version` 输出完整版本报告。
 
 ## 输出与退出码
 
 查询和 plan 默认输出稳定的人类可读文本，并在标注处支持 `--json`。JSON 模式错误
 以结构化对象写入 stderr。`runtime events --json` 输出 JSONL；
 `runtime logs --raw` 保留 OpenVPN 原始文本。
+
+人类模式客户端 UUID 默认显示 12 位十六进制字符；`--full-id/-u` 显示规范完整 UUID。
+JSON 始终使用完整 UUID。所有客户端 mutation JSON 都带版本、operation ID、客户端
+状态、profile 重分发影响和提交后的 runtime 收敛状态。
 
 | 退出码 | 含义 |
 |---|---|
@@ -49,6 +57,10 @@ maintenance 服务的 entrypoint 已经是 `ovpn`，因此 `<command>` 直接从
 
 `migrate apply`、`config apply`、`repair apply`、`client delete` 和批量地址
 编辑必须交互确认或带 `--yes`；非 TTY 未带 `--yes` 时直接拒绝。
+
+mutation 会先执行只读验证、目标选择和 plan，再请求确认。无效请求不会弹出确认；
+no-op plan 不需要 `--yes`，直接成功退出。人类模式错误在安全时给出下一步 hint，
+JSON 错误保持稳定对象格式。
 
 每个公开多字母参数都有单 token 短参数。长短形式等价；同时指定会被视为重复并拒绝。
 不支持短参数聚合或将值直接粘在短参数后。`-6` 为未来 IPv6 行为保留。
@@ -86,17 +98,17 @@ ovpn
 │   ├── plan [--json|-j]
 │   └── apply [--yes|-y] [--json|-j]
 ├── client
-│   ├── create NAME [--ipv4|-4 [auto|dynamic|ADDRESS]]
+│   ├── create NAME [--ipv4|-4 [auto|dynamic|ADDRESS]] [--output|-o FILE|-] [--full-id|-u] [--json|-j]
 │   ├── list [--detail|-d] [--full-id|-u] [--json|-j]
 │   ├── export (NAME|--name|-n NAME|--id|-i ID) [--output|-o FILE|-]
-│   ├── rename (NAME|--name|-n NAME|--id|-i ID) NEW_NAME
-│   ├── revoke (NAME|--name|-n NAME|--id|-i ID) [--release-ipv4|-4]
-│   ├── reissue (NAME|--name|-n NAME|--id|-i ID) [--ipv4|-4 [auto|dynamic|ADDRESS]]
-│   ├── delete (NAME|--name|-n NAME|--id|-i ID) [--yes|-y]
+│   ├── rename (NAME|--name|-n NAME|--id|-i ID) NEW_NAME [--full-id|-u] [--json|-j]
+│   ├── revoke (NAME|--name|-n NAME|--id|-i ID) [--release-ipv4|-4] [--full-id|-u] [--json|-j]
+│   ├── reissue (NAME|--name|-n NAME|--id|-i ID) [--ipv4|-4 [auto|dynamic|ADDRESS]] [--output|-o FILE|-] [--full-id|-u] [--json|-j]
+│   ├── delete (NAME|--name|-n NAME|--id|-i ID) [--yes|-y] [--full-id|-u] [--json|-j]
 │   └── address
-│       ├── set (NAME|--name|-n NAME|--id|-i ID) --ipv4|-4 [auto|dynamic|ADDRESS]
-│       ├── edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--yes|-y]
-│       └── release (NAME|--name|-n NAME|--id|-i ID)
+│       ├── set (NAME|--name|-n NAME|--id|-i ID) --ipv4|-4 [auto|dynamic|ADDRESS] [--full-id|-u] [--json|-j]
+│       ├── edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--yes|-y] [--json|-j]
+│       └── release (NAME|--name|-n NAME|--id|-i ID) [--full-id|-u] [--json|-j]
 ├── state
 │   ├── show [--json|-j]
 │   └── doctor [--json|-j]
@@ -107,11 +119,13 @@ ovpn
 │   ├── plan [--json|-j]
 │   └── apply [--yes|-y] [--json|-j]
 ├── runtime
-│   ├── status [--json|-j]
+│   ├── status [--json|-j] [--full-id|-u]
+│   ├── disconnect (NAME|--name|-n NAME|--id|-i ID) [--json|-j] [--full-id|-u]
 │   ├── health
 │   ├── capabilities [--json|-j]
 │   ├── logs [--lines|-l N] [--follow|-f] [--raw|-r] [--full-id|-u]
 │   └── events [--lines|-l N] [--follow|-f] [--json|-j] [--full-id|-u]
+├── completion (bash|zsh|fish)
 └── version [--short|-s|--json|-j]
 ```
 
@@ -199,10 +213,12 @@ IPv4 意图统一表示为：
 出现 `--ipv4` 但未提供值时等同于 `--ipv4 auto`。完全省略该选项时，保留各命令
 文档中说明的原有默认行为。
 
-### `ovpn client create NAME [--ipv4 ...]`
+### `ovpn client create NAME [--ipv4 ...] [--output FILE|-] [--json]`
 
 创建 UUID、Easy-RSA 证书/私钥、profile、地址 assignment、artifact metadata、
-operation 和 audit event。默认 IPv4 意图为 `auto`。
+operation 和 audit event。默认 IPv4 意图为 `auto`。`--output` 可在同一命令中
+导出已提交的 profile；文件以 `0600` 创建且不覆盖已有文件。`--output -` 只向
+stdout 写 profile，不能与 JSON 同时使用。
 
 ### `ovpn client list [--detail] [--full-id] [--json]`
 
@@ -213,30 +229,32 @@ operation 和 audit event。默认 IPv4 意图为 `auto`。
 
 导出 active 客户端的当前 profile，默认写 stdout。输出属于私密凭据。
 
-### `ovpn client rename SELECTOR NEW_NAME`
+### `ovpn client rename SELECTOR NEW_NAME [--json]`
 
 修改显示名称和 profile 文件名，不改变 UUID、证书身份、地址 assignment 或审计历史。
 
-### `ovpn client revoke SELECTOR [--release-ipv4]`
+### `ovpn client revoke SELECTOR [--release-ipv4] [--json]`
 
-吊销证书、重建 CRL、将 profile 标记为 revoked，并报告需要断开现有 runtime session。
-静态 IPv4 默认保留，带 `--release-ipv4` 时释放。
+吊销证书、重建 CRL，并将 profile 标记为 revoked。静态 IPv4 默认保留，带
+`--release-ipv4` 时释放。持久化提交后命令会尝试断开现有 session；runtime 失败
+只报告 warning/pending，不会回滚已完成的吊销。
 
-### `ovpn client reissue SELECTOR [--ipv4 ...]`
+### `ovpn client reissue SELECTOR [--ipv4 ...] [--output FILE|-] [--json]`
 
-为同一 UUID 签发新私钥/证书，更新 CRL/profile，并可改变地址意图。必须重新导出和
-分发 profile，并断开旧 session。省略 `--ipv4` 时保留当前 assignment 意图；仅写
-`--ipv4` 而不提供值时改为 `auto`。
+为同一 UUID 签发新私钥/证书，更新 CRL/profile，并可改变地址意图。省略
+`--ipv4` 时保留当前 assignment 意图；只写该参数时改为 `auto`。提交后会断开旧
+session，`--output` 可直接返回替换 profile；新 profile 必须重新分发。
 
 ### `ovpn client delete SELECTOR [--yes]`
 
 必要时先吊销 active 证书，再删除本地凭据和 assignment，保留 UUID tombstone。
-已删除私钥只能从安全备份恢复。
+active 或之前已 revoked 的客户端都会尝试清理残留 session。已删除私钥只能从安全
+备份恢复。
 
 ### `ovpn client address set SELECTOR --ipv4 ...`
 
-原子修改一个 active 客户端的 assignment 并同步 CCD。`--ipv4` 不带值时使用 `auto`。
-需要断开当前 session 才会使用新地址。
+原子修改一个 active 客户端的 assignment 并同步 CCD。`--ipv4` 不带值时使用
+`auto`。提交后命令会断开当前 session，使新地址生效。
 
 ### `ovpn client address edit TARGETS [--yes]`
 
@@ -251,7 +269,8 @@ tablet,10.42.0.20
 
 每个选中客户端必须恰好出现一次，值只能是 `auto`、`dynamic` 或静态 IPv4。
 位置名称、`--name`、`--id` 与 `--all` 不能混用。完整集合统一验证并原子提交，
-因此支持地址交换。
+因此支持地址交换。编辑器依次取 `OVPN_EDITOR`、`EDITOR`、已安装的 `nano`；提交
+后会断开选中的在线 session。
 
 ### `ovpn client address release SELECTOR`
 
@@ -304,6 +323,12 @@ transaction 可确定完成或回滚。
 通过 management broker 查询 daemon、management、在线客户端、虚拟地址和远端地址，
 要求服务正在运行。
 
+### `ovpn runtime disconnect SELECTOR [--json] [--full-id]`
+
+通过 management broker 按不可变 client UUID 断开当前 session。客户端已离线时是
+成功 no-op；此前 runtime 不可用时，也可按 ID 选择 deleted tombstone 重试清理。
+该命令不会吊销凭据，也不会阻止客户端重新连接。
+
 ### `ovpn runtime health`
 
 仅在 broker 与 OpenVPN 健康时返回成功并输出 `healthy`；镜像 healthcheck 使用该命令。
@@ -321,6 +346,22 @@ UUID 到名称翻译，`--full-id` 在翻译输出中保留完整 UUID。
 
 读取 `events.jsonl`。文本模式面向人，`--json` 保持 JSONL，`--follow` 跟随新增事件，
 `--full-id` 保留完整 UUID。
+
+## Completion 命令
+
+### `ovpn completion (bash|zsh|fish)`
+
+向 stdout 输出 shell completion 脚本。命令和参数来自与 help 相同的静态命令树；
+只有显式补全 `--name/-n` 或 `--id/-i` 的值时才读取当前 client list，不读取私密
+artifact。安装示例：
+
+```bash
+mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
+  ~/.config/fish/completions
+ovpn completion bash > ~/.local/share/bash-completion/completions/ovpn
+ovpn completion zsh > ~/.zfunc/_ovpn
+ovpn completion fish > ~/.config/fish/completions/ovpn.fish
+```
 
 ## 版本命令
 
