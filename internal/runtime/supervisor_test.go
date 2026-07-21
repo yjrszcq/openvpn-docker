@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -226,15 +227,15 @@ func TestSupervisorReconcilesBeforeStartAndCleansAfterStop(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- supervisor.Run(ctx, nil, testInstance()) }()
 	waitForFile(t, filepath.Join(markers, "openvpn-started"))
-	if network.reconciled != 1 || network.cleaned != 0 {
-		t.Fatalf("network before stop reconciled=%d cleaned=%d", network.reconciled, network.cleaned)
+	if network.reconciled.Load() != 1 || network.cleaned.Load() != 0 {
+		t.Fatalf("network before stop reconciled=%d cleaned=%d", network.reconciled.Load(), network.cleaned.Load())
 	}
 	cancel()
 	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
-	if network.cleaned != 1 {
-		t.Fatalf("network cleanup count=%d", network.cleaned)
+	if network.cleaned.Load() != 1 {
+		t.Fatalf("network cleanup count=%d", network.cleaned.Load())
 	}
 }
 
@@ -253,8 +254,8 @@ func TestSupervisorDoesNotStartProcessesWhenNetworkReconcileFails(t *testing.T) 
 	if _, err := os.Stat(filepath.Join(markers, "broker-started")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("broker started after network failure: %v", err)
 	}
-	if network.reconciled != 1 || network.cleaned != 0 {
-		t.Fatalf("network calls reconciled=%d cleaned=%d", network.reconciled, network.cleaned)
+	if network.reconciled.Load() != 1 || network.cleaned.Load() != 0 {
+		t.Fatalf("network calls reconciled=%d cleaned=%d", network.reconciled.Load(), network.cleaned.Load())
 	}
 }
 
@@ -282,18 +283,18 @@ func (noOpNetwork) Reconcile(context.Context, string, domain.Config) error { ret
 func (noOpNetwork) Cleanup(context.Context, string) error                  { return nil }
 
 type recordingNetwork struct {
-	reconciled int
-	cleaned    int
+	reconciled atomic.Int32
+	cleaned    atomic.Int32
 	err        error
 }
 
 func (network *recordingNetwork) Reconcile(context.Context, string, domain.Config) error {
-	network.reconciled++
+	network.reconciled.Add(1)
 	return network.err
 }
 
 func (network *recordingNetwork) Cleanup(context.Context, string) error {
-	network.cleaned++
+	network.cleaned.Add(1)
 	return nil
 }
 
