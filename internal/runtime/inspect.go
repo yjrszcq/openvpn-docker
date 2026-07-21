@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yjrszcq/openvpn-docker/internal/domain"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
 )
 
@@ -31,6 +32,15 @@ type StatusClient struct {
 	ClientName     string `json:"client_name,omitempty"`
 	RemoteAddress  string `json:"remote_address,omitempty"`
 	VirtualAddress string `json:"virtual_address,omitempty"`
+}
+
+type DisconnectResult struct {
+	Version      int    `json:"version"`
+	ClientID     string `json:"client_id"`
+	ClientName   string `json:"client_name"`
+	WasConnected bool   `json:"was_connected"`
+	Disconnected bool   `json:"disconnected"`
+	Connections  int    `json:"connections"`
 }
 
 func Request(ctx context.Context, socket, command string) ([]string, error) {
@@ -125,6 +135,35 @@ func QueryStatus(ctx context.Context, socket string, identities map[string]strin
 	}
 	status.ClientCount = len(status.Clients)
 	return status, nil
+}
+
+func Disconnect(ctx context.Context, socket, clientID, clientName string) (DisconnectResult, error) {
+	result := DisconnectResult{Version: 1, ClientID: clientID, ClientName: clientName}
+	if !domain.ValidUUID(clientID) || (clientName != "" && !domain.ValidClientName(clientName)) {
+		return DisconnectResult{}, fmt.Errorf("%w: invalid client identity", ErrUnavailable)
+	}
+	status, err := QueryStatus(ctx, socket, map[string]string{clientID: clientName})
+	if err != nil {
+		return DisconnectResult{}, err
+	}
+	for _, client := range status.Clients {
+		if client.ClientID == clientID {
+			result.Connections++
+		}
+	}
+	if result.Connections == 0 {
+		return result, nil
+	}
+	result.WasConnected = true
+	response, err := Request(ctx, socket, "kill "+clientID)
+	if err != nil {
+		return DisconnectResult{}, err
+	}
+	if len(response) != 1 || !strings.HasPrefix(response[0], "SUCCESS:") {
+		return DisconnectResult{}, fmt.Errorf("%w: disconnect response is invalid", ErrUnavailable)
+	}
+	result.Disconnected = true
+	return result, nil
 }
 
 func csvField(record []string, columns map[string]int, name string) (string, bool) {

@@ -42,6 +42,36 @@ func TestRequestRejectsBrokerError(t *testing.T) {
 	}
 }
 
+func TestDisconnectQueriesThenKillsImmutableUUID(t *testing.T) {
+	clientID := "11111111-1111-4111-8111-111111111111"
+	socket, commands := brokerSequenceFixture(t, [][]string{
+		{"HEADER\tCLIENT_LIST\tCommon Name\tReal Address\tVirtual Address", "CLIENT_LIST\t" + clientID + "\t192.0.2.10:44321\t10.42.0.2", "END"},
+		{"SUCCESS: common name found, client(s) killed"},
+	})
+	result, err := Disconnect(context.Background(), socket, clientID, "laptop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.WasConnected || !result.Disconnected || result.Connections != 1 || result.ClientID != clientID || result.ClientName != "laptop" {
+		t.Fatalf("disconnect result=%+v", result)
+	}
+	if first, second := <-commands, <-commands; first != "status 3" || second != "kill "+clientID {
+		t.Fatalf("commands=%q, %q", first, second)
+	}
+}
+
+func TestDisconnectTreatsAbsentClientAsSuccessfulNoop(t *testing.T) {
+	clientID := "22222222-2222-4222-8222-222222222222"
+	socket, commands := brokerSequenceFixture(t, [][]string{{"HEADER\tCLIENT_LIST\tCommon Name\tReal Address\tVirtual Address", "END"}})
+	result, err := Disconnect(context.Background(), socket, clientID, "offline")
+	if err != nil || result.WasConnected || result.Disconnected || result.Connections != 0 {
+		t.Fatalf("disconnect result=%+v err=%v", result, err)
+	}
+	if command := <-commands; command != "status 3" {
+		t.Fatalf("command=%q", command)
+	}
+}
+
 func brokerFixture(t *testing.T, response []string) (string, <-chan string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "broker.sock")
@@ -62,6 +92,34 @@ func brokerFixture(t *testing.T, response []string) (string, <-chan string) {
 		commands <- strings.TrimSpace(command)
 		for _, line := range response {
 			_, _ = connection.Write([]byte(line + "\n"))
+		}
+	}()
+	t.Cleanup(func() { _ = listener.Close(); _ = os.Remove(path) })
+	return path, commands
+}
+
+func brokerSequenceFixture(t *testing.T, responses [][]string) (string, <-chan string) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "broker.sock")
+	listener, err := net.Listen("unix", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commands := make(chan string, len(responses))
+	go func() {
+		defer listener.Close()
+		for _, response := range responses {
+			connection, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			_, _ = connection.Write([]byte(">INFO:OpenVPN Management Broker Version 1\n"))
+			command, _ := bufio.NewReader(connection).ReadString('\n')
+			commands <- strings.TrimSpace(command)
+			for _, line := range response {
+				_, _ = connection.Write([]byte(line + "\n"))
+			}
+			_ = connection.Close()
 		}
 	}()
 	t.Cleanup(func() { _ = listener.Close(); _ = os.Remove(path) })

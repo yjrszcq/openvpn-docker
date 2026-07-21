@@ -106,6 +106,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "runtime" && args[1] == "status" {
 		return runRuntimeStatus(args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "runtime" && args[1] == "disconnect" {
+		return runRuntimeDisconnect(args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "runtime" && args[1] == "health" {
 		return runRuntimeHealth(args[2:], stdout, stderr)
 	}

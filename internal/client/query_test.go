@@ -103,6 +103,13 @@ func TestListAndSelectCurrentClients(t *testing.T) {
 	if _, _, err := fixture.service.Select(context.Background(), Selector{IDPrefix: "33333333"}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("deleted selection error=%v", err)
 	}
+	identity, err := fixture.service.ResolveIdentity(context.Background(), Selector{IDPrefix: "33333333"})
+	if err != nil || identity.ID != deletedID || identity.Name != "deleted" {
+		t.Fatalf("deleted identity=%+v err=%v", identity, err)
+	}
+	if _, err := fixture.service.ResolveIdentity(context.Background(), Selector{Name: "deleted"}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("deleted name selection error=%v", err)
+	}
 	for _, selector := range []Selector{{}, {Name: "alpha", IDPrefix: "11111111"}, {IDPrefix: "1234"}, {IDPrefix: "zzzzzzzz"}, {IDPrefix: "1111-1111"}} {
 		if _, _, err := fixture.service.Select(context.Background(), selector); err == nil {
 			t.Fatalf("invalid selector was accepted: %+v", selector)

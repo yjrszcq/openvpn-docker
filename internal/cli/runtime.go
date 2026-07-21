@@ -64,6 +64,48 @@ func runRuntimeStatus(args []string, stdout, stderr io.Writer) int {
 	return int(apperror.ExitSuccess)
 }
 
+func runRuntimeDisconnect(args []string, stdout, stderr io.Writer) int {
+	jsonRequested := containsArgument(args, "--json")
+	options, args, optionErr := takeClientOutputOptions(args)
+	selector, positionals, selectorErr := parseMutationSelector(args)
+	if optionErr != nil || selectorErr != nil || len(positionals) != 0 {
+		return writeErrorMode(stderr, usageError("usage: ovpn runtime disconnect (NAME|--name NAME|--id ID) [--json] [--full-id]"), jsonRequested)
+	}
+	if options.JSON && options.FullID {
+		return writeErrorMode(stderr, usageError("--full-id only affects human output and cannot be combined with --json"), true)
+	}
+	service, state, err := openClientService(context.Background())
+	if err != nil {
+		return writeClientError(stderr, err, options.JSON)
+	}
+	identity, err := service.ResolveIdentity(context.Background(), selector)
+	closeErr := state.Close()
+	if err != nil {
+		return writeClientError(stderr, err, options.JSON)
+	}
+	if closeErr != nil {
+		return writeClientError(stderr, closeErr, options.JSON)
+	}
+	runtimeDir := environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)
+	result, err := runtimecontrol.Disconnect(context.Background(), runtimecontrol.SocketPath(runtimeDir), identity.ID, identity.Name)
+	if err != nil {
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitUnavailable, "runtime_unavailable", "OpenVPN runtime is unavailable", err), options.JSON)
+	}
+	if options.JSON {
+		if err := json.NewEncoder(stdout).Encode(result); err != nil {
+			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitFailure, "output_failure", "write runtime disconnect result", err), true)
+		}
+		return int(apperror.ExitSuccess)
+	}
+	identityText := fmt.Sprintf("%s [%s]", identity.Name, displayClientID(identity.ID, options.FullID))
+	if !result.WasConnected {
+		fmt.Fprintf(stdout, "client %s is not connected\n", identityText)
+		return int(apperror.ExitSuccess)
+	}
+	fmt.Fprintf(stdout, "disconnected client %s (%d connection(s))\n", identityText, result.Connections)
+	return int(apperror.ExitSuccess)
+}
+
 func runRuntimeHealth(args []string, stdout, stderr io.Writer) int {
 	if len(args) != 0 {
 		return writeError(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn runtime health"))

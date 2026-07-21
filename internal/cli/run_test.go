@@ -79,7 +79,7 @@ func TestEveryCommandHasUsefulHelp(t *testing.T) {
 		{"state"}, {"state", "show"}, {"state", "doctor"},
 		{"repair"}, {"repair", "plan"}, {"repair", "apply"},
 		{"migrate"}, {"migrate", "plan"}, {"migrate", "apply"},
-		{"runtime"}, {"runtime", "status"}, {"runtime", "health"}, {"runtime", "capabilities"}, {"runtime", "logs"}, {"runtime", "events"},
+		{"runtime"}, {"runtime", "status"}, {"runtime", "disconnect"}, {"runtime", "health"}, {"runtime", "capabilities"}, {"runtime", "logs"}, {"runtime", "events"},
 		{"version"},
 	}
 	for _, path := range paths {

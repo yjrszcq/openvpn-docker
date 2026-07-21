@@ -58,6 +58,10 @@ func TestBrokerProxySerializesCommandsWaitsForReloadAndLogs(t *testing.T) {
 	for response := range errorsSeen {
 		t.Fatalf("concurrent response=%q", response)
 	}
+	clientID := "11111111-1111-4111-8111-111111111111"
+	if response := mustBrokerCommand(t, listenPath, "kill "+clientID); !strings.HasPrefix(response, "SUCCESS:") {
+		t.Fatalf("disconnect response=%q", response)
+	}
 	if fake.maxActive() != 1 {
 		t.Fatalf("backend observed %d active commands", fake.maxActive())
 	}

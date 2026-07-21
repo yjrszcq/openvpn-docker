@@ -30,11 +30,17 @@ var (
 type QueryStore interface {
 	LoadOnlyInstance(context.Context) (storesqlite.InstanceState, error)
 	ListClients(context.Context, string) ([]storesqlite.ClientState, error)
+	ClientIdentities(context.Context, string) (map[string]string, error)
 }
 
 type Selector struct {
 	Name     string
 	IDPrefix string
+}
+
+type Identity struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type IPv4View struct {
@@ -86,6 +92,47 @@ func (service *Service) Select(ctx context.Context, selector Selector) (storesql
 	}
 	state, err := selectClient(clients, selector)
 	return instance, state, err
+}
+
+// ResolveIdentity selects current clients by name and includes deleted
+// tombstones when an immutable UUID prefix is used.
+func (service *Service) ResolveIdentity(ctx context.Context, selector Selector) (Identity, error) {
+	if err := validateSelector(selector); err != nil {
+		return Identity{}, err
+	}
+	if selector.Name != "" {
+		_, state, err := service.Select(ctx, selector)
+		if err != nil {
+			return Identity{}, err
+		}
+		return Identity{ID: state.Client.ID, Name: state.Client.Name}, nil
+	}
+	instance, err := service.state.LoadOnlyInstance(ctx)
+	if err != nil {
+		return Identity{}, err
+	}
+	identities, err := service.state.ClientIdentities(ctx, instance.ID)
+	if err != nil {
+		return Identity{}, err
+	}
+	prefix, err := normalizeIDPrefix(selector.IDPrefix)
+	if err != nil {
+		return Identity{}, err
+	}
+	matches := make([]Identity, 0, 1)
+	for id, name := range identities {
+		if strings.HasPrefix(strings.ReplaceAll(id, "-", ""), prefix) {
+			matches = append(matches, Identity{ID: id, Name: name})
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return Identity{}, ErrNotFound
+	case 1:
+		return matches[0], nil
+	default:
+		return Identity{}, ErrAmbiguous
+	}
 }
 
 // SelectActive returns the concrete batch edit targets without changing state.
