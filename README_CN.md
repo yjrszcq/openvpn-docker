@@ -134,7 +134,7 @@ docker compose exec openvpn ovpn client create phone --ipv4 dynamic
 docker compose exec openvpn ovpn client create tablet --ipv4 10.42.0.20
 
 docker compose exec -T openvpn \
-  ovpn client export --name laptop --output - > laptop.ovpn
+  ovpn client export laptop --output - > laptop.ovpn
 ```
 
 将 profile 导入 OpenVPN 客户端。profile 内含私钥，必须按凭据安全传输和保存。
@@ -174,7 +174,8 @@ docker compose run --rm openvpn-maintenance repair plan
 docker compose run --rm openvpn-maintenance repair apply --yes
 ```
 
-已有客户端必须用互斥的 `--name` 或 `--id` 选择。`--id` 接受至少八位且唯一的
+已有客户端可用位置参数 `NAME`、显式 `--name NAME` 或 `--id ID` 选择。未提供
+`--name` 或 `--id` 时，位置参数默认按客户端名称处理。`--id` 接受至少八位且唯一的
 UUID 十六进制前缀。可能删除或批量改写状态的命令需要交互确认或 `--yes`。
 
 ## schema 3 迁移

@@ -93,7 +93,7 @@ docker compose exec openvpn ovpn client create phone --ipv4 dynamic
 docker compose exec openvpn ovpn client create tablet --ipv4 10.42.0.20
 
 docker compose exec -T openvpn \
-  ovpn client export --name laptop --output - > laptop.ovpn
+  ovpn client export laptop --output - > laptop.ovpn
 chmod 600 laptop.ovpn
 ```
 
@@ -110,18 +110,18 @@ Rename, revoke, reissue, and delete:
 
 ```bash
 docker compose exec openvpn \
-  ovpn client rename --name laptop office-laptop
+  ovpn client rename laptop office-laptop
 
 docker compose exec openvpn \
-  ovpn client revoke --name office-laptop
+  ovpn client revoke office-laptop
 
 docker compose exec openvpn \
-  ovpn client reissue --name office-laptop --ipv4 auto
+  ovpn client reissue office-laptop --ipv4 auto
 docker compose exec -T openvpn \
-  ovpn client export --name office-laptop --output - > office-laptop.ovpn
+  ovpn client export office-laptop --output - > office-laptop.ovpn
 
 docker compose exec openvpn \
-  ovpn client delete --name office-laptop --yes
+  ovpn client delete office-laptop --yes
 ```
 
 After revoke, reissue, or an address change, disconnect any prior session.

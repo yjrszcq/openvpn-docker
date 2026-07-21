@@ -91,7 +91,7 @@ func runClientList(args []string, stdout, stderr io.Writer) int {
 
 func runClientExport(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client export (--name NAME|--id ID) [--output FILE|-]")
+		fmt.Fprintln(stdout, "Usage: ovpn client export (NAME|--name NAME|--id ID) [--output FILE|-]")
 		return int(apperror.ExitSuccess)
 	}
 	selector, output, err := parseClientExport(args)
@@ -149,12 +149,12 @@ func runClientCreate(args []string, stdout, stderr io.Writer) int {
 
 func runClientRename(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client rename (--name NAME|--id ID) NEW_NAME")
+		fmt.Fprintln(stdout, "Usage: ovpn client rename (NAME|--name NAME|--id ID) NEW_NAME")
 		return int(apperror.ExitSuccess)
 	}
 	selector, positionals, err := parseMutationSelector(args)
 	if err != nil || len(positionals) != 1 {
-		return writeError(stderr, usageError("usage: ovpn client rename (--name NAME|--id ID) NEW_NAME"))
+		return writeError(stderr, usageError("usage: ovpn client rename (NAME|--name NAME|--id ID) NEW_NAME"))
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
@@ -171,7 +171,7 @@ func runClientRename(args []string, stdout, stderr io.Writer) int {
 
 func runClientRevoke(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client revoke (--name NAME|--id ID) [--release-ipv4]")
+		fmt.Fprintln(stdout, "Usage: ovpn client revoke (NAME|--name NAME|--id ID) [--release-ipv4]")
 		return int(apperror.ExitSuccess)
 	}
 	release := false
@@ -188,7 +188,7 @@ func runClientRevoke(args []string, stdout, stderr io.Writer) int {
 	}
 	selector, positionals, err := parseMutationSelector(filtered)
 	if err != nil || len(positionals) != 0 {
-		return writeError(stderr, usageError("usage: ovpn client revoke (--name NAME|--id ID) [--release-ipv4]"))
+		return writeError(stderr, usageError("usage: ovpn client revoke (NAME|--name NAME|--id ID) [--release-ipv4]"))
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
@@ -205,7 +205,7 @@ func runClientRevoke(args []string, stdout, stderr io.Writer) int {
 
 func runClientReissue(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client reissue (--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]")
+		fmt.Fprintln(stdout, "Usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]")
 		return int(apperror.ExitSuccess)
 	}
 	ipv4 := ""
@@ -216,14 +216,14 @@ func runClientReissue(args []string, stdout, stderr io.Writer) int {
 			continue
 		}
 		if ipv4 != "" || index+1 >= len(args) || args[index+1] == "" {
-			return writeError(stderr, usageError("usage: ovpn client reissue (--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]"))
+			return writeError(stderr, usageError("usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]"))
 		}
 		ipv4 = args[index+1]
 		index++
 	}
 	selector, positionals, err := parseMutationSelector(filtered)
 	if err != nil || len(positionals) != 0 {
-		return writeError(stderr, usageError("usage: ovpn client reissue (--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]"))
+		return writeError(stderr, usageError("usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]"))
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
@@ -240,7 +240,7 @@ func runClientReissue(args []string, stdout, stderr io.Writer) int {
 
 func runClientDelete(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client delete (--name NAME|--id ID) [--yes]")
+		fmt.Fprintln(stdout, "Usage: ovpn client delete (NAME|--name NAME|--id ID) [--yes]")
 		return int(apperror.ExitSuccess)
 	}
 	yes := false
@@ -257,7 +257,7 @@ func runClientDelete(args []string, stdout, stderr io.Writer) int {
 	}
 	selector, positionals, err := parseMutationSelector(filtered)
 	if err != nil || len(positionals) != 0 {
-		return writeError(stderr, usageError("usage: ovpn client delete (--name NAME|--id ID) --yes"))
+		return writeError(stderr, usageError("usage: ovpn client delete (NAME|--name NAME|--id ID) --yes"))
 	}
 	if !yes {
 		confirmed, err := confirmAction(stderr, "Type yes to permanently delete the client credentials: ")
@@ -295,7 +295,7 @@ func confirmAction(stderr io.Writer, prompt string) (bool, error) {
 
 func runClientAddressSet(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client address set (--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS")
+		fmt.Fprintln(stdout, "Usage: ovpn client address set (NAME|--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS")
 		return int(apperror.ExitSuccess)
 	}
 	ipv4 := ""
@@ -306,14 +306,14 @@ func runClientAddressSet(args []string, stdout, stderr io.Writer) int {
 			continue
 		}
 		if ipv4 != "" || index+1 >= len(args) || args[index+1] == "" {
-			return writeError(stderr, usageError("usage: ovpn client address set (--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS"))
+			return writeError(stderr, usageError("usage: ovpn client address set (NAME|--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS"))
 		}
 		ipv4 = args[index+1]
 		index++
 	}
 	selector, positionals, err := parseMutationSelector(filtered)
 	if err != nil || len(positionals) != 0 || ipv4 == "" {
-		return writeError(stderr, usageError("usage: ovpn client address set (--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS"))
+		return writeError(stderr, usageError("usage: ovpn client address set (NAME|--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS"))
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
@@ -330,12 +330,12 @@ func runClientAddressSet(args []string, stdout, stderr io.Writer) int {
 
 func runClientAddressRelease(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client address release (--name NAME|--id ID)")
+		fmt.Fprintln(stdout, "Usage: ovpn client address release (NAME|--name NAME|--id ID)")
 		return int(apperror.ExitSuccess)
 	}
 	selector, positionals, err := parseMutationSelector(args)
 	if err != nil || len(positionals) != 0 {
-		return writeError(stderr, usageError("usage: ovpn client address release (--name NAME|--id ID)"))
+		return writeError(stderr, usageError("usage: ovpn client address release (NAME|--name NAME|--id ID)"))
 	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
@@ -352,10 +352,11 @@ func runClientAddressRelease(args []string, stdout, stderr io.Writer) int {
 
 func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client address edit (--all|--name NAME...|--id ID...) [--yes]")
+		fmt.Fprintln(stdout, "Usage: ovpn client address edit (--all|NAME...|--name NAME...|--id ID...) [--yes]")
 		return int(apperror.ExitSuccess)
 	}
 	request := clientservice.AddressEditRequest{}
+	positionalNames := make([]string, 0)
 	yes, selectorKind := false, ""
 	for index := 0; index < len(args); index++ {
 		switch args[index] {
@@ -387,11 +388,22 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 			}
 			request.Selectors = append(request.Selectors, selector)
 		default:
-			return writeError(stderr, usageError("usage: ovpn client address edit (--all|--name NAME...|--id ID...) [--yes]"))
+			if strings.HasPrefix(args[index], "-") {
+				return writeError(stderr, usageError("usage: ovpn client address edit (--all|NAME...|--name NAME...|--id ID...) [--yes]"))
+			}
+			positionalNames = append(positionalNames, args[index])
+		}
+	}
+	if len(positionalNames) > 0 {
+		if request.All || selectorKind != "" {
+			return writeError(stderr, usageError("positional names cannot be mixed with --all, --name, or --id"))
+		}
+		for _, name := range positionalNames {
+			request.Selectors = append(request.Selectors, clientservice.Selector{Name: name})
 		}
 	}
 	if request.All == (len(request.Selectors) > 0) {
-		return writeError(stderr, usageError("select exactly one of --all, --name, or --id"))
+		return writeError(stderr, usageError("select exactly one of --all, positional names, --name, or --id"))
 	}
 	if !yes {
 		confirmed, err := confirmAction(stderr, "Type yes to edit multiple client IPv4 assignments: ")
@@ -441,13 +453,14 @@ func runAddressEditor(path string) error {
 func parseClientExport(args []string) (clientservice.Selector, string, error) {
 	var selector clientservice.Selector
 	var output string
+	positionals := make([]string, 0, 1)
 	for index := 0; index < len(args); index++ {
 		switch args[index] {
 		case "-h", "--help":
-			return clientservice.Selector{}, "", usageError("usage: ovpn client export (--name NAME|--id ID) [--output FILE|-]")
+			return clientservice.Selector{}, "", usageError("usage: ovpn client export (NAME|--name NAME|--id ID) [--output FILE|-]")
 		case "--name", "--id", "--output":
 			if index+1 >= len(args) {
-				return clientservice.Selector{}, "", usageError("usage: ovpn client export (--name NAME|--id ID) [--output FILE|-]")
+				return clientservice.Selector{}, "", usageError("usage: ovpn client export (NAME|--name NAME|--id ID) [--output FILE|-]")
 			}
 			value := args[index+1]
 			index++
@@ -469,11 +482,24 @@ func parseClientExport(args []string) (clientservice.Selector, string, error) {
 				output = value
 			}
 		default:
-			return clientservice.Selector{}, "", usageError("usage: ovpn client export (--name NAME|--id ID) [--output FILE|-]")
+			if strings.HasPrefix(args[index], "-") {
+				return clientservice.Selector{}, "", usageError("usage: ovpn client export (NAME|--name NAME|--id ID) [--output FILE|-]")
+			}
+			positionals = append(positionals, args[index])
 		}
 	}
-	if (selector.Name == "") == (selector.IDPrefix == "") {
-		return clientservice.Selector{}, "", usageError("exactly one of --name or --id is required")
+	if selector.Name != "" && selector.IDPrefix != "" {
+		return clientservice.Selector{}, "", usageError("exactly one of positional NAME, --name, or --id is required")
+	}
+	if selector.Name == "" && selector.IDPrefix == "" {
+		if len(positionals) != 1 {
+			return clientservice.Selector{}, "", usageError("exactly one of positional NAME, --name, or --id is required")
+		}
+		selector.Name = positionals[0]
+		positionals = nil
+	}
+	if len(positionals) > 0 {
+		return clientservice.Selector{}, "", usageError("positional name cannot be mixed with --name or --id")
 	}
 	return selector, output, nil
 }
@@ -571,8 +597,15 @@ func parseMutationSelector(args []string) (clientservice.Selector, []string, err
 			positionals = append(positionals, args[index])
 		}
 	}
-	if (selector.Name == "") == (selector.IDPrefix == "") {
-		return clientservice.Selector{}, nil, usageError("exactly one of --name or --id is required")
+	if selector.Name != "" && selector.IDPrefix != "" {
+		return clientservice.Selector{}, nil, usageError("exactly one of positional NAME, --name, or --id is required")
+	}
+	if selector.Name == "" && selector.IDPrefix == "" {
+		if len(positionals) == 0 {
+			return clientservice.Selector{}, nil, usageError("exactly one of positional NAME, --name, or --id is required")
+		}
+		selector.Name = positionals[0]
+		positionals = positionals[1:]
 	}
 	return selector, positionals, nil
 }

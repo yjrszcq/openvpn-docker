@@ -148,7 +148,7 @@ docker compose exec openvpn ovpn client create phone --ipv4 dynamic
 docker compose exec openvpn ovpn client create tablet --ipv4 10.42.0.20
 
 docker compose exec -T openvpn \
-  ovpn client export --name laptop --output - > laptop.ovpn
+  ovpn client export laptop --output - > laptop.ovpn
 ```
 
 Import the resulting profile into an OpenVPN client. Profiles contain private
@@ -191,10 +191,11 @@ docker compose run --rm openvpn-maintenance repair plan
 docker compose run --rm openvpn-maintenance repair apply --yes
 ```
 
-Existing clients must be selected with exactly one of `--name` or `--id`.
-`--id` accepts an unambiguous UUID prefix of at least eight hexadecimal
-characters. Mutating commands that can destroy or broadly rewrite state require
-interactive confirmation or `--yes`.
+Existing clients may be selected by positional `NAME`, explicit `--name NAME`,
+or `--id ID`. When neither selector option is present, the positional value is
+treated as the client name. `--id` accepts an unambiguous UUID prefix of at least
+eight hexadecimal characters. Mutating commands that can destroy or broadly
+rewrite state require interactive confirmation or `--yes`.
 
 ## Schema 3 migration
 

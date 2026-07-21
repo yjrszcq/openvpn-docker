@@ -71,15 +71,15 @@ ovpn
 ├── client
 │   ├── create NAME [--ipv4 auto|dynamic|ADDRESS]
 │   ├── list [--detail] [--full-id] [--json]
-│   ├── export (--name NAME|--id ID) [--output FILE|-]
-│   ├── rename (--name NAME|--id ID) NEW_NAME
-│   ├── revoke (--name NAME|--id ID) [--release-ipv4]
-│   ├── reissue (--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]
-│   ├── delete (--name NAME|--id ID) [--yes]
+│   ├── export (NAME|--name NAME|--id ID) [--output FILE|-]
+│   ├── rename (NAME|--name NAME|--id ID) NEW_NAME
+│   ├── revoke (NAME|--name NAME|--id ID) [--release-ipv4]
+│   ├── reissue (NAME|--name NAME|--id ID) [--ipv4 auto|dynamic|ADDRESS]
+│   ├── delete (NAME|--name NAME|--id ID) [--yes]
 │   └── address
-│       ├── set (--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS
-│       ├── edit (--all|--name NAME...|--id ID...) [--yes]
-│       └── release (--name NAME|--id ID)
+│       ├── set (NAME|--name NAME|--id ID) --ipv4 auto|dynamic|ADDRESS
+│       ├── edit (--all|NAME...|--name NAME...|--id ID...) [--yes]
+│       └── release (NAME|--name NAME|--id ID)
 ├── state
 │   ├── show [--json]
 │   └── doctor [--json]
@@ -168,14 +168,16 @@ reload.
 ## Client selection and identity
 
 Each client has an immutable UUID and a current display name. Commands that
-operate on an existing client require exactly one selector:
+operate on an existing client accept exactly one selector form:
 
 ```text
+NAME
 --name NAME
 --id ID
 ```
 
-Names are exact and case-sensitive. IDs accept a standard UUID or an
+When neither `--name` nor `--id` is present, the positional value is treated as
+a name. Names are exact and case-sensitive. IDs accept a standard UUID or an
 unambiguous hexadecimal UUID prefix of at least eight characters. Active and
 revoked names are unique. Deleted clients retain UUID tombstones while their
 old names may be reused by a new UUID.
@@ -243,8 +245,9 @@ tablet,10.42.0.20
 ```
 
 Every selected client must appear exactly once. Values are `auto`, `dynamic`,
-or a static IPv4 address. `--name` and `--id` cannot be mixed. The complete set
-is validated and committed atomically, so address swaps are supported.
+or a static IPv4 address. Positional names, `--name`, `--id`, and `--all` cannot
+be mixed. The complete set is validated and committed atomically, so address
+swaps are supported.
 
 ### `ovpn client address release SELECTOR`
 
