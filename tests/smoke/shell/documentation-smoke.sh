@@ -39,7 +39,7 @@ for mapping in \
 done
 
 for mapping in \
-  '--version/-v' '--listen/-l' '--backend/-b' '--raw-log/-r' \
+  '--help/-h' '--version/-v' '--listen/-l' '--backend/-b' '--raw-log/-r' \
   '--max-bytes/-m' '--backups/-B' '--timeout/-t'; do
   grep -Fq -- "$mapping" docs/en/v4/commands.md
   grep -Fq -- "$mapping" docs/cn/v4/commands.md

@@ -117,9 +117,9 @@ ovpn
 
 所有命令组和 leaf command 都接受 `--help` 或 `-h`。
 
-内部独立二进制 `ovpn-broker` 使用自己的别名空间：`--version/-v`、
-`--listen/-l`、`--backend/-b`、`--raw-log/-r`、`--max-bytes/-m`、
-`--backups/-B` 和 `--timeout/-t`。
+内部独立二进制 `ovpn-broker` 使用自己的别名空间：`--help/-h`、
+`--version/-v`、`--listen/-l`、`--backend/-b`、`--raw-log/-r`、
+`--max-bytes/-m`、`--backups/-B` 和 `--timeout/-t`。
 
 ## Server 命令
 

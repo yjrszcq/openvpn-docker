@@ -124,8 +124,8 @@ ovpn
 All command groups and leaf commands accept `--help` or `-h`.
 
 `ovpn-broker` is an internal standalone binary with its own aliases:
-`--version/-v`, `--listen/-l`, `--backend/-b`, `--raw-log/-r`,
-`--max-bytes/-m`, `--backups/-B`, and `--timeout/-t`.
+`--help/-h`, `--version/-v`, `--listen/-l`, `--backend/-b`,
+`--raw-log/-r`, `--max-bytes/-m`, `--backups/-B`, and `--timeout/-t`.
 
 ## Server commands
 
