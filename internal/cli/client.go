@@ -274,8 +274,27 @@ func runClientDelete(args []string, stdout, stderr io.Writer) int {
 	if err != nil || len(positionals) != 0 {
 		return writeError(stderr, usageError("usage: ovpn client delete (NAME|--name NAME|--id ID) --yes"))
 	}
+	service, queryState, err := openClientService(context.Background())
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	_, target, err := service.Select(context.Background(), selector)
+	closeErr := queryState.Close()
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	if closeErr != nil {
+		return writeClientMutationError(stderr, closeErr)
+	}
 	if !yes {
-		confirmed, err := confirmAction(stderr, "Type yes to permanently delete the client credentials: ")
+		ipv4 := "none"
+		if target.Assignment != nil {
+			ipv4 = target.Assignment.Kind
+			if target.Assignment.Address != nil {
+				ipv4 += ":" + target.Assignment.Address.String()
+			}
+		}
+		confirmed, err := confirmAction(stderr, fmt.Sprintf("Type yes to permanently delete client %s [%s] (status %s, IPv4 %s): ", target.Client.Name, displayClientID(target.Client.ID, fullID), target.Client.Status, ipv4))
 		if err != nil {
 			return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "client delete requires an interactive confirmation or --yes", err))
 		}
@@ -419,8 +438,24 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 	if request.All == (len(request.Selectors) > 0) {
 		return writeError(stderr, usageError("select exactly one of --all, positional names, --name, or --id"))
 	}
+	service, queryState, err := openClientService(context.Background())
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	targets, err := service.SelectActive(context.Background(), request.All, request.Selectors)
+	closeErr := queryState.Close()
+	if err != nil {
+		return writeClientMutationError(stderr, err)
+	}
+	if closeErr != nil {
+		return writeClientMutationError(stderr, closeErr)
+	}
 	if !yes {
-		confirmed, err := confirmAction(stderr, "Type yes to edit multiple client IPv4 assignments: ")
+		names := make([]string, 0, len(targets))
+		for _, target := range targets {
+			names = append(names, target.Name)
+		}
+		confirmed, err := confirmAction(stderr, fmt.Sprintf("Type yes to edit IPv4 assignments for %d client(s) (%s): ", len(targets), strings.Join(names, ", ")))
 		if err != nil {
 			return writeError(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "batch address edit requires an interactive confirmation or --yes", err))
 		}

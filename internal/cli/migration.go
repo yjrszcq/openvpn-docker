@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/yjrszcq/openvpn-docker/internal/apperror"
@@ -51,14 +52,21 @@ func runMigrationApply(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeErrorMode(stderr, err, containsArgument(args, "--json"))
 	}
-	if !yes {
-		confirmed, confirmErr := confirmAction(stderr, "Type yes to migrate schema 3 to SQLite while OpenVPN is stopped: ")
-		if confirmErr != nil {
-			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "migrate apply requires an interactive confirmation or --yes", confirmErr), jsonMode)
+	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
+	now := time.Now().UTC()
+	markerPresent, err := migrationMarkerPresent(dataDir)
+	if err != nil {
+		return writeMigrationError(stderr, err, jsonMode)
+	}
+	var plan migrationservice.Plan
+	if !markerPresent {
+		plan, err = migrationservice.BuildPlan(context.Background(), dataDir, now)
+		if err != nil {
+			return writeMigrationError(stderr, err, jsonMode)
 		}
-		if !confirmed {
-			return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "confirmation_required", "migrate apply was not confirmed"), jsonMode)
-		}
+	}
+	if plan.Status == "current" && !markerPresent {
+		return writeMigrationApplyResult(stdout, stderr, migrationservice.ApplyResult{Version: 1, Applied: false, InstanceID: plan.InstanceID, SourceSchema: 4, TargetSchema: 4, FinalState: "HEALTHY"}, jsonMode)
 	}
 	if os.Getenv("OVPN_MAINTENANCE") != "true" {
 		return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "maintenance_required", "migrate apply requires OVPN_MAINTENANCE=true"), jsonMode)
@@ -67,12 +75,39 @@ func runMigrationApply(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeMigrationError(stderr, err, jsonMode)
 	}
-	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
+	if !yes {
+		prompt := fmt.Sprintf("Type yes to migrate schema 3 to SQLite (%d clients, snapshot %s): ", plan.Imports.Clients, plan.SnapshotPath)
+		if markerPresent {
+			prompt = "Type yes to recover the interrupted schema migration: "
+		}
+		confirmed, confirmErr := confirmAction(stderr, prompt)
+		if confirmErr != nil {
+			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "migrate apply requires an interactive confirmation or --yes", confirmErr), jsonMode)
+		}
+		if !confirmed {
+			return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "confirmation_required", "migrate apply was not confirmed"), jsonMode)
+		}
+	}
 	runtimeDir := environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)
-	result, err := migrationservice.Apply(context.Background(), migrationservice.ApplyOptions{DataDir: dataDir, RuntimeDir: runtimeDir, Maintenance: true, Version: buildinfo.Current().Version, Renderer: renderer, Paths: render.Paths{DataDir: dataDir, RuntimeDir: runtimeDir}, Now: time.Now().UTC()})
+	result, err := migrationservice.Apply(context.Background(), migrationservice.ApplyOptions{DataDir: dataDir, RuntimeDir: runtimeDir, Maintenance: true, Version: buildinfo.Current().Version, Renderer: renderer, Paths: render.Paths{DataDir: dataDir, RuntimeDir: runtimeDir}, Now: now})
 	if err != nil {
 		return writeMigrationError(stderr, err, jsonMode)
 	}
+	return writeMigrationApplyResult(stdout, stderr, result, jsonMode)
+}
+
+func migrationMarkerPresent(dataDir string) (bool, error) {
+	_, err := os.Lstat(filepath.Join(dataDir, filepath.FromSlash(migrationservice.ManifestRelativePath)))
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func writeMigrationApplyResult(stdout, stderr io.Writer, result migrationservice.ApplyResult, jsonMode bool) int {
 	if jsonMode {
 		if err := json.NewEncoder(stdout).Encode(result); err != nil {
 			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitFailure, "output_failure", "write migration result", err), true)

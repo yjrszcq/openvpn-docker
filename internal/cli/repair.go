@@ -44,8 +44,24 @@ func runRepairApply(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeErrorMode(stderr, err, containsArgument(args, "--json"))
 	}
+	options, err := stateScanOptions()
+	if err != nil {
+		return writeErrorMode(stderr, err, jsonMode)
+	}
+	ctx := context.Background()
+	plan, err := buildRepairPlan(ctx, options)
+	if err != nil {
+		return writeRepairError(stderr, err, jsonMode)
+	}
+	recoveryCount, preflightApplicable := repairPreflight(plan)
+	if !preflightApplicable {
+		return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "repair_refused", "repair plan contains authority, recovery, or reissue blockers"), jsonMode)
+	}
+	if len(plan.Actions) == 0 && recoveryCount == 0 {
+		return writeRepairNoop(stdout, stderr, plan, jsonMode)
+	}
 	if !yes {
-		confirmed, confirmErr := confirmAction(stderr, "Type yes to apply the repair plan: ")
+		confirmed, confirmErr := confirmAction(stderr, fmt.Sprintf("Type yes to apply %d repair action(s) and %d interrupted-operation recovery action(s): ", len(plan.Actions), recoveryCount))
 		if confirmErr != nil {
 			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "repair apply requires an interactive confirmation or --yes", confirmErr), jsonMode)
 		}
@@ -53,15 +69,10 @@ func runRepairApply(args []string, stdout, stderr io.Writer) int {
 			return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "confirmation_required", "repair apply was not confirmed"), jsonMode)
 		}
 	}
-	options, err := stateScanOptions()
-	if err != nil {
-		return writeErrorMode(stderr, err, jsonMode)
-	}
-	ctx := context.Background()
 	if _, err := recoveryservice.RecoverOperations(ctx, options.DataDir); err != nil {
 		return writeRepairError(stderr, err, jsonMode)
 	}
-	plan, err := buildRepairPlan(ctx, options)
+	plan, err = buildRepairPlan(ctx, options)
 	if err != nil {
 		return writeRepairError(stderr, err, jsonMode)
 	}
@@ -126,6 +137,37 @@ func runRepairApply(args []string, stdout, stderr io.Writer) int {
 	}
 	if final.State == statecontrol.Critical || final.State == statecontrol.Unrecoverable {
 		return int(apperror.ExitPolicy)
+	}
+	return int(apperror.ExitSuccess)
+}
+
+func repairPreflight(plan repairservice.Plan) (int, bool) {
+	recoveryCount := 0
+	for _, issue := range plan.Blockers {
+		if issue.Action != "RECOVER_OPERATION" {
+			return recoveryCount, false
+		}
+		recoveryCount++
+	}
+	return recoveryCount, true
+}
+
+func writeRepairNoop(stdout, stderr io.Writer, plan repairservice.Plan, jsonMode bool) int {
+	output := struct {
+		repairservice.Result
+		FinalState      statecontrol.Classification `json:"finalState"`
+		RemainingIssues int                         `json:"remainingIssues"`
+	}{
+		Result:          repairservice.Result{Version: 1, OperationIDs: []string{}, Actions: []repairservice.Action{}},
+		FinalState:      plan.State,
+		RemainingIssues: len(plan.Blockers) + len(plan.Deferred),
+	}
+	if jsonMode {
+		if err := json.NewEncoder(stdout).Encode(output); err != nil {
+			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitFailure, "output_failure", "write repair result", err), true)
+		}
+	} else {
+		fmt.Fprintf(stdout, "No automatic repairs are needed.\nfinal state: %s\nremaining issues: %d\n", output.FinalState, output.RemainingIssues)
 	}
 	return int(apperror.ExitSuccess)
 }

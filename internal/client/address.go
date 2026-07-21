@@ -84,38 +84,10 @@ func (manager *Manager) AddressEdit(ctx context.Context, request AddressEditRequ
 		return AddressResult{}, err
 	}
 	defer lock.Release()
-	instance, clients, err := manager.query.load(ctx)
+	instance, clients, targets, err := manager.query.selectActive(ctx, request.All, request.Selectors)
 	if err != nil {
 		return AddressResult{}, err
 	}
-	targets := make([]storesqlite.ClientState, 0)
-	if request.All {
-		for _, state := range clients {
-			if state.Client.Status == domain.ClientActive {
-				targets = append(targets, state)
-			}
-		}
-	} else {
-		seen := make(map[string]struct{}, len(request.Selectors))
-		for _, selector := range request.Selectors {
-			_, state, err := manager.query.Select(ctx, selector)
-			if err != nil {
-				return AddressResult{}, err
-			}
-			if state.Client.Status != domain.ClientActive {
-				return AddressResult{}, fmt.Errorf("%w: batch address edit only accepts active clients", ErrInvalidRequest)
-			}
-			if _, duplicate := seen[state.Client.ID]; duplicate {
-				return AddressResult{}, fmt.Errorf("%w: client selected more than once", ErrInvalidRequest)
-			}
-			seen[state.Client.ID] = struct{}{}
-			targets = append(targets, state)
-		}
-	}
-	if len(targets) == 0 {
-		return AddressResult{}, fmt.Errorf("%w: no active clients selected", ErrInvalidRequest)
-	}
-	sort.Slice(targets, func(left, right int) bool { return targets[left].Client.Name < targets[right].Client.Name })
 	temporaryID, err := domain.GenerateUUID()
 	if err != nil {
 		return AddressResult{}, err

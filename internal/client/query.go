@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/yjrszcq/openvpn-docker/internal/artifact"
@@ -79,12 +80,74 @@ func (service *Service) List(ctx context.Context) (ListResult, error) {
 }
 
 func (service *Service) Select(ctx context.Context, selector Selector) (storesqlite.InstanceState, storesqlite.ClientState, error) {
-	if err := validateSelector(selector); err != nil {
-		return storesqlite.InstanceState{}, storesqlite.ClientState{}, err
-	}
 	instance, clients, err := service.load(ctx)
 	if err != nil {
 		return storesqlite.InstanceState{}, storesqlite.ClientState{}, err
+	}
+	state, err := selectClient(clients, selector)
+	return instance, state, err
+}
+
+// SelectActive returns the concrete batch edit targets without changing state.
+func (service *Service) SelectActive(ctx context.Context, all bool, selectors []Selector) ([]View, error) {
+	_, _, targets, err := service.selectActive(ctx, all, selectors)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]View, 0, len(targets))
+	for _, target := range targets {
+		views = append(views, newView(target))
+	}
+	return views, nil
+}
+
+func (service *Service) selectActive(ctx context.Context, all bool, selectors []Selector) (storesqlite.InstanceState, []storesqlite.ClientState, []storesqlite.ClientState, error) {
+	if all == (len(selectors) > 0) {
+		return storesqlite.InstanceState{}, nil, nil, fmt.Errorf("%w: select --all or one or more clients", ErrInvalidRequest)
+	}
+	instance, clients, err := service.load(ctx)
+	if err != nil {
+		return storesqlite.InstanceState{}, nil, nil, err
+	}
+	targets := make([]storesqlite.ClientState, 0, len(selectors))
+	if all {
+		for _, state := range clients {
+			if state.Client.Status == domain.ClientActive {
+				targets = append(targets, state)
+			}
+		}
+	} else {
+		seen := make(map[string]struct{}, len(selectors))
+		for _, selector := range selectors {
+			state, err := selectClient(clients, selector)
+			if err != nil {
+				return storesqlite.InstanceState{}, nil, nil, err
+			}
+			if state.Client.Status != domain.ClientActive {
+				return storesqlite.InstanceState{}, nil, nil, fmt.Errorf("%w: batch address edit only accepts active clients", ErrInvalidRequest)
+			}
+			if _, duplicate := seen[state.Client.ID]; duplicate {
+				return storesqlite.InstanceState{}, nil, nil, fmt.Errorf("%w: client selected more than once", ErrInvalidRequest)
+			}
+			seen[state.Client.ID] = struct{}{}
+			targets = append(targets, state)
+		}
+	}
+	if len(targets) == 0 {
+		return storesqlite.InstanceState{}, nil, nil, fmt.Errorf("%w: no active clients selected", ErrInvalidRequest)
+	}
+	sort.Slice(targets, func(left, right int) bool {
+		if targets[left].Client.Name == targets[right].Client.Name {
+			return targets[left].Client.ID < targets[right].Client.ID
+		}
+		return targets[left].Client.Name < targets[right].Client.Name
+	})
+	return instance, clients, targets, nil
+}
+
+func selectClient(clients []storesqlite.ClientState, selector Selector) (storesqlite.ClientState, error) {
+	if err := validateSelector(selector); err != nil {
+		return storesqlite.ClientState{}, err
 	}
 	matches := make([]storesqlite.ClientState, 0, 1)
 	if selector.Name != "" {
@@ -96,7 +159,7 @@ func (service *Service) Select(ctx context.Context, selector Selector) (storesql
 	} else {
 		prefix, err := normalizeIDPrefix(selector.IDPrefix)
 		if err != nil {
-			return storesqlite.InstanceState{}, storesqlite.ClientState{}, err
+			return storesqlite.ClientState{}, err
 		}
 		for _, state := range clients {
 			if strings.HasPrefix(strings.ReplaceAll(state.Client.ID, "-", ""), prefix) {
@@ -106,11 +169,11 @@ func (service *Service) Select(ctx context.Context, selector Selector) (storesql
 	}
 	switch len(matches) {
 	case 0:
-		return storesqlite.InstanceState{}, storesqlite.ClientState{}, ErrNotFound
+		return storesqlite.ClientState{}, ErrNotFound
 	case 1:
-		return instance, matches[0], nil
+		return matches[0], nil
 	default:
-		return storesqlite.InstanceState{}, storesqlite.ClientState{}, ErrAmbiguous
+		return storesqlite.ClientState{}, ErrAmbiguous
 	}
 }
 

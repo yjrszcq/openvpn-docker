@@ -2,14 +2,18 @@ package cli_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yjrszcq/openvpn-docker/internal/buildinfo"
 	"github.com/yjrszcq/openvpn-docker/internal/cli"
+	"github.com/yjrszcq/openvpn-docker/internal/domain"
+	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
 )
 
 func run(args ...string) (int, string, string) {
@@ -183,10 +187,12 @@ func TestMigrationApplyConfirmationMaintenanceAndUsage(t *testing.T) {
 	if code != 64 || !strings.Contains(stderr, "specified once") {
 		t.Fatalf("duplicate code=%d stderr=%q", code, stderr)
 	}
+	root, _ := createConfigurationFixture(t)
+	t.Setenv("OVPN_DATA_DIR", root)
 	t.Setenv("OVPN_MAINTENANCE", "false")
 	code, stdout, stderr = run("migrate", "apply", "--yes", "--json")
-	if code != 78 || stdout != "" || !strings.Contains(stderr, `"kind":"maintenance_required"`) {
-		t.Fatalf("maintenance code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"applied":false`) || !strings.Contains(stdout, `"source_schema":4`) {
+		t.Fatalf("current no-op code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 
@@ -200,8 +206,8 @@ func TestRepairCLIPlanAndConfirmation(t *testing.T) {
 		t.Fatalf("repair plan code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	code, stdout, stderr = run("repair", "apply")
-	if code != 78 || stdout != "" || !strings.Contains(stderr, "requires an interactive confirmation or --yes") || strings.Contains(stderr, "Type yes") {
-		t.Fatalf("repair confirmation code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "No automatic repairs are needed") {
+		t.Fatalf("repair no-op code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	code, _, stderr = run("repair", "apply", "--yes", "--yes")
 	if code != 64 || !strings.Contains(stderr, "specified once") {
@@ -384,7 +390,13 @@ func TestClientLifecycleUsageAndDeleteConfirmation(t *testing.T) {
 			t.Fatalf("args=%v code=%d stderr=%q", args, code, stderr)
 		}
 	}
-	code, _, stderr := run("client", "delete", "--name", "laptop")
+	root := createClientPreflightFixture(t)
+	t.Setenv("OVPN_DATA_DIR", root)
+	code, _, stderr := run("client", "delete", "missing")
+	if code != 65 || !strings.Contains(stderr, "not found") {
+		t.Fatalf("delete preflight code=%d stderr=%q", code, stderr)
+	}
+	code, _, stderr = run("client", "delete", "--name", "laptop")
 	if code != 78 || !strings.Contains(stderr, "confirm") {
 		t.Fatalf("non-TTY delete code=%d stderr=%q", code, stderr)
 	}
@@ -409,10 +421,40 @@ func TestClientAddressUsageAndBatchConfirmation(t *testing.T) {
 			t.Fatalf("args=%v code=%d stderr=%q", args, code, stderr)
 		}
 	}
-	code, _, stderr := run("client", "address", "edit", "--all")
+	root := createClientPreflightFixture(t)
+	t.Setenv("OVPN_DATA_DIR", root)
+	code, _, stderr := run("client", "address", "edit", "missing")
+	if code != 65 || !strings.Contains(stderr, "not found") {
+		t.Fatalf("address edit preflight code=%d stderr=%q", code, stderr)
+	}
+	code, _, stderr = run("client", "address", "edit", "--all")
 	if code != 78 || !strings.Contains(stderr, "confirm") {
 		t.Fatalf("unconfirmed address edit code=%d stderr=%q", code, stderr)
 	}
+}
+
+func createClientPreflightFixture(t *testing.T) string {
+	t.Helper()
+	root, _ := createConfigurationFixture(t)
+	store, err := storesqlite.Open(context.Background(), filepath.Join(root, "meta", "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance, err := store.LoadOnlyInstance(context.Background())
+	if err == nil {
+		err = store.CreateClient(context.Background(), instance.ID, storesqlite.ClientState{
+			Client:    domain.Client{ID: "20000000-0000-4000-8000-000000000002", Name: "laptop", Status: domain.ClientActive},
+			CreatedAt: time.Now().UTC().Truncate(time.Second),
+		})
+	}
+	closeErr := store.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if closeErr != nil {
+		t.Fatal(closeErr)
+	}
+	return root
 }
 
 func TestUnknownCommandIsUsageError(t *testing.T) {

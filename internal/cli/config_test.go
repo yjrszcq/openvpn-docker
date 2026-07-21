@@ -106,9 +106,12 @@ func TestConfigApplyRequiresConfirmationAndCommitsOffline(t *testing.T) {
 	if err != nil || instance.Applied.Revision != 2 || instance.Applied.Config.Endpoint != "new.example.test" {
 		t.Fatalf("applied instance=%+v err=%v", instance, err)
 	}
-	code, stdout, stderr = run("config", "apply", "--yes", "--json")
+	code, stdout, stderr = run("config", "apply", "--json")
 	if code != 0 || stderr != "" || !strings.Contains(stdout, `"applied":false`) {
 		t.Fatalf("in-sync apply code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if strings.Contains(stdout, `"operation_id"`) {
+		t.Fatalf("in-sync apply unexpectedly reported an operation: %q", stdout)
 	}
 }
 

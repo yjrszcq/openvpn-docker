@@ -14,6 +14,7 @@ import (
 	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
 	configurationservice "github.com/yjrszcq/openvpn-docker/internal/configuration"
+	"github.com/yjrszcq/openvpn-docker/internal/domain"
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
 	"github.com/yjrszcq/openvpn-docker/internal/pki"
 	"github.com/yjrszcq/openvpn-docker/internal/render"
@@ -135,8 +136,30 @@ func runConfigApply(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitData, "invalid_config", "configuration is invalid: "+err.Error(), err), jsonMode)
 	}
+	plan, err := loadConfigurationPlan(context.Background(), desired)
+	if err != nil {
+		return writeConfigurationError(stderr, err, jsonMode)
+	}
+	if plan.Configuration.InSync {
+		result := configurationservice.ApplyResult{
+			Version: 1,
+			Activation: configurationservice.ActivationReport{
+				RestartRequired:       plan.Configuration.Impact.RestartRequired,
+				ProfileRedistribution: plan.ProfileRedistribution,
+			},
+			Plan: plan,
+		}
+		if jsonMode {
+			if err := json.NewEncoder(stdout).Encode(result); err != nil {
+				return writeErrorMode(stderr, apperror.Wrap(apperror.ExitFailure, "output_failure", "write configuration apply result", err), true)
+			}
+		} else {
+			fmt.Fprintf(stdout, "Configuration is already in sync at revision %d.\n", plan.Configuration.CurrentRevision)
+		}
+		return int(apperror.ExitSuccess)
+	}
 	if !yes {
-		confirmed, err := confirmAction(stderr, "Type yes to apply the configuration while OpenVPN is stopped: ")
+		confirmed, err := confirmAction(stderr, fmt.Sprintf("Type yes to apply configuration revision %d -> %d (%d address changes, %d artifacts): ", plan.Configuration.CurrentRevision, plan.Configuration.TargetRevision, len(plan.AddressChanges), len(plan.Artifacts)))
 		if err != nil {
 			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "config apply requires an interactive confirmation or --yes", err), jsonMode)
 		}
@@ -165,6 +188,37 @@ func runConfigApply(args []string, stdout, stderr io.Writer) int {
 	}
 	writeConfigurationApplyResult(stdout, result)
 	return int(apperror.ExitSuccess)
+}
+
+func loadConfigurationPlan(ctx context.Context, desired domain.Config) (configurationservice.Plan, error) {
+	store, instance, err := openConfigurationState(ctx)
+	if err != nil {
+		return configurationservice.Plan{}, err
+	}
+	defer store.Close()
+	pending, err := store.PendingOperations(ctx, instance.ID)
+	if err != nil {
+		return configurationservice.Plan{}, err
+	}
+	if len(pending) != 0 {
+		return configurationservice.Plan{}, fmt.Errorf("%w: found %d pending operation(s)", configurationservice.ErrRecoveryRequired, len(pending))
+	}
+	local, err := artifact.NewLocal(environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir))
+	if err != nil {
+		return configurationservice.Plan{}, err
+	}
+	artifactPending, err := local.PendingOperations()
+	if err != nil {
+		return configurationservice.Plan{}, err
+	}
+	if len(artifactPending) != 0 {
+		return configurationservice.Plan{}, fmt.Errorf("%w: found %d pending artifact operation(s)", configurationservice.ErrRecoveryRequired, len(artifactPending))
+	}
+	service, err := configurationservice.NewService(store)
+	if err != nil {
+		return configurationservice.Plan{}, err
+	}
+	return service.Plan(ctx, desired)
 }
 
 func runServerRender(args []string, stdout, stderr io.Writer) int {

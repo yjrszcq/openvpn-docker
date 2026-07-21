@@ -145,6 +145,29 @@ func TestExportRejectsRevokedAndMissingProfiles(t *testing.T) {
 	}
 }
 
+func TestSelectActivePreflightsBatchTargets(t *testing.T) {
+	fixture := newQueryFixture(t)
+	createQueryClient(t, fixture, storesqlite.ClientState{Client: domain.Client{ID: "71717171-7171-4717-8717-717171717171", Name: "zulu", Status: domain.ClientActive}, CreatedAt: testTime()})
+	createQueryClient(t, fixture, storesqlite.ClientState{Client: domain.Client{ID: "72727272-7272-4727-8727-727272727272", Name: "alpha", Status: domain.ClientActive}, CreatedAt: testTime()})
+	revokedAt := testTime()
+	createQueryClient(t, fixture, storesqlite.ClientState{Client: domain.Client{ID: "73737373-7373-4737-8737-737373737373", Name: "revoked", Status: domain.ClientRevoked}, CreatedAt: testTime(), RevokedAt: &revokedAt})
+
+	targets, err := fixture.service.SelectActive(context.Background(), true, nil)
+	if err != nil || len(targets) != 2 || targets[0].Name != "alpha" || targets[1].Name != "zulu" {
+		t.Fatalf("all targets=%+v err=%v", targets, err)
+	}
+	targets, err = fixture.service.SelectActive(context.Background(), false, []Selector{{Name: "zulu"}})
+	if err != nil || len(targets) != 1 || targets[0].Name != "zulu" {
+		t.Fatalf("selected targets=%+v err=%v", targets, err)
+	}
+	if _, err := fixture.service.SelectActive(context.Background(), false, []Selector{{Name: "revoked"}}); !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("revoked target error=%v", err)
+	}
+	if _, err := fixture.service.SelectActive(context.Background(), false, []Selector{{Name: "zulu"}, {IDPrefix: "71717171"}}); !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("duplicate target error=%v", err)
+	}
+}
+
 func createQueryClient(t *testing.T, fixture queryFixture, state storesqlite.ClientState) {
 	t.Helper()
 	if err := fixture.store.CreateClient(context.Background(), fixture.instance.ID, state); err != nil {
