@@ -200,6 +200,7 @@ func makeLegacyFixture(t *testing.T) legacyFixture {
 	writeLegacyBytes(t, root, "pki/private/"+testClientID+".key", clientKeyPEM, 0o600)
 	writeLegacyBytes(t, root, "pki/crl.pem", pem.EncodeToMemory(&pem.Block{Type: "X509 CRL", Bytes: crlDER}), 0o644)
 	writeLegacy(t, root, "pki/index.txt", "V\t270721000000Z\t\t02\tunknown\t/CN=openvpn-server\nV\t270721000000Z\t\t03\tunknown\t/CN="+testClientID+"\n", 0o600)
+	writeLegacy(t, root, "pki/serial", "04\n", 0o600)
 	writeLegacyBytes(t, root, "secrets/tls-crypt.key", tls, 0o600)
 	project := "OVPN_CONFIG_VERSION=3\nOVPN_ENDPOINT=vpn.example.com\nOVPN_PROTO=udp\nOVPN_TRANSPORT_FAMILY=auto\nOVPN_PORT=1194\nOVPN_NETWORK=10.42.0.0/24\nOVPN_TOPOLOGY=subnet\nOVPN_DYNAMIC_POOL_SIZE=64\nOVPN_NAT=false\nOVPN_NAT_INTERFACE=auto\nOVPN_REDIRECT_GATEWAY=false\nOVPN_CLIENT_TO_CLIENT=true\nOVPN_DNS=\nOVPN_ROUTES=\nOVPN_LOG_MAX_BYTES=10485760\nOVPN_LOG_BACKUPS=5\n"
 	writeLegacy(t, root, "config/project.env", project, 0o600)

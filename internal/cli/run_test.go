@@ -59,7 +59,7 @@ func TestVersionJSONUsageError(t *testing.T) {
 }
 
 func TestUnimplementedCommandFailsExplicitly(t *testing.T) {
-	code, _, stderr := run("migrate", "apply", "--yes")
+	code, _, stderr := run("server")
 	if code != 1 || !strings.Contains(stderr, "not implemented") {
 		t.Fatalf("foundation command code=%d stderr=%q", code, stderr)
 	}
@@ -79,6 +79,22 @@ func TestMigrationPlanUsageAndStructuredRefusal(t *testing.T) {
 	code, stdout, stderr = run("migrate", "plan", "--json")
 	if code != 78 || stdout != "" || !strings.Contains(stderr, `"kind":"migration_source_invalid"`) {
 		t.Fatalf("refusal code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestMigrationApplyConfirmationMaintenanceAndUsage(t *testing.T) {
+	code, stdout, stderr := run("migrate", "apply", "--help")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "Usage: ovpn migrate apply") {
+		t.Fatalf("help code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, _, stderr = run("migrate", "apply", "--yes", "--yes")
+	if code != 64 || !strings.Contains(stderr, "specified once") {
+		t.Fatalf("duplicate code=%d stderr=%q", code, stderr)
+	}
+	t.Setenv("OVPN_MAINTENANCE", "false")
+	code, stdout, stderr = run("migrate", "apply", "--yes", "--json")
+	if code != 78 || stdout != "" || !strings.Contains(stderr, `"kind":"maintenance_required"`) {
+		t.Fatalf("maintenance code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 

@@ -101,6 +101,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "migrate" && args[1] == "plan" {
 		return runMigrationPlan(args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "migrate" && args[1] == "apply" {
+		return runMigrationApply(args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "server" && args[1] == "init" {
 		return runServerInit(args[2:], stdout, stderr)
 	}

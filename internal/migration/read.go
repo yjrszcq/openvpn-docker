@@ -559,6 +559,8 @@ func (r *reader) readLeases(ctx context.Context, configuration domain.Config, cl
 			lease.Reason = "invalid lease content"
 		case !found || client.Client.Status == domain.ClientDeleted:
 			lease.Reason = "lease owner is not a current client"
+		case client.Client.Status != domain.ClientActive:
+			lease.Reason = "only active clients retain runtime leases"
 		case client.Address != nil:
 			lease.Reason = "static clients do not retain dynamic leases"
 		case layout.ValidateDynamicLease(address) != nil:

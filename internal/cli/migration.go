@@ -6,11 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/yjrszcq/openvpn-docker/internal/apperror"
+	"github.com/yjrszcq/openvpn-docker/internal/artifact"
+	"github.com/yjrszcq/openvpn-docker/internal/buildinfo"
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
 	migrationservice "github.com/yjrszcq/openvpn-docker/internal/migration"
+	"github.com/yjrszcq/openvpn-docker/internal/render"
+	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
 )
 
 func runMigrationPlan(args []string, stdout, stderr io.Writer) int {
@@ -45,6 +50,75 @@ func runMigrationPlan(args []string, stdout, stderr io.Writer) int {
 	return int(apperror.ExitSuccess)
 }
 
+func runMigrationApply(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && isHelp(args[0]) {
+		fmt.Fprintln(stdout, "Usage: ovpn migrate apply [--yes] [--json]")
+		return int(apperror.ExitSuccess)
+	}
+	yes, jsonMode, err := parseMigrationApplyOptions(args)
+	if err != nil {
+		return writeErrorMode(stderr, err, containsArgument(args, "--json"))
+	}
+	if !yes {
+		confirmed, confirmErr := confirmAction(stderr, "Type yes to migrate schema 3 to SQLite while OpenVPN is stopped: ")
+		if confirmErr != nil {
+			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "confirmation_required", "migrate apply requires an interactive confirmation or --yes", confirmErr), jsonMode)
+		}
+		if !confirmed {
+			return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "confirmation_required", "migrate apply was not confirmed"), jsonMode)
+		}
+	}
+	if os.Getenv("OVPN_MAINTENANCE") != "true" {
+		return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "maintenance_required", "migrate apply requires OVPN_MAINTENANCE=true"), jsonMode)
+	}
+	renderer, err := configurationRenderer()
+	if err != nil {
+		return writeMigrationError(stderr, err, jsonMode)
+	}
+	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
+	runtimeDir := environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)
+	result, err := migrationservice.Apply(context.Background(), migrationservice.ApplyOptions{DataDir: dataDir, RuntimeDir: runtimeDir, Maintenance: true, Version: buildinfo.Current().Version, Renderer: renderer, Paths: render.Paths{DataDir: dataDir, RuntimeDir: runtimeDir}, Now: time.Now().UTC()})
+	if err != nil {
+		return writeMigrationError(stderr, err, jsonMode)
+	}
+	if jsonMode {
+		if err := json.NewEncoder(stdout).Encode(result); err != nil {
+			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitFailure, "output_failure", "write migration result", err), true)
+		}
+		return int(apperror.ExitSuccess)
+	}
+	if !result.Applied {
+		fmt.Fprintf(stdout, "migration: current\nschema: 4\ninstance: %s\n", result.InstanceID)
+		if result.Recovered {
+			fmt.Fprintln(stdout, "interrupted transaction recovery: complete")
+		}
+		return int(apperror.ExitSuccess)
+	}
+	fmt.Fprintf(stdout, "migration: applied\nschema: 3 -> 4\ninstance: %s\noperation: %s\nclients: %d\naudit events imported: %d\nstate doctor: %s\nsnapshot: %s\nnext: ovpn config export --output /etc/openvpn-config/config.yaml\nrollback: restore the complete snapshot, then run the sh-ver image\n", result.InstanceID, result.OperationID, result.Clients, result.AuditEvents, result.FinalState, result.SnapshotPath)
+	return int(apperror.ExitSuccess)
+}
+
+func parseMigrationApplyOptions(args []string) (bool, bool, error) {
+	var yes, jsonMode bool
+	for _, arg := range args {
+		switch arg {
+		case "--yes":
+			if yes {
+				return false, jsonMode, apperror.New(apperror.ExitUsage, "usage", "--yes may only be specified once")
+			}
+			yes = true
+		case "--json":
+			if jsonMode {
+				return false, true, apperror.New(apperror.ExitUsage, "usage", "--json may only be specified once")
+			}
+			jsonMode = true
+		default:
+			return false, jsonMode, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn migrate apply [--yes] [--json]")
+		}
+	}
+	return yes, jsonMode, nil
+}
+
 func writeMigrationError(stderr io.Writer, err error, jsonMode bool) int {
 	switch {
 	case errors.Is(err, migrationservice.ErrNeedsShellUpgrade):
@@ -53,6 +127,12 @@ func writeMigrationError(stderr io.Writer, err error, jsonMode bool) int {
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "migration_schema_unsupported", "migration source schema is unsupported", err), jsonMode)
 	case errors.Is(err, migrationservice.ErrInvalidSource):
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "migration_source_invalid", "migration source is invalid", err), jsonMode)
+	case errors.Is(err, artifact.ErrLocked), errors.Is(err, storesqlite.ErrBusy):
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitTemporary, "migration_busy", "migration lock or state is busy", err), jsonMode)
+	case errors.Is(err, migrationservice.ErrMaintenanceRequired):
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "maintenance_required", "migration requires maintenance mode", err), jsonMode)
+	case errors.Is(err, migrationservice.ErrSnapshotExists), errors.Is(err, migrationservice.ErrRecoveryRequired):
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "migration_recovery_refused", "migration snapshot or recovery state requires operator review", err), jsonMode)
 	default:
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "migration_refused", "migration was refused", err), jsonMode)
 	}
