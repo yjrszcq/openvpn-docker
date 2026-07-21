@@ -75,6 +75,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if args[0] == "version" {
 		return runVersion(args[1:], stdout, stderr)
 	}
+	if args[0] == "completion" {
+		return runCompletion(args[1:], stdout, stderr)
+	}
 	if len(args) == 1 {
 		switch args[0] {
 		case "client":
