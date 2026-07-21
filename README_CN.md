@@ -167,6 +167,12 @@ UUID 十六进制前缀。可能删除或批量改写状态的命令需要交互
 
 无需额外 CLI 框架即可生成 shell completion：
 
+生成脚本补全的是名为 `ovpn` 的直接命令。可在服务容器的交互 shell 中使用，或在
+宿主机定义一个名为 `ovpn`、内部执行 `docker compose exec openvpn ovpn` 的 wrapper。
+若通过 Compose 生成脚本，把下面的 `ovpn completion` 换成
+`docker compose exec -T openvpn ovpn completion`。动态 name/ID 补全同样依赖该直接
+命令或 wrapper。
+
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
   ~/.config/fish/completions

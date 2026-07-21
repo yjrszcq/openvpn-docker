@@ -355,6 +355,11 @@ UUID 到名称翻译，`--full-id` 在翻译输出中保留完整 UUID。
 只有显式补全 `--name/-n` 或 `--id/-i` 的值时才读取当前 client list，不读取私密
 artifact。安装示例：
 
+脚本补全的是名为 `ovpn` 的直接命令。可在容器 shell 中使用，或在宿主机提供同名
+wrapper，内部调用 `docker compose exec openvpn ovpn`。通过 Compose 生成时，把下面
+的 `ovpn completion` 换成 `docker compose exec -T openvpn ovpn completion`；动态
+selector 也会调用同一个直接命令或 wrapper。
+
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
   ~/.config/fish/completions

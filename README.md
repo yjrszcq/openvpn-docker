@@ -187,6 +187,12 @@ as a manual retry.
 
 Generate shell completion without an external CLI framework:
 
+The generated script completes a direct command named `ovpn`. Use it inside an
+interactive service container, or define a host wrapper named `ovpn` that runs
+`docker compose exec openvpn ovpn`. When generating through Compose, replace
+`ovpn completion` below with `docker compose exec -T openvpn ovpn completion`.
+Dynamic client name/ID completion also uses that direct command or wrapper.
+
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
   ~/.config/fish/completions

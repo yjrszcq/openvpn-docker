@@ -235,6 +235,11 @@ docker compose exec openvpn ovpn runtime events -l 0 -f
 
 从与 `ovpn help` 相同的命令契约生成脚本：
 
+这些脚本补全的是名为 `ovpn` 的直接命令。可在服务容器的交互 shell 中运行，或在
+宿主机定义同名 wrapper，内部调用 `docker compose exec openvpn ovpn`。通过 Compose
+生成时，把下面的 `ovpn completion` 换成
+`docker compose exec -T openvpn ovpn completion`。
+
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
   ~/.config/fish/completions
@@ -243,8 +248,8 @@ ovpn completion zsh > ~/.zfunc/_ovpn
 ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 ```
 
-安装后启动新 shell。只有在显式 selector 参数后补全 name/ID 时，脚本才执行只读
-client list 查询。
+安装后启动新 shell。只有在显式 selector 参数后补全 name/ID 时，脚本才通过同一
+命令/wrapper 执行只读 client list 查询。
 
 ## 从 schema 3 升级
 

@@ -253,6 +253,11 @@ audit records and are not a substitute for runtime logs.
 
 Generate scripts from the same command contract used by `ovpn help`:
 
+These scripts complete a direct command named `ovpn`. Run them inside an
+interactive service container, or define a host wrapper with that name for
+`docker compose exec openvpn ovpn`. To generate through Compose, replace
+`ovpn completion` below with `docker compose exec -T openvpn ovpn completion`.
+
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
   ~/.config/fish/completions
@@ -262,7 +267,8 @@ ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 ```
 
 Start a new shell after installation. Name and ID completion performs a
-read-only client list query only after an explicit selector option.
+read-only client list query through the same command/wrapper only after an
+explicit selector option.
 
 ## Upgrade from schema 3
 

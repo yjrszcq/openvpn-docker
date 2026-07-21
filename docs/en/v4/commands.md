@@ -398,6 +398,12 @@ from the same static command tree used by help. Explicit `--name/-n` and
 `--id/-i` selector values query the current client list at completion time;
 private artifacts are never read. Install examples:
 
+The script completes a direct command named `ovpn`. Use it in a container shell
+or provide a host wrapper with that name for `docker compose exec openvpn ovpn`.
+To generate through Compose, replace `ovpn completion` below with
+`docker compose exec -T openvpn ovpn completion`. Dynamic selectors call the
+same direct command or wrapper.
+
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
   ~/.config/fish/completions

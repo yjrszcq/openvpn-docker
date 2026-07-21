@@ -68,7 +68,7 @@ func completionWords(spec completionSpec) []string {
 	}
 	words = append(words, "--help", "-h")
 	if len(spec.path) == 0 {
-		words = append(words, "--version", "-V", "-v")
+		words = append(words, "help", "--version", "-V", "-v")
 	}
 	return uniqueWords(words)
 }
@@ -128,7 +128,7 @@ func sortedCompletionSpecs() []completionSpec {
 }
 
 func writePathCases(writer io.Writer, wordExpression string) error {
-	if _, err := fmt.Fprintf(writer, "  local joined=\" %s \"\n  case \"$joined\" in\n", wordExpression); err != nil {
+	if _, err := fmt.Fprintf(writer, "  local joined=\" %s \"\n  if [[ \"$joined\" == ' help '* ]]; then\n    joined=\" ${joined#' help '}\"\n  fi\n  case \"$joined\" in\n", wordExpression); err != nil {
 		return err
 	}
 	for _, spec := range sortedCompletionSpecs() {
@@ -238,6 +238,9 @@ func writeFishCompletion(writer io.Writer) error {
 function __ovpn_path_is
     set -l tokens (commandline -opc)
     set -e tokens[1]
+    if test (count $tokens) -gt 0; and test "$tokens[1]" = help
+        set -e tokens[1]
+    end
     for expected in $argv
         if test (count $tokens) -eq 0; or test "$tokens[1]" != "$expected"
             return 1
@@ -245,6 +248,12 @@ function __ovpn_path_is
         set -e tokens[1]
     end
     return 0
+end
+
+function __ovpn_root_position
+    set -l tokens (commandline -opc)
+    test (count $tokens) -eq 1; and return 0
+    test (count $tokens) -eq 2; and test "$tokens[2]" = help
 end
 
 function __ovpn_client_names
@@ -258,13 +267,14 @@ end
 complete -c ovpn -f
 complete -c ovpn -n '__fish_use_subcommand' -s v -d 'print short version'
 complete -c ovpn -n '__fish_use_subcommand' -s V -l version -d 'print full version report'
+complete -c ovpn -n '__ovpn_root_position' -a help -d 'show command help'
 `); err != nil {
 		return err
 	}
 	for _, spec := range completionSpecs() {
 		path := strings.Join(spec.path, " ")
 		if len(spec.command.children) > 0 {
-			condition := "__fish_use_subcommand"
+			condition := "__ovpn_root_position"
 			if path != "" {
 				names := make([]string, 0, len(spec.command.children))
 				for _, child := range spec.command.children {

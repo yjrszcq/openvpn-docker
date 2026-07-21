@@ -62,6 +62,7 @@ run_image --version | grep -Fq "data schema: $DATA_SCHEMA"
 root_help="$(run_image --help)"
 grep -Fq 'completion' <<<"$root_help"
 test "$root_help" = "$(run_image help)"
+run_image completion bash | grep -Fq "help --version"
 
 while IFS= read -r path; do
   read -r -a args <<<"$path"
@@ -118,6 +119,10 @@ run_image completion bash >"$WORK_DIR/ovpn.bash"
 bash -n "$WORK_DIR/ovpn.bash"
 grep -Fq -- '--release-ipv4' "$WORK_DIR/ovpn.bash"
 grep -Fq -- '--full-id' "$WORK_DIR/ovpn.bash"
+bash -ec 'source "$1"; COMP_WORDS=(ovpn help client ""); COMP_CWORD=3; _ovpn_completion; printf "%s\n" "${COMPREPLY[@]}"' \
+  _ "$WORK_DIR/ovpn.bash" >"$WORK_DIR/help-client-completion.out"
+grep -Fxq create "$WORK_DIR/help-client-completion.out"
+grep -Fxq address "$WORK_DIR/help-client-completion.out"
 
 run_image completion zsh >"$WORK_DIR/_ovpn"
 if command -v zsh >/dev/null 2>&1; then

@@ -18,7 +18,7 @@ func TestCompletionCommandGeneratesSupportedShells(t *testing.T) {
 				t.Fatalf("completion %s code=%d stderr=%q", shell, code, stderr.String())
 			}
 			output := stdout.String()
-			for _, value := range []string{"client", "address", "disconnect", "name", "id", "ipv4", "full-id"} {
+			for _, value := range []string{"help", "client", "address", "disconnect", "name", "id", "ipv4", "full-id"} {
 				if !strings.Contains(output, value) {
 					t.Errorf("completion %s is missing %q", shell, value)
 				}
@@ -27,6 +27,19 @@ func TestCompletionCommandGeneratesSupportedShells(t *testing.T) {
 				t.Fatalf("completion %s contains private material", shell)
 			}
 		})
+	}
+}
+
+func TestGeneratedCompletionUnderstandsHelpPaths(t *testing.T) {
+	var bash, fish bytes.Buffer
+	if err := writeBashCompletion(&bash); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFishCompletion(&fish); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(bash.String(), "${joined#' help '}") || !strings.Contains(fish.String(), "test \"$tokens[1]\" = help") {
+		t.Fatalf("generated scripts do not normalize help paths")
 	}
 }
 
