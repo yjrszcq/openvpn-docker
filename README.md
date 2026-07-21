@@ -169,7 +169,7 @@ tests/smoke/shell/workflow-smoke.sh  # workflow logic verification
 
 CI validates the OpenVPN version, source checksum, support matrix, and project image version. Tests use `OVPN_NETWORK=10.88.0.0/24`. Some checks require Docker and `/dev/net/tun`.
 
-`OPENVPN_CANDIDATE_RANGE` in `versions.env` limits which upstream versions automation may propose; it does not claim runtime compatibility. Exact OpenVPN versions verified for the current image are listed in `compatibility/contract.env`.
+`OPENVPN_CANDIDATE_RANGE` in `versions.env` limits which upstream versions automation may propose; it does not claim runtime compatibility. Exact OpenVPN versions verified for the current image are listed in `compatibility/contract.json`.
 
 ## Build & Release
 

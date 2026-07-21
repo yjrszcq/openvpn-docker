@@ -73,37 +73,3 @@ func TestVersionLookupUsesSemanticOrder(t *testing.T) {
 		t.Fatal("semantic version lookup returned an incorrect result")
 	}
 }
-
-func TestLegacyShellContractRemainsAlignedUntilCutover(t *testing.T) {
-	contract, err := compatibility.Parse(repositoryContract(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(filepath.Join("..", "..", "compatibility", "contract.env"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []string{
-		"OPENVPN_SUPPORTED_VERSIONS=" + strings.Join(contract.SupportedOpenVPNVersions, ","),
-		"OPENVPN_ADAPTER=" + contract.Adapter.Name,
-		"OPENVPN_TEMPLATE_FAMILY=" + contract.Adapter.TemplateFamily,
-	}
-	featureNames := make([]string, 0, len(contract.RequiredFeatures))
-	for _, feature := range contract.RequiredFeatures {
-		featureNames = append(featureNames, feature.Name)
-	}
-	want = append(want, "OPENVPN_REQUIRED_FEATURES="+strings.Join(featureNames, ","))
-	lines := strings.Split(string(data), "\n")
-	for _, expected := range want {
-		found := false
-		for _, line := range lines {
-			if line == expected {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("legacy contract is missing aligned value %q", expected)
-		}
-	}
-}

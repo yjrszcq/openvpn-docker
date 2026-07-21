@@ -32,6 +32,6 @@ Replacing a same-schema image can be rolled back by recreating the container wit
 
 ## Release requirements
 
-Every image release must pass static checks, schema gates, representative migrations, persistent-state handoff, runtime lifecycle tests, and the relevant network E2E matrix. `compatibility/contract.env` records the exact OpenVPN versions verified with the image; `OPENVPN_CANDIDATE_RANGE` only constrains which upstream versions automation may propose.
+Every image release must pass static checks, schema gates, representative migrations, persistent-state handoff, runtime lifecycle tests, and the relevant network E2E matrix. `compatibility/contract.json` records the exact OpenVPN versions verified with the image; `OPENVPN_CANDIDATE_RANGE` only constrains which upstream versions automation may propose.
 
 Image versions are changed in a dedicated release commit. A persistent format change is incomplete without a schema increment, migration, fixtures, policy updates, and migration tests.

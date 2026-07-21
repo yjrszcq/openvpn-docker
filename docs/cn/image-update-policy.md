@@ -32,6 +32,6 @@
 
 ## 发布要求
 
-每个镜像版本必须通过静态检查、schema gate、代表性迁移、持久化状态接续、runtime 生命周期测试和相关网络 E2E 矩阵。`compatibility/contract.env` 记录该镜像实际验证过的 OpenVPN 精确版本；`OPENVPN_CANDIDATE_RANGE` 只限制自动化可提出的上游版本。
+每个镜像版本必须通过静态检查、schema gate、代表性迁移、持久化状态接续、runtime 生命周期测试和相关网络 E2E 矩阵。`compatibility/contract.json` 记录该镜像实际验证过的 OpenVPN 精确版本；`OPENVPN_CANDIDATE_RANGE` 只限制自动化可提出的上游版本。
 
 镜像版本在独立 release commit 中修改。持久化格式变更若缺少 schema 递增、migration、夹具、政策更新或迁移测试，则不算完成。

@@ -97,9 +97,7 @@ func TestInventoryClassifiesEveryExistingTest(t *testing.T) {
 	repositoryRoot := filepath.Join("..", "..")
 	patterns := []string{
 		"tests/smoke/shell/*.sh",
-		"tests/smoke/python/*.py",
 		"tests/smoke/container/*.sh",
-		"tests/integration/*.sh",
 	}
 	var actual []string
 	for _, pattern := range patterns {

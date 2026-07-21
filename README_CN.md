@@ -169,7 +169,7 @@ tests/smoke/shell/workflow-smoke.sh  # 工作流逻辑验证
 
 CI 会校验 OpenVPN 版本、源码校验和、支持矩阵和项目镜像版本。测试使用 `OVPN_NETWORK=10.88.0.0/24`。部分检查需要 Docker 和 `/dev/net/tun`。
 
-`versions.env` 中的 `OPENVPN_CANDIDATE_RANGE` 只限制自动化可以提出哪些上游版本，不代表 runtime 兼容性。当前镜像实际验证过的 OpenVPN 精确版本列在 `compatibility/contract.env` 中。
+`versions.env` 中的 `OPENVPN_CANDIDATE_RANGE` 只限制自动化可以提出哪些上游版本，不代表 runtime 兼容性。当前镜像实际验证过的 OpenVPN 精确版本列在 `compatibility/contract.json` 中。
 
 ## 镜像、构建与发布
 

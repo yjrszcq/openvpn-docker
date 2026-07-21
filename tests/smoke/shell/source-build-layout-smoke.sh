@@ -53,6 +53,11 @@ if grep -Fq 'COPY rootfs/ /' "$dockerfile"; then
   exit 1
 fi
 grep -Fq 'COPY rootfs/usr/local/share/openvpn-container/templates/' "$dockerfile"
+grep -Fq 'COPY compatibility/contract.json ' "$dockerfile"
+if grep -Fq 'COPY compatibility/ ' "$dockerfile"; then
+  echo 'runtime Dockerfile must copy only the strict JSON compatibility contract' >&2
+  exit 1
+fi
 
 if grep -Eq '^[[:space:]]+openvpn([[:space:]]|\\\\)' "$dockerfile"; then
   echo 'runtime Dockerfile must not install the Debian openvpn package' >&2

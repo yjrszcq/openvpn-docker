@@ -3,16 +3,8 @@ ARG GO_BUILD_IMAGE=golang:1.26.5-trixie
 
 FROM ${GO_BUILD_IMAGE} AS go-builder
 
-ARG GO_RUNTIME_VERSION
-ARG VCS_REF=unknown
-ARG BUILD_DATE=unknown
-
 ENV CGO_ENABLED=1 \
     GOPROXY=direct
-
-RUN test -n "$GO_RUNTIME_VERSION" \
-    && test -n "$VCS_REF" \
-    && test -n "$BUILD_DATE"
 
 WORKDIR /src
 
@@ -21,6 +13,14 @@ RUN go mod download
 
 COPY cmd/ cmd/
 COPY internal/ internal/
+
+ARG GO_RUNTIME_VERSION
+ARG VCS_REF=unknown
+ARG BUILD_DATE=unknown
+
+RUN test -n "$GO_RUNTIME_VERSION" \
+    && test -n "$VCS_REF" \
+    && test -n "$BUILD_DATE"
 
 RUN mkdir -p /out/usr/local/lib/openvpn-container/go \
     && go build -buildvcs=false -trimpath \
@@ -110,7 +110,7 @@ COPY --from=builder /work/openvpn/COPYING /usr/local/share/licenses/openvpn/COPY
 COPY --from=go-builder /out/ /
 COPY LICENSE NOTICE /usr/local/share/licenses/openvpn-container/
 COPY rootfs/usr/local/share/openvpn-container/templates/ /usr/local/share/openvpn-container/templates/
-COPY compatibility/ /usr/local/share/openvpn-container/compatibility/
+COPY compatibility/contract.json /usr/local/share/openvpn-container/compatibility/contract.json
 
 RUN install -m 0755 /usr/local/lib/openvpn-container/go/ovpn /usr/local/bin/ovpn \
     && install -m 0755 /usr/local/lib/openvpn-container/go/ovpn-broker /usr/local/bin/ovpn-broker \

@@ -10,8 +10,8 @@
     {"path":"tests/smoke/shell/source-fetch-smoke.sh","classification":"retain-build","replacement":"retain","area":"OpenVPN source fetch"},
     {"path":"tests/smoke/shell/update-openvpn-smoke.sh","classification":"retain-build","replacement":"retain","area":"upstream automation"},
     {"path":"tests/smoke/shell/workflow-smoke.sh","classification":"retain-build","replacement":"adapted","area":"CI workflow contract"},
-    {"path":"tests/smoke/container/client-lifecycle-container-smoke.sh","classification":"retain-black-box","replacement":"adapt","area":"Go client lifecycle"},
-    {"path":"tests/smoke/container/e2e-container-smoke.sh","classification":"retain-e2e","replacement":"adapt","area":"UDP and TCP VPN"},
+    {"path":"tests/smoke/container/client-lifecycle-container-smoke.sh","classification":"retain-black-box","replacement":"adapted","area":"Go client lifecycle"},
+    {"path":"tests/smoke/container/e2e-container-smoke.sh","classification":"retain-e2e","replacement":"adapted","area":"UDP and TCP VPN"},
     {"path":"tests/smoke/container/go-sqlite-handoff-smoke.sh","classification":"retain-migration-fixture","replacement":"retain","area":"schema 3 to Go SQLite handoff and rollback"},
     {"path":"tests/smoke/container/runtime-image-smoke.sh","classification":"retain-black-box","replacement":"adapted","area":"runtime image"}
   ]
