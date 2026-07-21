@@ -17,6 +17,8 @@ builder_version=${builder_version%%-*}
 source_version=$(sed -n 's/^[[:space:]]*Version[[:space:]]*=[[:space:]]*"\([^"]*\)"/\1/p' internal/buildinfo/info.go)
 source_schema=$(sed -n 's/^const DataSchema = \([0-9][0-9]*\)$/\1/p' internal/buildinfo/info.go)
 
+[ -s LICENSE ]
+[ -s NOTICE ]
 [ -n "$IMAGE_VERSION" ]
 [ "$IMAGE_VERSION" = "$GO_RUNTIME_VERSION" ] || {
   echo 'IMAGE_VERSION and GO_RUNTIME_VERSION must match' >&2
@@ -37,8 +39,14 @@ source_schema=$(sed -n 's/^const DataSchema = \([0-9][0-9]*\)$/\1/p' internal/bu
 [ "$sqlite_version" = v1.14.48 ]
 [ "$yaml_version" = v3.0.4 ]
 
+grep -Fq 'GNU GENERAL PUBLIC LICENSE' LICENSE
+grep -Fq 'Copyright (C) 2026 yjrszcq' NOTICE
+grep -Fq 'SPDX-License-Identifier: GPL-2.0-only' NOTICE
+grep -Fq "Go $go_version (BSD-3-Clause)" NOTICE
 grep -Fq "github.com/mattn/go-sqlite3 $sqlite_version (MIT)" NOTICE
 grep -Fq "go.yaml.in/yaml/v3 $yaml_version (MIT and Apache-2.0)" NOTICE
+grep -Fq 'COPY --from=builder /work/openvpn/COPYING /usr/local/share/licenses/openvpn/COPYING' Dockerfile
+grep -Fq 'COPY LICENSE NOTICE /usr/local/share/licenses/openvpn-container/' Dockerfile
 
 printf 'image_version=%s\n' "$IMAGE_VERSION"
 printf 'data_schema=%s\n' "$DATA_SCHEMA"

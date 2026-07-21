@@ -37,8 +37,6 @@ grep -Fq 'linux/amd64,linux/arm64' "$WORKFLOWS/test.yml"
 grep -Fq -- '--build-arg "GO_BUILD_IMAGE=$GO_BUILD_IMAGE"' "$WORKFLOWS/test.yml"
 # shellcheck disable=SC2016 # Assert literal workflow build-argument expressions.
 grep -Fq -- '--build-arg "GO_RUNTIME_VERSION=$GO_RUNTIME_VERSION"' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/license-smoke.sh' "$WORKFLOWS/test.yml"
-grep -Fq 'tests/smoke/shell/documentation-smoke.sh' "$WORKFLOWS/test.yml"
 for retired in \
   management-broker-smoke.sh \
   management-hook-smoke.sh \

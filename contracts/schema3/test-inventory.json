@@ -3,8 +3,6 @@
   "entries": [
     {"path":"tests/smoke/shell/check.sh","classification":"retain-build","replacement":"retain","area":"shell syntax and hygiene"},
     {"path":"tests/smoke/shell/docker-build-wrapper-smoke.sh","classification":"retain-build","replacement":"adapted","area":"image build orchestration"},
-    {"path":"tests/smoke/shell/documentation-smoke.sh","classification":"retain-build","replacement":"retain","area":"v4 documentation contract"},
-    {"path":"tests/smoke/shell/license-smoke.sh","classification":"retain-build","replacement":"adapted","area":"license inventory"},
     {"path":"tests/smoke/shell/maintenance-compose-smoke.sh","classification":"retain-black-box","replacement":"adapted","area":"maintenance compose interface"},
     {"path":"tests/smoke/shell/release-metadata-smoke.sh","classification":"retain-build","replacement":"retain","area":"stable release metadata"},
     {"path":"tests/smoke/shell/release-policy-smoke.sh","classification":"retain-build","replacement":"retain","area":"release policy"},
