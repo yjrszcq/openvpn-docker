@@ -430,6 +430,24 @@ func TestDeleteActiveClientKeepsTombstoneAndAllowsNameReuse(t *testing.T) {
 	}
 }
 
+func TestDeleteRevokedClientStillRequiresRuntimeConvergence(t *testing.T) {
+	fixture := newMutationFixture(t)
+	created, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "stale-session", IPv4: "auto"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.manager.Revoke(context.Background(), Selector{IDPrefix: ShortID(created.Client.ID)}, false); err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := fixture.manager.Delete(context.Background(), Selector{IDPrefix: ShortID(created.Client.ID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !deleted.KickRequired || deleted.Client.Status != "deleted" {
+		t.Fatalf("deleted revoked result=%+v", deleted)
+	}
+}
+
 func TestLifecyclePKIFailureLeavesActiveStateAndFiles(t *testing.T) {
 	fixture := newMutationFixture(t)
 	created, err := fixture.manager.Create(context.Background(), CreateRequest{Name: "laptop", IPv4: "auto"})

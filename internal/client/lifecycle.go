@@ -307,7 +307,10 @@ func (manager *Manager) Delete(ctx context.Context, selector Selector) (Mutation
 	if err != nil {
 		return MutationResult{}, err
 	}
-	return MutationResult{Version: 1, OperationID: operationID, Client: newView(loaded), KickRequired: state.Client.Status == domain.ClientActive}, nil
+	// A revoked client may still have a stale session when the runtime was
+	// unavailable during revoke. Deletion must therefore attempt convergence
+	// for every selectable non-deleted client state.
+	return MutationResult{Version: 1, OperationID: operationID, Client: newView(loaded), KickRequired: true}, nil
 }
 
 type lifecycleRollback func(error, json.RawMessage) error
