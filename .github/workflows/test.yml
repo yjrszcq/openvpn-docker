@@ -66,6 +66,7 @@ jobs:
             tests/smoke/container/go-sqlite-handoff-smoke.sh \
             tests/smoke/container/backup-restore-container-smoke.sh \
             tests/smoke/container/client-lifecycle-container-smoke.sh \
+            tests/smoke/container/cli-ux-container-smoke.sh \
             tests/smoke/container/e2e-container-smoke.sh \
             tests/smoke/container/runtime-image-smoke.sh \
             tests/smoke/shell/check.sh \
@@ -91,6 +92,7 @@ jobs:
             tests/smoke/container/go-sqlite-handoff-smoke.sh \
             tests/smoke/container/backup-restore-container-smoke.sh \
             tests/smoke/container/client-lifecycle-container-smoke.sh \
+            tests/smoke/container/cli-ux-container-smoke.sh \
             tests/smoke/container/e2e-container-smoke.sh \
             tests/smoke/container/runtime-image-smoke.sh \
             tests/smoke/shell/check.sh \
@@ -137,7 +139,9 @@ jobs:
       - name: Build pinned runtime image
         run: scripts/docker-build.sh -t "$IMAGE" .
       - name: Verify runtime image
-        run: OVPN_RUNTIME_SKIP_BUILD=1 OVPN_RUNTIME_REQUIRED=1 OVPN_RUNTIME_IMAGE="$IMAGE" tests/smoke/container/runtime-image-smoke.sh
+        run: |
+          OVPN_RUNTIME_SKIP_BUILD=1 OVPN_RUNTIME_REQUIRED=1 OVPN_RUNTIME_IMAGE="$IMAGE" tests/smoke/container/runtime-image-smoke.sh
+          OVPN_CLI_UX_SKIP_BUILD=1 OVPN_CLI_UX_REQUIRED=1 OVPN_CLI_UX_IMAGE="$IMAGE" tests/smoke/container/cli-ux-container-smoke.sh
       - name: Verify schema 4 backup and restore
         run: OVPN_BACKUP_SKIP_BUILD=1 OVPN_BACKUP_REQUIRED=1 OVPN_BACKUP_IMAGE="$IMAGE" tests/smoke/container/backup-restore-container-smoke.sh
       - name: Verify client lifecycle and UDP/TCP tunnels
