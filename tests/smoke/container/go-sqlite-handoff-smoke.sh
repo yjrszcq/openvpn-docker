@@ -45,7 +45,15 @@ mkdir -p "$source_context" "$data_dir" "$config_dir" "$bin_dir"
 chmod 750 "$data_dir" "$config_dir"
 
 if [ "$SKIP_SOURCE_BUILD" != 1 ]; then
-  git -C "$ROOT_DIR" archive sh-ver | tar -x -C "$source_context"
+  source_ref=''
+  for candidate in sh-ver refs/remotes/origin/sh-ver; do
+    if git -C "$ROOT_DIR" rev-parse --verify --quiet "$candidate^{commit}" >/dev/null; then
+      source_ref="$candidate"
+      break
+    fi
+  done
+  [ -n "$source_ref" ] || skip_or_fail 'missing sh-ver git reference'
+  git -C "$ROOT_DIR" archive "$source_ref" | tar -x -C "$source_context"
   OVPN_BUILD_NETWORK=host \
     OVPN_BUILD_HTTP_PROXY="${http_proxy-${HTTP_PROXY-}}" \
     OVPN_BUILD_HTTPS_PROXY="${https_proxy-${HTTPS_PROXY-}}" \

@@ -85,7 +85,8 @@ run_image --version | grep -Fq "data schema: $DATA_SCHEMA"
 root_help="$(run_image --help)"
 grep -Fq 'completion' <<<"$root_help"
 test "$root_help" = "$(run_image help)"
-run_image completion bash | grep -Fq "help --version"
+run_image completion bash >"$WORK_DIR/ovpn.bash"
+grep -Fq "help --version" "$WORK_DIR/ovpn.bash"
 command_overview="$(run_image)"
 grep -Fq 'Command tree:' <<<"$command_overview"
 grep -Fq 'ovpn client address edit' <<<"$command_overview"
@@ -146,7 +147,6 @@ completion
 version
 PATHS
 
-run_image completion bash >"$WORK_DIR/ovpn.bash"
 bash -n "$WORK_DIR/ovpn.bash"
 grep -Fq -- '--release-ipv4' "$WORK_DIR/ovpn.bash"
 grep -Fq -- '--full-id' "$WORK_DIR/ovpn.bash"
