@@ -200,3 +200,20 @@ func writeHelp(writer io.Writer, path []string) {
 		}
 	}
 }
+
+func writeCommandOverview(writer io.Writer) {
+	fmt.Fprintf(writer, "Usage: %s\n\nCommand tree:\n", rootCommand.usage)
+	writeCommandOverviewChildren(writer, rootCommand.children, 1)
+}
+
+func writeCommandOverviewChildren(writer io.Writer, children []command, depth int) {
+	indent := strings.Repeat("  ", depth)
+	for _, child := range children {
+		if len(child.children) > 0 {
+			fmt.Fprintf(writer, "%s%s\n", indent, child.name)
+			writeCommandOverviewChildren(writer, child.children, depth+1)
+			continue
+		}
+		fmt.Fprintf(writer, "%s%s\n", indent, child.usage)
+	}
+}

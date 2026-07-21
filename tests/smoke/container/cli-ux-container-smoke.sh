@@ -63,6 +63,14 @@ root_help="$(run_image --help)"
 grep -Fq 'completion' <<<"$root_help"
 test "$root_help" = "$(run_image help)"
 run_image completion bash | grep -Fq "help --version"
+command_overview="$(run_image)"
+grep -Fq 'Command tree:' <<<"$command_overview"
+grep -Fq 'ovpn client address edit' <<<"$command_overview"
+grep -Fq 'ovpn runtime disconnect' <<<"$command_overview"
+if grep -Fq 'Examples:' <<<"$command_overview"; then
+  printf 'bare ovpn output is not compact\n' >&2
+  exit 1
+fi
 
 while IFS= read -r path; do
   read -r -a args <<<"$path"

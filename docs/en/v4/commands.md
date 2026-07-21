@@ -36,7 +36,8 @@ and development interfaces, not normal deployment configuration.
 `ovpn client`, `ovpn state`, and `ovpn runtime` are safe shortcuts for
 `client list`, `state doctor`, and `runtime status`. At the top level, `-v`
 prints only the project version while `-V` and `--version` print the full
-version report.
+version report. Running `ovpn` without arguments prints a compact command tree
+with every leaf usage; `ovpn -h` retains the detailed root help.
 
 ## Output and exit codes
 

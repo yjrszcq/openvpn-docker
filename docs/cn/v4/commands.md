@@ -33,7 +33,8 @@ maintenance 服务的 entrypoint 已经是 `ovpn`，因此 `<command>` 直接从
 
 `ovpn client`、`ovpn state`、`ovpn runtime` 是 `client list`、
 `state doctor`、`runtime status` 的安全快捷方式。顶层 `-v` 只输出项目版本，
-`-V` 与 `--version` 输出完整版本报告。
+`-V` 与 `--version` 输出完整版本报告。裸执行 `ovpn` 会显示包含全部 leaf usage 的
+精简命令树；`ovpn -h` 仍显示详细根帮助。
 
 ## 输出与退出码
 

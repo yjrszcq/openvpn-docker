@@ -35,7 +35,7 @@ import (
 // Run dispatches the ovpn multicall CLI and returns a stable exit code.
 func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		writeHelp(stdout, nil)
+		writeCommandOverview(stdout)
 		return int(apperror.ExitSuccess)
 	}
 	switch args[0] {
