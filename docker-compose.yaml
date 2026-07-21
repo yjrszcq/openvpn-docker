@@ -5,7 +5,7 @@ x-openvpn-data: &openvpn-data
 
 services:
   openvpn:
-    image: ${OVPN_IMAGE:-szcq/openvpn:4.0.0-dev}
+    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
     container_name: openvpn
     restart: unless-stopped
     network_mode: host
@@ -19,7 +19,7 @@ services:
       - /dev/net/tun:/dev/net/tun
 
   openvpn-maintenance:
-    image: ${OVPN_IMAGE:-szcq/openvpn:4.0.0-dev}
+    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
     restart: "no"
     network_mode: host
 

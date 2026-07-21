@@ -5,6 +5,7 @@
     {"path":"tests/smoke/shell/docker-build-wrapper-smoke.sh","classification":"retain-build","replacement":"adapted","area":"image build orchestration"},
     {"path":"tests/smoke/shell/license-smoke.sh","classification":"retain-build","replacement":"adapted","area":"license inventory"},
     {"path":"tests/smoke/shell/maintenance-compose-smoke.sh","classification":"retain-black-box","replacement":"adapted","area":"maintenance compose interface"},
+    {"path":"tests/smoke/shell/release-metadata-smoke.sh","classification":"retain-build","replacement":"retain","area":"stable release metadata"},
     {"path":"tests/smoke/shell/release-policy-smoke.sh","classification":"retain-build","replacement":"retain","area":"release policy"},
     {"path":"tests/smoke/shell/source-build-layout-smoke.sh","classification":"retain-build","replacement":"adapted","area":"Docker source build"},
     {"path":"tests/smoke/shell/source-fetch-smoke.sh","classification":"retain-build","replacement":"retain","area":"OpenVPN source fetch"},

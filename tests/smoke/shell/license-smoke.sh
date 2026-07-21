@@ -11,6 +11,9 @@ done
 grep -Fq 'GNU GENERAL PUBLIC LICENSE' "$ROOT_DIR/LICENSE"
 grep -Fq 'Copyright (C) 2026 yjrszcq' "$ROOT_DIR/NOTICE"
 grep -Fq 'SPDX-License-Identifier: GPL-2.0-only' "$ROOT_DIR/NOTICE"
+grep -Fq 'Go 1.26.5 (BSD-3-Clause)' "$ROOT_DIR/NOTICE"
+grep -Fq 'github.com/mattn/go-sqlite3 v1.14.48 (MIT)' "$ROOT_DIR/NOTICE"
+grep -Fq 'go.yaml.in/yaml/v3 v3.0.4 (MIT and Apache-2.0)' "$ROOT_DIR/NOTICE"
 grep -Fq 'COPY --from=builder /work/openvpn/COPYING /usr/local/share/licenses/openvpn/COPYING' "$DOCKERFILE"
 grep -Fq 'COPY LICENSE NOTICE /usr/local/share/licenses/openvpn-container/' "$DOCKERFILE"
 

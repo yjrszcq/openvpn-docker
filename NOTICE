@@ -16,3 +16,10 @@ Other third-party components, including Debian packages and Easy-RSA, remain
 subject to their respective licenses. The pinned OpenVPN source version and
 checksum are recorded in versions.env, and scripts/fetch-openvpn-source.sh
 retrieves the corresponding official source archive during image builds.
+
+The Go control plane is built with Go 1.26.5 (BSD-3-Clause). Its pinned direct
+runtime dependencies are github.com/mattn/go-sqlite3 v1.14.48 (MIT) and
+go.yaml.in/yaml/v3 v3.0.4 (MIT and Apache-2.0). The YAML module's indirect
+test dependency gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 uses a
+BSD-3-Clause-style license. These components are not relicensed by this
+project; their license files remain available in their source distributions.

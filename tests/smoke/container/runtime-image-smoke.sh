@@ -48,8 +48,9 @@ fi
 
 metadata="$(docker run --rm --entrypoint ovpn "$IMAGE" version --json)"
 grep -Fq "\"version\":\"$GO_RUNTIME_VERSION\"" <<<"$metadata"
-grep -Fq '"data_schema":4' <<<"$metadata"
-grep -Fq '"go_version":"go1.26.5"' <<<"$metadata"
+grep -Fq "\"data_schema\":$DATA_SCHEMA" <<<"$metadata"
+go_version="$(awk '$1 == "go" { print $2; exit }' "$ROOT_DIR/go.mod")"
+grep -Fq "\"go_version\":\"go$go_version\"" <<<"$metadata"
 grep -Fq '"sqlite":"github.com/mattn/go-sqlite3 v1.14.48"' <<<"$metadata"
 grep -Fq '"yaml":"go.yaml.in/yaml/v3 v3.0.4"' <<<"$metadata"
 
@@ -60,6 +61,8 @@ if [ "$short_version" != "$GO_RUNTIME_VERSION" ]; then
 fi
 
 test "$(docker run --rm --entrypoint ovpn-broker "$IMAGE" --version)" = "$GO_RUNTIME_VERSION"
+test "$(docker image inspect "$IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')" = "$IMAGE_VERSION"
+test "$(docker image inspect "$IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.licenses" }}')" = GPL-2.0-only
 
 for binary in /usr/local/bin/ovpn /usr/local/bin/ovpn-broker; do
   ldd_output="$(docker run --rm --entrypoint ldd "$IMAGE" "$binary")"

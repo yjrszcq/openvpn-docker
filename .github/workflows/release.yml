@@ -41,6 +41,8 @@ jobs:
           set -a
           . ./versions.env
           set +a
+          scripts/verify-release-metadata.sh > release-metadata.env
+          cat release-metadata.env >> "$GITHUB_STEP_SUMMARY"
           previous="$(git show HEAD^:versions.env 2>/dev/null | awk -F= '$1 == "OPENVPN_VERSION" {print $2}' || true)"
           [ -n "$previous" ] || previous="$OPENVPN_VERSION"
           previous_image="$(git show HEAD^:versions.env 2>/dev/null | awk -F= '$1 == "IMAGE_VERSION" {print $2}' || true)"
@@ -104,14 +106,17 @@ jobs:
             --tag "$image:$image_major" \
             --tag "$image:latest" \
             --tag "$image:ovpn$OPENVPN_VERSION" \
-            "$image:candidate-ovpn$OPENVPN_VERSION"
+            "$image:candidate-$IMAGE_VERSION"
           {
             echo '## Stable release'
             echo "- Image version: $IMAGE_VERSION"
             echo "- OpenVPN version: $OPENVPN_VERSION"
             echo "- Easy-RSA version: $EASYRSA_VERSION"
+            echo "- Go runtime version: $GO_RUNTIME_VERSION"
             echo "- Candidate range: $OPENVPN_CANDIDATE_RANGE"
             echo "- Schema version: $DATA_SCHEMA"
+            echo '- SQLite driver: github.com/mattn/go-sqlite3 v1.14.48 (MIT)'
+            echo '- YAML library: go.yaml.in/yaml/v3 v3.0.4 (MIT and Apache-2.0)'
             echo '- Branch transition: same branch'
             echo '- Approval: not required'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -162,14 +167,17 @@ jobs:
             --tag "$image:$image_major" \
             --tag "$image:latest" \
             --tag "$image:ovpn$OPENVPN_VERSION" \
-            "$image:candidate-ovpn$OPENVPN_VERSION"
+            "$image:candidate-$IMAGE_VERSION"
           {
             echo '## Stable release'
             echo "- Image version: $IMAGE_VERSION"
             echo "- OpenVPN version: $OPENVPN_VERSION"
             echo "- Easy-RSA version: $EASYRSA_VERSION"
+            echo "- Go runtime version: $GO_RUNTIME_VERSION"
             echo "- Candidate range: $OPENVPN_CANDIDATE_RANGE"
             echo "- Schema version: $DATA_SCHEMA"
+            echo '- SQLite driver: github.com/mattn/go-sqlite3 v1.14.48 (MIT)'
+            echo '- YAML library: go.yaml.in/yaml/v3 v3.0.4 (MIT and Apache-2.0)'
             echo '- Branch transition: cross branch'
             echo '- Approval: stable-cross-branch Environment approved'
           } >> "$GITHUB_STEP_SUMMARY"

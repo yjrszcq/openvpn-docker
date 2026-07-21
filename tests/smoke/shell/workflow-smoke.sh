@@ -21,6 +21,8 @@ grep -Fq 'gofmt -l cmd internal' "$WORKFLOWS/test.yml"
 grep -Fq 'go vet ./...' "$WORKFLOWS/test.yml"
 grep -Fq 'go test -race ./...' "$WORKFLOWS/test.yml"
 grep -Fq 'scripts/verify-go-licenses.sh' "$WORKFLOWS/test.yml"
+grep -Fq 'scripts/verify-release-metadata.sh' "$WORKFLOWS/test.yml"
+grep -Fq 'tests/smoke/shell/release-metadata-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/container/runtime-image-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/container/client-lifecycle-container-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/container/e2e-container-smoke.sh' "$WORKFLOWS/test.yml"
@@ -46,7 +48,9 @@ for retired in \
     exit 1
   fi
 done
-grep -Fq 'candidate-ovpn' "$WORKFLOWS/candidate.yml"
+grep -Fq 'candidate-$IMAGE_VERSION' "$WORKFLOWS/candidate.yml"
+grep -Fq 'candidate-$IMAGE_VERSION' "$WORKFLOWS/release.yml"
+grep -Fq 'org.opencontainers.image.licenses=GPL-2.0-only' "$WORKFLOWS/candidate.yml"
 grep -Fq 'packages: write' "$WORKFLOWS/candidate.yml"
 grep -Fq "GHCR_TOKEN: \${{ github.token }}" "$WORKFLOWS/candidate.yml"
 grep -Fq 'scripts/release-policy.sh' "$WORKFLOWS/candidate.yml"
@@ -62,6 +66,7 @@ if grep -Eq 'upgrade-state|OVPN_UPGRADE_' "$WORKFLOWS/test.yml"; then
 fi
 grep -Fq 'schedule:' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'scripts/update-openvpn.sh' "$WORKFLOWS/upstream-check.yml"
+grep -Fq 'scripts/verify-release-metadata.sh' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'OPENVPN_CANDIDATE_RANGE' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'in_range=true' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'gh pr create' "$WORKFLOWS/upstream-check.yml"

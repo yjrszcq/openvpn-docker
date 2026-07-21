@@ -28,6 +28,7 @@ jobs:
           set -a
           . ./versions.env
           set +a
+          scripts/verify-release-metadata.sh >/dev/null
           latest_tag="$(gh api repos/OpenVPN/openvpn/releases/latest --jq .tag_name)"
           target="${latest_tag#v}"
           if ! [[ "$target" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then

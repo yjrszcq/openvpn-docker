@@ -15,10 +15,15 @@ COPY cmd/ cmd/
 COPY internal/ internal/
 
 ARG GO_RUNTIME_VERSION
+ARG IMAGE_VERSION
+ARG DATA_SCHEMA
 ARG VCS_REF=unknown
 ARG BUILD_DATE=unknown
 
 RUN test -n "$GO_RUNTIME_VERSION" \
+    && test "$GO_RUNTIME_VERSION" = "$IMAGE_VERSION" \
+    && test "$DATA_SCHEMA" = 4 \
+    && grep -Fq "const DataSchema = $DATA_SCHEMA" internal/buildinfo/info.go \
     && test -n "$VCS_REF" \
     && test -n "$BUILD_DATE"
 
@@ -133,6 +138,10 @@ RUN for binary in /usr/local/bin/ovpn /usr/local/bin/ovpn-broker; do \
     && rm /tmp/ovpn.ldd /tmp/ovpn-broker.ldd
 
 RUN mkdir -p /etc/openvpn /usr/local/share/openvpn-container
+
+ARG IMAGE_VERSION
+LABEL org.opencontainers.image.version="$IMAGE_VERSION" \
+      org.opencontainers.image.licenses="GPL-2.0-only"
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=1 CMD ["/usr/local/bin/ovpn", "runtime", "health"]
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/docker-entrypoint"]
