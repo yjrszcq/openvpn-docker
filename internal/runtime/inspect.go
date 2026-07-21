@@ -95,7 +95,9 @@ func QueryStatus(ctx context.Context, socket string, identities map[string]strin
 	status := Status{Version: 1, Daemon: "running", Management: "connected", Clients: make([]StatusClient, 0)}
 	var columns map[string]int
 	for _, line := range response {
-		record, err := csv.NewReader(strings.NewReader(line)).Read()
+		reader := csv.NewReader(strings.NewReader(line))
+		reader.Comma = '\t'
+		record, err := reader.Read()
 		if err != nil || len(record) < 2 {
 			continue
 		}

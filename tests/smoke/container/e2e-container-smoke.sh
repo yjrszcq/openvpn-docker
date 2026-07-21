@@ -51,6 +51,7 @@ run_protocol() {
   local data_dir="$protocol_dir/data"
   local config_dir="$protocol_dir/config"
   local server="ovpn-e2e-$protocol-$$"
+  local client_container="$server-client"
   local network="ovpn-e2e-$protocol-net-$$"
   local client="e2e-$protocol"
 
@@ -119,14 +120,59 @@ YAML
     return 1
   fi
 
+  if [ "$protocol" = udp ]; then
+    sed -i 's/maxBytes: 10485760/maxBytes: 2097152/' "$config_dir/config.yaml"
+    set +e
+    docker run --rm \
+      -v "$data_dir:/etc/openvpn" \
+      -v "$config_dir:/etc/openvpn-config" \
+      --entrypoint ovpn \
+      "$IMAGE" config apply --yes --json >"$protocol_dir/apply-while-running.out" 2>"$protocol_dir/apply-while-running.err"
+    local apply_status=$?
+    set -e
+    sed -i 's/maxBytes: 2097152/maxBytes: 10485760/' "$config_dir/config.yaml"
+    if [ "$apply_status" -ne 75 ] || ! grep -Fq '"kind":"configuration_busy"' "$protocol_dir/apply-while-running.err"; then
+      cat "$protocol_dir/apply-while-running.out" >&2
+      cat "$protocol_dir/apply-while-running.err" >&2
+      printf 'config apply while running returned %s\n' "$apply_status" >&2
+      return 1
+    fi
+  fi
+
   set +e
   docker run --rm \
+    --name "$client_container" \
     --network "$network" \
     --cap-add NET_ADMIN \
     --device /dev/net/tun \
     -v "$protocol_dir/client.ovpn:/client.ovpn:ro" \
     --entrypoint /usr/bin/timeout \
-    "$IMAGE" 20s openvpn --config /client.ovpn >"$protocol_dir/client.log" 2>&1
+    "$IMAGE" 20s openvpn --config /client.ovpn >"$protocol_dir/client.log" 2>&1 &
+  local client_process=$!
+  active_containers+=("$client_container")
+  set -e
+
+  for _ in $(seq 1 60); do
+    if grep -Fq 'Initialization Sequence Completed' "$protocol_dir/client.log"; then
+      break
+    fi
+    sleep 0.5
+  done
+  if ! grep -Fq 'Initialization Sequence Completed' "$protocol_dir/client.log"; then
+    cat "$protocol_dir/client.log" >&2
+    docker logs "$server" >&2 || true
+    return 1
+  fi
+
+  local runtime_status
+  runtime_status="$(docker exec "$server" ovpn runtime status --json)"
+  if ! grep -Fq '"client_count":1' <<<"$runtime_status" || ! grep -Fq "\"client_name\":\"$client\"" <<<"$runtime_status"; then
+    printf '%s\n' "$runtime_status" >&2
+    return 1
+  fi
+
+  set +e
+  wait "$client_process"
   local status=$?
   set -e
   if [ "$status" -ne 124 ] || ! grep -Fq 'Initialization Sequence Completed' "$protocol_dir/client.log"; then

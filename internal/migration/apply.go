@@ -90,7 +90,7 @@ func Apply(ctx context.Context, options ApplyOptions) (ApplyResult, error) {
 	}
 	lockCtx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
-	runtimeLock, err := artifact.AcquireLock(lockCtx, filepath.Join(options.RuntimeDir, ".runtime.lock"), artifact.LockExclusive)
+	runtimeLock, err := artifact.AcquireLock(lockCtx, artifact.RuntimeLockPath(options.DataDir), artifact.LockExclusive)
 	if err != nil {
 		return ApplyResult{}, err
 	}

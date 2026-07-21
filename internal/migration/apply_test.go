@@ -323,7 +323,7 @@ func TestApplyRequiresMaintenanceAndStoppedRuntime(t *testing.T) {
 		t.Fatalf("maintenance error=%v", err)
 	}
 	options.Maintenance = true
-	shared, err := artifact.AcquireLock(context.Background(), filepath.Join(options.RuntimeDir, ".runtime.lock"), artifact.LockShared)
+	shared, err := artifact.AcquireLock(context.Background(), artifact.RuntimeLockPath(options.DataDir), artifact.LockShared)
 	if err != nil {
 		t.Fatal(err)
 	}

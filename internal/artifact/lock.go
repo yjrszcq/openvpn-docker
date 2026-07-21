@@ -23,6 +23,12 @@ type FileLock struct {
 	file *os.File
 }
 
+// RuntimeLockPath returns the cross-container coordination lock stored with
+// the shared instance data rather than container-local runtime sockets.
+func RuntimeLockPath(dataDir string) string {
+	return filepath.Join(dataDir, ".ovpn-runtime.lock")
+}
+
 func AcquireLock(ctx context.Context, lockPath string, mode LockMode) (*FileLock, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrLocked, err)

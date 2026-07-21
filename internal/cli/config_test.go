@@ -150,7 +150,7 @@ func TestConfigApplyMapsRuntimeLockToTemporaryFailure(t *testing.T) {
 	t.Setenv("OVPN_CONFIG_FILE", configPath)
 	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
 	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
-	lock, err := artifact.AcquireLock(context.Background(), filepath.Join(runtimeDir, ".runtime.lock"), artifact.LockShared)
+	lock, err := artifact.AcquireLock(context.Background(), artifact.RuntimeLockPath(root), artifact.LockShared)
 	if err != nil {
 		t.Fatal(err)
 	}

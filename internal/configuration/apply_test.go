@@ -19,7 +19,7 @@ import (
 )
 
 func TestApplyCommitsNetworkAddressAndArtifactsAsOneOperation(t *testing.T) {
-	manager, store, root, runtimeDir, instance := applyFixture(t)
+	manager, store, root, _, instance := applyFixture(t)
 	now := time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC)
 	address, _ := domain.ParseAddress("10.42.0.10")
 	client := storesqlite.ClientState{Client: domain.Client{ID: "61616161-6161-4616-8616-616161616161", Name: "alpha", Status: domain.ClientActive}, CreatedAt: now, Assignment: &storesqlite.AddressAssignment{ID: "62626262-6262-4626-8626-626262626262", NetworkID: instance.NetworkID, Kind: "static", Address: &address, Status: storesqlite.AssignmentActive, CreatedAt: now, UpdatedAt: now}}
@@ -50,7 +50,7 @@ func TestApplyCommitsNetworkAddressAndArtifactsAsOneOperation(t *testing.T) {
 	if err != nil || string(ccd) != "ifconfig-push 10.43.0.10 255.255.255.0\n" {
 		t.Fatalf("ccd=%q err=%v", ccd, err)
 	}
-	if _, err := os.Stat(filepath.Join(runtimeDir, ".runtime.lock")); err != nil {
+	if _, err := os.Stat(artifact.RuntimeLockPath(root)); err != nil {
 		t.Fatalf("runtime lock file was not retained safely: %v", err)
 	}
 }
@@ -93,8 +93,8 @@ func TestApplyRollsBackInstalledFilesWhenSQLiteCommitFails(t *testing.T) {
 }
 
 func TestApplyRefusesRunningSupervisorLock(t *testing.T) {
-	manager, store, _, runtimeDir, instance := applyFixture(t)
-	shared, err := artifact.AcquireLock(context.Background(), filepath.Join(runtimeDir, ".runtime.lock"), artifact.LockShared)
+	manager, store, root, _, instance := applyFixture(t)
+	shared, err := artifact.AcquireLock(context.Background(), artifact.RuntimeLockPath(root), artifact.LockShared)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestApplyRefusesPendingOperationBeforePlanningNewMutation(t *testing.T) {
 func TestApplyPersistentChecksRuntimeLockBeforeOpeningSQLite(t *testing.T) {
 	dataDir := filepath.Join(t.TempDir(), "data-without-database")
 	runtimeDir := filepath.Join(t.TempDir(), "run")
-	lock, err := artifact.AcquireLock(context.Background(), filepath.Join(runtimeDir, ".runtime.lock"), artifact.LockShared)
+	lock, err := artifact.AcquireLock(context.Background(), artifact.RuntimeLockPath(dataDir), artifact.LockShared)
 	if err != nil {
 		t.Fatal(err)
 	}

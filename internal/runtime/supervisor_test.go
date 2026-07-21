@@ -187,6 +187,33 @@ func TestSupervisorRefusesSecondServerProcess(t *testing.T) {
 	}
 }
 
+func TestSupervisorHoldsSharedDataRuntimeLock(t *testing.T) {
+	markers := t.TempDir()
+	t.Setenv("OVPN_RUNTIME_HELPER", "1")
+	t.Setenv("OVPN_RUNTIME_MARKERS", markers)
+	installHelperBuilder(t)
+	dataDir := filepath.Join(t.TempDir(), "data")
+	runtimeDir := filepath.Join(t.TempDir(), "run")
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- testSupervisor(dataDir, runtimeDir).Run(ctx, nil, testInstance()) }()
+	waitForFile(t, filepath.Join(markers, "openvpn-started"))
+	lockCtx, lockCancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer lockCancel()
+	if _, err := artifact.AcquireLock(lockCtx, artifact.RuntimeLockPath(dataDir), artifact.LockExclusive); !errors.Is(err, artifact.ErrLocked) {
+		t.Fatalf("exclusive runtime lock error=%v", err)
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("supervisor did not stop")
+	}
+}
+
 func TestSupervisorReconcilesBeforeStartAndCleansAfterStop(t *testing.T) {
 	markers := t.TempDir()
 	t.Setenv("OVPN_RUNTIME_HELPER", "1")

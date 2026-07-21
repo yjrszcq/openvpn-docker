@@ -21,7 +21,7 @@ func TestHealthAndStatusUseBrokerProtocol(t *testing.T) {
 	}
 	clientID := "11111111-1111-4111-8111-111111111111"
 	statusSocket, statusCommand := brokerFixture(t, []string{
-		"TITLE,OpenVPN 2.7", "HEADER,CLIENT_LIST,Common Name,Real Address,Virtual Address", "CLIENT_LIST," + clientID + ",192.0.2.10:44321,10.42.0.200", "END",
+		"TITLE\tOpenVPN 2.7", "HEADER\tCLIENT_LIST\tCommon Name\tReal Address\tVirtual Address", "CLIENT_LIST\t" + clientID + "\t192.0.2.10:44321\t10.42.0.200", "END",
 	})
 	status, err := QueryStatus(context.Background(), statusSocket, map[string]string{clientID: "laptop"})
 	if err != nil {

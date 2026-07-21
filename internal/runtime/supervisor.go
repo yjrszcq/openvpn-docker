@@ -63,7 +63,7 @@ func (supervisor Supervisor) Run(ctx context.Context, hup <-chan os.Signal, inst
 		return err
 	}
 	defer serverLock.Release()
-	runtimeLock, err := acquireLock(ctx, filepath.Join(supervisor.RuntimeDir, ".runtime.lock"), artifact.LockShared, supervisor.LockTimeout)
+	runtimeLock, err := acquireLock(ctx, artifact.RuntimeLockPath(supervisor.DataDir), artifact.LockShared, supervisor.LockTimeout)
 	if err != nil {
 		return err
 	}

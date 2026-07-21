@@ -23,7 +23,8 @@ maintenance 服务的 entrypoint 已经是 `ovpn`，因此 `<command>` 直接从
 |---|---|---|
 | 期望 YAML | `/etc/openvpn-config/config.yaml` | `OVPN_CONFIG_FILE` |
 | 持久化数据 | `/etc/openvpn` | `OVPN_DATA_DIR` |
-| runtime socket 与锁 | `/run/openvpn-container` | `OVPN_RUNTIME_DIR` |
+| 协调锁 | `/etc/openvpn` | `OVPN_DATA_DIR` |
+| runtime socket | `/run/openvpn-container` | `OVPN_RUNTIME_DIR` |
 | SQLite 权威库 | `/etc/openvpn/meta/state.db` | 由 data dir 派生 |
 
 `OVPN_MAINTENANCE=true` 授权离线迁移。批量地址编辑器依次取

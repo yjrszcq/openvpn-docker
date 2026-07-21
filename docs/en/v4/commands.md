@@ -25,7 +25,8 @@ Default paths:
 |---|---|---|
 | Desired YAML | `/etc/openvpn-config/config.yaml` | `OVPN_CONFIG_FILE` |
 | Persistent data | `/etc/openvpn` | `OVPN_DATA_DIR` |
-| Runtime sockets and locks | `/run/openvpn-container` | `OVPN_RUNTIME_DIR` |
+| Coordination locks | `/etc/openvpn` | `OVPN_DATA_DIR` |
+| Runtime sockets | `/run/openvpn-container` | `OVPN_RUNTIME_DIR` |
 | SQLite authority | `/etc/openvpn/meta/state.db` | derived from data dir |
 
 `OVPN_MAINTENANCE=true` authorizes offline migration. `OVPN_EDITOR`, then

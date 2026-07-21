@@ -90,7 +90,7 @@ func ApplyPersistent(ctx context.Context, desired domain.Config, renderer render
 	if paths.DataDir == "" || !filepath.IsAbs(paths.DataDir) || filepath.Clean(paths.DataDir) != paths.DataDir || paths.RuntimeDir == "" || !filepath.IsAbs(paths.RuntimeDir) || filepath.Clean(paths.RuntimeDir) != paths.RuntimeDir {
 		return ApplyResult{}, fmt.Errorf("configuration data and runtime paths are invalid")
 	}
-	runtimeLock, err := acquireApplyLock(ctx, filepath.Join(paths.RuntimeDir, ".runtime.lock"))
+	runtimeLock, err := acquireApplyLock(ctx, artifact.RuntimeLockPath(paths.DataDir))
 	if err != nil {
 		return ApplyResult{}, err
 	}
@@ -116,11 +116,11 @@ func ApplyPersistent(ctx context.Context, desired domain.Config, renderer render
 	return manager.applyLocked(ctx, desired)
 }
 
-// Apply obtains the exclusive runtime lock before the data lock. The running
-// supervisor holds the same runtime lock shared for its complete lifetime, so
-// an apply can never overlap OpenVPN startup or execution.
+// Apply obtains the exclusive shared-data runtime lock before the data lock.
+// The running supervisor holds the same lock for its complete lifetime, so an
+// apply in a separate container cannot overlap OpenVPN startup or execution.
 func (manager *Manager) Apply(ctx context.Context, desired domain.Config) (ApplyResult, error) {
-	runtimeLock, err := acquireApplyLock(ctx, filepath.Join(manager.paths.RuntimeDir, ".runtime.lock"))
+	runtimeLock, err := acquireApplyLock(ctx, artifact.RuntimeLockPath(manager.paths.DataDir))
 	if err != nil {
 		return ApplyResult{}, err
 	}
