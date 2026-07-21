@@ -59,9 +59,26 @@ func TestVersionJSONUsageError(t *testing.T) {
 }
 
 func TestUnimplementedCommandFailsExplicitly(t *testing.T) {
-	code, _, stderr := run("migrate", "plan")
+	code, _, stderr := run("migrate", "apply", "--yes")
 	if code != 1 || !strings.Contains(stderr, "not implemented") {
 		t.Fatalf("foundation command code=%d stderr=%q", code, stderr)
+	}
+}
+
+func TestMigrationPlanUsageAndStructuredRefusal(t *testing.T) {
+	code, stdout, stderr := run("migrate", "plan", "--help")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "Usage: ovpn migrate plan") {
+		t.Fatalf("help code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, _, stderr = run("migrate", "plan", "--json", "extra")
+	if code != 64 || !strings.Contains(stderr, `"kind":"usage"`) {
+		t.Fatalf("usage code=%d stderr=%q", code, stderr)
+	}
+	root := t.TempDir()
+	t.Setenv("OVPN_DATA_DIR", root)
+	code, stdout, stderr = run("migrate", "plan", "--json")
+	if code != 78 || stdout != "" || !strings.Contains(stderr, `"kind":"migration_source_invalid"`) {
+		t.Fatalf("refusal code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 
