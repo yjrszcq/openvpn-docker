@@ -17,11 +17,11 @@ import (
 
 func runRuntimeStatus(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn runtime status [--json]")
+		fmt.Fprintln(stdout, "Usage: ovpn runtime status [--json|-j]")
 		return int(apperror.ExitSuccess)
 	}
 	jsonRequested := containsArgument(args, "--json")
-	jsonMode := len(args) == 1 && args[0] == "--json"
+	jsonMode := len(args) == 1 && canonicalOption(args[0]) == "--json"
 	if len(args) != 0 && !jsonMode {
 		return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn runtime status [--json]"), jsonRequested)
 	}
@@ -80,7 +80,7 @@ func parseStreamOptions(args []string, events bool) (streamCLIOptions, error) {
 	options := streamCLIOptions{lines: 100}
 	seen := make(map[string]bool)
 	for index := 0; index < len(args); index++ {
-		name := args[index]
+		name := canonicalOption(args[index])
 		if seen[name] {
 			return options, fmt.Errorf("option %s is repeated", name)
 		}
@@ -119,7 +119,7 @@ func parseStreamOptions(args []string, events bool) (streamCLIOptions, error) {
 
 func runRuntimeLogs(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn runtime logs [--lines N] [--follow] [--raw] [--full-id]")
+		fmt.Fprintln(stdout, "Usage: ovpn runtime logs [--lines|-l N] [--follow|-f] [--raw|-r] [--full-id|-u]")
 		return int(apperror.ExitSuccess)
 	}
 	options, err := parseStreamOptions(args, false)
@@ -155,7 +155,7 @@ func runRuntimeLogs(args []string, stdout, stderr io.Writer) int {
 
 func runRuntimeEvents(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn runtime events [--lines N] [--follow] [--json] [--full-id]")
+		fmt.Fprintln(stdout, "Usage: ovpn runtime events [--lines|-l N] [--follow|-f] [--json|-j] [--full-id|-u]")
 		return int(apperror.ExitSuccess)
 	}
 	options, err := parseStreamOptions(args, true)
@@ -193,7 +193,7 @@ func runRuntimeEvents(args []string, stdout, stderr io.Writer) int {
 
 func containsArgument(args []string, wanted string) bool {
 	for _, value := range args {
-		if value == wanted {
+		if canonicalOption(value) == wanted {
 			return true
 		}
 	}

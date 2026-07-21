@@ -350,18 +350,21 @@ func runRuntimeCapabilities(args []string, stdout, stderr io.Writer) int {
 func runRuntimeCapabilitiesWith(args []string, stdout, stderr io.Writer, contractPath, binary string, runner compatibility.CommandRunner) int {
 	jsonMode := false
 	for _, arg := range args {
-		if arg == "--json" {
+		if canonicalOption(arg) == "--json" {
+			if jsonMode {
+				return writeErrorMode(stderr, usageError("--json may only be specified once"), true)
+			}
 			jsonMode = true
 		}
 	}
 	for _, arg := range args {
-		switch arg {
+		switch canonicalOption(arg) {
 		case "--json":
 		case "-h", "--help":
 			if len(args) != 1 {
 				return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "help does not accept additional arguments"), jsonMode)
 			}
-			fmt.Fprintln(stdout, "Usage: ovpn runtime capabilities [--json]")
+			fmt.Fprintln(stdout, "Usage: ovpn runtime capabilities [--json|-j]")
 			return int(apperror.ExitSuccess)
 		default:
 			return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn runtime capabilities [--json]"), jsonMode)
@@ -404,18 +407,21 @@ func runRuntimeCapabilitiesWith(args []string, stdout, stderr io.Writer, contrac
 func runConfigValidate(args []string, stdout, stderr io.Writer) int {
 	jsonMode := false
 	for _, arg := range args {
-		if arg == "--json" {
+		if canonicalOption(arg) == "--json" {
+			if jsonMode {
+				return writeErrorMode(stderr, usageError("--json may only be specified once"), true)
+			}
 			jsonMode = true
 		}
 	}
 	for _, arg := range args {
-		switch arg {
+		switch canonicalOption(arg) {
 		case "--json":
 		case "-h", "--help":
 			if len(args) != 1 {
 				return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "help does not accept additional arguments"), jsonMode)
 			}
-			fmt.Fprintln(stdout, "Usage: ovpn config validate [--json]")
+			fmt.Fprintln(stdout, "Usage: ovpn config validate [--json|-j]")
 			return int(apperror.ExitSuccess)
 		default:
 			return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn config validate [--json]"), jsonMode)
@@ -460,26 +466,27 @@ func commandPath(args []string) []string {
 	return path
 }
 
-func isHelp(value string) bool { return value == "-h" || value == "--help" }
+func isHelp(value string) bool { return canonicalOption(value) == "--help" }
 
 func runVersion(args []string, stdout, stderr io.Writer) int {
 	short, jsonMode := false, false
 	for _, arg := range args {
-		if arg == "--json" {
-			jsonMode = true
-		}
-	}
-	for _, arg := range args {
-		switch arg {
+		switch canonicalOption(arg) {
 		case "--short":
+			if short {
+				return writeErrorMode(stderr, usageError("--short may only be specified once"), jsonMode)
+			}
 			short = true
 		case "--json":
+			if jsonMode {
+				return writeErrorMode(stderr, usageError("--json may only be specified once"), true)
+			}
 			jsonMode = true
 		case "-h", "--help":
 			if len(args) != 1 {
 				return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "help does not accept additional arguments"), jsonMode)
 			}
-			fmt.Fprintln(stdout, "Usage: ovpn version [--short|--json]")
+			fmt.Fprintln(stdout, "Usage: ovpn version [--short|-s|--json|-j]")
 			return int(apperror.ExitSuccess)
 		default:
 			return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn version [--short|--json]"), jsonMode)

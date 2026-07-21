@@ -20,11 +20,11 @@ import (
 
 func runMigrationPlan(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn migrate plan [--json]")
+		fmt.Fprintln(stdout, "Usage: ovpn migrate plan [--json|-j]")
 		return int(apperror.ExitSuccess)
 	}
 	jsonRequested := containsArgument(args, "--json")
-	jsonMode := len(args) == 1 && args[0] == "--json"
+	jsonMode := len(args) == 1 && canonicalOption(args[0]) == "--json"
 	if len(args) != 0 && !jsonMode {
 		return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", "usage: ovpn migrate plan [--json]"), jsonRequested)
 	}
@@ -52,7 +52,7 @@ func runMigrationPlan(args []string, stdout, stderr io.Writer) int {
 
 func runMigrationApply(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn migrate apply [--yes] [--json]")
+		fmt.Fprintln(stdout, "Usage: ovpn migrate apply [--yes|-y] [--json|-j]")
 		return int(apperror.ExitSuccess)
 	}
 	yes, jsonMode, err := parseMigrationApplyOptions(args)
@@ -101,7 +101,7 @@ func runMigrationApply(args []string, stdout, stderr io.Writer) int {
 func parseMigrationApplyOptions(args []string) (bool, bool, error) {
 	var yes, jsonMode bool
 	for _, arg := range args {
-		switch arg {
+		switch canonicalOption(arg) {
 		case "--yes":
 			if yes {
 				return false, jsonMode, apperror.New(apperror.ExitUsage, "usage", "--yes may only be specified once")

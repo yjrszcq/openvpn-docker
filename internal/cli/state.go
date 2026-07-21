@@ -16,11 +16,11 @@ func runState(args []string, stdout, stderr io.Writer, doctor bool) int {
 		command = "doctor"
 	}
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintf(stdout, "Usage: ovpn state %s [--json]\n", command)
+		fmt.Fprintf(stdout, "Usage: ovpn state %s [--json|-j]\n", command)
 		return int(apperror.ExitSuccess)
 	}
 	jsonRequested := containsArgument(args, "--json")
-	jsonMode := len(args) == 1 && args[0] == "--json"
+	jsonMode := len(args) == 1 && canonicalOption(args[0]) == "--json"
 	if len(args) != 0 && !jsonMode {
 		return writeErrorMode(stderr, apperror.New(apperror.ExitUsage, "usage", fmt.Sprintf("usage: ovpn state %s [--json]", command)), jsonRequested)
 	}

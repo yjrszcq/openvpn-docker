@@ -26,22 +26,31 @@ import (
 func runClientList(args []string, stdout, stderr io.Writer) int {
 	detail, fullID, jsonMode := false, false, false
 	for _, arg := range args {
-		if arg == "--json" {
+		if canonicalOption(arg) == "--json" {
 			jsonMode = true
 		}
 	}
 	for _, arg := range args {
-		switch arg {
+		switch canonicalOption(arg) {
 		case "--detail":
+			if detail {
+				return writeErrorMode(stderr, usageError("--detail may only be specified once"), jsonMode)
+			}
 			detail = true
 		case "--full-id":
+			if fullID {
+				return writeErrorMode(stderr, usageError("--full-id may only be specified once"), jsonMode)
+			}
 			fullID = true
 		case "--json":
+			if countCanonicalOption(args, "--json") > 1 {
+				return writeErrorMode(stderr, usageError("--json may only be specified once"), true)
+			}
 		case "-h", "--help":
 			if len(args) != 1 {
 				return writeErrorMode(stderr, usageError("usage: ovpn client list [--detail] [--full-id] [--json]"), jsonMode)
 			}
-			fmt.Fprintln(stdout, "Usage: ovpn client list [--detail] [--full-id] [--json]")
+			fmt.Fprintln(stdout, "Usage: ovpn client list [--detail|-d] [--full-id|-u] [--json|-j]")
 			return int(apperror.ExitSuccess)
 		default:
 			return writeErrorMode(stderr, usageError("usage: ovpn client list [--detail] [--full-id] [--json]"), jsonMode)
@@ -91,7 +100,7 @@ func runClientList(args []string, stdout, stderr io.Writer) int {
 
 func runClientExport(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client export (NAME|--name NAME|--id ID) [--output FILE|-]")
+		fmt.Fprintln(stdout, "Usage: ovpn client export (NAME|--name|-n NAME|--id|-i ID) [--output|-o FILE|-]")
 		return int(apperror.ExitSuccess)
 	}
 	selector, output, err := parseClientExport(args)
@@ -121,7 +130,7 @@ func runClientExport(args []string, stdout, stderr io.Writer) int {
 
 func runClientCreate(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]]")
+		fmt.Fprintln(stdout, "Usage: ovpn client create NAME [--ipv4|-4 [auto|dynamic|ADDRESS]]")
 		return int(apperror.ExitSuccess)
 	}
 	if len(args) < 1 || len(args) > 3 || strings.HasPrefix(args[0], "-") {
@@ -129,7 +138,7 @@ func runClientCreate(args []string, stdout, stderr io.Writer) int {
 	}
 	request := clientservice.CreateRequest{Name: args[0], IPv4: "auto"}
 	if len(args) >= 2 {
-		if args[1] != "--ipv4" {
+		if canonicalOption(args[1]) != "--ipv4" {
 			return writeError(stderr, usageError("usage: ovpn client create NAME [--ipv4 [auto|dynamic|ADDRESS]]"))
 		}
 		if len(args) == 3 {
@@ -154,7 +163,7 @@ func runClientCreate(args []string, stdout, stderr io.Writer) int {
 
 func runClientRename(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client rename (NAME|--name NAME|--id ID) NEW_NAME")
+		fmt.Fprintln(stdout, "Usage: ovpn client rename (NAME|--name|-n NAME|--id|-i ID) NEW_NAME")
 		return int(apperror.ExitSuccess)
 	}
 	selector, positionals, err := parseMutationSelector(args)
@@ -176,13 +185,17 @@ func runClientRename(args []string, stdout, stderr io.Writer) int {
 
 func runClientRevoke(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client revoke (NAME|--name NAME|--id ID) [--release-ipv4]")
+		fmt.Fprintln(stdout, "Usage: ovpn client revoke (NAME|--name|-n NAME|--id|-i ID) [--release-ipv4|-4]")
 		return int(apperror.ExitSuccess)
 	}
 	release := false
 	filtered := make([]string, 0, len(args))
 	for _, arg := range args {
-		if arg == "--release-ipv4" {
+		option := canonicalOption(arg)
+		if arg == "-4" {
+			option = "--release-ipv4"
+		}
+		if option == "--release-ipv4" {
 			if release {
 				return writeError(stderr, usageError("--release-ipv4 may only be specified once"))
 			}
@@ -210,13 +223,13 @@ func runClientRevoke(args []string, stdout, stderr io.Writer) int {
 
 func runClientReissue(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client reissue (NAME|--name NAME|--id ID) [--ipv4 [auto|dynamic|ADDRESS]]")
+		fmt.Fprintln(stdout, "Usage: ovpn client reissue (NAME|--name|-n NAME|--id|-i ID) [--ipv4|-4 [auto|dynamic|ADDRESS]]")
 		return int(apperror.ExitSuccess)
 	}
 	ipv4 := ""
 	filtered := make([]string, 0, len(args))
 	for index := 0; index < len(args); index++ {
-		if args[index] != "--ipv4" {
+		if canonicalOption(args[index]) != "--ipv4" {
 			filtered = append(filtered, args[index])
 			continue
 		}
@@ -244,13 +257,13 @@ func runClientReissue(args []string, stdout, stderr io.Writer) int {
 
 func runClientDelete(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client delete (NAME|--name NAME|--id ID) [--yes]")
+		fmt.Fprintln(stdout, "Usage: ovpn client delete (NAME|--name|-n NAME|--id|-i ID) [--yes|-y]")
 		return int(apperror.ExitSuccess)
 	}
 	yes := false
 	filtered := make([]string, 0, len(args))
 	for _, arg := range args {
-		if arg == "--yes" {
+		if canonicalOption(arg) == "--yes" {
 			if yes {
 				return writeError(stderr, usageError("--yes may only be specified once"))
 			}
@@ -299,14 +312,14 @@ func confirmAction(stderr io.Writer, prompt string) (bool, error) {
 
 func runClientAddressSet(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client address set (NAME|--name NAME|--id ID) --ipv4 [auto|dynamic|ADDRESS]")
+		fmt.Fprintln(stdout, "Usage: ovpn client address set (NAME|--name|-n NAME|--id|-i ID) --ipv4|-4 [auto|dynamic|ADDRESS]")
 		return int(apperror.ExitSuccess)
 	}
 	ipv4 := ""
 	ipv4Set := false
 	filtered := make([]string, 0, len(args))
 	for index := 0; index < len(args); index++ {
-		if args[index] != "--ipv4" {
+		if canonicalOption(args[index]) != "--ipv4" {
 			filtered = append(filtered, args[index])
 			continue
 		}
@@ -335,7 +348,7 @@ func runClientAddressSet(args []string, stdout, stderr io.Writer) int {
 
 func runClientAddressRelease(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client address release (NAME|--name NAME|--id ID)")
+		fmt.Fprintln(stdout, "Usage: ovpn client address release (NAME|--name|-n NAME|--id|-i ID)")
 		return int(apperror.ExitSuccess)
 	}
 	selector, positionals, err := parseMutationSelector(args)
@@ -357,14 +370,15 @@ func runClientAddressRelease(args []string, stdout, stderr io.Writer) int {
 
 func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn client address edit (--all|NAME...|--name NAME...|--id ID...) [--yes]")
+		fmt.Fprintln(stdout, "Usage: ovpn client address edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--yes|-y]")
 		return int(apperror.ExitSuccess)
 	}
 	request := clientservice.AddressEditRequest{}
 	positionalNames := make([]string, 0)
 	yes, selectorKind := false, ""
 	for index := 0; index < len(args); index++ {
-		switch args[index] {
+		option := canonicalOption(args[index])
+		switch option {
 		case "--all":
 			if request.All {
 				return writeError(stderr, usageError("--all may only be specified once"))
@@ -379,7 +393,7 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 			if index+1 >= len(args) {
 				return writeError(stderr, usageError("client selector requires a value"))
 			}
-			kind := strings.TrimPrefix(args[index], "--")
+			kind := strings.TrimPrefix(option, "--")
 			if selectorKind != "" && selectorKind != kind {
 				return writeError(stderr, usageError("--name and --id cannot be mixed"))
 			}
@@ -460,7 +474,8 @@ func parseClientExport(args []string) (clientservice.Selector, string, error) {
 	var output string
 	positionals := make([]string, 0, 1)
 	for index := 0; index < len(args); index++ {
-		switch args[index] {
+		option := canonicalOption(args[index])
+		switch option {
 		case "-h", "--help":
 			return clientservice.Selector{}, "", usageError("usage: ovpn client export (NAME|--name NAME|--id ID) [--output FILE|-]")
 		case "--name", "--id", "--output":
@@ -469,7 +484,7 @@ func parseClientExport(args []string) (clientservice.Selector, string, error) {
 			}
 			value := args[index+1]
 			index++
-			switch args[index-1] {
+			switch option {
 			case "--name":
 				if selector.Name != "" {
 					return clientservice.Selector{}, "", usageError("--name may only be specified once")
@@ -577,14 +592,15 @@ func parseMutationSelector(args []string) (clientservice.Selector, []string, err
 	var selector clientservice.Selector
 	positionals := make([]string, 0, 1)
 	for index := 0; index < len(args); index++ {
-		switch args[index] {
+		option := canonicalOption(args[index])
+		switch option {
 		case "--name", "--id":
 			if index+1 >= len(args) {
 				return clientservice.Selector{}, nil, usageError("client selector requires a value")
 			}
 			value := args[index+1]
 			index++
-			if args[index-1] == "--name" {
+			if option == "--name" {
 				if selector.Name != "" {
 					return clientservice.Selector{}, nil, usageError("--name may only be specified once")
 				}

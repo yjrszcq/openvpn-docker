@@ -53,12 +53,12 @@ func runConfigShow(args []string, stdout, stderr io.Writer) int {
 
 func runConfigExport(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn config export [--output FILE|-]")
+		fmt.Fprintln(stdout, "Usage: ovpn config export [--output|-o FILE|-]")
 		return int(apperror.ExitSuccess)
 	}
 	output := ""
 	for index := 0; index < len(args); index++ {
-		if args[index] != "--output" || index+1 >= len(args) || output != "" {
+		if canonicalOption(args[index]) != "--output" || index+1 >= len(args) || output != "" {
 			return writeError(stderr, usageError("usage: ovpn config export [--output FILE|-]"))
 		}
 		output = args[index+1]
@@ -119,12 +119,12 @@ func runConfigPlan(args []string, stdout, stderr io.Writer) int {
 
 func runConfigApply(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn config apply [--yes] [--json]")
+		fmt.Fprintln(stdout, "Usage: ovpn config apply [--yes|-y] [--json|-j]")
 		return int(apperror.ExitSuccess)
 	}
 	yes, jsonMode := false, false
 	for _, arg := range args {
-		switch arg {
+		switch canonicalOption(arg) {
 		case "--yes":
 			if yes {
 				return writeErrorMode(stderr, usageError("--yes may only be specified once"), jsonMode)
@@ -177,12 +177,12 @@ func runConfigApply(args []string, stdout, stderr io.Writer) int {
 
 func runServerRender(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 && isHelp(args[0]) {
-		fmt.Fprintln(stdout, "Usage: ovpn server render [--output FILE|-]")
+		fmt.Fprintln(stdout, "Usage: ovpn server render [--output|-o FILE|-]")
 		return int(apperror.ExitSuccess)
 	}
 	output := ""
 	for index := 0; index < len(args); index++ {
-		if args[index] != "--output" || index+1 >= len(args) || output != "" {
+		if canonicalOption(args[index]) != "--output" || index+1 >= len(args) || output != "" {
 			return writeError(stderr, usageError("usage: ovpn server render [--output FILE|-]"))
 		}
 		output = args[index+1]
@@ -219,7 +219,7 @@ func runServerRender(args []string, stdout, stderr io.Writer) int {
 func parseJSONOnly(args []string, stdout, stderr io.Writer, command string) (int, bool) {
 	jsonMode := false
 	for _, arg := range args {
-		if arg == "--json" {
+		if canonicalOption(arg) == "--json" {
 			if jsonMode {
 				return writeErrorMode(stderr, usageError("--json may only be specified once"), true), false
 			}
@@ -227,13 +227,13 @@ func parseJSONOnly(args []string, stdout, stderr io.Writer, command string) (int
 		}
 	}
 	for _, arg := range args {
-		switch arg {
+		switch canonicalOption(arg) {
 		case "--json":
 		case "-h", "--help":
 			if len(args) != 1 {
 				return writeErrorMode(stderr, usageError("usage: "+command+" [--json]"), jsonMode), false
 			}
-			fmt.Fprintf(stdout, "Usage: %s [--json]\n", command)
+			fmt.Fprintf(stdout, "Usage: %s [--json|-j]\n", command)
 			return int(apperror.ExitSuccess), false
 		default:
 			return writeErrorMode(stderr, usageError("usage: "+command+" [--json]"), jsonMode), false
