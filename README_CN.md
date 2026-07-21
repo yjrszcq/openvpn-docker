@@ -203,7 +203,7 @@ docker compose up -d openvpn
 
 ```bash
 docker compose stop openvpn
-tar --numeric-owner -czf openvpn-v4-backup.tar.gz \
+sudo tar --numeric-owner -czf openvpn-v4-backup.tar.gz \
   openvpn-data openvpn-config
 docker compose up -d openvpn
 ```

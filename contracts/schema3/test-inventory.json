@@ -3,6 +3,7 @@
   "entries": [
     {"path":"tests/smoke/shell/check.sh","classification":"retain-build","replacement":"retain","area":"shell syntax and hygiene"},
     {"path":"tests/smoke/shell/docker-build-wrapper-smoke.sh","classification":"retain-build","replacement":"adapted","area":"image build orchestration"},
+    {"path":"tests/smoke/shell/documentation-smoke.sh","classification":"retain-build","replacement":"retain","area":"v4 documentation contract"},
     {"path":"tests/smoke/shell/license-smoke.sh","classification":"retain-build","replacement":"adapted","area":"license inventory"},
     {"path":"tests/smoke/shell/maintenance-compose-smoke.sh","classification":"retain-black-box","replacement":"adapted","area":"maintenance compose interface"},
     {"path":"tests/smoke/shell/release-metadata-smoke.sh","classification":"retain-build","replacement":"retain","area":"stable release metadata"},
@@ -12,6 +13,7 @@
     {"path":"tests/smoke/shell/update-openvpn-smoke.sh","classification":"retain-build","replacement":"retain","area":"upstream automation"},
     {"path":"tests/smoke/shell/workflow-smoke.sh","classification":"retain-build","replacement":"adapted","area":"CI workflow contract"},
     {"path":"tests/smoke/container/client-lifecycle-container-smoke.sh","classification":"retain-black-box","replacement":"adapted","area":"Go client lifecycle"},
+    {"path":"tests/smoke/container/backup-restore-container-smoke.sh","classification":"retain-black-box","replacement":"retain","area":"schema 4 backup and restore"},
     {"path":"tests/smoke/container/e2e-container-smoke.sh","classification":"retain-e2e","replacement":"adapted","area":"UDP and TCP VPN"},
     {"path":"tests/smoke/container/go-sqlite-handoff-smoke.sh","classification":"retain-migration-fixture","replacement":"retain","area":"schema 3 to Go SQLite handoff and rollback"},
     {"path":"tests/smoke/container/runtime-image-smoke.sh","classification":"retain-black-box","replacement":"adapted","area":"runtime image"}

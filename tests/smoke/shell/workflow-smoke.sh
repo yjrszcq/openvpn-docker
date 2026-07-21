@@ -24,6 +24,7 @@ grep -Fq 'scripts/verify-go-licenses.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'scripts/verify-release-metadata.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/release-metadata-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/container/runtime-image-smoke.sh' "$WORKFLOWS/test.yml"
+grep -Fq 'tests/smoke/container/backup-restore-container-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/container/client-lifecycle-container-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/container/e2e-container-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'OVPN_LIFECYCLE_REQUIRED=1' "$WORKFLOWS/test.yml"
@@ -37,6 +38,7 @@ grep -Fq -- '--build-arg "GO_BUILD_IMAGE=$GO_BUILD_IMAGE"' "$WORKFLOWS/test.yml"
 # shellcheck disable=SC2016 # Assert literal workflow build-argument expressions.
 grep -Fq -- '--build-arg "GO_RUNTIME_VERSION=$GO_RUNTIME_VERSION"' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/license-smoke.sh' "$WORKFLOWS/test.yml"
+grep -Fq 'tests/smoke/shell/documentation-smoke.sh' "$WORKFLOWS/test.yml"
 for retired in \
   management-broker-smoke.sh \
   management-hook-smoke.sh \

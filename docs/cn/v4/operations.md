@@ -256,13 +256,14 @@ docker compose exec openvpn ovpn runtime health
 ```bash
 docker compose stop openvpn
 
-cp openvpn-data/repair/migrations/schema3-pre-v4.tar.gz .
-cp openvpn-data/repair/migrations/schema3-pre-v4.tar.gz.sha256 .
+sudo cp openvpn-data/repair/migrations/schema3-pre-v4.tar.gz .
+sudo cp openvpn-data/repair/migrations/schema3-pre-v4.tar.gz.sha256 .
+sudo chown "$(id -u):$(id -g)" schema3-pre-v4.tar.gz schema3-pre-v4.tar.gz.sha256
 sha256sum -c schema3-pre-v4.tar.gz.sha256
 
 mkdir openvpn-data-schema3
 chmod 750 openvpn-data-schema3
-tar --numeric-owner -xzf schema3-pre-v4.tar.gz -C openvpn-data-schema3
+sudo tar --numeric-owner -xzf schema3-pre-v4.tar.gz -C openvpn-data-schema3
 
 mv openvpn-data openvpn-data-schema4
 mv openvpn-data-schema3 openvpn-data
@@ -281,7 +282,7 @@ SQLite 和文件 artifact 始终必须一起备份和恢复：
 
 ```bash
 docker compose stop openvpn
-tar --numeric-owner -czf openvpn-v4-$(date +%Y%m%d%H%M%S).tar.gz \
+sudo tar --numeric-owner -czf openvpn-v4-$(date +%Y%m%d%H%M%S).tar.gz \
   openvpn-data openvpn-config
 docker compose up -d openvpn
 ```
@@ -292,7 +293,7 @@ docker compose up -d openvpn
 
 ```bash
 mkdir restore-work
-tar --numeric-owner -xzf openvpn-v4-backup.tar.gz -C restore-work
+sudo tar --numeric-owner -xzf openvpn-v4-backup.tar.gz -C restore-work
 
 mv openvpn-data openvpn-data-before-restore
 mv openvpn-config openvpn-config-before-restore
