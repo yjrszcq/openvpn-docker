@@ -4,9 +4,9 @@
 
 本镜像使用 Go 控制面和 SQLite schema 4 运行 OpenVPN Community Edition，适合在 Linux 主机上部署基于证书的 IPv4 TUN VPN，不提供 Web 管理界面。
 
-## v4 提供的能力
+## 主要能力
 
-- CLI、entrypoint、OpenVPN hook、进程监督器和 management broker 均为 Go 二进制；镜像不再包含 Python 或旧的运行时 Shell 控制面。
+- CLI、entrypoint、OpenVPN hook、进程监督器和 management broker 均由 Go 二进制提供。
 - `/etc/openvpn/meta/state.db` 是配置、客户端、地址、artifact 元数据、审计和 operation 状态的唯一结构化权威来源。
 - Easy-RSA 仍是 PKI 签发权威。证书、私钥、CRL、tls-crypt、profile、CCD 和日志仍作为数据目录中的文件保存。
 - 使用严格 YAML 声明期望配置，拒绝未知字段、重复字段、错误类型、null 和多文档。
@@ -84,7 +84,7 @@ services:
       - doctor
 ```
 
-Docker Hub tag 使用镜像内 OpenVPN 版本。这里的项目镜像版本为 4.0.0，内含 OpenVPN 2.7.5；生产环境应固定明确 tag。
+Docker Hub tag 使用镜像内 OpenVPN 版本。这里的镜像内含 OpenVPN 2.7.5；生产环境应固定明确 tag。
 
 该示例会在空的 `openvpn-config` 目录中生成第一份规范 YAML。首次启动成功后，将 `OVPN_BOOTSTRAP_FROM_ENV` 改为 `"false"`；之后 bootstrap 变量会被忽略，绝不会覆盖 YAML 或 SQLite。若希望从一开始就手动管理 YAML，请复制并编辑 [config.example.yaml](config.example.yaml)，将 bootstrap 开关设为 `"false"`，并删除其余 `OVPN_BOOTSTRAP_*` 项。除 `version: 1` 外，只有 `server.endpoint` 与 `ipv4.network` 必填。
 
@@ -223,7 +223,7 @@ ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 
 ## schema 3 迁移
 
-v4 镜像只直接迁移 schema 3。schema 1/2 必须先使用 `sh-ver` 镜像升级到 schema 3。
+当前镜像只直接迁移 schema 3。schema 1/2 必须先使用 `sh-ver` 镜像升级到 schema 3。
 
 ```bash
 docker compose stop openvpn
@@ -237,7 +237,7 @@ docker compose run --rm -T openvpn-maintenance \
 docker compose up -d openvpn
 ```
 
-迁移安装 schema 4 前会创建 `/etc/openvpn/repair/migrations/schema3-pre-v4.tar.gz` 及其 SHA-256 sidecar。迁移成功后若要回滚，必须停止全部容器、校验并恢复完整快照，再运行 `sh-ver` 镜像；只切换镜像不等于数据回滚。
+迁移安装 schema 4 前会创建完整快照及其 SHA-256 sidecar。迁移成功后若要回滚，必须停止全部容器、校验并恢复该快照，再运行 `sh-ver` 镜像；只切换镜像不等于数据回滚。
 
 ## 备份与恢复
 
@@ -245,7 +245,7 @@ docker compose up -d openvpn
 
 ```bash
 docker compose stop openvpn
-sudo tar --numeric-owner -czf openvpn-v4-backup.tar.gz \
+sudo tar --numeric-owner -czf openvpn-backup.tar.gz \
   openvpn-data openvpn-config
 docker compose up -d openvpn
 ```
@@ -254,8 +254,8 @@ docker compose up -d openvpn
 
 ## 文档
 
-- [v4 命令参考](docs/cn/v4/commands.md)
-- [v4 操作手册](docs/cn/v4/operations.md)
+- [命令参考](docs/cn/v4/commands.md)
+- [操作手册](docs/cn/v4/operations.md)
 - [数据 schema 升级政策](docs/cn/data-schema-upgrade-policy.md)
 - [镜像更新政策](docs/cn/image-update-policy.md)
 - 历史版本：[v1](docs/cn/v1/commands.md)、[v2](docs/cn/v2/commands.md)、[v3](docs/cn/v3/commands.md)

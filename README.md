@@ -4,9 +4,9 @@
 
 This image runs OpenVPN Community Edition with a Go control plane and SQLite schema 4 state. It is intended for Linux hosts that need certificate-based IPv4 TUN access without a web interface.
 
-## What v4 provides
+## Features
 
-- Go binaries for the CLI, entrypoint, OpenVPN hook, supervisor, and management broker. Python and the legacy runtime Shell control plane are not included.
+- Go binaries provide the CLI, entrypoint, OpenVPN hook, process supervisor, and management broker.
 - SQLite at `/etc/openvpn/meta/state.db` as the sole authority for structured configuration, client, address, artifact metadata, audit, and operation state.
 - Easy-RSA remains the PKI authority. Certificates, private keys, CRL, tls-crypt material, profiles, CCD files, and logs remain files under the data directory.
 - Declarative YAML configuration with strict unknown-field, duplicate-field, type, null, and multi-document rejection.
@@ -86,7 +86,7 @@ services:
       - doctor
 ```
 
-Docker Hub tags follow the embedded OpenVPN version. The v4.0.0 project image shown here contains OpenVPN 2.7.5. Pin a concrete tag in production.
+Docker Hub tags follow the embedded OpenVPN version. The image shown here contains OpenVPN 2.7.5. Pin a concrete tag in production.
 
 The example generates the initial canonical YAML in the empty `openvpn-config` directory. After the first successful start, change `OVPN_BOOTSTRAP_FROM_ENV` to `"false"`; later bootstrap values are ignored and never overwrite YAML or SQLite. To manage YAML manually from the beginning, copy and edit [config.example.yaml](config.example.yaml), set the bootstrap switch to `"false"`, and omit the remaining `OVPN_BOOTSTRAP_*` entries. Only `server.endpoint` and `ipv4.network` are required beyond `version: 1`.
 
@@ -225,7 +225,7 @@ ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 
 ## Schema 3 migration
 
-The v4 image directly migrates schema 3 only. Schema 1 or 2 instances must first be upgraded to schema 3 with the `sh-ver` image.
+The current image directly migrates schema 3 only. Schema 1 or 2 instances must first be upgraded to schema 3 with the `sh-ver` image.
 
 ```bash
 docker compose stop openvpn
@@ -239,7 +239,7 @@ docker compose run --rm -T openvpn-maintenance \
 docker compose up -d openvpn
 ```
 
-Migration creates `/etc/openvpn/repair/migrations/schema3-pre-v4.tar.gz` and a matching SHA-256 sidecar before installing schema 4. To roll back after a successful migration, stop all containers, verify and restore the complete snapshot, then run the `sh-ver` image. Switching the image alone is not a data rollback.
+Migration creates a complete snapshot and matching SHA-256 sidecar before installing schema 4. To roll back after a successful migration, stop all containers, verify and restore that snapshot, then run the `sh-ver` image. Switching the image alone is not a data rollback.
 
 ## Backup and restore
 
@@ -247,7 +247,7 @@ The database and all PKI/artifact files are one restore unit. Never copy only `s
 
 ```bash
 docker compose stop openvpn
-sudo tar --numeric-owner -czf openvpn-v4-backup.tar.gz \
+sudo tar --numeric-owner -czf openvpn-backup.tar.gz \
   openvpn-data openvpn-config
 docker compose up -d openvpn
 ```
@@ -256,8 +256,8 @@ Restore into empty target directories while the service is stopped, preserve own
 
 ## Documentation
 
-- [v4 command reference](docs/en/v4/commands.md)
-- [v4 operations guide](docs/en/v4/operations.md)
+- [command reference](docs/en/v4/commands.md)
+- [operations guide](docs/en/v4/operations.md)
 - [data schema upgrade policy](docs/en/data-schema-upgrade-policy.md)
 - [image update policy](docs/en/image-update-policy.md)
 - Historical references: [v1](docs/en/v1/commands.md), [v2](docs/en/v2/commands.md), and [v3](docs/en/v3/commands.md)
