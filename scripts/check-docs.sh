@@ -68,6 +68,29 @@ for variable in "${documented_environment[@]}"; do
   grep -Fq "\`$variable\`" README_CN.md
 done
 
+extract_command_headings() {
+  sed -n 's/^### `\(ovpn .*\)`$/\1/p' "$1"
+}
+
+extract_command_usage() {
+  local file=$1
+  local label=$2
+  awk -v label="$label" '
+    $0 == label { waiting_for_fence = 1; next }
+    waiting_for_fence && $0 == "```text" { reading_usage = 1; waiting_for_fence = 0; next }
+    reading_usage { print; reading_usage = 0 }
+  ' "$file"
+}
+
+diff -u \
+  <(extract_command_headings docs/en/v4/commands.md) \
+  <(extract_command_headings docs/cn/v4/commands.md)
+diff -u \
+  <(extract_command_usage docs/en/v4/commands.md 'Syntax:') \
+  <(extract_command_usage docs/cn/v4/commands.md '语法：')
+test "$(extract_command_headings docs/en/v4/commands.md | wc -l)" -eq \
+  "$(extract_command_usage docs/en/v4/commands.md 'Syntax:' | wc -l)"
+
 if rg -n \
   'ovpn (start|init|network |client ip |runtime version)|--no-trunc|--release-ip([^v]|$)|compatibility/contract\.env|meta/client-ip\.csv|meta/audit\.jsonl|config export --output /etc/openvpn-config/config\.yaml' \
   README.md README_CN.md docs/en/v4 docs/cn/v4; then

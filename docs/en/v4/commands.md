@@ -1,8 +1,8 @@
-# OpenVPN CLI v4 Reference
+# OpenVPN CLI Reference
 
-This is the command contract for the Go and SQLite schema 4 control plane.
+This is the complete command reference for the current CLI in this source tree.
 
-## Invocation and paths
+## Scope and conventions
 
 Run live commands through the service container:
 
@@ -17,6 +17,10 @@ docker compose run --rm openvpn-maintenance <command>
 ```
 
 The maintenance service uses `ovpn` as its entrypoint, so `<command>` starts with `config`, `state`, `repair`, or `migrate`, not with another `ovpn`.
+
+- Existing clients can be selected by positional name, `--name/-n`, or `--id/-i`; an unqualified positional selector is always a name.
+- Validation and plan commands are read-only. Commands that change persistent state use locks, transactions, and confirmation where documented.
+- Persistent settings come from declarative YAML. Bootstrap environment variables are initialization inputs only.
 
 Default paths:
 
@@ -55,7 +59,7 @@ A new empty instance can generate its first YAML file from Compose environment v
 
 The normal YAML defaults and validation are applied, then a canonical mode `0600` file is installed at `OVPN_CONFIG_FILE`. An existing YAML file is accepted only when it normalizes to exactly the same configuration, allowing a failed initialization to be retried safely. A conflicting file is refused.
 
-After schema 4 exists, bootstrap variables are ignored with a warning. All later changes must use YAML with `config validate`, `config plan`, and offline `config apply`. Remove the bootstrap flag, or set it to `false`, after the first successful initialization.
+After initialization, bootstrap variables are ignored with a warning. All later changes must use YAML with `config validate`, `config plan`, and offline `config apply`. Remove the bootstrap flag, or set it to `false`, after the first successful initialization.
 
 ## Output and exit codes
 
@@ -101,46 +105,15 @@ Every public multi-letter option has a single-token short alias. Long and short 
 
 ```text
 ovpn
-├── server
-│   ├── init
-│   ├── run
-│   └── render [--output|-o FILE|-]
-├── config
-│   ├── validate [--json|-j]
-│   ├── show [--json|-j]
-│   ├── export [--output|-o FILE|-]
-│   ├── plan [--json|-j]
-│   └── apply [--yes|-y] [--json|-j]
-├── client
-│   ├── create NAME [--ipv4|-4 [auto|dynamic|ADDRESS]] [--output|-o FILE|-] [--full-id|-u] [--json|-j]
-│   ├── list [--detail|-d] [--full-id|-u] [--json|-j]
-│   ├── export (NAME|--name|-n NAME|--id|-i ID) [--output|-o FILE|-]
-│   ├── rename (NAME|--name|-n NAME|--id|-i ID) NEW_NAME [--full-id|-u] [--json|-j]
-│   ├── revoke (NAME|--name|-n NAME|--id|-i ID) [--release-ipv4|-4] [--full-id|-u] [--json|-j]
-│   ├── reissue (NAME|--name|-n NAME|--id|-i ID) [--ipv4|-4 [auto|dynamic|ADDRESS]] [--output|-o FILE|-] [--full-id|-u] [--json|-j]
-│   ├── delete (NAME|--name|-n NAME|--id|-i ID) [--yes|-y] [--full-id|-u] [--json|-j]
-│   └── address
-│       ├── set (NAME|--name|-n NAME|--id|-i ID) --ipv4|-4 [auto|dynamic|ADDRESS] [--full-id|-u] [--json|-j]
-│       ├── edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--yes|-y] [--json|-j]
-│       └── release (NAME|--name|-n NAME|--id|-i ID) [--full-id|-u] [--json|-j]
-├── state
-│   ├── show [--json|-j]
-│   └── doctor [--json|-j]
-├── repair
-│   ├── plan [--json|-j]
-│   └── apply [--yes|-y] [--json|-j]
-├── migrate
-│   ├── plan [--json|-j]
-│   └── apply [--yes|-y] [--json|-j]
-├── runtime
-│   ├── status [--json|-j] [--full-id|-u]
-│   ├── disconnect (NAME|--name|-n NAME|--id|-i ID) [--json|-j] [--full-id|-u]
-│   ├── health
-│   ├── capabilities [--json|-j]
-│   ├── logs [--lines|-l N] [--follow|-f] [--raw|-r] [--full-id|-u]
-│   └── events [--lines|-l N] [--follow|-f] [--json|-j] [--full-id|-u]
-├── completion (bash|zsh|fish)
-└── version [--short|-s|--json|-j]
+├── server       Initialize, run, or render the OpenVPN server.
+├── config       Validate, inspect, plan, or apply declarative configuration.
+├── client       Manage client identities, profiles, and addresses.
+├── state        Inspect authoritative instance state.
+├── repair       Plan or apply state repair.
+├── migrate      Plan or apply persistent data migration.
+├── runtime      Inspect and control the running OpenVPN service.
+├── completion   Generate shell completion for ovpn.
+└── version      Print build and data-format versions.
 ```
 
 All command groups and leaf commands accept `--help` or `-h`.
@@ -151,17 +124,35 @@ All command groups and leaf commands accept `--help` or `-h`.
 
 ### `ovpn server init`
 
+Syntax:
+
+```text
+ovpn server init
+```
+
 Initializes an empty schema 4 data directory from valid YAML. It stages and validates SQLite, PKI, server credentials, CRL, tls-crypt, configuration, and derived files before installation. A non-empty or unsupported legacy directory is refused.
 
 The image entrypoint calls initialization automatically only when the mounted data directory is empty. Explicit `server run` does not initialize missing state.
 
 ### `ovpn server run`
 
+Syntax:
+
+```text
+ovpn server run
+```
+
 Loads the applied SQLite snapshot, recovers interrupted operations, reconciles IPv4 forwarding/firewall state, starts the Go broker and OpenVPN, supervises both processes, and forwards TERM, INT, and HUP.
 
 Missing or changed YAML causes a warning; runtime continues with the last applied database revision. Configuration is never applied at startup.
 
-### `ovpn server render [--output FILE|-]`
+### `ovpn server render`
+
+Syntax:
+
+```text
+ovpn server render [--output|-o FILE|-]
+```
 
 Renders the server configuration from applied SQLite state. The default output is standard output. `--output -` is explicit standard output; any file target must satisfy the command's safe output rules.
 
@@ -169,23 +160,53 @@ Renders the server configuration from applied SQLite state. The default output i
 
 YAML version 1 requires `server.endpoint` and `ipv4.network`. Parsing is strict: unknown or duplicate fields, null values, multiple documents, incorrect types, noncanonical networks, unsupported values, and IPv6 tunnel state are rejected.
 
-### `ovpn config validate [--json]`
+### `ovpn config validate`
+
+Syntax:
+
+```text
+ovpn config validate [--json|-j]
+```
 
 Validates and normalizes desired YAML only. It does not open SQLite and does not compare or change applied state.
 
-### `ovpn config show [--json]`
+### `ovpn config show`
+
+Syntax:
+
+```text
+ovpn config show [--json|-j]
+```
 
 Displays the normalized applied configuration, revision, and SHA-256 digest from SQLite. It does not read desired YAML.
 
-### `ovpn config export [--output FILE|-]`
+### `ovpn config export`
+
+Syntax:
+
+```text
+ovpn config export [--output|-o FILE|-]
+```
 
 Writes a complete YAML v1 document from the applied SQLite snapshot. This is required after schema 3 migration if the instance did not already have v4 YAML. A file output is created with mode `0600` and is never overwritten; use stdout plus a temporary host file when replacing an existing YAML document.
 
-### `ovpn config plan [--json]`
+### `ovpn config plan`
+
+Syntax:
+
+```text
+ovpn config plan [--json|-j]
+```
 
 Compares desired YAML with the applied revision. The plan lists field changes and whether they require restart, address remapping, firewall reconciliation, derived artifact regeneration, or client-profile redistribution.
 
-### `ovpn config apply [--yes] [--json]`
+### `ovpn config apply`
+
+Syntax:
+
+```text
+ovpn config apply [--yes|-y] [--json|-j]
+```
 
 Requires OpenVPN to be stopped and takes the exclusive runtime lock. It applies ordinary configuration and IPv4 network/pool changes in one staged operation, updates SQLite, remaps addresses when required, regenerates derived files, and reports restart and redistribution requirements. It never performs an online reload.
 
@@ -209,39 +230,93 @@ IPv4 intent is expressed uniformly as:
 
 When `--ipv4` is present without a value, it means `auto`. Omitting the option entirely keeps each command's documented default behavior.
 
-### `ovpn client create NAME [--ipv4 ...] [--output FILE|-] [--json]`
+### `ovpn client create`
+
+Syntax:
+
+```text
+ovpn client create NAME [--ipv4|-4 [auto|dynamic|ADDRESS]] [--output|-o FILE|-] [--full-id|-u] [--json|-j]
+```
 
 Creates the UUID, Easy-RSA certificate and key, profile, address assignment, artifact metadata, operation record, and audit event. The default IPv4 intent is `auto`. `--output` exports the committed profile in the same command. File targets are mode `0600` and never overwritten; `--output -` writes only the profile to stdout and cannot be combined with JSON.
 
-### `ovpn client list [--detail] [--full-id] [--json]`
+### `ovpn client list`
+
+Syntax:
+
+```text
+ovpn client list [--detail|-d] [--full-id|-u] [--json|-j]
+```
 
 Lists current clients. `--detail` includes assignment and lease information. The default text ID is shortened; `--full-id` prints the full UUID. JSON uses a stable object representation.
 
-### `ovpn client export SELECTOR [--output FILE|-]`
+### `ovpn client export`
+
+Syntax:
+
+```text
+ovpn client export (NAME|--name|-n NAME|--id|-i ID) [--output|-o FILE|-]
+```
 
 Exports an active client's current profile. The default output is standard output. Treat the result as a private credential.
 
-### `ovpn client rename SELECTOR NEW_NAME [--json]`
+### `ovpn client rename`
+
+Syntax:
+
+```text
+ovpn client rename (NAME|--name|-n NAME|--id|-i ID) NEW_NAME [--full-id|-u] [--json|-j]
+```
 
 Changes the display name and profile filename without changing the UUID, certificate identity, address assignment, or audit history.
 
-### `ovpn client revoke SELECTOR [--release-ipv4] [--json]`
+### `ovpn client revoke`
+
+Syntax:
+
+```text
+ovpn client revoke (NAME|--name|-n NAME|--id|-i ID) [--release-ipv4|-4] [--full-id|-u] [--json|-j]
+```
 
 Revokes the certificate, regenerates the CRL, and marks the profile revoked. Static IPv4 is retained unless `--release-ipv4` is supplied. After the durable commit, the command tries to disconnect any current session. Runtime failure is reported as a warning/pending result and does not roll back the revocation.
 
-### `ovpn client reissue SELECTOR [--ipv4 ...] [--output FILE|-] [--json]`
+### `ovpn client reissue`
+
+Syntax:
+
+```text
+ovpn client reissue (NAME|--name|-n NAME|--id|-i ID) [--ipv4|-4 [auto|dynamic|ADDRESS]] [--output|-o FILE|-] [--full-id|-u] [--json|-j]
+```
 
 Issues a new key/certificate for the same UUID, updates CRL/profile state, and optionally changes the address intent. Omitting `--ipv4` retains the current assignment intent; specifying it without a value changes it to `auto`. The old session is disconnected after commit, and `--output` can return the replacement profile directly. The replacement profile must be redistributed.
 
-### `ovpn client delete SELECTOR [--yes]`
+### `ovpn client delete`
+
+Syntax:
+
+```text
+ovpn client delete (NAME|--name|-n NAME|--id|-i ID) [--yes|-y] [--full-id|-u] [--json|-j]
+```
 
 Revokes an active certificate when needed, removes local credentials and assignment state, and retains the UUID tombstone. It also attempts to remove a stale session for active or previously revoked clients. Deleted private keys are recoverable only from a secure backup.
 
-### `ovpn client address set SELECTOR --ipv4 ...`
+### `ovpn client address set`
+
+Syntax:
+
+```text
+ovpn client address set (NAME|--name|-n NAME|--id|-i ID) --ipv4|-4 [auto|dynamic|ADDRESS] [--full-id|-u] [--json|-j]
+```
 
 Changes one active client's assignment atomically and updates the CCD artifact. `--ipv4` without a value selects `auto`. The command disconnects the current session after commit so the new assignment can take effect.
 
-### `ovpn client address edit TARGETS [--yes]`
+### `ovpn client address edit`
+
+Syntax:
+
+```text
+ovpn client address edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--yes|-y] [--json|-j]
+```
 
 Selects all active clients or repeated names/IDs and opens a private CSV file:
 
@@ -254,35 +329,77 @@ tablet,10.42.0.20
 
 Every selected client must appear exactly once. Values are `auto`, `dynamic`, or a static IPv4 address. Positional names, `--name`, `--id`, and `--all` cannot be mixed. The complete set is validated and committed atomically, so address swaps are supported. The editor is selected from `OVPN_EDITOR`, then `EDITOR`, then installed `nano`; selected live sessions are disconnected after commit.
 
-### `ovpn client address release SELECTOR`
+### `ovpn client address release`
+
+Syntax:
+
+```text
+ovpn client address release (NAME|--name|-n NAME|--id|-i ID) [--full-id|-u] [--json|-j]
+```
 
 Releases the retained static assignment of a revoked client. It does not delete the client, profile history, certificate evidence, or tombstone.
 
 ## State and repair
 
-### `ovpn state show [--json]`
+### `ovpn state show`
+
+Syntax:
+
+```text
+ovpn state show [--json|-j]
+```
 
 Prints the aggregate state: `HEALTHY`, `DEGRADED_REPAIRABLE`, `DEGRADED_RECOVERABLE`, `DEGRADED_REISSUABLE`, `CRITICAL`, or `UNRECOVERABLE`. An empty directory is reported separately during initialization workflows.
 
-### `ovpn state doctor [--json]`
+### `ovpn state doctor`
+
+Syntax:
+
+```text
+ovpn state doctor [--json|-j]
+```
 
 Scans SQLite integrity and constraints, applied configuration, PKI, artifact metadata, certificates, keys, CRL, profiles, CCD, and interrupted operations. It reports issue IDs, evidence, severity, and recommended actions. It does not guess or recreate a missing/corrupt authoritative database.
 
-### `ovpn repair plan [--json]`
+### `ovpn repair plan`
+
+Syntax:
+
+```text
+ovpn repair plan [--json|-j]
+```
 
 Builds a read-only plan from the state report. Safe derived-file or evidence- backed recovery actions are listed separately from blockers and deferred work.
 
-### `ovpn repair apply [--yes] [--json]`
+### `ovpn repair apply`
+
+Syntax:
+
+```text
+ovpn repair apply [--yes|-y] [--json|-j]
+```
 
 Applies eligible actions under the exclusive lock with staging, operation journaling, validation, and rollback. Missing/corrupt SQLite authority or conflicting security evidence remains a backup-restore condition.
 
 ## Migration commands
 
-### `ovpn migrate plan [--json]`
+### `ovpn migrate plan`
+
+Syntax:
+
+```text
+ovpn migrate plan [--json|-j]
+```
 
 Reads schema 3 state without mutation and reports imported clients, assignments, leases, audit events, artifacts, normalization repairs, profile impact, snapshot paths, YAML export, and rollback instructions. Schema 1/2 is refused with an instruction to upgrade through `sh-ver`; newer, unknown, or corrupt sources are also refused.
 
-### `ovpn migrate apply [--yes] [--json]`
+### `ovpn migrate apply`
+
+Syntax:
+
+```text
+ovpn migrate apply [--yes|-y] [--json|-j]
+```
 
 Requires `OVPN_MAINTENANCE=true`, a stopped server, confirmation, and the exclusive lock. It creates and hashes a complete schema 3 snapshot, builds schema 4 in staging, validates `state doctor`, and installs atomically. Interrupted transactions are completed or rolled back deterministically.
 
@@ -290,33 +407,75 @@ After success, export YAML. Rollback requires restoring the complete verified sn
 
 ## Runtime commands
 
-### `ovpn runtime status [--json]`
+### `ovpn runtime status`
+
+Syntax:
+
+```text
+ovpn runtime status [--json|-j] [--full-id|-u]
+```
 
 Queries the management broker for daemon state, management state, connected clients, virtual addresses, and remote addresses. It requires a running server.
 
-### `ovpn runtime disconnect SELECTOR [--json] [--full-id]`
+### `ovpn runtime disconnect`
+
+Syntax:
+
+```text
+ovpn runtime disconnect (NAME|--name|-n NAME|--id|-i ID) [--json|-j] [--full-id|-u]
+```
 
 Disconnects current sessions for the selected immutable client UUID through the management broker. An already-offline client is a successful no-op. Deleted tombstones can be selected by ID to retry cleanup after a prior runtime outage. This command does not revoke credentials or prevent reconnection.
 
 ### `ovpn runtime health`
 
+Syntax:
+
+```text
+ovpn runtime health
+```
+
 Returns success and prints `healthy` only when the broker and OpenVPN runtime are healthy. This is the image healthcheck command.
 
-### `ovpn runtime capabilities [--json]`
+### `ovpn runtime capabilities`
+
+Syntax:
+
+```text
+ovpn runtime capabilities [--json|-j]
+```
 
 Reports the strict compatibility contract and probed OpenVPN features.
 
-### `ovpn runtime logs [options]`
+### `ovpn runtime logs`
+
+Syntax:
+
+```text
+ovpn runtime logs [--lines|-l N] [--follow|-f] [--raw|-r] [--full-id|-u]
+```
 
 Reads persistent OpenVPN logs. `--lines` defaults to 100, `--follow` follows rotation, `--raw` disables UUID-to-name translation, and `--full-id` prevents UUID shortening in translated output.
 
-### `ovpn runtime events [options]`
+### `ovpn runtime events`
+
+Syntax:
+
+```text
+ovpn runtime events [--lines|-l N] [--follow|-f] [--json|-j] [--full-id|-u]
+```
 
 Reads `events.jsonl`. Text output is human-readable. `--json` preserves JSONL, `--follow` follows appended events, and `--full-id` prevents UUID shortening.
 
 ## Completion command
 
-### `ovpn completion (bash|zsh|fish)`
+### `ovpn completion`
+
+Syntax:
+
+```text
+ovpn completion (bash|zsh|fish)
+```
 
 Writes a shell completion script to stdout. Commands and options are generated from the same static command tree used by help. Explicit `--name/-n` and `--id/-i` selector values query the current client list at completion time; private artifacts are never read. Install examples:
 
@@ -332,6 +491,26 @@ ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 
 ## Version command
 
-### `ovpn version [--short|--json]`
+### `ovpn version`
+
+Syntax:
+
+```text
+ovpn version [--short|-s|--json|-j]
+```
 
 Prints project image/runtime version, data schema, Go version, VCS revision, build date, and pinned Go module versions. `--short` prints only the project version; `--json` emits the stable version object.
+
+## Examples
+
+```bash
+# Create a client with the lowest available static address and save its profile.
+docker compose exec -T openvpn \
+  ovpn client create laptop --ipv4 --output - > laptop.ovpn
+
+# Preview a declarative configuration change without modifying applied state.
+docker compose exec openvpn ovpn config plan
+
+# Diagnose an instance through the maintenance service.
+docker compose run --rm openvpn-maintenance state doctor
+```
