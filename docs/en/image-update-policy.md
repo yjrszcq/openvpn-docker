@@ -9,7 +9,7 @@ The repository records separate release axes in `versions.env`:
 - `IMAGE_VERSION`: project control-plane and container release.
 - `DATA_SCHEMA`: persistent structured-state format.
 - `OPENVPN_VERSION`: OpenVPN Community Edition runtime built into the image.
-- `GO_RUNTIME_VERSION`: version reported by the Go binaries; for a stable release it must equal `IMAGE_VERSION`.
+- `GO_RUNTIME_VERSION`: version reported by the Go binaries; it is derived from `IMAGE_VERSION` in `versions.env`.
 
 Build inputs also pin the Go builder image and OpenVPN source checksum. `compatibility/contract.json` lists exact OpenVPN runtime versions and features verified for the image. `OPENVPN_CANDIDATE_RANGE` only constrains automation; it is not a compatibility claim.
 

@@ -9,7 +9,7 @@
 - `IMAGE_VERSION`：项目控制面和容器版本。
 - `DATA_SCHEMA`：持久化结构化状态格式。
 - `OPENVPN_VERSION`：镜像内构建的 OpenVPN Community Edition 版本。
-- `GO_RUNTIME_VERSION`：Go 二进制报告的版本；稳定发布时必须等于 `IMAGE_VERSION`。
+- `GO_RUNTIME_VERSION`：Go 二进制报告的版本；在 `versions.env` 中由 `IMAGE_VERSION` 派生。
 
 构建输入还固定 Go builder 镜像和 OpenVPN 源码 SHA-256。`compatibility/contract.json` 列出该镜像实际验证过的 OpenVPN 精确版本与 feature；`OPENVPN_CANDIDATE_RANGE` 只限制自动化，不代表兼容性承诺。
 

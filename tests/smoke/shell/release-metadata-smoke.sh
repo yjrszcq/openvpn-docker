@@ -16,7 +16,7 @@ mkdir -p "$TMP_DIR/scripts" "$TMP_DIR/internal/buildinfo"
 cp "$ROOT_DIR/scripts/verify-release-metadata.sh" "$TMP_DIR/scripts/"
 cp "$ROOT_DIR/internal/buildinfo/info.go" "$TMP_DIR/internal/buildinfo/"
 cp "$ROOT_DIR/versions.env" "$ROOT_DIR/go.mod" "$ROOT_DIR/LICENSE" "$ROOT_DIR/NOTICE" "$ROOT_DIR/Dockerfile" "$TMP_DIR/"
-sed -i 's/^GO_RUNTIME_VERSION=4.0.0$/GO_RUNTIME_VERSION=4.0.1/' "$TMP_DIR/versions.env"
+sed -i 's/^GO_RUNTIME_VERSION=${IMAGE_VERSION}$/GO_RUNTIME_VERSION=4.0.1/' "$TMP_DIR/versions.env"
 set +e
 "$TMP_DIR/scripts/verify-release-metadata.sh" >"$TMP_DIR/mismatch.out" 2>"$TMP_DIR/mismatch.err"
 status=$?
