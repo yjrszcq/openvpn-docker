@@ -52,6 +52,7 @@ type ApplyResult struct {
 
 type ActivationReport struct {
 	RestartRequired       bool        `json:"restart_required"`
+	RuntimeRestarted      bool        `json:"runtime_restarted"`
 	ProfileRedistribution []ClientRef `json:"profile_redistribution"`
 }
 
@@ -84,8 +85,9 @@ func NewManager(state ApplyStore, artifacts *artifact.LocalStore, renderer rende
 	return &Manager{state: state, artifacts: artifacts, renderer: renderer, paths: paths, now: func() time.Time { return time.Now().UTC() }}, nil
 }
 
-// ApplyPersistent acquires both cross-resource locks before opening SQLite, so
-// even an adapter migration cannot occur while the supervisor is running.
+// ApplyPersistent acquires both cross-resource locks before opening SQLite.
+// A live supervisor must yield its shared runtime lock through the control
+// protocol; an offline caller acquires the same exclusive lock directly.
 func ApplyPersistent(ctx context.Context, desired domain.Config, renderer render.Renderer, paths render.Paths) (ApplyResult, error) {
 	if paths.DataDir == "" || !filepath.IsAbs(paths.DataDir) || filepath.Clean(paths.DataDir) != paths.DataDir || paths.RuntimeDir == "" || !filepath.IsAbs(paths.RuntimeDir) || filepath.Clean(paths.RuntimeDir) != paths.RuntimeDir {
 		return ApplyResult{}, fmt.Errorf("configuration data and runtime paths are invalid")
@@ -117,8 +119,8 @@ func ApplyPersistent(ctx context.Context, desired domain.Config, renderer render
 }
 
 // Apply obtains the exclusive shared-data runtime lock before the data lock.
-// The running supervisor holds the same lock for its complete lifetime, so an
-// apply in a separate container cannot overlap OpenVPN startup or execution.
+// It is used only after a live supervisor has yielded or while the runtime is
+// offline, so configuration writes cannot overlap OpenVPN execution.
 func (manager *Manager) Apply(ctx context.Context, desired domain.Config) (ApplyResult, error) {
 	runtimeLock, err := acquireApplyLock(ctx, artifact.RuntimeLockPath(manager.paths.DataDir))
 	if err != nil {

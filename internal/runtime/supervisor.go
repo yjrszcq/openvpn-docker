@@ -33,6 +33,7 @@ type Supervisor struct {
 	StopTimeout    time.Duration
 	LockTimeout    time.Duration
 	Network        NetworkCoordinator
+	ReloadInstance func(context.Context, string) (storesqlite.InstanceState, error)
 }
 
 var commandBuilder = exec.Command
@@ -63,11 +64,20 @@ func (supervisor Supervisor) Run(ctx context.Context, hup <-chan os.Signal, inst
 		return err
 	}
 	defer serverLock.Release()
+	control, err := startControlServer(ctx, supervisor.RuntimeDir)
+	if err != nil {
+		return err
+	}
+	defer control.Close()
 	runtimeLock, err := acquireLock(ctx, artifact.RuntimeLockPath(supervisor.DataDir), artifact.LockShared, supervisor.LockTimeout)
 	if err != nil {
 		return err
 	}
-	defer runtimeLock.Release()
+	defer func() {
+		if runtimeLock != nil {
+			_ = runtimeLock.Release()
+		}
+	}()
 	coordinator := supervisor.Network
 	if coordinator == nil {
 		coordinator, err = networkcontrol.New(networkcontrol.Config{
@@ -79,20 +89,122 @@ func (supervisor Supervisor) Run(ctx context.Context, hup <-chan os.Signal, inst
 			return err
 		}
 	}
-	if err := coordinator.Reconcile(ctx, instance.ID, instance.Applied.Config); err != nil {
-		return fmt.Errorf("reconcile IPv4 network: %w", err)
+	reload := supervisor.ReloadInstance
+	if reload == nil {
+		reload = LoadInstance
 	}
-	defer func() {
+	var processes *runtimeProcesses
+	networkActive := false
+	cleanupNetwork := func(strict bool) error {
+		if !networkActive {
+			return nil
+		}
 		cleanupContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		if err := coordinator.Cleanup(cleanupContext, instance.ID); err != nil {
+			if strict {
+				return fmt.Errorf("clean up IPv4 network before config apply: %w", err)
+			}
 			fmt.Fprintf(os.Stderr, "ovpn: warning: IPv4 network cleanup failed: %v\n", err)
 		}
+		networkActive = false
+		return nil
+	}
+	stopRuntime := func() {
+		if processes != nil {
+			_ = signalProcess(processes.openvpn, syscall.SIGTERM)
+			_ = signalProcess(processes.broker, syscall.SIGTERM)
+			waitBoth(processes.openvpn, processes.broker, supervisor.StopTimeout)
+			processes = nil
+		}
+	}
+	startRuntime := func() error {
+		if err := coordinator.Reconcile(ctx, instance.ID, instance.Applied.Config); err != nil {
+			return fmt.Errorf("reconcile IPv4 network: %w", err)
+		}
+		networkActive = true
+		started, err := supervisor.startProcesses(ctx, instance)
+		if err != nil {
+			_ = cleanupNetwork(false)
+			return err
+		}
+		processes = started
+		return nil
+	}
+	if err := startRuntime(); err != nil {
+		return err
+	}
+	defer func() {
+		stopRuntime()
+		_ = cleanupNetwork(false)
 	}()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-hup:
+			if err := signalProcess(processes.openvpn, syscall.SIGHUP); err != nil {
+				return fmt.Errorf("forward HUP to OpenVPN: %w", err)
+			}
+		case <-processes.openvpn.done:
+			terminate(processes.broker, supervisor.StopTimeout)
+			err := processes.openvpn.err
+			if err == nil {
+				return fmt.Errorf("OpenVPN exited unexpectedly")
+			}
+			return fmt.Errorf("OpenVPN exited: %w", err)
+		case <-processes.broker.done:
+			terminate(processes.openvpn, supervisor.StopTimeout)
+			err := processes.broker.err
+			if err == nil {
+				return fmt.Errorf("management broker exited unexpectedly")
+			}
+			return fmt.Errorf("management broker exited: %w", err)
+		case request := <-control.requests:
+			stopRuntime()
+			if err := cleanupNetwork(true); err != nil {
+				request.ready <- err
+				return err
+			}
+			if err := runtimeLock.Release(); err != nil {
+				request.ready <- err
+				return err
+			}
+			runtimeLock = nil
+			request.ready <- nil
+			select {
+			case resume := <-request.resume:
+				if !resume {
+					return fmt.Errorf("configuration apply disconnected while the runtime was stopped")
+				}
+			case <-ctx.Done():
+				return nil
+			}
+			runtimeLock, err = acquireLock(ctx, artifact.RuntimeLockPath(supervisor.DataDir), artifact.LockShared, supervisor.LockTimeout)
+			if err == nil {
+				instance, err = reload(ctx, supervisor.DataDir)
+			}
+			if err == nil {
+				err = startRuntime()
+			}
+			request.done <- err
+			if err != nil {
+				return fmt.Errorf("restart runtime after configuration apply: %w", err)
+			}
+		}
+	}
+}
+
+type runtimeProcesses struct {
+	openvpn *childProcess
+	broker  *childProcess
+}
+
+func (supervisor Supervisor) startProcesses(ctx context.Context, instance storesqlite.InstanceState) (*runtimeProcesses, error) {
 	listen := filepath.Join(supervisor.RuntimeDir, "management.sock")
 	backend := filepath.Join(supervisor.RuntimeDir, "openvpn-management.sock")
 	if err := removeSocket(backend); err != nil {
-		return err
+		return nil, err
 	}
 	brokerCommand := commandBuilder(supervisor.BrokerBinary,
 		"--listen", listen, "--backend", backend,
@@ -105,45 +217,18 @@ func (supervisor Supervisor) Run(ctx context.Context, hup <-chan os.Signal, inst
 	openvpnCommand.Stderr = os.Stderr
 	brokerProcess, err := startProcess(brokerCommand)
 	if err != nil {
-		return fmt.Errorf("start management broker: %w", err)
+		return nil, fmt.Errorf("start management broker: %w", err)
 	}
 	if err := waitSocket(ctx, listen, brokerProcess, supervisor.StartupTimeout); err != nil {
 		terminate(brokerProcess, supervisor.StopTimeout)
-		return err
+		return nil, err
 	}
 	openvpnProcess, err := startProcess(openvpnCommand)
 	if err != nil {
 		terminate(brokerProcess, supervisor.StopTimeout)
-		return fmt.Errorf("start OpenVPN: %w", err)
+		return nil, fmt.Errorf("start OpenVPN: %w", err)
 	}
-	for {
-		select {
-		case <-ctx.Done():
-			_ = signalProcess(openvpnProcess, syscall.SIGTERM)
-			_ = signalProcess(brokerProcess, syscall.SIGTERM)
-			waitBoth(openvpnProcess, brokerProcess, supervisor.StopTimeout)
-			return nil
-		case <-hup:
-			if err := signalProcess(openvpnProcess, syscall.SIGHUP); err != nil {
-				waitBoth(openvpnProcess, brokerProcess, supervisor.StopTimeout)
-				return fmt.Errorf("forward HUP to OpenVPN: %w", err)
-			}
-		case <-openvpnProcess.done:
-			terminate(brokerProcess, supervisor.StopTimeout)
-			err := openvpnProcess.err
-			if err == nil {
-				return fmt.Errorf("OpenVPN exited unexpectedly")
-			}
-			return fmt.Errorf("OpenVPN exited: %w", err)
-		case <-brokerProcess.done:
-			terminate(openvpnProcess, supervisor.StopTimeout)
-			err := brokerProcess.err
-			if err == nil {
-				return fmt.Errorf("management broker exited unexpectedly")
-			}
-			return fmt.Errorf("management broker exited: %w", err)
-		}
-	}
+	return &runtimeProcesses{openvpn: openvpnProcess, broker: brokerProcess}, nil
 }
 
 func environmentOr(name, fallback string) string {

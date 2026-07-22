@@ -57,7 +57,7 @@ maintenance 服务的 entrypoint 已经是 `ovpn`，因此 `<command>` 直接从
 
 程序应用普通 YAML 的默认值和严格验证，然后在 `OVPN_CONFIG_FILE` 原子安装 mode `0600` 的规范 YAML。已有 YAML 只有在规范化后与环境配置完全一致时才接受，以便安全重试失败的初始化；内容冲突会被拒绝。
 
-初始化完成后，bootstrap 变量只会被忽略并输出 warning。之后所有修改必须通过 YAML 的 `config validate`、`config plan` 和离线 `config apply`。首次初始化成功后应删除 bootstrap 开关或将其设为 `false`。
+初始化完成后，bootstrap 变量只会被忽略并输出 warning。之后所有修改必须通过 YAML 的 `config validate`、`config plan` 和 `config apply`。首次初始化成功后应删除 bootstrap 开关或将其设为 `false`。
 
 ## 输出与退出码
 
@@ -112,7 +112,7 @@ ovpn
 │   ├── show            显示 applied SQLite 配置。
 │   ├── export          将 applied 配置导出为 YAML。
 │   ├── plan            规划期望配置到 applied 配置的变更。
-│   └── apply           在 OpenVPN 停止时应用期望配置。
+│   └── apply           应用配置并重启受管 runtime。
 ├── client
 │   ├── create          创建客户端及其凭据。
 │   ├── list            列出 active 和 revoked 客户端。
@@ -237,7 +237,7 @@ ovpn config plan [--json|-j]
 ovpn config apply [--yes|-y] [--json|-j]
 ```
 
-要求 OpenVPN 已停止并获取独占 runtime lock。普通配置与 IPv4 网段/动态池变化在同一 staging operation 中完成，统一更新 SQLite、重映射地址、生成派生文件并报告重启和重分发要求；不会在线 reload。
+普通配置与 IPv4 网段/动态池变化在同一 staging operation 中完成，统一更新 SQLite、按需重映射地址并生成派生文件。在在线容器内，supervisor 会停止 OpenVPN 和 broker、清理当前网络规则、释放共享 runtime lock，等待独占 apply 事务完成后重新读取已提交的 SQLite revision、reconcile 网络并重启两个进程，容器本身不会停止。没有在线 supervisor 时（包括 `openvpn-maintenance`），apply 保持原有离线行为，并报告仍需重启。JSON activation 使用 `runtime_restarted` 和 `restart_required` 区分两种结果。
 
 ## 客户端选择与身份
 

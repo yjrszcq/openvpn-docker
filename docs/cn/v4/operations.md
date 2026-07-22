@@ -248,14 +248,16 @@ docker compose exec openvpn \
 
 ### 验证并应用变更
 
-修改 YAML 不会自动改变 applied 状态。先在线验证和预览：
+修改 YAML 不会自动改变 applied 状态。常规在线容器流程为：
 
 ```bash
-docker compose exec openvpn ovpn config validate
 docker compose exec openvpn ovpn config plan
+docker compose exec openvpn ovpn config apply --yes
 ```
 
-然后停止 OpenVPN，通过 maintenance 服务应用：
+`config plan` 和 `config apply` 都会验证 YAML。apply 期间 supervisor 会暂时停止 OpenVPN 和 management broker、释放共享 runtime lock，在独占锁下执行 staging 事务，然后重新读取已提交的 revision 并重启受管进程；容器保持运行，但现有 VPN session 会因 OpenVPN 的受控重启而断开。
+
+当在线 runtime 异常，或管理员明确希望停服操作时，仍可使用离线 maintenance 流程：
 
 ```bash
 docker compose stop openvpn
@@ -267,7 +269,7 @@ docker compose up -d openvpn
 docker compose exec openvpn ovpn runtime health
 ```
 
-apply 前必须阅读 plan。endpoint/transport 变化要求重分发 profile；网段/动态池变化可能重映射静态地址并重建 CCD/server config；NAT、route 和 redirect-gateway 变化要求重启后 reconcile 防火墙。
+maintenance 命令不会启动或重启 OpenVPN，之后由 `docker compose up -d openvpn` 完成激活。apply 前必须阅读 plan。endpoint/transport 变化要求重分发 profile；网段/动态池变化可能重映射静态地址并重建 CCD/server config；NAT、route 和 redirect-gateway 变化会在受控重启期间 reconcile。
 
 YAML 发生漂移但未 apply 时，重启仍使用旧 applied revision 并输出警告，避免意外文件编辑直接改变运行服务。
 

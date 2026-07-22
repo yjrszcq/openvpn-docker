@@ -18,6 +18,7 @@ import (
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
 	"github.com/yjrszcq/openvpn-docker/internal/pki"
 	"github.com/yjrszcq/openvpn-docker/internal/render"
+	runtimecontrol "github.com/yjrszcq/openvpn-docker/internal/runtime"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
 )
 
@@ -172,9 +173,29 @@ func runConfigApply(args []string, stdout, stderr io.Writer) int {
 		return writeConfigurationApplyError(stderr, err, jsonMode)
 	}
 	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
-	result, err := configurationservice.ApplyPersistent(context.Background(), desired, renderer, render.Paths{DataDir: dataDir, RuntimeDir: environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)})
-	if err != nil {
-		return writeConfigurationApplyError(stderr, err, jsonMode)
+	runtimeDir := environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)
+	ctx := context.Background()
+	var session *runtimecontrol.ApplySession
+	if os.Getenv("OVPN_MAINTENANCE") != "true" {
+		session, err = runtimecontrol.BeginApply(ctx, runtimeDir)
+		if err != nil && !errors.Is(err, runtimecontrol.ErrControlUnavailable) {
+			return writeConfigurationApplyError(stderr, err, jsonMode)
+		}
+	}
+	result, applyErr := configurationservice.ApplyPersistent(ctx, desired, renderer, render.Paths{DataDir: dataDir, RuntimeDir: runtimeDir})
+	if session != nil {
+		restartErr := session.Resume(ctx)
+		if restartErr != nil {
+			if applyErr != nil {
+				return writeErrorMode(stderr, apperror.Wrap(apperror.ExitFailure, "configuration_activation_failed", "configuration apply failed and the OpenVPN runtime could not be restarted", errors.Join(applyErr, restartErr)), jsonMode)
+			}
+			return writeErrorMode(stderr, apperror.Wrap(apperror.ExitFailure, "configuration_activation_failed", "configuration was applied but the OpenVPN runtime could not be restarted", restartErr), jsonMode)
+		}
+		result.Activation.RuntimeRestarted = true
+		result.Activation.RestartRequired = false
+	}
+	if applyErr != nil {
+		return writeConfigurationApplyError(stderr, applyErr, jsonMode)
 	}
 	if jsonMode {
 		if err := json.NewEncoder(stdout).Encode(result); err != nil {
@@ -317,7 +338,7 @@ func writeConfigurationPlan(writer io.Writer, plan configurationservice.Plan) {
 	for _, change := range plan.Configuration.Changes {
 		fmt.Fprintf(writer, "  %s: %v -> %v\n", change.Field, change.Before, change.After)
 	}
-	fmt.Fprintf(writer, "Restart required: %t\nFirewall reconcile on next start: %t\n", plan.Configuration.Impact.RestartRequired, plan.Firewall.Reconcile)
+	fmt.Fprintf(writer, "Restart required: %t\nFirewall reconcile required at activation: %t\n", plan.Configuration.Impact.RestartRequired, plan.Firewall.Reconcile)
 	if len(plan.AddressChanges) > 0 {
 		fmt.Fprintln(writer, "IPv4 assignments:")
 		for _, change := range plan.AddressChanges {
@@ -347,8 +368,10 @@ func formatAddressIntent(value configurationservice.AddressIntent) string {
 
 func writeConfigurationApplyResult(writer io.Writer, result configurationservice.ApplyResult) {
 	fmt.Fprintf(writer, "Applied configuration revision %d (operation %s).\n", result.Plan.Configuration.TargetRevision, result.OperationID)
-	if result.Activation.RestartRequired {
-		fmt.Fprintln(writer, "Restart required: yes (OpenVPN was not reloaded by config apply).")
+	if result.Activation.RuntimeRestarted {
+		fmt.Fprintln(writer, "Runtime restarted: yes.")
+	} else if result.Activation.RestartRequired {
+		fmt.Fprintln(writer, "Restart required: yes (offline apply did not restart OpenVPN).")
 	} else {
 		fmt.Fprintln(writer, "Restart required: no.")
 	}
@@ -383,8 +406,8 @@ func writeConfigurationApplyError(stderr io.Writer, err error, jsonMode bool) in
 		return writeErrorMode(stderr, err, jsonMode)
 	}
 	switch {
-	case errors.Is(err, artifact.ErrLocked), errors.Is(err, storesqlite.ErrBusy):
-		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitTemporary, "configuration_busy", "OpenVPN must be stopped and configuration state unlocked", err), jsonMode)
+	case errors.Is(err, artifact.ErrLocked), errors.Is(err, storesqlite.ErrBusy), errors.Is(err, runtimecontrol.ErrControlRejected):
+		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitTemporary, "configuration_busy", "configuration state or runtime coordination is busy", err), jsonMode)
 	case errors.Is(err, pki.ErrInvalidMaterial), errors.Is(err, artifact.ErrUnsafePath), errors.Is(err, storesqlite.ErrConstraint), errors.Is(err, os.ErrNotExist):
 		return writeErrorMode(stderr, apperror.Wrap(apperror.ExitPolicy, "configuration_apply_refused", "configuration apply was refused by state or security policy", err), jsonMode)
 	default:

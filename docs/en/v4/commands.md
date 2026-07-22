@@ -59,7 +59,7 @@ A new empty instance can generate its first YAML file from Compose environment v
 
 The normal YAML defaults and validation are applied, then a canonical mode `0600` file is installed at `OVPN_CONFIG_FILE`. An existing YAML file is accepted only when it normalizes to exactly the same configuration, allowing a failed initialization to be retried safely. A conflicting file is refused.
 
-After initialization, bootstrap variables are ignored with a warning. All later changes must use YAML with `config validate`, `config plan`, and offline `config apply`. Remove the bootstrap flag, or set it to `false`, after the first successful initialization.
+After initialization, bootstrap variables are ignored with a warning. All later changes must use YAML with `config validate`, `config plan`, and `config apply`. Remove the bootstrap flag, or set it to `false`, after the first successful initialization.
 
 ## Output and exit codes
 
@@ -114,7 +114,7 @@ ovpn
 │   ├── show            Show the applied SQLite configuration.
 │   ├── export          Export the applied configuration as YAML.
 │   ├── plan            Plan desired-to-applied configuration changes.
-│   └── apply           Apply desired configuration while OpenVPN is stopped.
+│   └── apply           Apply configuration and restart the managed runtime.
 ├── client
 │   ├── create          Create a client and its credentials.
 │   ├── list            List active and revoked clients.
@@ -239,7 +239,7 @@ Syntax:
 ovpn config apply [--yes|-y] [--json|-j]
 ```
 
-Requires OpenVPN to be stopped and takes the exclusive runtime lock. It applies ordinary configuration and IPv4 network/pool changes in one staged operation, updates SQLite, remaps addresses when required, regenerates derived files, and reports restart and redistribution requirements. It never performs an online reload.
+Applies ordinary configuration and IPv4 network/pool changes in one staged operation, updates SQLite, remaps addresses when required, and regenerates derived files. In the live container, the supervisor stops OpenVPN and the broker, cleans the current network rules, releases its shared runtime lock, waits for the exclusive apply transaction, reloads the committed SQLite revision, reconciles networking, and restarts both processes before the command returns. The container itself remains running. When no live supervisor is available, including in `openvpn-maintenance`, apply retains the offline behavior and reports that a restart is still required. JSON activation output distinguishes `runtime_restarted` from `restart_required`.
 
 ## Client selection and identity
 

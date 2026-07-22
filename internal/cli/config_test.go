@@ -1,8 +1,11 @@
 package cli_test
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -94,7 +97,7 @@ func TestConfigApplyRequiresConfirmationAndCommitsOffline(t *testing.T) {
 		t.Fatalf("confirmation code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	code, stdout, stderr = run("config", "apply", "--yes", "--json")
-	if code != 0 || stderr != "" || !strings.Contains(stdout, `"applied":true`) || !strings.Contains(stdout, `"target_revision":2`) || !strings.Contains(stdout, `"restart_required":true`) || !strings.Contains(stdout, `"profile_redistribution":[]`) {
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"applied":true`) || !strings.Contains(stdout, `"target_revision":2`) || !strings.Contains(stdout, `"restart_required":true`) || !strings.Contains(stdout, `"runtime_restarted":false`) || !strings.Contains(stdout, `"profile_redistribution":[]`) {
 		t.Fatalf("apply code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	store, err := storesqlite.Open(context.Background(), filepath.Join(root, "meta", "state.db"))
@@ -112,6 +115,69 @@ func TestConfigApplyRequiresConfirmationAndCommitsOffline(t *testing.T) {
 	}
 	if strings.Contains(stdout, `"operation_id"`) {
 		t.Fatalf("in-sync apply unexpectedly reported an operation: %q", stdout)
+	}
+}
+
+func TestConfigApplyCoordinatesOnlineRuntimeRestart(t *testing.T) {
+	root, configPath := createConfigurationFixture(t)
+	runtimeDir := filepath.Join(t.TempDir(), "run")
+	if err := os.MkdirAll(runtimeDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	shared, err := artifact.AcquireLock(context.Background(), artifact.RuntimeLockPath(root), artifact.LockShared)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("unix", filepath.Join(runtimeDir, "supervisor.sock"))
+	if err != nil {
+		_ = shared.Release()
+		t.Fatal(err)
+	}
+	serverDone := make(chan error, 1)
+	go func() {
+		connection, err := listener.Accept()
+		if err != nil {
+			serverDone <- err
+			return
+		}
+		defer connection.Close()
+		_ = connection.SetDeadline(time.Now().Add(5 * time.Second))
+		reader := bufio.NewReader(connection)
+		command, err := reader.ReadString('\n')
+		if err != nil || strings.TrimSpace(command) != "APPLY" {
+			serverDone <- fmt.Errorf("apply command=%q err=%v", command, err)
+			return
+		}
+		if err := shared.Release(); err != nil {
+			serverDone <- err
+			return
+		}
+		if _, err := connection.Write([]byte("READY\n")); err != nil {
+			serverDone <- err
+			return
+		}
+		command, err = reader.ReadString('\n')
+		if err != nil || strings.TrimSpace(command) != "RESUME" {
+			serverDone <- fmt.Errorf("resume command=%q err=%v", command, err)
+			return
+		}
+		_, err = connection.Write([]byte("OK\n"))
+		serverDone <- err
+	}()
+	t.Cleanup(func() { _ = listener.Close() })
+	t.Setenv("OVPN_DATA_DIR", root)
+	t.Setenv("OVPN_RUNTIME_DIR", runtimeDir)
+	t.Setenv("OVPN_CONFIG_FILE", configPath)
+	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
+	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "templates"))
+	t.Setenv("OVPN_MAINTENANCE", "false")
+
+	code, stdout, stderr := run("config", "apply", "--yes", "--json")
+	if serverErr := <-serverDone; serverErr != nil {
+		t.Fatal(serverErr)
+	}
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"applied":true`) || !strings.Contains(stdout, `"restart_required":false`) || !strings.Contains(stdout, `"runtime_restarted":true`) {
+		t.Fatalf("online apply code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 

@@ -178,17 +178,14 @@ docker compose exec openvpn ovpn config validate
 docker compose exec openvpn ovpn config plan
 ```
 
-Applying configuration is deliberately offline. Stop the server, inspect the plan, apply under the exclusive lock, then restart:
+Apply through the running container. The supervisor temporarily stops OpenVPN and its broker, performs the exclusive configuration transaction, then restarts the managed runtime before the command returns:
 
 ```bash
-docker compose stop openvpn
-docker compose run --rm openvpn-maintenance config plan
-docker compose run --rm openvpn-maintenance config apply --yes
-docker compose run --rm openvpn-maintenance state doctor
-docker compose up -d openvpn
+docker compose exec openvpn ovpn config plan
+docker compose exec openvpn ovpn config apply --yes
 ```
 
-The plan reports restart, address remap, firewall reconciliation, derived-file, and profile redistribution impact. Network and dynamic-pool changes are part of the same `config apply`; there is no separate online network migration command.
+The container remains running, but connected VPN clients are disconnected during the controlled OpenVPN restart. The plan reports restart, address remap, firewall reconciliation, derived-file, and profile redistribution impact. Network and dynamic-pool changes are part of the same `config apply`; there is no separate network migration command. The stopped `openvpn-maintenance` workflow remains available for recovery and explicit offline operation; it applies the data change without starting runtime processes.
 
 ## Common operations
 

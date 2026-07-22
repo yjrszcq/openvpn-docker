@@ -122,21 +122,12 @@ YAML
 
   if [ "$protocol" = udp ]; then
     sed -i 's/maxBytes: 10485760/maxBytes: 2097152/' "$config_dir/config.yaml"
-    set +e
-    docker run --rm \
-      -v "$data_dir:/etc/openvpn" \
-      -v "$config_dir:/etc/openvpn-config" \
-      --entrypoint ovpn \
-      "$IMAGE" config apply --yes --json >"$protocol_dir/apply-while-running.out" 2>"$protocol_dir/apply-while-running.err"
-    local apply_status=$?
-    set -e
-    sed -i 's/maxBytes: 2097152/maxBytes: 10485760/' "$config_dir/config.yaml"
-    if [ "$apply_status" -ne 75 ] || ! grep -Fq '"kind":"configuration_busy"' "$protocol_dir/apply-while-running.err"; then
-      cat "$protocol_dir/apply-while-running.out" >&2
-      cat "$protocol_dir/apply-while-running.err" >&2
-      printf 'config apply while running returned %s\n' "$apply_status" >&2
-      return 1
-    fi
+    docker exec "$server" ovpn config plan --json >"$protocol_dir/apply-plan.json"
+    docker exec "$server" ovpn config apply --yes --json >"$protocol_dir/apply-while-running.json"
+    grep -Fq '"applied":true' "$protocol_dir/apply-while-running.json"
+    grep -Fq '"restart_required":false' "$protocol_dir/apply-while-running.json"
+    grep -Fq '"runtime_restarted":true' "$protocol_dir/apply-while-running.json"
+    docker exec "$server" ovpn runtime health
   fi
 
   set +e

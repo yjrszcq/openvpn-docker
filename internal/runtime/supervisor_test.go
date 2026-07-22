@@ -215,6 +215,78 @@ func TestSupervisorHoldsSharedDataRuntimeLock(t *testing.T) {
 	}
 }
 
+func TestSupervisorPausesForApplyAndRestartsRuntime(t *testing.T) {
+	markers := t.TempDir()
+	t.Setenv("OVPN_RUNTIME_HELPER", "1")
+	t.Setenv("OVPN_RUNTIME_MARKERS", markers)
+	installHelperBuilder(t)
+	dataDir := filepath.Join(t.TempDir(), "data")
+	runtimeDir := filepath.Join(t.TempDir(), "run")
+	network := &recordingNetwork{}
+	supervisor := testSupervisor(dataDir, runtimeDir)
+	supervisor.Network = network
+	var reloads atomic.Int32
+	supervisor.ReloadInstance = func(context.Context, string) (storesqlite.InstanceState, error) {
+		reloads.Add(1)
+		return testInstance(), nil
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- supervisor.Run(ctx, nil, testInstance()) }()
+	waitForFile(t, filepath.Join(markers, "openvpn-started"))
+
+	session, err := BeginApply(context.Background(), runtimeDir)
+	if err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	if _, err := BeginApply(context.Background(), runtimeDir); !errors.Is(err, ErrControlRejected) {
+		cancel()
+		t.Fatalf("concurrent apply error=%v", err)
+	}
+	exclusive, err := artifact.AcquireLock(context.Background(), artifact.RuntimeLockPath(dataDir), artifact.LockExclusive)
+	if err != nil {
+		cancel()
+		t.Fatalf("exclusive lock while paused: %v", err)
+	}
+	if network.cleaned.Load() != 1 {
+		t.Fatalf("network cleanup count while paused=%d", network.cleaned.Load())
+	}
+	if err := exclusive.Release(); err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	if err := session.Resume(context.Background()); err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	if reloads.Load() != 1 || network.reconciled.Load() != 2 {
+		cancel()
+		t.Fatalf("reloads=%d reconciled=%d", reloads.Load(), network.reconciled.Load())
+	}
+	lockCtx, lockCancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer lockCancel()
+	if _, err := artifact.AcquireLock(lockCtx, artifact.RuntimeLockPath(dataDir), artifact.LockExclusive); !errors.Is(err, artifact.ErrLocked) {
+		cancel()
+		t.Fatalf("exclusive lock after restart error=%v", err)
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("supervisor did not stop")
+	}
+}
+
+func TestBeginApplyReportsUnavailableSupervisor(t *testing.T) {
+	if _, err := BeginApply(context.Background(), t.TempDir()); !errors.Is(err, ErrControlUnavailable) {
+		t.Fatalf("unavailable control error=%v", err)
+	}
+}
+
 func TestSupervisorReconcilesBeforeStartAndCleansAfterStop(t *testing.T) {
 	markers := t.TempDir()
 	t.Setenv("OVPN_RUNTIME_HELPER", "1")

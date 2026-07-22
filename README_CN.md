@@ -176,17 +176,14 @@ docker compose exec openvpn ovpn config validate
 docker compose exec openvpn ovpn config plan
 ```
 
-配置应用必须离线进行：
+通过运行中的容器应用配置。supervisor 会暂时停止 OpenVPN 和 broker，执行独占配置事务，并在命令返回前重启受管 runtime：
 
 ```bash
-docker compose stop openvpn
-docker compose run --rm openvpn-maintenance config plan
-docker compose run --rm openvpn-maintenance config apply --yes
-docker compose run --rm openvpn-maintenance state doctor
-docker compose up -d openvpn
+docker compose exec openvpn ovpn config plan
+docker compose exec openvpn ovpn config apply --yes
 ```
 
-plan 会列出重启、地址重映射、防火墙 reconcile、派生文件和 profile 重分发影响。网段和动态池变化统一由 `config apply` 处理，不再存在独立的在线 network apply。
+容器保持运行，但现有 VPN 客户端会在 OpenVPN 受控重启时断开。plan 会列出重启、地址重映射、防火墙 reconcile、派生文件和 profile 重分发影响。网段和动态池变化统一由 `config apply` 处理，不再存在独立的 network migration 命令。停服后的 `openvpn-maintenance` 流程仍可用于恢复和明确的离线操作；它只应用数据变更，不启动 runtime 进程。
 
 ## 常用操作
 

@@ -58,7 +58,7 @@ func TestConfigurationApplyHumanOutputListsEveryProfile(t *testing.T) {
 	for _, expected := range []string{
 		"Applied configuration revision 4",
 		"Restart required: yes",
-		"OpenVPN was not reloaded",
+		"offline apply did not restart OpenVPN",
 		"Profiles to redistribute: 2",
 		"alpha [91919191-9191-4919-8919-919191919191]",
 		"beta [92929292-9292-4929-8929-929292929292]",
@@ -74,6 +74,15 @@ func TestConfigurationApplyHumanOutputReportsNoProfiles(t *testing.T) {
 	var output bytes.Buffer
 	writeConfigurationApplyResult(&output, result)
 	if !strings.Contains(output.String(), "Profiles to redistribute: none.") {
+		t.Fatalf("output=%q", output.String())
+	}
+}
+
+func TestConfigurationApplyHumanOutputReportsRuntimeRestart(t *testing.T) {
+	result := configurationservice.ApplyResult{Applied: true, Activation: configurationservice.ActivationReport{RuntimeRestarted: true, ProfileRedistribution: []configurationservice.ClientRef{}}, Plan: configurationservice.Plan{Configuration: configservice.Plan{TargetRevision: 2}}}
+	var output bytes.Buffer
+	writeConfigurationApplyResult(&output, result)
+	if !strings.Contains(output.String(), "Runtime restarted: yes.") || strings.Contains(output.String(), "Restart required: yes") {
 		t.Fatalf("output=%q", output.String())
 	}
 }

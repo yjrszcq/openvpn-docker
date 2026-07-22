@@ -250,14 +250,16 @@ docker compose exec openvpn \
 
 ### Validate and apply changes
 
-YAML changes do nothing until explicitly applied. Start with online validation and planning:
+YAML changes do nothing until explicitly applied. The normal live-container workflow is:
 
 ```bash
-docker compose exec openvpn ovpn config validate
 docker compose exec openvpn ovpn config plan
+docker compose exec openvpn ovpn config apply --yes
 ```
 
-Then stop OpenVPN and apply through the maintenance service:
+`config plan` and `config apply` both validate the YAML. During apply, the supervisor temporarily stops OpenVPN and the management broker, releases the shared runtime lock, applies the staged transaction under the exclusive lock, then reloads the committed revision and restarts the managed processes before returning. The container remains up; existing VPN sessions are disconnected by the controlled OpenVPN restart.
+
+The offline maintenance workflow remains available when the live runtime is unhealthy or an operator explicitly wants the server stopped:
 
 ```bash
 docker compose stop openvpn
@@ -269,7 +271,7 @@ docker compose up -d openvpn
 docker compose exec openvpn ovpn runtime health
 ```
 
-Inspect the plan before applying. Endpoint/transport changes require profile redistribution. Network/pool changes can remap static assignments and require CCD/server regeneration. NAT, routes, and redirect-gateway changes require firewall reconciliation after restart.
+The maintenance command does not start or restart OpenVPN; `docker compose up -d openvpn` performs activation afterward. Inspect the plan before applying. Endpoint/transport changes require profile redistribution. Network/pool changes can remap static assignments and require CCD/server regeneration. NAT, routes, and redirect-gateway changes are reconciled during the managed restart.
 
 If YAML differs but has not been applied, restarting the server continues with the old applied revision and prints a warning. This protects the running service from accidental file edits.
 
