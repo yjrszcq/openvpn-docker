@@ -34,14 +34,9 @@ mkdir -p openvpn-data openvpn-config
 chmod 750 openvpn-data openvpn-config
 ```
 
-Create `compose.yaml`. This version is self-contained and does not require a `.env` file. Replace `vpn.example.com` and choose a non-overlapping IPv4 network before starting:
+Create `docker-compose.yaml`. This version is self-contained and does not require a `.env` file. Replace `vpn.example.com` and choose a non-overlapping IPv4 network before starting:
 
 ```yaml
-x-openvpn-data: &openvpn-data
-  volumes:
-    - ./openvpn-data:/etc/openvpn
-    - ./openvpn-config:/etc/ovpn-conf
-
 services:
   openvpn:
     image: szcq/openvpn:2.7.5
@@ -52,29 +47,18 @@ services:
       OVPN_BOOTSTRAP_FROM_ENV: "true"
       OVPN_BOOTSTRAP_ENDPOINT: vpn.example.com
       OVPN_BOOTSTRAP_IPV4_NETWORK: 10.42.0.0/24
-    <<: *openvpn-data
+    volumes:
+      - ./openvpn-data:/etc/openvpn
+      - ./openvpn-config:/etc/ovpn-conf
     cap_add:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
-
-  openvpn-maintenance:
-    image: szcq/openvpn:2.7.5
-    restart: "no"
-    network_mode: host
-    environment:
-      OVPN_MAINTENANCE: "true"
-    <<: *openvpn-data
-    profiles:
-      - maintenance
-    entrypoint:
-      - /usr/local/bin/ovpn
-    command:
-      - state
-      - doctor
 ```
 
 Docker Hub tags follow the embedded OpenVPN version. The image shown here contains OpenVPN 2.7.5. Pin a concrete tag in production.
+
+The quick-start file intentionally contains only the live service. See the [operations guide](docs/en/v4/operations.md#runtime-conventions) for the `openvpn-maintenance` service definition and offline diagnosis, repair, migration, backup, and recovery workflows.
 
 The example shows only the three values required for one-time environment initialization; all omitted settings use the normal defaults. See the [environment-variable table](#environment-variables), [.env.example](.env.example), or the [bootstrap command reference](docs/en/v4/commands.md#one-time-environment-bootstrap) for every optional variable. After the first successful start, change `OVPN_BOOTSTRAP_FROM_ENV` to `"false"`; later bootstrap values are ignored and never overwrite YAML or SQLite.
 
@@ -197,10 +181,6 @@ docker compose exec openvpn ovpn runtime status
 docker compose exec openvpn ovpn runtime disconnect laptop
 docker compose exec openvpn ovpn runtime logs --lines 100 --follow
 docker compose exec openvpn ovpn runtime events --lines 100 --json
-
-docker compose run --rm openvpn-maintenance state doctor
-docker compose run --rm openvpn-maintenance repair plan
-docker compose run --rm openvpn-maintenance repair apply --yes
 ```
 
 Existing clients may be selected by positional `NAME`, explicit `--name NAME`, or `--id ID`. When neither selector option is present, the positional value is treated as the client name. `--id` accepts an unambiguous UUID prefix of at least eight hexadecimal characters. Mutating commands that can destroy or broadly rewrite state require interactive confirmation or `--yes`.

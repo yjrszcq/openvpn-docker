@@ -32,14 +32,9 @@ mkdir -p openvpn-data openvpn-config
 chmod 750 openvpn-data openvpn-config
 ```
 
-创建 `compose.yaml`。以下版本可以独立使用，不需要 `.env` 文件。启动前必须替换 `vpn.example.com`，并选择不重叠的 IPv4 网段：
+创建 `docker-compose.yaml`。以下版本可以独立使用，不需要 `.env` 文件。启动前必须替换 `vpn.example.com`，并选择不重叠的 IPv4 网段：
 
 ```yaml
-x-openvpn-data: &openvpn-data
-  volumes:
-    - ./openvpn-data:/etc/openvpn
-    - ./openvpn-config:/etc/ovpn-conf
-
 services:
   openvpn:
     image: szcq/openvpn:2.7.5
@@ -50,29 +45,18 @@ services:
       OVPN_BOOTSTRAP_FROM_ENV: "true"
       OVPN_BOOTSTRAP_ENDPOINT: vpn.example.com
       OVPN_BOOTSTRAP_IPV4_NETWORK: 10.42.0.0/24
-    <<: *openvpn-data
+    volumes:
+      - ./openvpn-data:/etc/openvpn
+      - ./openvpn-config:/etc/ovpn-conf
     cap_add:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
-
-  openvpn-maintenance:
-    image: szcq/openvpn:2.7.5
-    restart: "no"
-    network_mode: host
-    environment:
-      OVPN_MAINTENANCE: "true"
-    <<: *openvpn-data
-    profiles:
-      - maintenance
-    entrypoint:
-      - /usr/local/bin/ovpn
-    command:
-      - state
-      - doctor
 ```
 
 Docker Hub tag 使用镜像内 OpenVPN 版本。这里的镜像内含 OpenVPN 2.7.5；生产环境应固定明确 tag。
+
+快速部署文件有意只保留在线服务。`openvpn-maintenance` 的服务配置，以及离线诊断、修复、迁移、备份和恢复流程见[操作手册](docs/cn/v4/operations.md#运行环境约定)。
 
 该示例只列出一次性环境初始化所需的三个值，其余设置使用正常默认值。全部可选变量见[环境变量表](#环境变量)、[.env.example](.env.example) 和[初始化命令参考](docs/cn/v4/commands.md#一次性环境变量初始化)。首次启动成功后，将 `OVPN_BOOTSTRAP_FROM_ENV` 改为 `"false"`；之后 bootstrap 变量会被忽略，绝不会覆盖 YAML 或 SQLite。
 
@@ -195,10 +179,6 @@ docker compose exec openvpn ovpn runtime status
 docker compose exec openvpn ovpn runtime disconnect laptop
 docker compose exec openvpn ovpn runtime logs --lines 100 --follow
 docker compose exec openvpn ovpn runtime events --lines 100 --json
-
-docker compose run --rm openvpn-maintenance state doctor
-docker compose run --rm openvpn-maintenance repair plan
-docker compose run --rm openvpn-maintenance repair apply --yes
 ```
 
 已有客户端可用位置参数 `NAME`、显式 `--name NAME` 或 `--id ID` 选择。未提供 `--name` 或 `--id` 时，位置参数默认按客户端名称处理。`--id` 接受至少八位且唯一的 UUID 十六进制前缀。可能删除或批量改写状态的命令需要交互确认或 `--yes`。

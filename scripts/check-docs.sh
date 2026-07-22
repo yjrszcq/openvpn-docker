@@ -92,10 +92,22 @@ test "$(extract_command_headings docs/en/v4/commands.md | wc -l)" -eq \
   "$(extract_command_usage docs/en/v4/commands.md 'Syntax:' | wc -l)"
 
 for readme in README.md README_CN.md; do
-  test "$(sed -n '/^```yaml$/,/^```$/p' "$readme" | rg -c 'OVPN_BOOTSTRAP_')" -eq 3
+  readme_compose="$(sed -n '/^```yaml$/,/^```$/p' "$readme")"
+  test "$(printf '%s\n' "$readme_compose" | rg -c 'OVPN_BOOTSTRAP_')" -eq 3
+  printf '%s\n' "$readme_compose" | grep -Fq 'volumes:'
+  if printf '%s\n' "$readme_compose" | grep -Fq 'openvpn-maintenance:'; then
+    echo "$readme quick-start must not define openvpn-maintenance" >&2
+    exit 1
+  fi
+  grep -Fq 'docker-compose.yaml' "$readme"
   grep -Fq 'cp config.example.yaml openvpn-config/config.yaml' "$readme"
   grep -Fq '[.env.example](.env.example)' "$readme"
 done
+
+if rg -n --pcre2 '(?<!docker-)compose\.yaml' --glob '*.md' .; then
+  echo 'documentation contains the noncanonical compose.yaml filename' >&2
+  exit 1
+fi
 
 if rg -n \
   'ovpn (start|init|network |client ip |runtime version)|--no-trunc|--release-ip([^v]|$)|compatibility/contract\.env|meta/client-ip\.csv|meta/audit\.jsonl|/etc/openvpn-config' \

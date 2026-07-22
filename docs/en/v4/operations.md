@@ -19,7 +19,7 @@ docker compose run --rm openvpn-maintenance state doctor
 
 Both services must use the same target image and mount the same `openvpn-data` and `openvpn-config` directories.
 
-Add the following service next to `openvpn` in `compose.yaml`. It deliberately has no `devices`, `cap_add`, or published ports:
+Add the following service next to `openvpn` in `docker-compose.yaml`. It deliberately has no `devices`, `cap_add`, or published ports:
 
 ```yaml
   openvpn-maintenance:

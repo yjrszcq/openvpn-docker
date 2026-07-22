@@ -17,7 +17,7 @@ docker compose run --rm openvpn-maintenance state doctor
 
 两个服务必须使用相同目标镜像，并挂载同一个 `openvpn-data` 和 `openvpn-config`。
 
-在 `compose.yaml` 中将以下服务添加到 `openvpn` 旁边。它有意不配置 `devices`、`cap_add` 或端口映射：
+在 `docker-compose.yaml` 中将以下服务添加到 `openvpn` 旁边。它有意不配置 `devices`、`cap_add` 或端口映射：
 
 ```yaml
   openvpn-maintenance:
