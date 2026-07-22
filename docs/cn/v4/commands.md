@@ -7,8 +7,10 @@
 在线命令通过服务容器执行：
 
 ```bash
-docker compose exec openvpn ovpn <command>
+docker exec openvpn ovpn <command>
 ```
+
+示例假定 Compose 的 `container_name` 为 `openvpn`；如果修改了该值，需要替换为实际容器名。
 
 离线维护命令通过 one-shot maintenance 服务执行：
 
@@ -510,7 +512,7 @@ ovpn completion (bash|zsh|fish)
 
 向 stdout 输出 shell completion 脚本。命令和参数来自与 help 相同的静态命令树；只有显式补全 `--name/-n` 或 `--id/-i` 的值时才读取当前 client list，不读取私密 artifact。安装示例：
 
-脚本补全的是名为 `ovpn` 的直接命令。可在容器 shell 中使用，或在宿主机提供同名 wrapper，内部调用 `docker compose exec openvpn ovpn`。通过 Compose 生成时，把下面的 `ovpn completion` 换成 `docker compose exec -T openvpn ovpn completion`；动态 selector 也会调用同一个直接命令或 wrapper。
+脚本补全的是名为 `ovpn` 的直接命令。可在容器 shell 中使用，或在宿主机提供同名 wrapper，内部调用 `docker exec openvpn ovpn`。从宿主机生成时，把下面的 `ovpn completion` 换成 `docker exec openvpn ovpn completion`；动态 selector 也会调用同一个直接命令或 wrapper。
 
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
@@ -536,11 +538,11 @@ ovpn version [--short|-s|--json|-j]
 
 ```bash
 # 创建客户端、分配最低可用静态地址并保存 profile。
-docker compose exec -T openvpn \
+docker exec openvpn \
   ovpn client create laptop --ipv4 --output - > laptop.ovpn
 
 # 预览声明式配置变更，不修改 applied 状态。
-docker compose exec openvpn ovpn config plan
+docker exec openvpn ovpn config plan
 
 # 通过 maintenance 服务诊断实例。
 docker compose run --rm openvpn-maintenance state doctor

@@ -11,13 +11,15 @@ Persistent compatibility follows the [data schema upgrade policy](../data-schema
 
 ```bash
 # live query or client operation
-docker compose exec openvpn ovpn client list
+docker exec openvpn ovpn client list
 
 # offline state/config/migration operation
 docker compose run --rm openvpn-maintenance state doctor
 ```
 
 Both services must use the same target image and mount the same `openvpn-data` and `openvpn-config` directories.
+
+Live CLI examples use `docker exec openvpn` because the Compose service fixes `container_name: openvpn`. Substitute the actual container name if you change it. Maintenance workflows continue to use `docker compose run --rm openvpn-maintenance`.
 
 Add the following service next to `openvpn` in `docker-compose.yaml`. It deliberately has no `devices`, `cap_add`, or published ports:
 
@@ -58,8 +60,8 @@ cp config.example.yaml openvpn-config/config.yaml
 $EDITOR openvpn-config/config.yaml
 
 docker compose up -d
-docker compose exec openvpn ovpn state doctor
-docker compose exec openvpn ovpn runtime health
+docker exec openvpn ovpn state doctor
+docker exec openvpn ovpn runtime health
 ```
 
 Initialization fails closed if YAML is missing or invalid, the data directory is non-empty but unrecognized, PKI generation fails, or staged state does not validate.
@@ -117,11 +119,11 @@ Every public multi-letter option has a single-token short form. The examples use
 Create and export in one command when the profile should be written to the operator's current directory:
 
 ```bash
-docker compose exec -T openvpn \
+docker exec openvpn \
   ovpn client create laptop -4 -o - > laptop.ovpn
 chmod 600 laptop.ovpn
-docker compose exec openvpn ovpn client create phone -4 dynamic
-docker compose exec openvpn ovpn client create tablet -4 10.42.0.20
+docker exec openvpn ovpn client create phone -4 dynamic
+docker exec openvpn ovpn client create tablet -4 10.42.0.20
 ```
 
 Profiles contain private keys. Store the exported file with mode `0600` and distribute it through a secure channel.
@@ -129,8 +131,8 @@ Profiles contain private keys. Store the exported file with mode `0600` and dist
 ### View client status
 
 ```bash
-docker compose exec openvpn ovpn client list -d
-docker compose exec openvpn ovpn client list -u
+docker exec openvpn ovpn client list -d
+docker exec openvpn ovpn client list -u
 ```
 
 Detailed columns are ordered as `CLIENT ID`, `NAME`, `STATUS`, `CONNECTION`, `IPV4 MODE`, `IPV4 ADDRESS`, and `IPV4 STATE`. `STATUS` is the credential lifecycle state. `CONNECTION` is `online` or `offline` when the runtime broker is available and `unknown` when the service is stopped or cannot be queried. `IPV4 MODE` is `static`, `dynamic`, or `none`; a dynamic address is the last recorded lease and may be `-` before the first connection. `IPV4 STATE` is assignment state such as `active`, `retained`, or `none`. Use `--full-id/-u` for complete UUIDs and `--json/-j` for automation.
@@ -138,9 +140,9 @@ Detailed columns are ordered as `CLIENT ID`, `NAME`, `STATUS`, `CONNECTION`, `IP
 The default shortened ID can be copied after `--id/-i`. Positional values are exact names; `--name/-n` is the explicit equivalent:
 
 ```bash
-docker compose exec -T openvpn \
+docker exec openvpn \
   ovpn client export -i 844854e4 -o - > laptop.ovpn
-docker compose exec -T openvpn \
+docker exec openvpn \
   ovpn client export -n laptop -o - > laptop.ovpn
 ```
 
@@ -149,7 +151,7 @@ ID prefixes require at least eight hexadecimal characters and must identify exac
 ### Rename a client
 
 ```bash
-docker compose exec openvpn ovpn client rename laptop office-laptop
+docker exec openvpn ovpn client rename laptop office-laptop
 ```
 
 Rename preserves the immutable UUID, certificate identity, address assignment, and audit history. Redistribute the profile only when users need the new filename or embedded display name.
@@ -158,13 +160,13 @@ Rename preserves the immutable UUID, certificate identity, address assignment, a
 
 ```bash
 # revoke and retain a static reservation
-docker compose exec openvpn ovpn client revoke office-laptop
+docker exec openvpn ovpn client revoke office-laptop
 
 # revoke and release the reservation immediately
-docker compose exec openvpn ovpn client revoke office-laptop --release-ipv4
+docker exec openvpn ovpn client revoke office-laptop --release-ipv4
 
 # release a retained reservation later
-docker compose exec openvpn ovpn client address release office-laptop
+docker exec openvpn ovpn client address release office-laptop
 ```
 
 Revocation regenerates the CRL and attempts to disconnect the active session after committing. Releasing an address does not delete the client or certificate history.
@@ -173,15 +175,15 @@ Revocation regenerates the CRL and attempts to disconnect the active session aft
 
 ```bash
 # retain the current address intent
-docker compose exec -T openvpn \
+docker exec openvpn \
   ovpn client reissue laptop -o - > laptop.ovpn
 
 # reissue and allocate the lowest free static address
-docker compose exec -T openvpn \
+docker exec openvpn \
   ovpn client reissue laptop -4 -o - > laptop.ovpn
 
 # reissue with dynamic addressing
-docker compose exec -T openvpn \
+docker exec openvpn \
   ovpn client reissue laptop -4 dynamic -o - > laptop.ovpn
 
 chmod 600 laptop.ovpn
@@ -192,7 +194,7 @@ Reissue keeps the UUID but replaces the certificate and private key. The old ses
 ### Delete a client
 
 ```bash
-docker compose exec openvpn ovpn client delete office-laptop --yes
+docker exec openvpn ovpn client delete office-laptop --yes
 ```
 
 Delete removes local credentials and assignment state while retaining a UUID tombstone. Recover deleted private keys only from a secure backup.
@@ -206,11 +208,11 @@ Revoke, reissue, delete, and address changes attempt to disconnect affected sess
 ### Single-client operations
 
 ```bash
-docker compose exec openvpn \
+docker exec openvpn \
   ovpn client address set -n laptop -4 dynamic
-docker compose exec openvpn \
+docker exec openvpn \
   ovpn client address set phone -4
-docker compose exec openvpn \
+docker exec openvpn \
   ovpn client address set -n tablet -4 10.42.0.30
 ```
 
@@ -221,7 +223,7 @@ docker compose exec openvpn \
 Batch changes always open an editor. Use `--yes` only to skip the confirmation prompt before the editor opens:
 
 ```bash
-docker compose exec openvpn \
+docker exec openvpn \
   ovpn client address edit -n laptop -n phone -e vim -y
 ```
 
@@ -232,7 +234,7 @@ The file contains one `client,ipv4` row per selected active client. Use `auto`, 
 Release a revoked client's retained static address:
 
 ```bash
-docker compose exec openvpn \
+docker exec openvpn \
   ovpn client address release -n retired-device
 ```
 
@@ -243,8 +245,8 @@ docker compose exec openvpn \
 YAML changes do nothing until explicitly applied. The normal live-container workflow is:
 
 ```bash
-docker compose exec openvpn ovpn config plan
-docker compose exec openvpn ovpn config apply --yes
+docker exec openvpn ovpn config plan
+docker exec openvpn ovpn config apply --yes
 ```
 
 `config plan` and `config apply` both validate the YAML. Apply then runs a state preflight and refuses any result other than `HEALTHY`; inspect `state doctor` and repair the instance before retrying. `--force/-f` is available only for a reviewed false negative and bypasses no other safety check. During apply, the supervisor temporarily stops OpenVPN and the management broker, releases the shared runtime lock, applies the staged transaction under the exclusive lock, then reloads the committed revision and restarts the managed processes before returning. The container remains up; existing VPN sessions are disconnected by the controlled OpenVPN restart.
@@ -258,7 +260,7 @@ docker compose run --rm openvpn-maintenance config plan
 docker compose run --rm openvpn-maintenance config apply -y
 docker compose run --rm openvpn-maintenance state doctor
 docker compose start
-docker compose exec openvpn ovpn runtime health
+docker exec openvpn ovpn runtime health
 ```
 
 The maintenance command does not start or restart OpenVPN; `docker compose start` restarts the existing live container afterward without starting the profiled maintenance service. Inspect the plan before applying. Endpoint/transport changes require profile redistribution. Network/pool changes can remap static assignments and require CCD/server regeneration. NAT, routes, and redirect-gateway changes are reconciled during startup.
@@ -283,8 +285,8 @@ docker compose run --rm -T openvpn-maintenance \
 Read-only diagnosis can run online, but offline diagnosis produces a stable view when a repair or restore is being considered:
 
 ```bash
-docker compose exec openvpn ovpn state show
-docker compose exec openvpn ovpn state doctor -j
+docker exec openvpn ovpn state show
+docker exec openvpn ovpn state doctor -j
 
 docker compose stop
 docker compose run --rm openvpn-maintenance state doctor
@@ -307,21 +309,21 @@ Repair can rebuild derived files and recover artifacts only from mutually consis
 ### Status and session control
 
 ```bash
-docker compose exec openvpn ovpn runtime status
-docker compose exec openvpn ovpn runtime status -j
-docker compose exec openvpn ovpn runtime disconnect laptop
-docker compose exec openvpn ovpn runtime disconnect -i 844854e4 -j
-docker compose exec openvpn ovpn runtime capabilities -j
+docker exec openvpn ovpn runtime status
+docker exec openvpn ovpn runtime status -j
+docker exec openvpn ovpn runtime disconnect laptop
+docker exec openvpn ovpn runtime disconnect -i 844854e4 -j
+docker exec openvpn ovpn runtime capabilities -j
 ```
 
 ### Logs and events
 
 ```bash
-docker compose exec openvpn ovpn runtime logs -l 200
-docker compose exec openvpn ovpn runtime logs -l 0 -f
-docker compose exec openvpn ovpn runtime logs -r -u
-docker compose exec openvpn ovpn runtime events -l 200 -j
-docker compose exec openvpn ovpn runtime events -l 0 -f
+docker exec openvpn ovpn runtime logs -l 200
+docker exec openvpn ovpn runtime logs -l 0 -f
+docker exec openvpn ovpn runtime logs -r -u
+docker exec openvpn ovpn runtime events -l 200 -j
+docker exec openvpn ovpn runtime events -l 0 -f
 ```
 
 Logs are persistent and rotate according to applied configuration. Events are a user-facing JSONL stream. SQLite `audit_events` are authoritative business audit records and are not a substitute for runtime logs.
@@ -330,7 +332,7 @@ Logs are persistent and rotate according to applied configuration. Events are a 
 
 Generate scripts from the same command contract used by `ovpn help`:
 
-These scripts complete a direct command named `ovpn`. Run them inside an interactive service container, or define a host wrapper with that name for `docker compose exec openvpn ovpn`. To generate through Compose, replace `ovpn completion` below with `docker compose exec -T openvpn ovpn completion`.
+These scripts complete a direct command named `ovpn`. Run them inside an interactive service container, or define a host wrapper with that name for `docker exec openvpn ovpn`. To generate from the host, replace `ovpn completion` below with `docker exec openvpn ovpn completion`.
 
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
@@ -364,7 +366,7 @@ docker compose run --rm -T openvpn-maintenance \
   config export --output - > openvpn-config/config.yaml.new &&
   mv openvpn-config/config.yaml.new openvpn-config/config.yaml
 docker compose up -d
-docker compose exec openvpn ovpn runtime health
+docker exec openvpn ovpn runtime health
 ```
 
 Migration preserves schema 3 UUID certificate identities and imports current client/address/audit/artifact state. It removes the live legacy structured files after success; originals remain only in the migration snapshot.
@@ -425,7 +427,7 @@ mv restore-work/openvpn-config ./openvpn-config
 
 docker compose run --rm openvpn-maintenance state doctor
 docker compose start
-docker compose exec openvpn ovpn runtime health
+docker exec openvpn ovpn runtime health
 ```
 
 Do not merge a backup into an existing data directory and do not restore only `state.db`. Keep the previous directories until the restored instance and at least one client connection are verified.
@@ -440,8 +442,8 @@ docker compose stop
 docker compose pull openvpn openvpn-maintenance
 docker compose run --rm openvpn-maintenance state doctor
 docker compose up -d
-docker compose exec openvpn ovpn version --json
-docker compose exec openvpn ovpn runtime health
+docker exec openvpn ovpn version --json
+docker exec openvpn ovpn runtime health
 ```
 
 Do not run `migrate apply` for a same-schema image change.

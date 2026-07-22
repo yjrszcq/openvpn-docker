@@ -7,8 +7,10 @@ This is the complete command reference for the current CLI in this source tree.
 Run live commands through the service container:
 
 ```bash
-docker compose exec openvpn ovpn <command>
+docker exec openvpn ovpn <command>
 ```
+
+The examples assume the Compose `container_name` is `openvpn`; substitute the actual name if it is changed.
 
 Run offline maintenance commands through the one-shot service:
 
@@ -512,7 +514,7 @@ ovpn completion (bash|zsh|fish)
 
 Writes a shell completion script to stdout. Commands and options are generated from the same static command tree used by help. Explicit `--name/-n` and `--id/-i` selector values query the current client list at completion time; private artifacts are never read. Install examples:
 
-The script completes a direct command named `ovpn`. Use it in a container shell or provide a host wrapper with that name for `docker compose exec openvpn ovpn`. To generate through Compose, replace `ovpn completion` below with `docker compose exec -T openvpn ovpn completion`. Dynamic selectors call the same direct command or wrapper.
+The script completes a direct command named `ovpn`. Use it in a container shell or provide a host wrapper with that name for `docker exec openvpn ovpn`. To generate from the host, replace `ovpn completion` below with `docker exec openvpn ovpn completion`. Dynamic selectors call the same direct command or wrapper.
 
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
@@ -538,11 +540,11 @@ Prints project image/runtime version, data schema, Go version, VCS revision, bui
 
 ```bash
 # Create a client with the lowest available static address and save its profile.
-docker compose exec -T openvpn \
+docker exec openvpn \
   ovpn client create laptop --ipv4 --output - > laptop.ovpn
 
 # Preview a declarative configuration change without modifying applied state.
-docker compose exec openvpn ovpn config plan
+docker exec openvpn ovpn config plan
 
 # Diagnose an instance through the maintenance service.
 docker compose run --rm openvpn-maintenance state doctor

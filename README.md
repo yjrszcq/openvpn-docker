@@ -79,6 +79,8 @@ docker compose up -d
 
 In the repository's complete Compose file, `openvpn-maintenance` belongs to the `maintenance` profile and is not started by this command.
 
+Live CLI examples use `docker exec openvpn` because the Compose service fixes the container name as `openvpn`. If you change `container_name`, substitute the actual container name.
+
 The entrypoint initializes only an empty data directory and requires either a valid YAML file or enabled bootstrap environment for a new instance. Environment bootstrap writes the canonical YAML first; initialization then creates the SQLite database, PKI, server identity, CRL, tls-crypt key, and derived runtime files as one staged operation.
 
 YAML is the desired configuration; SQLite stores the last operator-confirmed applied revision. If YAML later becomes missing or differs from that revision, `server run` warns and continues with the applied SQLite snapshot. It never applies configuration implicitly.
@@ -87,14 +89,14 @@ YAML is the desired configuration; SQLite stores the last operator-confirmed app
 
 ```bash
 # Lowest available static IPv4 address, with the profile returned directly
-docker compose exec -T openvpn \
+docker exec openvpn \
   ovpn client create laptop --ipv4 --output - > laptop.ovpn
 
 # Dynamic address
-docker compose exec openvpn ovpn client create phone --ipv4 dynamic
+docker exec openvpn ovpn client create phone --ipv4 dynamic
 
 # Explicit static address
-docker compose exec openvpn ovpn client create tablet --ipv4 10.42.0.20
+docker exec openvpn ovpn client create tablet --ipv4 10.42.0.20
 
 chmod 600 laptop.ovpn
 ```
@@ -159,15 +161,15 @@ These variables replace trusted files, executables, or host networking interface
 Validate and preview YAML without changing applied state:
 
 ```bash
-docker compose exec openvpn ovpn config validate
-docker compose exec openvpn ovpn config plan
+docker exec openvpn ovpn config validate
+docker exec openvpn ovpn config plan
 ```
 
 Apply through the running container. The supervisor temporarily stops OpenVPN and its broker, performs the exclusive configuration transaction, then restarts the managed runtime before the command returns:
 
 ```bash
-docker compose exec openvpn ovpn config plan
-docker compose exec openvpn ovpn config apply --yes
+docker exec openvpn ovpn config plan
+docker exec openvpn ovpn config apply --yes
 ```
 
 Before changing state, apply checks SQLite, PKI, certificates, CRL, and artifacts and refuses a non-healthy instance. Review `ovpn state doctor` and repair the cause first. `--force/-f` bypasses only this preflight result when it is known to be a false negative; schema, path, lock, pending-operation, and transaction safety checks still apply.
@@ -177,12 +179,12 @@ The container remains running, but connected VPN clients are disconnected during
 ## Common operations
 
 ```bash
-docker compose exec openvpn ovpn client list --detail
-docker compose exec openvpn ovpn client address edit laptop phone --editor vim --yes
-docker compose exec openvpn ovpn runtime status
-docker compose exec openvpn ovpn runtime disconnect laptop
-docker compose exec openvpn ovpn runtime logs --lines 100 --follow
-docker compose exec openvpn ovpn runtime events --lines 100 --json
+docker exec openvpn ovpn client list --detail
+docker exec openvpn ovpn client address edit laptop phone --editor vim --yes
+docker exec openvpn ovpn runtime status
+docker exec openvpn ovpn runtime disconnect laptop
+docker exec openvpn ovpn runtime logs --lines 100 --follow
+docker exec openvpn ovpn runtime events --lines 100 --json
 ```
 
 Existing clients may be selected by positional `NAME`, explicit `--name NAME`, or `--id ID`. When neither selector option is present, the positional value is treated as the client name. `--id` accepts an unambiguous UUID prefix of at least eight hexadecimal characters. Mutating commands that can destroy or broadly rewrite state require interactive confirmation or `--yes`.
@@ -193,7 +195,7 @@ Batch address editing selects its editor from `--editor/-e`, `OVPN_EDITOR`, `EDI
 
 Generate shell completion without an external CLI framework:
 
-The generated script completes a direct command named `ovpn`. Use it inside an interactive service container, or define a host wrapper named `ovpn` that runs `docker compose exec openvpn ovpn`. When generating through Compose, replace `ovpn completion` below with `docker compose exec -T openvpn ovpn completion`. Dynamic client name/ID completion also uses that direct command or wrapper.
+The generated script completes a direct command named `ovpn`. Use it inside an interactive service container, or define a host wrapper named `ovpn` that runs `docker exec openvpn ovpn`. To generate a script from the host, replace `ovpn completion` below with `docker exec openvpn ovpn completion`. Dynamic client name/ID completion also uses that direct command or wrapper.
 
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \

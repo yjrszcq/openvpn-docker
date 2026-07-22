@@ -77,6 +77,8 @@ docker compose up -d
 
 仓库完整 Compose 中的 `openvpn-maintenance` 属于 `maintenance` profile，不会被这条命令启动。
 
+在线 CLI 示例使用 `docker exec openvpn`，因为 Compose 将容器名固定为 `openvpn`。如果修改了 `container_name`，需要替换为实际容器名。
+
 entrypoint 只会初始化空数据目录，新实例必须提供有效 YAML 或启用 bootstrap 环境变量。环境初始化会先写入规范 YAML，再在 staging 中创建 SQLite、PKI、服务端身份、CRL、tls-crypt 和派生文件，验证后统一安装。
 
 YAML 是期望配置，SQLite 保存最近一次经操作员确认的 applied revision。之后 YAML 缺失或与 applied revision 不同时，`server run` 只告警并继续使用数据库快照，不会自动应用配置。
@@ -85,14 +87,14 @@ YAML 是期望配置，SQLite 保存最近一次经操作员确认的 applied re
 
 ```bash
 # 自动选择最低可用静态 IPv4，并直接输出 profile
-docker compose exec -T openvpn \
+docker exec openvpn \
   ovpn client create laptop --ipv4 --output - > laptop.ovpn
 
 # 动态地址
-docker compose exec openvpn ovpn client create phone --ipv4 dynamic
+docker exec openvpn ovpn client create phone --ipv4 dynamic
 
 # 指定静态地址
-docker compose exec openvpn ovpn client create tablet --ipv4 10.42.0.20
+docker exec openvpn ovpn client create tablet --ipv4 10.42.0.20
 
 chmod 600 laptop.ovpn
 ```
@@ -157,15 +159,15 @@ chmod 600 laptop.ovpn
 只验证或预览 YAML，不修改 applied 状态：
 
 ```bash
-docker compose exec openvpn ovpn config validate
-docker compose exec openvpn ovpn config plan
+docker exec openvpn ovpn config validate
+docker exec openvpn ovpn config plan
 ```
 
 通过运行中的容器应用配置。supervisor 会暂时停止 OpenVPN 和 broker，执行独占配置事务，并在命令返回前重启受管 runtime：
 
 ```bash
-docker compose exec openvpn ovpn config plan
-docker compose exec openvpn ovpn config apply --yes
+docker exec openvpn ovpn config plan
+docker exec openvpn ovpn config apply --yes
 ```
 
 apply 修改状态前会检查 SQLite、PKI、证书、CRL 和 artifact，实例不是 `HEALTHY` 时拒绝执行。应先查看 `ovpn state doctor` 并修复原因；只有确认预检属于误判时才使用 `--force/-f`。该参数只跳过预检结论，schema、路径、锁、中断 operation 和事务安全检查仍然生效。
@@ -175,12 +177,12 @@ apply 修改状态前会检查 SQLite、PKI、证书、CRL 和 artifact，实例
 ## 常用操作
 
 ```bash
-docker compose exec openvpn ovpn client list --detail
-docker compose exec openvpn ovpn client address edit laptop phone --editor vim --yes
-docker compose exec openvpn ovpn runtime status
-docker compose exec openvpn ovpn runtime disconnect laptop
-docker compose exec openvpn ovpn runtime logs --lines 100 --follow
-docker compose exec openvpn ovpn runtime events --lines 100 --json
+docker exec openvpn ovpn client list --detail
+docker exec openvpn ovpn client address edit laptop phone --editor vim --yes
+docker exec openvpn ovpn runtime status
+docker exec openvpn ovpn runtime disconnect laptop
+docker exec openvpn ovpn runtime logs --lines 100 --follow
+docker exec openvpn ovpn runtime events --lines 100 --json
 ```
 
 已有客户端可用位置参数 `NAME`、显式 `--name NAME` 或 `--id ID` 选择。未提供 `--name` 或 `--id` 时，位置参数默认按客户端名称处理。`--id` 接受至少八位且唯一的 UUID 十六进制前缀。可能删除或批量改写状态的命令需要交互确认或 `--yes`。
@@ -191,7 +193,7 @@ docker compose exec openvpn ovpn runtime events --lines 100 --json
 
 无需额外 CLI 框架即可生成 shell completion：
 
-生成脚本补全的是名为 `ovpn` 的直接命令。可在服务容器的交互 shell 中使用，或在宿主机定义一个名为 `ovpn`、内部执行 `docker compose exec openvpn ovpn` 的 wrapper。若通过 Compose 生成脚本，把下面的 `ovpn completion` 换成 `docker compose exec -T openvpn ovpn completion`。动态 name/ID 补全同样依赖该直接命令或 wrapper。
+生成脚本补全的是名为 `ovpn` 的直接命令。可在服务容器的交互 shell 中使用，或在宿主机定义一个名为 `ovpn`、内部执行 `docker exec openvpn ovpn` 的 wrapper。若从宿主机生成脚本，把下面的 `ovpn completion` 换成 `docker exec openvpn ovpn completion`。动态 name/ID 补全同样依赖该直接命令或 wrapper。
 
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
