@@ -7,6 +7,8 @@ cd "$ROOT_DIR"
 FILES=(
   README.md
   README_CN.md
+  contracts/schema3/README.md
+  contracts/schema3/README_CN.md
   docs/en/v4/commands.md
   docs/en/v4/operations.md
   docs/cn/v4/commands.md

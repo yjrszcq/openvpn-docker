@@ -1,5 +1,7 @@
 # Schema 3 Shell Runtime Contract
 
+[中文](README_CN.md)
+
 This directory freezes the observable 3.2.0 Shell/Python runtime baseline that the Go rewrite starts from. It is an implementation input, not a promise that the intentionally redesigned v4 CLI or storage layout remains byte-for-byte compatible.
 
 `behavior.json` records commands, defaults, state classes, persistent files, render cases, migration fixtures, and the disposition of changed interfaces. `test-inventory.json` classifies every existing test so the runtime cutover can retain external evidence and replace implementation-coupled assertions deliberately.
@@ -20,7 +22,7 @@ The v3 command manual and current smoke tests remain the detailed source of trut
 - Environment-driven persistent configuration becomes strict declarative YAML.
 - `init`, `start`, and server rendering move under `ovpn server`.
 - Online `network plan/apply` is folded into offline `config plan/apply`.
-- Positional existing-client selectors are removed; exactly one of `--name` or `--id` is required.
+- Existing-client selectors accept an explicit `--name` or `--id`; when neither option is present, a positional selector is treated as a name.
 - `--dynamic`/`--ip` become `--ipv4 auto|dynamic|ADDRESS`.
 - `client ip` becomes `client address`.
 - `runtime version` moves to top-level `version`.
