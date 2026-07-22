@@ -27,7 +27,7 @@
 
 ## Tag 政策
 
-GHCR 接收项目镜像 tag（`4.0.1`、`4.0`、`4`、`latest`）以及验证过的 OpenVPN tag。Docker Hub 继续提供现有部署使用的 OpenVPN 版本 tag。生产环境必须固定明确 tag，并在更新后检查 `ovpn version --json`。
+GHCR 接收项目镜像 tag（`4.0.2`、`4.0`、`4`、`latest`）以及验证过的 OpenVPN tag。Docker Hub 继续提供现有部署使用的 OpenVPN 版本 tag。生产环境必须固定明确 tag，并在更新后检查 `ovpn version --json`。
 
 每个候选镜像都必须先测试再发布。候选范围可以阻止 stable 提升，但不会阻止已测试的候选镜像发布。prerelease `IMAGE_VERSION` 不允许稳定提升；OpenVPN 跨 minor 更新需要经过配置的审批边界。
 
@@ -48,4 +48,4 @@ GHCR 接收项目镜像 tag（`4.0.1`、`4.0`、`4`、`latest`）以及验证过
 - 证明镜像不含旧 runtime Shell/Python 的内容检查；
 - 完整中英文命令、操作、迁移、备份和回滚文档。
 
-镜像/schema 版本在发布准备阶段修改。任何门禁、review finding 或 release metadata 不一致未解决时，都必须阻止稳定发布。
+镜像/schema 版本在发布准备阶段修改。项目镜像版本应通过 `scripts/update-image-version.sh X.Y.Z` 更新；脚本会同步已跟踪的版本权威、Go fallback 版本、测试断言和当前 tag 示例，并验证 release metadata。被忽略的发布草稿有意不在脚本处理范围内。任何门禁、review finding 或 release metadata 不一致未解决时，都必须阻止稳定发布。

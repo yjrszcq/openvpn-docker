@@ -225,7 +225,7 @@ docker compose start
 
 ## 开发
 
-版本输入集中在 `versions.env`。Go 依赖使用 `GOPROXY=direct`，构建脚本把宿主机的标准代理变量转发给 Docker。
+版本输入集中在 `versions.env`。更新项目镜像版本时使用 `scripts/update-image-version.sh X.Y.Z`，由脚本同步全部已跟踪的版本元数据。Go 依赖使用 `GOPROXY=direct`，构建脚本把宿主机的标准代理变量转发给 Docker。
 
 ```bash
 scripts/verify-go-toolchain.sh

@@ -227,7 +227,7 @@ Restore into empty target directories while the service is stopped, preserve own
 
 ## Development
 
-Version inputs live in `versions.env`. Go dependencies use `GOPROXY=direct`; the build wrapper forwards the host's standard proxy variables to Docker.
+Version inputs live in `versions.env`. Use `scripts/update-image-version.sh X.Y.Z` to update the project image version and its tracked metadata consistently. Go dependencies use `GOPROXY=direct`; the build wrapper forwards the host's standard proxy variables to Docker.
 
 ```bash
 scripts/verify-go-toolchain.sh

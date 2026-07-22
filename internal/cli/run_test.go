@@ -102,19 +102,19 @@ func TestVersionJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &info); err != nil {
 		t.Fatalf("decode version JSON: %v", err)
 	}
-	if info.Version != "4.0.1" || info.DataSchema != 4 || info.GoVersion == "" || info.Dependencies.SQLite == "" || info.Dependencies.YAML == "" {
+	if info.Version != "4.0.2" || info.DataSchema != 4 || info.GoVersion == "" || info.Dependencies.SQLite == "" || info.Dependencies.YAML == "" {
 		t.Fatalf("unexpected version info: %+v", info)
 	}
 }
 
 func TestTopLevelVersionAliases(t *testing.T) {
 	code, stdout, stderr := run("-v")
-	if code != 0 || strings.TrimSpace(stdout) != "4.0.1" || stderr != "" {
+	if code != 0 || strings.TrimSpace(stdout) != "4.0.2" || stderr != "" {
 		t.Fatalf("short alias code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	for _, alias := range []string{"-V", "--version"} {
 		code, aliasOutput, aliasError := run(alias)
-		if code != 0 || aliasError != "" || !strings.Contains(aliasOutput, "ovpn 4.0.1") || !strings.Contains(aliasOutput, "data schema: 4") {
+		if code != 0 || aliasError != "" || !strings.Contains(aliasOutput, "ovpn 4.0.2") || !strings.Contains(aliasOutput, "data schema: 4") {
 			t.Errorf("alias %s code=%d stdout=%q stderr=%q", alias, code, aliasOutput, aliasError)
 		}
 	}
@@ -294,13 +294,13 @@ func TestServerRunUsageAndMissingState(t *testing.T) {
 func TestEntrypointDispatchesOVPNAndDefaultCommands(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cli.RunEntrypoint([]string{"ovpn", "version", "--short"}, &stdout, &stderr)
-	if code != 0 || strings.TrimSpace(stdout.String()) != "4.0.1" || stderr.Len() != 0 {
+	if code != 0 || strings.TrimSpace(stdout.String()) != "4.0.2" || stderr.Len() != 0 {
 		t.Fatalf("ovpn entrypoint code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	stdout.Reset()
 	stderr.Reset()
 	code = cli.RunEntrypoint([]string{"version", "--short"}, &stdout, &stderr)
-	if code != 0 || strings.TrimSpace(stdout.String()) != "4.0.1" || stderr.Len() != 0 {
+	if code != 0 || strings.TrimSpace(stdout.String()) != "4.0.2" || stderr.Len() != 0 {
 		t.Fatalf("default entrypoint code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }

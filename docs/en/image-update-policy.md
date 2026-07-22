@@ -27,7 +27,7 @@ When the target requires a newer schema, normal runtime refuses old state. The o
 
 ## Tag policy
 
-GHCR receives project image tags (`4.0.1`, `4.0`, `4`, and `latest`) plus the verified OpenVPN tag. Docker Hub keeps the public OpenVPN-version tag used by existing deployments. Production users should always pin a concrete tag and verify `ovpn version --json` after update.
+GHCR receives project image tags (`4.0.2`, `4.0`, `4`, and `latest`) plus the verified OpenVPN tag. Docker Hub keeps the public OpenVPN-version tag used by existing deployments. Production users should always pin a concrete tag and verify `ovpn version --json` after update.
 
 Every candidate image is tested before publication. The candidate range may block stable promotion, but it does not suppress the tested candidate image. A prerelease `IMAGE_VERSION` is not eligible for stable promotion. OpenVPN cross-minor updates require the configured approval boundary.
 
@@ -48,4 +48,4 @@ Every stable release must pass:
 - image-content checks proving the absence of legacy runtime Shell and Python;
 - complete English/Chinese command, operations, migration, backup, and rollback documentation.
 
-Image/schema version changes are made in the release-preparation phase. A stable release is blocked while any required gate, review finding, or release metadata inconsistency remains unresolved.
+Image/schema version changes are made in the release-preparation phase. Update the project image version with `scripts/update-image-version.sh X.Y.Z`; it synchronizes the tracked version authority, Go fallback version, assertions, and current tag examples, then validates release metadata. Ignored publishing drafts are intentionally outside its scope. A stable release is blocked while any required gate, review finding, or release metadata inconsistency remains unresolved.
