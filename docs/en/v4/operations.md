@@ -1,18 +1,13 @@
 # OpenVPN v4 Operations Guide
 
-This guide organizes the schema 4 CLI by operator workflow. See the
-[v4 command reference](commands.md) for every option and exit code.
+This guide organizes the schema 4 CLI by operator workflow. See the [v4 command reference](commands.md) for every option and exit code.
 
-Persistent compatibility follows the
-[data schema upgrade policy](../data-schema-upgrade-policy.md). Image delivery
-and rollback follow the [image update policy](../image-update-policy.md).
+Persistent compatibility follows the [data schema upgrade policy](../data-schema-upgrade-policy.md). Image delivery and rollback follow the [image update policy](../image-update-policy.md).
 
 ## Container roles
 
-- `openvpn`: live service with `/dev/net/tun`, `NET_ADMIN`, the management
-  broker, and OpenVPN.
-- `openvpn-maintenance`: one-shot CLI container mounting the same data and YAML
-  without TUN or `NET_ADMIN`. It sets `OVPN_MAINTENANCE=true`.
+- `openvpn`: live service with `/dev/net/tun`, `NET_ADMIN`, the management broker, and OpenVPN.
+- `openvpn-maintenance`: one-shot CLI container mounting the same data and YAML without TUN or `NET_ADMIN`. It sets `OVPN_MAINTENANCE=true`.
 
 ```bash
 # live query or client operation
@@ -22,15 +17,12 @@ docker compose exec openvpn ovpn client list
 docker compose run --rm openvpn-maintenance state doctor
 ```
 
-Both services must use the same target image and mount the same
-`openvpn-data` and `openvpn-config` directories.
+Both services must use the same target image and mount the same `openvpn-data` and `openvpn-config` directories.
 
 ## Initial deployment
 
 1. Create the data and configuration directories with restricted permissions.
-2. Copy the repository's root `config.example.yaml` to
-   `openvpn-config/config.yaml`, then validate the endpoint, IPv4 network,
-   routing, and NAT choices.
+2. Copy the repository's root `config.example.yaml` to `openvpn-config/config.yaml`, then validate the endpoint, IPv4 network, routing, and NAT choices.
 3. Start the service. The entrypoint initializes only an empty data directory.
 4. Verify state and runtime health before issuing clients.
 
@@ -46,13 +38,9 @@ docker compose exec openvpn ovpn state doctor
 docker compose exec openvpn ovpn runtime health
 ```
 
-Initialization fails closed if YAML is missing or invalid, the data directory
-is non-empty but unrecognized, PKI generation fails, or staged state does not
-validate.
+Initialization fails closed if YAML is missing or invalid, the data directory is non-empty but unrecognized, PKI generation fails, or staged state does not validate.
 
-For a first deployment without manually creating YAML, leave the configuration
-directory empty and set the Compose variables below. The entrypoint validates
-them, writes mode-`0600` canonical YAML, and then runs the same initialization:
+For a first deployment without manually creating YAML, leave the configuration directory empty and set the Compose variables below. The entrypoint validates them, writes mode-`0600` canonical YAML, and then runs the same initialization:
 
 ```dotenv
 OVPN_BOOTSTRAP_FROM_ENV=true
@@ -60,10 +48,7 @@ OVPN_BOOTSTRAP_ENDPOINT=vpn.example.com
 OVPN_BOOTSTRAP_IPV4_NETWORK=10.42.0.0/24
 ```
 
-After a successful start, set `OVPN_BOOTSTRAP_FROM_ENV=false`. Keeping it true
-only produces an ignored-bootstrap warning; it never updates the initialized
-instance. See the [command reference](commands.md#one-time-environment-bootstrap)
-for optional fields.
+After a successful start, set `OVPN_BOOTSTRAP_FROM_ENV=false`. Keeping it true only produces an ignored-bootstrap warning; it never updates the initialized instance. See the [command reference](commands.md#one-time-environment-bootstrap) for optional fields.
 
 ## Choose routing deliberately
 
@@ -79,8 +64,7 @@ ipv4:
     - 192.168.50.0/24
 ```
 
-The destination network must have a return route to the VPN CIDR through the
-OpenVPN host.
+The destination network must have a return route to the VPN CIDR through the OpenVPN host.
 
 Full-tunnel Internet access:
 
@@ -95,18 +79,13 @@ ipv4:
     - 8.8.8.8
 ```
 
-With `network_mode: host`, forwarding and project-owned iptables rules exist in
-the host network namespace. Review the host firewall and cloud security group.
-The runtime reconciles only its instance-specific chain/comments and does not
-flush unrelated rules.
+With `network_mode: host`, forwarding and project-owned iptables rules exist in the host network namespace. Review the host firewall and cloud security group. The runtime reconciles only its instance-specific chain/comments and does not flush unrelated rules.
 
 ## Day-to-day client lifecycle
 
-The examples below use the short aliases where practical. The long forms in
-the command reference remain equivalent.
+The examples below use the short aliases where practical. The long forms in the command reference remain equivalent.
 
-Create and export in one command when the profile should be written to the
-operator's current directory:
+Create and export in one command when the profile should be written to the operator's current directory:
 
 ```bash
 docker compose exec -T openvpn \
@@ -142,12 +121,7 @@ docker compose exec openvpn \
   ovpn client delete office-laptop -y
 ```
 
-Revoke, reissue, delete, and address mutations attempt to disconnect affected
-sessions after their durable commit. If the broker is unavailable, the command
-still succeeds and reports a pending warning; retry with
-`ovpn runtime disconnect NAME` after runtime health is restored. After reissue,
-redistribute the new profile. Delete retains a UUID tombstone but removes local
-credentials; retain backups if recovery may be required.
+Revoke, reissue, delete, and address mutations attempt to disconnect affected sessions after their durable commit. If the broker is unavailable, the command still succeeds and reports a pending warning; retry with `ovpn runtime disconnect NAME` after runtime health is restored. After reissue, redistribute the new profile. Delete retains a UUID tombstone but removes local credentials; retain backups if recovery may be required.
 
 ## Address management
 
@@ -167,10 +141,7 @@ docker compose exec openvpn \
   ovpn client address edit -n laptop -n phone -y
 ```
 
-The file contains one `client,ipv4` row per selected active client. Use
-`auto`, `dynamic`, or a static address. The whole file is validated and
-committed atomically. The editor is selected from `OVPN_EDITOR`, then `EDITOR`,
-then installed `nano`.
+The file contains one `client,ipv4` row per selected active client. Use `auto`, `dynamic`, or a static address. The whole file is validated and committed atomically. The editor is selected from `OVPN_EDITOR`, then `EDITOR`, then installed `nano`.
 
 Release a revoked client's retained static address:
 
@@ -181,8 +152,7 @@ docker compose exec openvpn \
 
 ## Declarative configuration changes
 
-YAML changes do nothing until explicitly applied. Start with online validation
-and planning:
+YAML changes do nothing until explicitly applied. Start with online validation and planning:
 
 ```bash
 docker compose exec openvpn ovpn config validate
@@ -201,14 +171,9 @@ docker compose up -d openvpn
 docker compose exec openvpn ovpn runtime health
 ```
 
-Inspect the plan before applying. Endpoint/transport changes require profile
-redistribution. Network/pool changes can remap static assignments and require
-CCD/server regeneration. NAT, routes, and redirect-gateway changes require
-firewall reconciliation after restart.
+Inspect the plan before applying. Endpoint/transport changes require profile redistribution. Network/pool changes can remap static assignments and require CCD/server regeneration. NAT, routes, and redirect-gateway changes require firewall reconciliation after restart.
 
-If YAML differs but has not been applied, restarting the server continues with
-the old applied revision and prints a warning. This protects the running
-service from accidental file edits.
+If YAML differs but has not been applied, restarting the server continues with the old applied revision and prints a warning. This protects the running service from accidental file edits.
 
 Recover a complete desired YAML from applied state:
 
@@ -221,8 +186,7 @@ docker compose run --rm -T openvpn-maintenance \
 
 ## State diagnosis and repair
 
-Read-only diagnosis can run online, but offline diagnosis produces a stable
-view when a repair or restore is being considered:
+Read-only diagnosis can run online, but offline diagnosis produces a stable view when a repair or restore is being considered:
 
 ```bash
 docker compose exec openvpn ovpn state show
@@ -240,10 +204,7 @@ docker compose run --rm openvpn-maintenance repair apply -y
 docker compose run --rm openvpn-maintenance state doctor
 ```
 
-Repair can rebuild derived files and recover artifacts only from mutually
-consistent evidence. It does not reconstruct a missing/corrupt SQLite authority
-from guesses. `CRITICAL` and `UNRECOVERABLE` database conditions require a
-trusted backup.
+Repair can rebuild derived files and recover artifacts only from mutually consistent evidence. It does not reconstruct a missing/corrupt SQLite authority from guesses. `CRITICAL` and `UNRECOVERABLE` database conditions require a trusted backup.
 
 ## Runtime inspection
 
@@ -260,18 +221,13 @@ docker compose exec openvpn ovpn runtime events -l 200 -j
 docker compose exec openvpn ovpn runtime events -l 0 -f
 ```
 
-Logs are persistent and rotate according to applied configuration. Events are a
-user-facing JSONL stream. SQLite `audit_events` are authoritative business
-audit records and are not a substitute for runtime logs.
+Logs are persistent and rotate according to applied configuration. Events are a user-facing JSONL stream. SQLite `audit_events` are authoritative business audit records and are not a substitute for runtime logs.
 
 ## Shell completion
 
 Generate scripts from the same command contract used by `ovpn help`:
 
-These scripts complete a direct command named `ovpn`. Run them inside an
-interactive service container, or define a host wrapper with that name for
-`docker compose exec openvpn ovpn`. To generate through Compose, replace
-`ovpn completion` below with `docker compose exec -T openvpn ovpn completion`.
+These scripts complete a direct command named `ovpn`. Run them inside an interactive service container, or define a host wrapper with that name for `docker compose exec openvpn ovpn`. To generate through Compose, replace `ovpn completion` below with `docker compose exec -T openvpn ovpn completion`.
 
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
@@ -281,9 +237,7 @@ ovpn completion zsh > ~/.zfunc/_ovpn
 ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 ```
 
-Start a new shell after installation. Name and ID completion performs a
-read-only client list query through the same command/wrapper only after an
-explicit selector option.
+Start a new shell after installation. Name and ID completion performs a read-only client list query through the same command/wrapper only after an explicit selector option.
 
 ## Upgrade from schema 3
 
@@ -310,14 +264,11 @@ docker compose up -d openvpn
 docker compose exec openvpn ovpn runtime health
 ```
 
-Migration preserves schema 3 UUID certificate identities and imports current
-client/address/audit/artifact state. It removes the live legacy structured
-files after success; originals remain only in the migration snapshot.
+Migration preserves schema 3 UUID certificate identities and imports current client/address/audit/artifact state. It removes the live legacy structured files after success; originals remain only in the migration snapshot.
 
 ## Roll back a successful schema migration
 
-An image switch is not sufficient. Restore the complete migration snapshot and
-then run `sh-ver`:
+An image switch is not sufficient. Restore the complete migration snapshot and then run `sh-ver`:
 
 ```bash
 docker compose stop openvpn
@@ -339,8 +290,7 @@ docker compose run --rm openvpn-maintenance state doctor
 docker compose up -d openvpn
 ```
 
-Keep `openvpn-data-schema4` until the rollback is verified. The restored schema
-3 tree and `sh-ver` image are a matched unit.
+Keep `openvpn-data-schema4` until the rollback is verified. The restored schema 3 tree and `sh-ver` image are a matched unit.
 
 ## Offline backup and restore
 
@@ -353,8 +303,7 @@ sudo tar --numeric-owner -czf openvpn-v4-$(date +%Y%m%d%H%M%S).tar.gz \
 docker compose up -d openvpn
 ```
 
-Store the archive encrypted. It contains the CA, server/client private keys,
-tls-crypt key, profiles, and database.
+Store the archive encrypted. It contains the CA, server/client private keys, tls-crypt key, profiles, and database.
 
 Restore into an empty working directory while no container is running:
 
@@ -372,9 +321,7 @@ docker compose up -d openvpn
 docker compose exec openvpn ovpn runtime health
 ```
 
-Do not merge a backup into an existing data directory and do not restore only
-`state.db`. Keep the previous directories until the restored instance and at
-least one client connection are verified.
+Do not merge a backup into an existing data directory and do not restore only `state.db`. Keep the previous directories until the restored instance and at least one client connection are verified.
 
 ## Image update without a schema change
 

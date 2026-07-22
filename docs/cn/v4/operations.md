@@ -1,16 +1,11 @@
 # OpenVPN v4 操作手册
 
-本文按运维工作流组织 schema 4 CLI。完整参数与退出码见
-[v4 命令参考](commands.md)。持久化兼容性遵循
-[数据 schema 升级政策](../data-schema-upgrade-policy.md)，镜像交付与回滚遵循
-[镜像更新政策](../image-update-policy.md)。
+本文按运维工作流组织 schema 4 CLI。完整参数与退出码见 [v4 命令参考](commands.md)。持久化兼容性遵循 [数据 schema 升级政策](../data-schema-upgrade-policy.md)，镜像交付与回滚遵循 [镜像更新政策](../image-update-policy.md)。
 
 ## 容器角色
 
-- `openvpn`：在线服务，拥有 `/dev/net/tun`、`NET_ADMIN`、management broker 和
-  OpenVPN。
-- `openvpn-maintenance`：挂载相同数据与 YAML 的 one-shot CLI，不请求 TUN 或
-  `NET_ADMIN`，并设置 `OVPN_MAINTENANCE=true`。
+- `openvpn`：在线服务，拥有 `/dev/net/tun`、`NET_ADMIN`、management broker 和 OpenVPN。
+- `openvpn-maintenance`：挂载相同数据与 YAML 的 one-shot CLI，不请求 TUN 或 `NET_ADMIN`，并设置 `OVPN_MAINTENANCE=true`。
 
 ```bash
 # 在线查询或客户端操作
@@ -20,14 +15,12 @@ docker compose exec openvpn ovpn client list
 docker compose run --rm openvpn-maintenance state doctor
 ```
 
-两个服务必须使用相同目标镜像，并挂载同一个 `openvpn-data` 和
-`openvpn-config`。
+两个服务必须使用相同目标镜像，并挂载同一个 `openvpn-data` 和 `openvpn-config`。
 
 ## 首次部署
 
 1. 创建权限受限的数据与配置目录。
-2. 将仓库根目录的 `config.example.yaml` 复制为
-   `openvpn-config/config.yaml`，再确认 endpoint、IPv4 网段、路由和 NAT。
+2. 将仓库根目录的 `config.example.yaml` 复制为 `openvpn-config/config.yaml`，再确认 endpoint、IPv4 网段、路由和 NAT。
 3. 启动服务；entrypoint 只初始化空数据目录。
 4. 签发客户端前检查 state 和 runtime health。
 
@@ -43,11 +36,9 @@ docker compose exec openvpn ovpn state doctor
 docker compose exec openvpn ovpn runtime health
 ```
 
-YAML 缺失/错误、数据目录非空但无法识别、PKI 生成失败或 staging 状态验证失败时，
-初始化都会 fail closed。
+YAML 缺失/错误、数据目录非空但无法识别、PKI 生成失败或 staging 状态验证失败时，初始化都会 fail closed。
 
-首次部署若不想手动创建 YAML，可保持配置目录为空并设置以下 Compose 变量。entrypoint
-会严格验证、写入 mode `0600` 的规范 YAML，再执行相同初始化流程：
+首次部署若不想手动创建 YAML，可保持配置目录为空并设置以下 Compose 变量。entrypoint 会严格验证、写入 mode `0600` 的规范 YAML，再执行相同初始化流程：
 
 ```dotenv
 OVPN_BOOTSTRAP_FROM_ENV=true
@@ -55,9 +46,7 @@ OVPN_BOOTSTRAP_ENDPOINT=vpn.example.com
 OVPN_BOOTSTRAP_IPV4_NETWORK=10.42.0.0/24
 ```
 
-首次启动成功后将 `OVPN_BOOTSTRAP_FROM_ENV=false`。继续保持 true 只会产生已忽略的
-bootstrap warning，绝不会修改已初始化实例。可选字段见
-[命令参考](commands.md#一次性环境变量初始化)。
+首次启动成功后将 `OVPN_BOOTSTRAP_FROM_ENV=false`。继续保持 true 只会产生已忽略的 bootstrap warning，绝不会修改已初始化实例。可选字段见 [命令参考](commands.md#一次性环境变量初始化)。
 
 ## 明确选择路由方式
 
@@ -88,9 +77,7 @@ ipv4:
     - 8.8.8.8
 ```
 
-使用 `network_mode: host` 时，forwarding 和项目规则位于宿主机网络命名空间。
-应检查主机防火墙与云安全组。runtime 只 reconcile 当前实例专属 chain/comment，
-不会清空无关规则。
+使用 `network_mode: host` 时，forwarding 和项目规则位于宿主机网络命名空间。应检查主机防火墙与云安全组。runtime 只 reconcile 当前实例专属 chain/comment，不会清空无关规则。
 
 ## 日常客户端生命周期
 
@@ -132,10 +119,7 @@ docker compose exec openvpn \
   ovpn client delete office-laptop -y
 ```
 
-revoke、reissue、delete 和地址 mutation 会在持久化提交后尝试断开受影响 session。
-若 broker 不可用，命令仍成功并报告 pending warning；runtime 恢复健康后用
-`ovpn runtime disconnect NAME` 重试。重签后必须重分发新 profile。delete 会保留
-UUID tombstone，但删除本地凭据；若需要恢复能力，应保留备份。
+revoke、reissue、delete 和地址 mutation 会在持久化提交后尝试断开受影响 session。若 broker 不可用，命令仍成功并报告 pending warning；runtime 恢复健康后用 `ovpn runtime disconnect NAME` 重试。重签后必须重分发新 profile。delete 会保留 UUID tombstone，但删除本地凭据；若需要恢复能力，应保留备份。
 
 ## 地址管理
 
@@ -155,9 +139,7 @@ docker compose exec openvpn \
   ovpn client address edit -n laptop -n phone -y
 ```
 
-文件中每个选中 active 客户端占一行 `client,ipv4`，值使用 `auto`、`dynamic` 或静态
-地址。完整文件统一验证并原子提交。编辑器依次取 `OVPN_EDITOR`、`EDITOR`，最后
-使用已安装的 `nano`。
+文件中每个选中 active 客户端占一行 `client,ipv4`，值使用 `auto`、`dynamic` 或静态地址。完整文件统一验证并原子提交。编辑器依次取 `OVPN_EDITOR`、`EDITOR`，最后使用已安装的 `nano`。
 
 释放 revoked 客户端保留的静态地址：
 
@@ -187,12 +169,9 @@ docker compose up -d openvpn
 docker compose exec openvpn ovpn runtime health
 ```
 
-apply 前必须阅读 plan。endpoint/transport 变化要求重分发 profile；网段/动态池变化可能
-重映射静态地址并重建 CCD/server config；NAT、route 和 redirect-gateway 变化要求重启
-后 reconcile 防火墙。
+apply 前必须阅读 plan。endpoint/transport 变化要求重分发 profile；网段/动态池变化可能重映射静态地址并重建 CCD/server config；NAT、route 和 redirect-gateway 变化要求重启后 reconcile 防火墙。
 
-YAML 发生漂移但未 apply 时，重启仍使用旧 applied revision 并输出警告，避免意外文件
-编辑直接改变运行服务。
+YAML 发生漂移但未 apply 时，重启仍使用旧 applied revision 并输出警告，避免意外文件编辑直接改变运行服务。
 
 从 applied 状态恢复完整 YAML：
 
@@ -223,8 +202,7 @@ docker compose run --rm openvpn-maintenance repair apply -y
 docker compose run --rm openvpn-maintenance state doctor
 ```
 
-repair 只能根据互相一致的证据重建派生文件或恢复 artifact，不会猜测重建缺失/损坏的
-SQLite 权威库。数据库处于 `CRITICAL`/`UNRECOVERABLE` 时必须恢复可信备份。
+repair 只能根据互相一致的证据重建派生文件或恢复 artifact，不会猜测重建缺失/损坏的 SQLite 权威库。数据库处于 `CRITICAL`/`UNRECOVERABLE` 时必须恢复可信备份。
 
 ## Runtime 检查
 
@@ -241,17 +219,13 @@ docker compose exec openvpn ovpn runtime events -l 200 -j
 docker compose exec openvpn ovpn runtime events -l 0 -f
 ```
 
-日志按 applied 配置持久化轮转；events 是面向用户的 JSONL。SQLite `audit_events` 是
-权威业务审计，不能替代 runtime 日志。
+日志按 applied 配置持久化轮转；events 是面向用户的 JSONL。SQLite `audit_events` 是权威业务审计，不能替代 runtime 日志。
 
 ## Shell completion
 
 从与 `ovpn help` 相同的命令契约生成脚本：
 
-这些脚本补全的是名为 `ovpn` 的直接命令。可在服务容器的交互 shell 中运行，或在
-宿主机定义同名 wrapper，内部调用 `docker compose exec openvpn ovpn`。通过 Compose
-生成时，把下面的 `ovpn completion` 换成
-`docker compose exec -T openvpn ovpn completion`。
+这些脚本补全的是名为 `ovpn` 的直接命令。可在服务容器的交互 shell 中运行，或在宿主机定义同名 wrapper，内部调用 `docker compose exec openvpn ovpn`。通过 Compose 生成时，把下面的 `ovpn completion` 换成 `docker compose exec -T openvpn ovpn completion`。
 
 ```bash
 mkdir -p ~/.local/share/bash-completion/completions ~/.zfunc \
@@ -261,8 +235,7 @@ ovpn completion zsh > ~/.zfunc/_ovpn
 ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 ```
 
-安装后启动新 shell。只有在显式 selector 参数后补全 name/ID 时，脚本才通过同一
-命令/wrapper 执行只读 client list 查询。
+安装后启动新 shell。只有在显式 selector 参数后补全 name/ID 时，脚本才通过同一命令/wrapper 执行只读 client list 查询。
 
 ## 从 schema 3 升级
 
@@ -289,8 +262,7 @@ docker compose up -d openvpn
 docker compose exec openvpn ovpn runtime health
 ```
 
-迁移保留 schema 3 的 UUID 证书身份，导入当前 client/address/audit/artifact 状态。成功后
-删除 live legacy 结构化文件；原件只保留在迁移快照中。
+迁移保留 schema 3 的 UUID 证书身份，导入当前 client/address/audit/artifact 状态。成功后删除 live legacy 结构化文件；原件只保留在迁移快照中。
 
 ## 回滚已成功的 schema 迁移
 
@@ -316,8 +288,7 @@ docker compose run --rm openvpn-maintenance state doctor
 docker compose up -d openvpn
 ```
 
-验证完成前保留 `openvpn-data-schema4`。恢复后的 schema 3 数据树与 `sh-ver` 镜像必须
-作为匹配单元使用。
+验证完成前保留 `openvpn-data-schema4`。恢复后的 schema 3 数据树与 `sh-ver` 镜像必须作为匹配单元使用。
 
 ## 离线备份与恢复
 
@@ -348,8 +319,7 @@ docker compose up -d openvpn
 docker compose exec openvpn ovpn runtime health
 ```
 
-不要把备份合并进现有目录，也不要只恢复 `state.db`。恢复实例通过诊断并完成至少一次
-客户端连接前，保留原目录。
+不要把备份合并进现有目录，也不要只恢复 `state.db`。恢复实例通过诊断并完成至少一次客户端连接前，保留原目录。
 
 ## 不变 schema 的镜像更新
 
