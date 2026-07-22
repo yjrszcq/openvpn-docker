@@ -93,10 +93,14 @@ func TestConfigApplyRequiresConfirmationAndCommitsOffline(t *testing.T) {
 	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "templates"))
 
 	code, stdout, stderr := run("config", "apply", "--json")
+	if code != 78 || stdout != "" || !strings.Contains(stderr, `"kind":"configuration_preflight_refused"`) || !strings.Contains(stderr, "issue(s)") {
+		t.Fatalf("preflight code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, stdout, stderr = run("config", "apply", "-f", "--json")
 	if code != 78 || stdout != "" || !strings.Contains(stderr, `"kind":"confirmation_required"`) || strings.Contains(stderr, "Type yes") {
 		t.Fatalf("confirmation code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
-	code, stdout, stderr = run("config", "apply", "--yes", "--json")
+	code, stdout, stderr = run("config", "apply", "--force", "--yes", "--json")
 	if code != 0 || stderr != "" || !strings.Contains(stdout, `"applied":true`) || !strings.Contains(stdout, `"target_revision":2`) || !strings.Contains(stdout, `"restart_required":true`) || !strings.Contains(stdout, `"runtime_restarted":false`) || !strings.Contains(stdout, `"profile_redistribution":[]`) {
 		t.Fatalf("apply code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
@@ -109,12 +113,19 @@ func TestConfigApplyRequiresConfirmationAndCommitsOffline(t *testing.T) {
 	if err != nil || instance.Applied.Revision != 2 || instance.Applied.Config.Endpoint != "new.example.test" {
 		t.Fatalf("applied instance=%+v err=%v", instance, err)
 	}
-	code, stdout, stderr = run("config", "apply", "--json")
+	code, stdout, stderr = run("config", "apply", "--force", "--json")
 	if code != 0 || stderr != "" || !strings.Contains(stdout, `"applied":false`) {
 		t.Fatalf("in-sync apply code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	if strings.Contains(stdout, `"operation_id"`) {
 		t.Fatalf("in-sync apply unexpectedly reported an operation: %q", stdout)
+	}
+}
+
+func TestConfigApplyRejectsRepeatedForceAlias(t *testing.T) {
+	code, stdout, stderr := run("config", "apply", "--json", "-f", "--force")
+	if code != 64 || stdout != "" || !strings.Contains(stderr, `"kind":"usage"`) || !strings.Contains(stderr, "--force may only be specified once") {
+		t.Fatalf("duplicate force code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
 
@@ -172,7 +183,7 @@ func TestConfigApplyCoordinatesOnlineRuntimeRestart(t *testing.T) {
 	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "templates"))
 	t.Setenv("OVPN_MAINTENANCE", "false")
 
-	code, stdout, stderr := run("config", "apply", "--yes", "--json")
+	code, stdout, stderr := run("config", "apply", "--force", "--yes", "--json")
 	if serverErr := <-serverDone; serverErr != nil {
 		t.Fatal(serverErr)
 	}
@@ -233,7 +244,7 @@ func TestConfigApplyMapsRuntimeLockToTemporaryFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer lock.Release()
-	code, stdout, stderr := run("config", "apply", "--yes", "--json")
+	code, stdout, stderr := run("config", "apply", "-f", "--yes", "--json")
 	if code != 75 || stdout != "" || !strings.Contains(stderr, `"kind":"configuration_busy"`) {
 		t.Fatalf("locked apply code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
@@ -265,7 +276,7 @@ func TestConfigApplyRequiresInterruptedOperationRecovery(t *testing.T) {
 	if err := store.Close(); err != nil {
 		t.Fatal(err)
 	}
-	code, stdout, stderr := run("config", "apply", "--yes", "--json")
+	code, stdout, stderr := run("config", "apply", "--force", "--yes", "--json")
 	if code != 78 || stdout != "" || !strings.Contains(stderr, `"kind":"operation_recovery_required"`) {
 		t.Fatalf("pending apply code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}

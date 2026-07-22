@@ -76,7 +76,7 @@ func runClientList(args []string, stdout, stderr io.Writer) int {
 	}
 	writer := tabwriter.NewWriter(stdout, 0, 4, 2, ' ', 0)
 	if detail {
-		fmt.Fprintln(writer, "CLIENT ID\tNAME\tSTATUS\tIPV4 MODE\tIPV4 ADDRESS\tIPV4 STATE\tCONNECTION")
+		fmt.Fprintln(writer, "CLIENT ID\tNAME\tSTATUS\tCONNECTION\tIPV4 MODE\tIPV4 ADDRESS\tIPV4 STATE")
 	} else {
 		fmt.Fprintln(writer, "CLIENT ID\tNAME\tSTATUS")
 	}
@@ -90,7 +90,7 @@ func runClientList(args []string, stdout, stderr io.Writer) int {
 			if value.IPv4.Address != nil {
 				address = *value.IPv4.Address
 			}
-			fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", id, value.Name, value.Status, value.IPv4.Mode, address, value.IPv4.State, value.Connection)
+			fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", id, value.Name, value.Status, value.Connection, value.IPv4.Mode, address, value.IPv4.State)
 		} else {
 			fmt.Fprintf(writer, "%s\t%s\t%s\n", id, value.Name, value.Status)
 		}

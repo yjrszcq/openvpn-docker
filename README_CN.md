@@ -38,7 +38,7 @@ chmod 750 openvpn-data openvpn-config
 x-openvpn-data: &openvpn-data
   volumes:
     - ./openvpn-data:/etc/openvpn
-    - ./openvpn-config:/etc/openvpn-config
+    - ./openvpn-config:/etc/ovpn-conf
 
 services:
   openvpn:
@@ -123,7 +123,7 @@ chmod 600 laptop.ovpn
 | 变量 | 运行时默认值 / Compose 回退值 | `.env.example` 值 | 说明 |
 |---|---|---|---|
 | `OVPN_IMAGE` | `szcq/openvpn:2.7.5` | `szcq/openvpn:2.7.5` | Compose 使用的镜像。生产环境应固定已发布 tag。 |
-| `OVPN_CONFIG_FILE` | `/etc/openvpn-config/config.yaml` | 未设置 | 期望状态声明式 YAML 的路径。 |
+| `OVPN_CONFIG_FILE` | `/etc/ovpn-conf/config.yaml` | 未设置 | 期望状态声明式 YAML 的路径。 |
 | `OVPN_DATA_DIR` | `/etc/openvpn` | 未设置 | 保存 SQLite、PKI、artifact、日志和锁的持久数据目录。 |
 | `OVPN_RUNTIME_DIR` | `/run/openvpn-container` | 未设置 | 保存 runtime socket 和服务进程锁的临时目录。 |
 | `OVPN_MAINTENANCE` | 未设置 | 未设置 | `migrate apply` 要求该值严格等于 `true`；Compose maintenance 服务会自动设置。 |
@@ -182,6 +182,8 @@ docker compose exec openvpn ovpn config plan
 docker compose exec openvpn ovpn config plan
 docker compose exec openvpn ovpn config apply --yes
 ```
+
+apply 修改状态前会检查 SQLite、PKI、证书、CRL 和 artifact，实例不是 `HEALTHY` 时拒绝执行。应先查看 `ovpn state doctor` 并修复原因；只有确认预检属于误判时才使用 `--force/-f`。该参数只跳过预检结论，schema、路径、锁、中断 operation 和事务安全检查仍然生效。
 
 容器保持运行，但现有 VPN 客户端会在 OpenVPN 受控重启时断开。plan 会列出重启、地址重映射、防火墙 reconcile、派生文件和 profile 重分发影响。网段和动态池变化统一由 `config apply` 处理，不再存在独立的 network migration 命令。停服后的 `openvpn-maintenance` 流程仍可用于恢复和明确的离线操作；它只应用数据变更，不启动 runtime 进程。
 

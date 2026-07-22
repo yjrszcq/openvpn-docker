@@ -103,7 +103,7 @@ func BuildPlan(ctx context.Context, root string, now time.Time) (Plan, error) {
 		SnapshotPath:        filepath.Join(root, filepath.FromSlash(SnapshotRelativePath)),
 		SnapshotDigestPath:  filepath.Join(root, filepath.FromSlash(SnapshotDigestRelativePath)),
 		YAMLExportRequired:  true,
-		YAMLExportCommand:   "ovpn config export --output /etc/openvpn-config/config.yaml",
+		YAMLExportCommand:   "ovpn config export --output /etc/ovpn-conf/config.yaml",
 		RollbackInstruction: "restore the complete migration snapshot, then run the sh-ver image",
 	}
 	for _, client := range source.Clients {

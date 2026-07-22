@@ -16,7 +16,7 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-const DefaultPath = "/etc/openvpn-config/config.yaml"
+const DefaultPath = "/etc/ovpn-conf/config.yaml"
 
 const (
 	defaultPort        = 1194

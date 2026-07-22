@@ -30,7 +30,7 @@ Add the following service next to `openvpn` in `compose.yaml`. It deliberately h
       OVPN_MAINTENANCE: "true"
     volumes:
       - ./openvpn-data:/etc/openvpn
-      - ./openvpn-config:/etc/openvpn-config
+      - ./openvpn-config:/etc/ovpn-conf
     profiles:
       - maintenance
     entrypoint:
@@ -134,16 +134,7 @@ docker compose exec openvpn ovpn client list -d
 docker compose exec openvpn ovpn client list -u
 ```
 
-Typical `client list --detail` output looks like this (IDs and addresses are examples):
-
-```text
-CLIENT ID     NAME      STATUS   IPV4 MODE  IPV4 ADDRESS  IPV4 STATE  CONNECTION
-111111111111  laptop    active   static     10.42.0.2    active      online
-222222222222  phone     active   dynamic    10.42.0.129  active      offline
-333333333333  retired   revoked  static     10.42.0.20   retained    offline
-```
-
-`STATUS` is the credential lifecycle state. `IPV4 MODE` is `static`, `dynamic`, or `none`; a dynamic address is the last recorded lease and may be `-` before the first connection. `IPV4 STATE` is assignment state such as `active`, `retained`, or `none`. `CONNECTION` is `online` or `offline` when the runtime broker is available and `unknown` when the service is stopped or cannot be queried. Use `--full-id/-u` for complete UUIDs and `--json/-j` for automation.
+Detailed columns are ordered as `CLIENT ID`, `NAME`, `STATUS`, `CONNECTION`, `IPV4 MODE`, `IPV4 ADDRESS`, and `IPV4 STATE`. `STATUS` is the credential lifecycle state. `CONNECTION` is `online` or `offline` when the runtime broker is available and `unknown` when the service is stopped or cannot be queried. `IPV4 MODE` is `static`, `dynamic`, or `none`; a dynamic address is the last recorded lease and may be `-` before the first connection. `IPV4 STATE` is assignment state such as `active`, `retained`, or `none`. Use `--full-id/-u` for complete UUIDs and `--json/-j` for automation.
 
 The default shortened ID can be copied after `--id/-i`. Positional values are exact names; `--name/-n` is the explicit equivalent:
 
@@ -257,7 +248,7 @@ docker compose exec openvpn ovpn config plan
 docker compose exec openvpn ovpn config apply --yes
 ```
 
-`config plan` and `config apply` both validate the YAML. During apply, the supervisor temporarily stops OpenVPN and the management broker, releases the shared runtime lock, applies the staged transaction under the exclusive lock, then reloads the committed revision and restarts the managed processes before returning. The container remains up; existing VPN sessions are disconnected by the controlled OpenVPN restart.
+`config plan` and `config apply` both validate the YAML. Apply then runs a state preflight and refuses any result other than `HEALTHY`; inspect `state doctor` and repair the instance before retrying. `--force/-f` is available only for a reviewed false negative and bypasses no other safety check. During apply, the supervisor temporarily stops OpenVPN and the management broker, releases the shared runtime lock, applies the staged transaction under the exclusive lock, then reloads the committed revision and restarts the managed processes before returning. The container remains up; existing VPN sessions are disconnected by the controlled OpenVPN restart.
 
 The offline maintenance workflow remains available when the live runtime is unhealthy or an operator explicitly wants the server stopped:
 

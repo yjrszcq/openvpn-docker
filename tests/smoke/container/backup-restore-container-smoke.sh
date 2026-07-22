@@ -50,7 +50,7 @@ run_control() {
   shift 2
   docker run --rm \
     -v "$data_dir:/etc/openvpn" \
-    -v "$config_dir:/etc/openvpn-config" \
+    -v "$config_dir:/etc/ovpn-conf" \
     --entrypoint ovpn \
     "$IMAGE" "$@"
 }

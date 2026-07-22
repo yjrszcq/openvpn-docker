@@ -24,7 +24,7 @@ maintenance 服务的 entrypoint 已经是 `ovpn`，因此 `<command>` 直接从
 
 | 用途 | 默认路径 | 覆盖变量 |
 |---|---|---|
-| 期望 YAML | `/etc/openvpn-config/config.yaml` | `OVPN_CONFIG_FILE` |
+| 期望 YAML | `/etc/ovpn-conf/config.yaml` | `OVPN_CONFIG_FILE` |
 | 持久化数据 | `/etc/openvpn` | `OVPN_DATA_DIR` |
 | 协调锁 | `/etc/openvpn` | `OVPN_DATA_DIR` |
 | runtime socket | `/run/openvpn-container` | `OVPN_RUNTIME_DIR` |
@@ -87,6 +87,7 @@ mutation 会先执行只读验证、目标选择和 plan，再请求确认。无
 | `--json` | `-j` |
 | `--output` | `-o` |
 | `--yes` | `-y` |
+| `--force` | `config apply` 中使用 `-f` |
 | `--name` | `-n` |
 | `--id` | `-i` |
 | `--ipv4` | `-4` |
@@ -234,10 +235,10 @@ ovpn config plan [--json|-j]
 语法：
 
 ```text
-ovpn config apply [--yes|-y] [--json|-j]
+ovpn config apply [--yes|-y] [--force|-f] [--json|-j]
 ```
 
-普通配置与 IPv4 网段/动态池变化在同一 staging operation 中完成，统一更新 SQLite、按需重映射地址并生成派生文件。在在线容器内，supervisor 会停止 OpenVPN 和 broker、清理当前网络规则、释放共享 runtime lock，等待独占 apply 事务完成后重新读取已提交的 SQLite revision、reconcile 网络并重启两个进程，容器本身不会停止。没有在线 supervisor 时（包括 `openvpn-maintenance`），apply 保持原有离线行为，并报告仍需重启。JSON activation 使用 `runtime_restarted` 和 `restart_required` 区分两种结果。
+普通配置与 IPv4 网段/动态池变化在同一 staging operation 中完成，统一更新 SQLite、按需重映射地址并生成派生文件。请求确认前，apply 会按照当前 applied revision 检查 SQLite、PKI、证书、CRL 和 artifact，状态不是 `HEALTHY` 时拒绝执行。只有确认预检为误判时才使用 `--force/-f`；该参数不会绕过 schema、路径、锁、中断 operation 或事务安全检查。在在线容器内，supervisor 会停止 OpenVPN 和 broker、清理当前网络规则、释放共享 runtime lock，等待独占 apply 事务完成后重新读取已提交的 SQLite revision、reconcile 网络并重启两个进程，容器本身不会停止。没有在线 supervisor 时（包括 `openvpn-maintenance`），apply 保持原有离线行为，并报告仍需重启。JSON activation 使用 `runtime_restarted` 和 `restart_required` 区分两种结果。
 
 ## 客户端选择与身份
 
@@ -277,7 +278,7 @@ ovpn client create NAME [--ipv4|-4 [auto|dynamic|ADDRESS]] [--output|-o FILE|-] 
 ovpn client list [--detail|-d] [--full-id|-u] [--json|-j]
 ```
 
-列出当前客户端。`--detail` 增加 assignment、lease 与实时连接状态；runtime broker 可用时 `CONNECTION` 为 `online` 或 `offline`，无法查询时为 `unknown`。文本模式默认缩短 ID，`--full-id` 显示完整 UUID；JSON 使用稳定对象，并在指定 `--detail` 时包含 `connection`。
+列出当前客户端。`--detail` 的列顺序为 `CLIENT ID`、`NAME`、`STATUS`、`CONNECTION`、`IPV4 MODE`、`IPV4 ADDRESS`、`IPV4 STATE`；runtime broker 可用时 `CONNECTION` 为 `online` 或 `offline`，无法查询时为 `unknown`。文本模式默认缩短 ID，`--full-id` 显示完整 UUID；JSON 使用稳定对象，并在指定 `--detail` 时包含 `connection`。
 
 ### `ovpn client export`
 

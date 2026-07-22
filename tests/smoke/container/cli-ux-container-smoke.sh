@@ -50,7 +50,7 @@ run_image() {
 run_ovpn() {
   docker run --rm \
     -v "$WORK_DIR/data:/etc/openvpn" \
-    -v "$WORK_DIR/config:/etc/openvpn-config" \
+    -v "$WORK_DIR/config:/etc/ovpn-conf" \
     --entrypoint ovpn \
     "$IMAGE" "$@"
 }
@@ -66,16 +66,16 @@ run_bootstrap() {
     -e OVPN_BOOTSTRAP_PORT=443 \
     -e OVPN_BOOTSTRAP_DNS=1.1.1.1,8.8.8.8 \
     -v "$WORK_DIR/bootstrap-data:/etc/openvpn" \
-    -v "$WORK_DIR/bootstrap-config:/etc/openvpn-config" \
+    -v "$WORK_DIR/bootstrap-config:/etc/ovpn-conf" \
     --entrypoint ovpn \
     "$IMAGE" "$@"
 }
 
 bootstrap_config_contains() {
   docker run --rm \
-    -v "$WORK_DIR/bootstrap-config:/etc/openvpn-config:ro" \
+    -v "$WORK_DIR/bootstrap-config:/etc/ovpn-conf:ro" \
     --entrypoint grep \
-    "$IMAGE" -Fq "$1" /etc/openvpn-config/config.yaml
+    "$IMAGE" -Fq "$1" /etc/ovpn-conf/config.yaml
 }
 
 test "$(run_image -v)" = "$GO_RUNTIME_VERSION"
@@ -150,6 +150,7 @@ PATHS
 bash -n "$WORK_DIR/ovpn.bash"
 grep -Fq -- '--release-ipv4' "$WORK_DIR/ovpn.bash"
 grep -Fq -- '--full-id' "$WORK_DIR/ovpn.bash"
+grep -Fq -- '--force' "$WORK_DIR/ovpn.bash"
 bash -ec 'source "$1"; COMP_WORDS=(ovpn help client ""); COMP_CWORD=3; _ovpn_completion; printf "%s\n" "${COMPREPLY[@]}"' \
   _ "$WORK_DIR/ovpn.bash" >"$WORK_DIR/help-client-completion.out"
 grep -Fxq create "$WORK_DIR/help-client-completion.out"
@@ -186,12 +187,31 @@ diff -u "$WORK_DIR/runtime-default.err" "$WORK_DIR/runtime-status.err"
 run_ovpn config apply --json >"$WORK_DIR/noop-apply.json"
 grep -Fq '"applied":false' "$WORK_DIR/noop-apply.json"
 
+docker run --rm \
+  -v "$WORK_DIR/data:/etc/openvpn" \
+  --entrypoint sh \
+  "$IMAGE" -ec 'printf "\n# preflight drift\n" >> /etc/openvpn/server/server.conf'
+set +e
+run_ovpn config apply --yes --json >"$WORK_DIR/preflight-refused.out" 2>"$WORK_DIR/preflight-refused.err"
+preflight_code=$?
+set -e
+test "$preflight_code" -eq 78
+grep -Fq '"kind":"configuration_preflight_refused"' "$WORK_DIR/preflight-refused.err"
+docker run --rm \
+  -v "$WORK_DIR/config:/etc/ovpn-conf" \
+  --entrypoint sed \
+  "$IMAGE" -i 's/port: 1194/port: 1195/' /etc/ovpn-conf/config.yaml
+run_ovpn config apply -f -y -j >"$WORK_DIR/forced-apply.json"
+grep -Fq '"applied":true' "$WORK_DIR/forced-apply.json"
+run_ovpn state doctor --json >"$WORK_DIR/post-force-doctor.json"
+grep -Fq '"state":"HEALTHY"' "$WORK_DIR/post-force-doctor.json"
+
 run_bootstrap bootstrap.example.test server init >"$WORK_DIR/bootstrap-init.out"
 grep -Fq 'generated initial declarative configuration' "$WORK_DIR/bootstrap-init.out"
 bootstrap_config_contains 'endpoint: bootstrap.example.test'
 bootstrap_config_contains 'protocol: tcp'
 bootstrap_config_contains 'port: 443'
-test "$(docker run --rm -v "$WORK_DIR/bootstrap-config:/etc/openvpn-config:ro" --entrypoint stat "$IMAGE" -c %a /etc/openvpn-config/config.yaml)" = 600
+test "$(docker run --rm -v "$WORK_DIR/bootstrap-config:/etc/ovpn-conf:ro" --entrypoint stat "$IMAGE" -c %a /etc/ovpn-conf/config.yaml)" = 600
 run_bootstrap bootstrap.example.test config validate --json >"$WORK_DIR/bootstrap-validate.json"
 grep -Fq '"valid":true' "$WORK_DIR/bootstrap-validate.json"
 run_bootstrap bootstrap.example.test state doctor --json >"$WORK_DIR/bootstrap-doctor.json"

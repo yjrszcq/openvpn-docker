@@ -1,7 +1,7 @@
 x-openvpn-data: &openvpn-data
   volumes:
     - ./openvpn-data:/etc/openvpn
-    - ./openvpn-config:/etc/openvpn-config
+    - ./openvpn-config:/etc/ovpn-conf
 
 services:
   openvpn:

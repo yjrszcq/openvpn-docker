@@ -137,7 +137,7 @@ RUN for binary in /usr/local/bin/ovpn /usr/local/bin/ovpn-broker; do \
     done \
     && rm /tmp/ovpn.ldd /tmp/ovpn-broker.ldd
 
-RUN mkdir -p /etc/openvpn /usr/local/share/openvpn-container
+RUN mkdir -p /etc/openvpn /etc/ovpn-conf /usr/local/share/openvpn-container
 
 ARG IMAGE_VERSION
 LABEL org.opencontainers.image.version="$IMAGE_VERSION" \

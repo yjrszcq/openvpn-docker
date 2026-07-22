@@ -29,7 +29,7 @@ for variable in OVPN_GITHUB_TOKEN HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY; do
     exit 1
   fi
 done
-printf '%s\n' "$openvpn_service" | grep -Fq '/etc/openvpn-config'
+printf '%s\n' "$openvpn_service" | grep -Fq '/etc/ovpn-conf'
 bootstrap_variables=(
   OVPN_BOOTSTRAP_FROM_ENV
   OVPN_BOOTSTRAP_ENDPOINT
@@ -72,7 +72,7 @@ printf '%s\n' "$maintenance_service" | grep -Fq -- '- doctor'
 printf '%s\n' "$maintenance_service" | grep -Fq 'restart: "no"'
 printf '%s\n' "$maintenance_service" | grep -Fq 'OVPN_MAINTENANCE: "true"'
 printf '%s\n' "$maintenance_service" | grep -Fq 'network_mode: host'
-printf '%s\n' "$maintenance_service" | grep -Fq '/etc/openvpn-config'
+printf '%s\n' "$maintenance_service" | grep -Fq '/etc/ovpn-conf'
 if printf '%s\n' "$maintenance_service" | grep -Fq 'OVPN_BOOTSTRAP_'; then
   echo 'maintenance service must not accept initialization bootstrap variables' >&2
   exit 1

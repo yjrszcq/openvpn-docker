@@ -28,7 +28,7 @@ docker compose run --rm openvpn-maintenance state doctor
       OVPN_MAINTENANCE: "true"
     volumes:
       - ./openvpn-data:/etc/openvpn
-      - ./openvpn-config:/etc/openvpn-config
+      - ./openvpn-config:/etc/ovpn-conf
     profiles:
       - maintenance
     entrypoint:
@@ -132,16 +132,7 @@ docker compose exec openvpn ovpn client list -d
 docker compose exec openvpn ovpn client list -u
 ```
 
-`client list --detail` 的典型输出如下（ID 和地址仅为示例）：
-
-```text
-CLIENT ID     NAME      STATUS   IPV4 MODE  IPV4 ADDRESS  IPV4 STATE  CONNECTION
-111111111111  laptop    active   static     10.42.0.2    active      online
-222222222222  phone     active   dynamic    10.42.0.129  active      offline
-333333333333  retired   revoked  static     10.42.0.20   retained    offline
-```
-
-`STATUS` 表示凭据生命周期状态。`IPV4 MODE` 为 `static`、`dynamic` 或 `none`；动态地址显示最近记录的 lease，首次连接前可能为 `-`。`IPV4 STATE` 表示 assignment 状态，例如 `active`、`retained` 或 `none`。runtime broker 可用时 `CONNECTION` 为 `online` 或 `offline`，服务停止或无法查询时为 `unknown`。使用 `--full-id/-u` 显示完整 UUID，自动化应使用 `--json/-j`。
+详细列的顺序为 `CLIENT ID`、`NAME`、`STATUS`、`CONNECTION`、`IPV4 MODE`、`IPV4 ADDRESS`、`IPV4 STATE`。`STATUS` 表示凭据生命周期状态；runtime broker 可用时 `CONNECTION` 为 `online` 或 `offline`，服务停止或无法查询时为 `unknown`。`IPV4 MODE` 为 `static`、`dynamic` 或 `none`；动态地址显示最近记录的 lease，首次连接前可能为 `-`。`IPV4 STATE` 表示 assignment 状态，例如 `active`、`retained` 或 `none`。使用 `--full-id/-u` 显示完整 UUID，自动化应使用 `--json/-j`。
 
 默认显示的短 ID 可以直接用于 `--id/-i`。位置值是精确名称；`--name/-n` 是对应的显式形式：
 
@@ -255,7 +246,7 @@ docker compose exec openvpn ovpn config plan
 docker compose exec openvpn ovpn config apply --yes
 ```
 
-`config plan` 和 `config apply` 都会验证 YAML。apply 期间 supervisor 会暂时停止 OpenVPN 和 management broker、释放共享 runtime lock，在独占锁下执行 staging 事务，然后重新读取已提交的 revision 并重启受管进程；容器保持运行，但现有 VPN session 会因 OpenVPN 的受控重启而断开。
+`config plan` 和 `config apply` 都会验证 YAML。apply 随后执行状态预检，结果不是 `HEALTHY` 时拒绝；应先查看 `state doctor` 并修复实例。`--force/-f` 只用于确认过的预检误判，不会绕过其他安全检查。apply 期间 supervisor 会暂时停止 OpenVPN 和 management broker、释放共享 runtime lock，在独占锁下执行 staging 事务，然后重新读取已提交的 revision 并重启受管进程；容器保持运行，但现有 VPN session 会因 OpenVPN 的受控重启而断开。
 
 当在线 runtime 异常，或管理员明确希望停服操作时，仍可使用离线 maintenance 流程：
 

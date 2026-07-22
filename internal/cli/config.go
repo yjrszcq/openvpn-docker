@@ -19,6 +19,7 @@ import (
 	"github.com/yjrszcq/openvpn-docker/internal/pki"
 	"github.com/yjrszcq/openvpn-docker/internal/render"
 	runtimecontrol "github.com/yjrszcq/openvpn-docker/internal/runtime"
+	statecontrol "github.com/yjrszcq/openvpn-docker/internal/state"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
 )
 
@@ -116,21 +117,30 @@ func runConfigPlan(args []string, stdout, stderr io.Writer) int {
 }
 
 func runConfigApply(args []string, stdout, stderr io.Writer) int {
-	yes, jsonMode := false, false
+	yes, force, jsonMode := false, false, false
 	for _, arg := range args {
-		switch canonicalOption(arg) {
+		option := canonicalOption(arg)
+		if arg == "-f" {
+			option = "--force"
+		}
+		switch option {
 		case "--yes":
 			if yes {
 				return writeErrorMode(stderr, usageError("--yes may only be specified once"), jsonMode)
 			}
 			yes = true
+		case "--force":
+			if force {
+				return writeErrorMode(stderr, usageError("--force may only be specified once"), jsonMode)
+			}
+			force = true
 		case "--json":
 			if jsonMode {
 				return writeErrorMode(stderr, usageError("--json may only be specified once"), true)
 			}
 			jsonMode = true
 		default:
-			return writeErrorMode(stderr, usageError("usage: ovpn config apply [--yes] [--json]"), jsonMode)
+			return writeErrorMode(stderr, usageError("usage: ovpn config apply [--yes] [--force] [--json]"), jsonMode)
 		}
 	}
 	desired, err := configservice.LoadFile(environmentOr("OVPN_CONFIG_FILE", configservice.DefaultPath))
@@ -140,6 +150,9 @@ func runConfigApply(args []string, stdout, stderr io.Writer) int {
 	plan, err := loadConfigurationPlan(context.Background(), desired)
 	if err != nil {
 		return writeConfigurationError(stderr, err, jsonMode)
+	}
+	if err := checkConfigurationApplyPreflight(context.Background(), force); err != nil {
+		return writeErrorMode(stderr, err, jsonMode)
 	}
 	if plan.Configuration.InSync {
 		result := configurationservice.ApplyResult{
@@ -209,6 +222,21 @@ func runConfigApply(args []string, stdout, stderr io.Writer) int {
 	}
 	writeConfigurationApplyResult(stdout, result)
 	return int(apperror.ExitSuccess)
+}
+
+func checkConfigurationApplyPreflight(ctx context.Context, force bool) error {
+	options, err := stateScanOptions()
+	if err != nil {
+		return err
+	}
+	// Desired YAML drift is expected here and is already validated by the plan.
+	options.ConfigFile = ""
+	report := statecontrol.Scan(ctx, options)
+	if report.State == statecontrol.Healthy || force {
+		return nil
+	}
+	detail := fmt.Sprintf("state preflight reported %s with %d issue(s); run 'ovpn state doctor' and repair the instance, or use --force/-f after reviewing the findings", report.State, report.IssueCount)
+	return apperror.New(apperror.ExitPolicy, "configuration_preflight_refused", detail)
 }
 
 func loadConfigurationPlan(ctx context.Context, desired domain.Config) (configurationservice.Plan, error) {

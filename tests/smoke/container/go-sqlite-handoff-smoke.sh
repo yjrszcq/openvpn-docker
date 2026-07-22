@@ -95,7 +95,7 @@ run_shell() {
     -e OVPN_NETWORK=10.98.0.0/24 \
     -e OVPN_PROTO=udp \
     -v "$data_dir:/etc/openvpn" \
-    -v "$config_dir:/etc/openvpn-config" \
+    -v "$config_dir:/etc/ovpn-conf" \
     "$SOURCE_IMAGE" "$@"
 }
 
@@ -105,7 +105,7 @@ run_go() {
     -e OVPN_RUNTIME_DIR=/run/openvpn-container \
     -e OVPN_COMPATIBILITY_FILE=/tool/contract.json \
     -v "$data_dir:/etc/openvpn" \
-    -v "$config_dir:/etc/openvpn-config" \
+    -v "$config_dir:/etc/ovpn-conf" \
     -v "$bin_dir:/tool:ro" \
     --entrypoint /tool/ovpn \
     "$SOURCE_IMAGE" "$@"
@@ -127,7 +127,7 @@ docker run --rm \
   -e OVPN_MAINTENANCE=true \
   -e OVPN_COMPATIBILITY_FILE=/tool/contract.json \
   -v "$data_dir:/etc/openvpn" \
-  -v "$config_dir:/etc/openvpn-config" \
+  -v "$config_dir:/etc/ovpn-conf" \
   -v "$bin_dir:/tool:ro" \
   --entrypoint /tool/ovpn \
   "$SOURCE_IMAGE" migrate apply --yes --json >"$WORK_DIR/apply.json"
@@ -138,7 +138,7 @@ test "$(docker run --rm -v "$data_dir:/etc/openvpn:ro" --entrypoint /usr/bin/sha
 run_go state doctor --json >"$WORK_DIR/doctor-before-export.json"
 grep -Fq '"state":"DEGRADED_REPAIRABLE"' "$WORK_DIR/doctor-before-export.json"
 grep -Fq '"id":"DECLARATIVE_CONFIG_UNAVAILABLE"' "$WORK_DIR/doctor-before-export.json"
-run_go config export --output /etc/openvpn-config/config.yaml
+run_go config export --output /etc/ovpn-conf/config.yaml
 run_go state doctor --json >"$WORK_DIR/doctor.json"
 grep -Fq '"state":"HEALTHY"' "$WORK_DIR/doctor.json"
 run_go client export --name "$CLIENT_NAME" --output - >"$WORK_DIR/schema4.ovpn"
@@ -154,7 +154,7 @@ docker run -d \
   -e OVPN_BROKER_BIN=/tool/ovpn-broker \
   -e OVPN_IPTABLES_BIN=iptables-legacy \
   -v "$data_dir:/etc/openvpn" \
-  -v "$config_dir:/etc/openvpn-config" \
+  -v "$config_dir:/etc/ovpn-conf" \
   -v "$bin_dir:/tool:ro" \
   -v "$bin_dir/ovpn:/usr/local/bin/ovpn-hook:ro" \
   --entrypoint /tool/ovpn \

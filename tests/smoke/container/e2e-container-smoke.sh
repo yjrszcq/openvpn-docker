@@ -82,17 +82,17 @@ YAML
 
   docker run --rm \
     -v "$data_dir:/etc/openvpn" \
-    -v "$config_dir:/etc/openvpn-config" \
+    -v "$config_dir:/etc/ovpn-conf" \
     --entrypoint ovpn \
     "$IMAGE" server init >"$protocol_dir/init.out"
   docker run --rm \
     -v "$data_dir:/etc/openvpn" \
-    -v "$config_dir:/etc/openvpn-config" \
+    -v "$config_dir:/etc/ovpn-conf" \
     --entrypoint ovpn \
     "$IMAGE" client create "$client" --ipv4 dynamic >"$protocol_dir/create.out"
   docker run --rm \
     -v "$data_dir:/etc/openvpn" \
-    -v "$config_dir:/etc/openvpn-config" \
+    -v "$config_dir:/etc/ovpn-conf" \
     --entrypoint ovpn \
     "$IMAGE" client export --name "$client" --output - >"$protocol_dir/client.ovpn"
 
@@ -105,7 +105,7 @@ YAML
     --device /dev/net/tun \
     -e OVPN_IPTABLES_BIN=iptables-legacy \
     -v "$data_dir:/etc/openvpn" \
-    -v "$config_dir:/etc/openvpn-config:ro" \
+    -v "$config_dir:/etc/ovpn-conf:ro" \
     "$IMAGE" >"$protocol_dir/server.id"
   active_containers+=("$server")
 

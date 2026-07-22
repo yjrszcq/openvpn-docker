@@ -26,7 +26,7 @@ Default paths:
 
 | Purpose | Path | Override |
 |---|---|---|
-| Desired YAML | `/etc/openvpn-config/config.yaml` | `OVPN_CONFIG_FILE` |
+| Desired YAML | `/etc/ovpn-conf/config.yaml` | `OVPN_CONFIG_FILE` |
 | Persistent data | `/etc/openvpn` | `OVPN_DATA_DIR` |
 | Coordination locks | `/etc/openvpn` | `OVPN_DATA_DIR` |
 | Runtime sockets | `/run/openvpn-container` | `OVPN_RUNTIME_DIR` |
@@ -89,6 +89,7 @@ Every public multi-letter option has a single-token short alias. Long and short 
 | `--json` | `-j` |
 | `--output` | `-o` |
 | `--yes` | `-y` |
+| `--force` | `-f` within `config apply` |
 | `--name` | `-n` |
 | `--id` | `-i` |
 | `--ipv4` | `-4` |
@@ -236,10 +237,10 @@ Compares desired YAML with the applied revision. The plan lists field changes an
 Syntax:
 
 ```text
-ovpn config apply [--yes|-y] [--json|-j]
+ovpn config apply [--yes|-y] [--force|-f] [--json|-j]
 ```
 
-Applies ordinary configuration and IPv4 network/pool changes in one staged operation, updates SQLite, remaps addresses when required, and regenerates derived files. In the live container, the supervisor stops OpenVPN and the broker, cleans the current network rules, releases its shared runtime lock, waits for the exclusive apply transaction, reloads the committed SQLite revision, reconciles networking, and restarts both processes before the command returns. The container itself remains running. When no live supervisor is available, including in `openvpn-maintenance`, apply retains the offline behavior and reports that a restart is still required. JSON activation output distinguishes `runtime_restarted` from `restart_required`.
+Applies ordinary configuration and IPv4 network/pool changes in one staged operation, updates SQLite, remaps addresses when required, and regenerates derived files. Before confirmation, apply checks SQLite, PKI, certificates, CRL, and artifacts against the currently applied revision and refuses any state other than `HEALTHY`. Use `--force/-f` only to bypass a reviewed false-negative preflight; it does not bypass schema, path, lock, pending-operation, or transaction safety checks. In the live container, the supervisor stops OpenVPN and the broker, cleans the current network rules, releases its shared runtime lock, waits for the exclusive apply transaction, reloads the committed SQLite revision, reconciles networking, and restarts both processes before the command returns. The container itself remains running. When no live supervisor is available, including in `openvpn-maintenance`, apply retains the offline behavior and reports that a restart is still required. JSON activation output distinguishes `runtime_restarted` from `restart_required`.
 
 ## Client selection and identity
 
@@ -279,7 +280,7 @@ Syntax:
 ovpn client list [--detail|-d] [--full-id|-u] [--json|-j]
 ```
 
-Lists current clients. `--detail` includes assignment, lease, and live connection information. `CONNECTION` is `online` or `offline` when the runtime broker is available and `unknown` when it cannot be queried. The default text ID is shortened; `--full-id` prints the full UUID. JSON uses a stable object representation and includes `connection` when `--detail` is requested.
+Lists current clients. `--detail` adds columns in this order: `CLIENT ID`, `NAME`, `STATUS`, `CONNECTION`, `IPV4 MODE`, `IPV4 ADDRESS`, and `IPV4 STATE`. `CONNECTION` is `online` or `offline` when the runtime broker is available and `unknown` when it cannot be queried. The default text ID is shortened; `--full-id` prints the full UUID. JSON uses a stable object representation and includes `connection` when `--detail` is requested.
 
 ### `ovpn client export`
 

@@ -45,6 +45,10 @@ func TestClientListDetailCombinesRuntimeConnectionState(t *testing.T) {
 	if code != 0 || stderr != "" || !strings.Contains(stdout, "CONNECTION") || !strings.Contains(stdout, "online") {
 		t.Fatalf("online detail code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
+	header := strings.Join(strings.Fields(strings.SplitN(stdout, "\n", 2)[0]), " ")
+	if header != "CLIENT ID NAME STATUS CONNECTION IPV4 MODE IPV4 ADDRESS IPV4 STATE" {
+		t.Fatalf("detail header=%q", header)
+	}
 	if command := <-commands; command != "status 3" {
 		t.Fatalf("command=%q", command)
 	}

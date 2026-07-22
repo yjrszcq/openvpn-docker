@@ -40,7 +40,7 @@ Create `compose.yaml`. This version is self-contained and does not require a `.e
 x-openvpn-data: &openvpn-data
   volumes:
     - ./openvpn-data:/etc/openvpn
-    - ./openvpn-config:/etc/openvpn-config
+    - ./openvpn-config:/etc/ovpn-conf
 
 services:
   openvpn:
@@ -125,7 +125,7 @@ Persistent server settings belong in declarative YAML. Environment variables con
 | Variable | Runtime default / Compose fallback | `.env.example` value | Purpose |
 |---|---|---|---|
 | `OVPN_IMAGE` | `szcq/openvpn:2.7.5` | `szcq/openvpn:2.7.5` | Image used by Compose. Pin a released tag in production. |
-| `OVPN_CONFIG_FILE` | `/etc/openvpn-config/config.yaml` | unset | Desired declarative YAML path. |
+| `OVPN_CONFIG_FILE` | `/etc/ovpn-conf/config.yaml` | unset | Desired declarative YAML path. |
 | `OVPN_DATA_DIR` | `/etc/openvpn` | unset | Persistent data directory containing SQLite, PKI, artifacts, logs, and locks. |
 | `OVPN_RUNTIME_DIR` | `/run/openvpn-container` | unset | Ephemeral directory for runtime sockets and the server-process lock. |
 | `OVPN_MAINTENANCE` | unset | unset | Must be exactly `true` for `migrate apply`; the Compose maintenance service sets it automatically. |
@@ -184,6 +184,8 @@ Apply through the running container. The supervisor temporarily stops OpenVPN an
 docker compose exec openvpn ovpn config plan
 docker compose exec openvpn ovpn config apply --yes
 ```
+
+Before changing state, apply checks SQLite, PKI, certificates, CRL, and artifacts and refuses a non-healthy instance. Review `ovpn state doctor` and repair the cause first. `--force/-f` bypasses only this preflight result when it is known to be a false negative; schema, path, lock, pending-operation, and transaction safety checks still apply.
 
 The container remains running, but connected VPN clients are disconnected during the controlled OpenVPN restart. The plan reports restart, address remap, firewall reconciliation, derived-file, and profile redistribution impact. Network and dynamic-pool changes are part of the same `config apply`; there is no separate network migration command. The stopped `openvpn-maintenance` workflow remains available for recovery and explicit offline operation; it applies the data change without starting runtime processes.
 

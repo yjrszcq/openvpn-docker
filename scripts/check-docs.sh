@@ -98,7 +98,7 @@ for readme in README.md README_CN.md; do
 done
 
 if rg -n \
-  'ovpn (start|init|network |client ip |runtime version)|--no-trunc|--release-ip([^v]|$)|compatibility/contract\.env|meta/client-ip\.csv|meta/audit\.jsonl|config export --output /etc/openvpn-config/config\.yaml' \
+  'ovpn (start|init|network |client ip |runtime version)|--no-trunc|--release-ip([^v]|$)|compatibility/contract\.env|meta/client-ip\.csv|meta/audit\.jsonl|/etc/openvpn-config' \
   README.md README_CN.md docs/en/v4 docs/cn/v4; then
   echo 'current documentation contains retired schema 3 interfaces' >&2
   exit 1
