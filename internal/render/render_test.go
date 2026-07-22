@@ -29,7 +29,7 @@ func newRenderer(t *testing.T) render.Renderer {
 	if err != nil {
 		t.Fatal(err)
 	}
-	renderer, err := render.New(filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"), contract)
+	renderer, err := render.New(filepath.Join("..", "..", "templates"), contract)
 	if err != nil {
 		t.Fatal(err)
 	}

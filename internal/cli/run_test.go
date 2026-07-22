@@ -131,7 +131,7 @@ func TestSafeGroupDefaults(t *testing.T) {
 	t.Setenv("OVPN_DATA_DIR", dataDir)
 	t.Setenv("OVPN_RUNTIME_DIR", filepath.Join(dataDir, "run"))
 	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
-	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
+	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "templates"))
 
 	code, stdout, stderr := run("client")
 	if code != 78 || stdout != "" || !strings.Contains(stderr, "SQLite database is missing") {
@@ -200,7 +200,7 @@ func TestRepairCLIPlanAndConfirmation(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("OVPN_DATA_DIR", root)
 	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
-	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
+	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "templates"))
 	code, stdout, stderr := run("repair", "plan", "--json")
 	if code != 0 || stderr != "" || !strings.Contains(stdout, `"state":"EMPTY"`) || !strings.Contains(stdout, `"actions":[]`) {
 		t.Fatalf("repair plan code=%d stdout=%q stderr=%q", code, stdout, stderr)
@@ -219,7 +219,7 @@ func TestStateCLIReportsEmptyAndMissingDatabase(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("OVPN_DATA_DIR", root)
 	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
-	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
+	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "templates"))
 	code, stdout, stderr := run("state", "show", "--json")
 	if code != 0 || stderr != "" || !strings.Contains(stdout, `"state":"EMPTY"`) || !strings.Contains(stdout, `"issues":[]`) {
 		t.Fatalf("empty state code=%d stdout=%q stderr=%q", code, stdout, stderr)
@@ -251,7 +251,7 @@ func TestServerInitUsageAndInvalidConfiguration(t *testing.T) {
 	t.Setenv("OVPN_DATA_DIR", filepath.Join(root, "data"))
 	t.Setenv("OVPN_RUNTIME_DIR", filepath.Join(root, "run"))
 	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
-	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
+	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "templates"))
 	code, stdout, stderr = run("server", "init")
 	if code != 65 || stdout != "" || !strings.Contains(stderr, "initialization configuration is invalid") {
 		t.Fatalf("invalid init code=%d stdout=%q stderr=%q", code, stdout, stderr)
@@ -404,7 +404,7 @@ func TestClientMutationJSONSuccessUsesVersionedFullIDs(t *testing.T) {
 	t.Setenv("OVPN_DATA_DIR", root)
 	t.Setenv("OVPN_RUNTIME_DIR", filepath.Join(t.TempDir(), "run"))
 	t.Setenv("OVPN_COMPATIBILITY_FILE", filepath.Join("..", "..", "compatibility", "contract.json"))
-	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"))
+	t.Setenv("OVPN_TEMPLATE_ROOT", filepath.Join("..", "..", "templates"))
 
 	code, stdout, stderr := run("client", "rename", "laptop", "laptop", "-j")
 	if code != 0 || stderr != "" || !strings.Contains(stdout, `"version":1`) || !strings.Contains(stdout, `"id":"20000000-0000-4000-8000-000000000002"`) {

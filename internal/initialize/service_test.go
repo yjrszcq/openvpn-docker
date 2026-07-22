@@ -134,7 +134,7 @@ func newInitializationService(t *testing.T, fail string) (*Service, *initializat
 	if err != nil {
 		t.Fatal(err)
 	}
-	renderer, err := render.New(filepath.Join("..", "..", "rootfs", "usr", "local", "share", "openvpn-container", "templates"), contract)
+	renderer, err := render.New(filepath.Join("..", "..", "templates"), contract)
 	if err != nil {
 		t.Fatal(err)
 	}

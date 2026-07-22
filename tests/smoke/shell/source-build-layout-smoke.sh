@@ -56,7 +56,7 @@ if grep -Fq 'COPY rootfs/ /' "$dockerfile"; then
   echo 'runtime Dockerfile must not copy the legacy rootfs control plane' >&2
   exit 1
 fi
-grep -Fq 'COPY rootfs/usr/local/share/openvpn-container/templates/' "$dockerfile"
+grep -Fq 'COPY templates/ /usr/local/share/openvpn-container/templates/' "$dockerfile"
 grep -Fq 'COPY compatibility/contract.json ' "$dockerfile"
 if grep -Fq 'COPY compatibility/ ' "$dockerfile"; then
   echo 'runtime Dockerfile must copy only the strict JSON compatibility contract' >&2

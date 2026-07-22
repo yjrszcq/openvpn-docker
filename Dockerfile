@@ -114,7 +114,7 @@ COPY --from=builder /out/ /
 COPY --from=builder /work/openvpn/COPYING /usr/local/share/licenses/openvpn/COPYING
 COPY --from=go-builder /out/ /
 COPY LICENSE NOTICE /usr/local/share/licenses/openvpn-container/
-COPY rootfs/usr/local/share/openvpn-container/templates/ /usr/local/share/openvpn-container/templates/
+COPY templates/ /usr/local/share/openvpn-container/templates/
 COPY compatibility/contract.json /usr/local/share/openvpn-container/compatibility/contract.json
 
 RUN install -m 0755 /usr/local/lib/openvpn-container/go/ovpn /usr/local/bin/ovpn \
