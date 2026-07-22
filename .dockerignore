@@ -1,5 +1,6 @@
 .git
 .checkpoint-karpathy
 goal
-openvpn-data
+data
+config
 *.log

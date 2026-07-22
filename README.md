@@ -30,8 +30,8 @@ The project does not currently provide a web UI, TAP, LDAP/RADIUS/OIDC, Kubernet
 Create the persistent and configuration directories:
 
 ```bash
-mkdir -p openvpn-data openvpn-config
-chmod 750 openvpn-data openvpn-config
+mkdir -p data config
+chmod 750 data config
 ```
 
 Create `docker-compose.yaml`. This version is self-contained and does not require a `.env` file. Replace `vpn.example.com` and choose a non-overlapping IPv4 network before starting:
@@ -48,8 +48,8 @@ services:
       OVPN_BOOTSTRAP_ENDPOINT: vpn.example.com
       OVPN_BOOTSTRAP_IPV4_NETWORK: 10.42.0.0/24
     volumes:
-      - ./openvpn-data:/etc/openvpn
-      - ./openvpn-config:/etc/ovpn-conf
+      - ./data:/etc/openvpn
+      - ./config:/etc/ovpn-conf
     cap_add:
       - NET_ADMIN
     devices:
@@ -65,8 +65,8 @@ The example shows only the three values required for one-time environment initia
 To skip environment initialization and manage the configuration file yourself, create it before the first start:
 
 ```bash
-cp config.example.yaml openvpn-config/config.yaml
-$EDITOR openvpn-config/config.yaml
+cp config.example.yaml config/config.yaml
+$EDITOR config/config.yaml
 ```
 
 Then remove the entire `environment:` block from the `openvpn` service in the Compose example. The mounted file becomes the desired configuration; only `version`, `server.endpoint`, and `ipv4.network` are required, and the example file documents the remaining defaults.
@@ -212,7 +212,7 @@ The database and all PKI/artifact files are one restore unit. Never copy only `s
 ```bash
 docker compose stop
 sudo tar --numeric-owner -czf openvpn-backup.tar.gz \
-  openvpn-data openvpn-config
+  data config
 docker compose start
 ```
 

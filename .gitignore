@@ -1,4 +1,6 @@
 goal/
 .env
 .checkpoint-karpathy/private/
+/data/
+/config/
 temp/

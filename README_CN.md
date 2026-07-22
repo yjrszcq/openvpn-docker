@@ -28,8 +28,8 @@
 ### 创建部署
 
 ```bash
-mkdir -p openvpn-data openvpn-config
-chmod 750 openvpn-data openvpn-config
+mkdir -p data config
+chmod 750 data config
 ```
 
 创建 `docker-compose.yaml`。以下版本可以独立使用，不需要 `.env` 文件。启动前必须替换 `vpn.example.com`，并选择不重叠的 IPv4 网段：
@@ -46,8 +46,8 @@ services:
       OVPN_BOOTSTRAP_ENDPOINT: vpn.example.com
       OVPN_BOOTSTRAP_IPV4_NETWORK: 10.42.0.0/24
     volumes:
-      - ./openvpn-data:/etc/openvpn
-      - ./openvpn-config:/etc/ovpn-conf
+      - ./data:/etc/openvpn
+      - ./config:/etc/ovpn-conf
     cap_add:
       - NET_ADMIN
     devices:
@@ -63,8 +63,8 @@ Docker Hub tag 使用镜像内 OpenVPN 版本。这里的镜像内含 OpenVPN 2.
 如果不用一次性环境变量初始化，应在首次启动前自行创建配置文件：
 
 ```bash
-cp config.example.yaml openvpn-config/config.yaml
-$EDITOR openvpn-config/config.yaml
+cp config.example.yaml config/config.yaml
+$EDITOR config/config.yaml
 ```
 
 然后删除 Compose 示例中 `openvpn` 服务的整个 `environment:` 配置块。挂载的文件将作为期望配置；只有 `version`、`server.endpoint` 和 `ipv4.network` 必填，其余默认值均在示例文件中说明。
@@ -210,7 +210,7 @@ ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 ```bash
 docker compose stop
 sudo tar --numeric-owner -czf openvpn-backup.tar.gz \
-  openvpn-data openvpn-config
+  data config
 docker compose start
 ```
 

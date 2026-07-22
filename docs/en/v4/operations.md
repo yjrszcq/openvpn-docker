@@ -17,7 +17,7 @@ docker exec openvpn ovpn client list
 docker compose run --rm openvpn-maintenance state doctor
 ```
 
-Both services must use the same target image and mount the same `openvpn-data` and `openvpn-config` directories.
+Both services must use the same target image and mount the same `./data` and `./config` directories.
 
 Live CLI examples use `docker exec openvpn` because the Compose service fixes `container_name: openvpn`. Substitute the actual container name if you change it. Maintenance workflows continue to use `docker compose run --rm openvpn-maintenance`.
 
@@ -31,8 +31,8 @@ Add the following service next to `openvpn` in `docker-compose.yaml`. It deliber
     environment:
       OVPN_MAINTENANCE: "true"
     volumes:
-      - ./openvpn-data:/etc/openvpn
-      - ./openvpn-config:/etc/ovpn-conf
+      - ./data:/etc/openvpn
+      - ./config:/etc/ovpn-conf
     profiles:
       - maintenance
     entrypoint:
@@ -49,15 +49,15 @@ Use the same pinned image tag as the live service. The maintenance service belon
 ## Initial deployment
 
 1. Create the data and configuration directories with restricted permissions.
-2. Copy the repository's root `config.example.yaml` to `openvpn-config/config.yaml`, then validate the endpoint, IPv4 network, routing, and NAT choices.
+2. Copy the repository's root `config.example.yaml` to `config/config.yaml`, then validate the endpoint, IPv4 network, routing, and NAT choices.
 3. Start the service. The entrypoint initializes only an empty data directory.
 4. Verify state and runtime health before issuing clients.
 
 ```bash
-mkdir -p openvpn-data openvpn-config
-chmod 750 openvpn-data openvpn-config
-cp config.example.yaml openvpn-config/config.yaml
-$EDITOR openvpn-config/config.yaml
+mkdir -p data config
+chmod 750 data config
+cp config.example.yaml config/config.yaml
+$EDITOR config/config.yaml
 
 docker compose up -d
 docker exec openvpn ovpn state doctor
@@ -274,8 +274,8 @@ Recover a complete desired YAML from applied state:
 ```bash
 umask 077
 docker compose run --rm -T openvpn-maintenance \
-  config export -o - > openvpn-config/config.yaml.new &&
-  mv openvpn-config/config.yaml.new openvpn-config/config.yaml
+  config export -o - > config/config.yaml.new &&
+  mv config/config.yaml.new config/config.yaml
 ```
 
 ## State diagnosis and repair
@@ -363,8 +363,8 @@ docker compose run --rm openvpn-maintenance migrate apply --yes
 docker compose run --rm openvpn-maintenance state doctor
 umask 077
 docker compose run --rm -T openvpn-maintenance \
-  config export --output - > openvpn-config/config.yaml.new &&
-  mv openvpn-config/config.yaml.new openvpn-config/config.yaml
+  config export --output - > config/config.yaml.new &&
+  mv config/config.yaml.new config/config.yaml
 docker compose up -d
 docker exec openvpn ovpn runtime health
 ```
@@ -378,24 +378,24 @@ An image switch is not sufficient. Restore the complete migration snapshot and t
 ```bash
 docker compose stop
 
-sudo cp openvpn-data/repair/migrations/schema3-pre-v4.tar.gz .
-sudo cp openvpn-data/repair/migrations/schema3-pre-v4.tar.gz.sha256 .
+sudo cp data/repair/migrations/schema3-pre-v4.tar.gz .
+sudo cp data/repair/migrations/schema3-pre-v4.tar.gz.sha256 .
 sudo chown "$(id -u):$(id -g)" schema3-pre-v4.tar.gz schema3-pre-v4.tar.gz.sha256
 sha256sum -c schema3-pre-v4.tar.gz.sha256
 
-mkdir openvpn-data-schema3
-chmod 750 openvpn-data-schema3
-sudo tar --numeric-owner -xzf schema3-pre-v4.tar.gz -C openvpn-data-schema3
+mkdir data-schema3
+chmod 750 data-schema3
+sudo tar --numeric-owner -xzf schema3-pre-v4.tar.gz -C data-schema3
 
-mv openvpn-data openvpn-data-schema4
-mv openvpn-data-schema3 openvpn-data
+mv data data-schema4
+mv data-schema3 data
 
 # Point OVPN_IMAGE to the stable sh-ver image before startup.
 docker compose run --rm openvpn-maintenance state doctor
 docker compose up -d
 ```
 
-Keep `openvpn-data-schema4` until the rollback is verified. The restored schema 3 tree and `sh-ver` image are a matched unit.
+Keep `data-schema4` until the rollback is verified. The restored schema 3 tree and `sh-ver` image are a matched unit.
 
 ## Offline backup and restore
 
@@ -406,7 +406,7 @@ SQLite and file artifacts must always be backed up and restored together.
 ```bash
 docker compose stop
 sudo tar --numeric-owner -czf openvpn-v4-$(date +%Y%m%d%H%M%S).tar.gz \
-  openvpn-data openvpn-config
+  data config
 docker compose start
 ```
 
@@ -420,10 +420,10 @@ Restore into an empty working directory while no container is running:
 mkdir restore-work
 sudo tar --numeric-owner -xzf openvpn-v4-backup.tar.gz -C restore-work
 
-mv openvpn-data openvpn-data-before-restore
-mv openvpn-config openvpn-config-before-restore
-mv restore-work/openvpn-data ./openvpn-data
-mv restore-work/openvpn-config ./openvpn-config
+mv data data-before-restore
+mv config config-before-restore
+mv restore-work/data ./data
+mv restore-work/config ./config
 
 docker compose run --rm openvpn-maintenance state doctor
 docker compose start
