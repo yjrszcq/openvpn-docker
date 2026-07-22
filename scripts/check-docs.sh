@@ -91,6 +91,12 @@ diff -u \
 test "$(extract_command_headings docs/en/v4/commands.md | wc -l)" -eq \
   "$(extract_command_usage docs/en/v4/commands.md 'Syntax:' | wc -l)"
 
+for readme in README.md README_CN.md; do
+  test "$(sed -n '/^```yaml$/,/^```$/p' "$readme" | rg -c 'OVPN_BOOTSTRAP_')" -eq 3
+  grep -Fq 'cp config.example.yaml openvpn-config/config.yaml' "$readme"
+  grep -Fq '[.env.example](.env.example)' "$readme"
+done
+
 if rg -n \
   'ovpn (start|init|network |client ip |runtime version)|--no-trunc|--release-ip([^v]|$)|compatibility/contract\.env|meta/client-ip\.csv|meta/audit\.jsonl|config export --output /etc/openvpn-config/config\.yaml' \
   README.md README_CN.md docs/en/v4 docs/cn/v4; then

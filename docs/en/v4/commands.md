@@ -34,7 +34,7 @@ Default paths:
 
 `OVPN_MAINTENANCE=true` authorizes offline migration. `OVPN_EDITOR`, then `EDITOR`, selects the batch address editor. Binary/template overrides are test and development interfaces, not normal deployment configuration.
 
-`ovpn client`, `ovpn state`, and `ovpn runtime` are safe shortcuts for `client list`, `state doctor`, and `runtime status`. At the top level, `-v` prints only the project version while `-V` and `--version` print the full version report. Running `ovpn` without arguments prints a compact command tree with every leaf usage; `ovpn -h` retains the detailed root help.
+`ovpn client`, `ovpn state`, and `ovpn runtime` are safe shortcuts for `client list`, `state doctor`, and `runtime status`. At the top level, `-v` prints only the project version while `-V` and `--version` print the full version report. Running `ovpn` without arguments prints the fully expanded command tree with descriptions and every leaf usage; `ovpn -h` retains the detailed root help.
 
 ## One-time environment bootstrap
 
@@ -105,15 +105,46 @@ Every public multi-letter option has a single-token short alias. Long and short 
 
 ```text
 ovpn
-├── server       Initialize, run, or render the OpenVPN server.
-├── config       Validate, inspect, plan, or apply declarative configuration.
-├── client       Manage client identities, profiles, and addresses.
-├── state        Inspect authoritative instance state.
-├── repair       Plan or apply state repair.
-├── migrate      Plan or apply persistent data migration.
-├── runtime      Inspect and control the running OpenVPN service.
-├── completion   Generate shell completion for ovpn.
-└── version      Print build and data-format versions.
+├── server
+│   ├── init            Initialize an empty OpenVPN instance.
+│   ├── run             Supervise OpenVPN and its management broker.
+│   └── render          Render the applied server configuration.
+├── config
+│   ├── validate        Validate the desired YAML configuration.
+│   ├── show            Show the applied SQLite configuration.
+│   ├── export          Export the applied configuration as YAML.
+│   ├── plan            Plan desired-to-applied configuration changes.
+│   └── apply           Apply desired configuration while OpenVPN is stopped.
+├── client
+│   ├── create          Create a client and its credentials.
+│   ├── list            List active and revoked clients.
+│   ├── export          Export an active client profile.
+│   ├── rename          Rename a client without changing its UUID.
+│   ├── revoke          Revoke a client certificate.
+│   ├── reissue         Reissue a client certificate and profile.
+│   ├── delete          Delete local credentials and retain a UUID tombstone.
+│   └── address
+│       ├── set         Set one active client's IPv4 intent.
+│       ├── edit        Edit multiple IPv4 assignments atomically.
+│       └── release     Release a revoked client's retained static IPv4.
+├── state
+│   ├── show            Show aggregate instance state.
+│   └── doctor          Diagnose SQLite, PKI, and artifact consistency.
+├── repair
+│   ├── plan            Plan safe repairs and report blockers.
+│   └── apply           Apply eligible repairs transactionally.
+├── migrate
+│   ├── plan            Plan an offline legacy data migration.
+│   └── apply           Migrate legacy state to the current data format.
+├── runtime
+│   ├── status          Show daemon and connected-client status.
+│   ├── disconnect      Disconnect a client session.
+│   ├── health          Check broker and OpenVPN health.
+│   ├── capabilities    Inspect OpenVPN compatibility.
+│   ├── logs            Read or follow persistent OpenVPN logs.
+│   └── events          Read or follow user-facing runtime events.
+├── completion          Generate shell completion for ovpn.
+└── version             Print build and data-format versions.
 ```
 
 All command groups and leaf commands accept `--help` or `-h`.

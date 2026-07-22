@@ -49,19 +49,7 @@ services:
     environment:
       OVPN_BOOTSTRAP_FROM_ENV: "true"
       OVPN_BOOTSTRAP_ENDPOINT: vpn.example.com
-      OVPN_BOOTSTRAP_PROTOCOL: udp
-      OVPN_BOOTSTRAP_FAMILY: auto
-      OVPN_BOOTSTRAP_PORT: "1194"
-      OVPN_BOOTSTRAP_CLIENT_TO_CLIENT: "true"
       OVPN_BOOTSTRAP_IPV4_NETWORK: 10.42.0.0/24
-      OVPN_BOOTSTRAP_DYNAMIC_POOL_SIZE: "64"
-      OVPN_BOOTSTRAP_NAT_ENABLED: "false"
-      OVPN_BOOTSTRAP_NAT_INTERFACE: auto
-      OVPN_BOOTSTRAP_REDIRECT_GATEWAY: "false"
-      OVPN_BOOTSTRAP_DNS: ""
-      OVPN_BOOTSTRAP_ROUTES: ""
-      OVPN_BOOTSTRAP_LOG_MAX_BYTES: "10485760"
-      OVPN_BOOTSTRAP_LOG_BACKUPS: "5"
     <<: *openvpn-data
     cap_add:
       - NET_ADMIN
@@ -86,7 +74,16 @@ services:
 
 Docker Hub tag 使用镜像内 OpenVPN 版本。这里的镜像内含 OpenVPN 2.7.5；生产环境应固定明确 tag。
 
-该示例会在空的 `openvpn-config` 目录中生成第一份规范 YAML。首次启动成功后，将 `OVPN_BOOTSTRAP_FROM_ENV` 改为 `"false"`；之后 bootstrap 变量会被忽略，绝不会覆盖 YAML 或 SQLite。若希望从一开始就手动管理 YAML，请复制并编辑 [config.example.yaml](config.example.yaml)，将 bootstrap 开关设为 `"false"`，并删除其余 `OVPN_BOOTSTRAP_*` 项。除 `version: 1` 外，只有 `server.endpoint` 与 `ipv4.network` 必填。
+该示例只列出一次性环境初始化所需的三个值，其余设置使用正常默认值。全部可选变量见[环境变量表](#环境变量)、[.env.example](.env.example) 和[初始化命令参考](docs/cn/v4/commands.md#一次性环境变量初始化)。首次启动成功后，将 `OVPN_BOOTSTRAP_FROM_ENV` 改为 `"false"`；之后 bootstrap 变量会被忽略，绝不会覆盖 YAML 或 SQLite。
+
+如果不用一次性环境变量初始化，应在首次启动前自行创建配置文件：
+
+```bash
+cp config.example.yaml openvpn-config/config.yaml
+$EDITOR openvpn-config/config.yaml
+```
+
+然后删除 Compose 示例中 `openvpn` 服务的整个 `environment:` 配置块。挂载的文件将作为期望配置；只有 `version`、`server.endpoint` 和 `ipv4.network` 必填，其余默认值均在示例文件中说明。
 
 ### 初始化并启动
 

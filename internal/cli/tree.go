@@ -17,7 +17,7 @@ type command struct {
 
 var rootCommand = command{
 	name:    "ovpn",
-	summary: "manage an OpenVPN schema 4 instance",
+	summary: "manage an OpenVPN instance",
 	usage:   "ovpn <command> [options]",
 	details: []string{
 		"Run 'ovpn help COMMAND' or 'ovpn COMMAND -h' for command help.",
@@ -26,7 +26,7 @@ var rootCommand = command{
 	},
 	children: []command{
 		group("server", "initialize, run, or render the OpenVPN server",
-			leaf("init", "initialize a schema 4 instance", "ovpn server init",
+			leaf("init", "initialize an empty OpenVPN instance", "ovpn server init",
 				[]string{"Requires an empty data directory and either valid declarative YAML or one-time bootstrap environment."},
 				"ovpn server init"),
 			leaf("run", "supervise OpenVPN and its broker", "ovpn server run",
@@ -97,11 +97,11 @@ var rootCommand = command{
 			leaf("apply", "apply eligible repairs transactionally", "ovpn repair apply [--yes|-y] [--json|-j]",
 				[]string{"Requires confirmation unless --yes or -y is supplied."},
 				"ovpn repair apply", "ovpn repair apply -y")),
-		group("migrate", "plan or apply schema 3 migration",
-			leaf("plan", "plan an offline schema 3 to 4 migration", "ovpn migrate plan [--json|-j]",
+		group("migrate", "plan or apply persistent data migration",
+			leaf("plan", "plan an offline legacy data migration", "ovpn migrate plan [--json|-j]",
 				[]string{"Read-only; schema 1 or 2 must first be upgraded with sh-ver."},
 				"ovpn migrate plan"),
-			leaf("apply", "migrate schema 3 state to SQLite schema 4", "ovpn migrate apply [--yes|-y] [--json|-j]",
+			leaf("apply", "migrate legacy state to the current data format", "ovpn migrate apply [--yes|-y] [--json|-j]",
 				[]string{"Requires OVPN_MAINTENANCE=true, a stopped server, and confirmation."},
 				"ovpn migrate apply -y")),
 		group("runtime", "inspect the running OpenVPN service",
@@ -126,7 +126,7 @@ var rootCommand = command{
 		leaf("completion", "generate shell completion for ovpn", "ovpn completion (bash|zsh|fish)",
 			[]string{"Writes a dependency-free completion script to stdout. Client names and IDs are queried only while completing selector values."},
 			"ovpn completion bash > /etc/bash_completion.d/ovpn", "ovpn completion zsh > ~/.zfunc/_ovpn", "ovpn completion fish > ~/.config/fish/completions/ovpn.fish"),
-		leaf("version", "print build and schema version", "ovpn version [--short|-s|--json|-j]",
+		leaf("version", "print build and data-format versions", "ovpn version [--short|-s|--json|-j]",
 			[]string{"--short prints only the project version; --json emits a stable object."},
 			"ovpn version", "ovpn version -s", "ovpn version -j"),
 	},
@@ -203,17 +203,23 @@ func writeHelp(writer io.Writer, path []string) {
 
 func writeCommandOverview(writer io.Writer) {
 	fmt.Fprintf(writer, "Usage: %s\n\nCommand tree:\n", rootCommand.usage)
-	writeCommandOverviewChildren(writer, rootCommand.children, 1)
+	writeCommandOverviewChildren(writer, rootCommand.children, "")
 }
 
-func writeCommandOverviewChildren(writer io.Writer, children []command, depth int) {
-	indent := strings.Repeat("  ", depth)
-	for _, child := range children {
+func writeCommandOverviewChildren(writer io.Writer, children []command, prefix string) {
+	for index, child := range children {
+		last := index == len(children)-1
+		branch := "├── "
+		continuation := "│   "
+		if last {
+			branch = "└── "
+			continuation = "    "
+		}
+		fmt.Fprintf(writer, "%s%s%s - %s\n", prefix, branch, child.name, child.summary)
 		if len(child.children) > 0 {
-			fmt.Fprintf(writer, "%s%s\n", indent, child.name)
-			writeCommandOverviewChildren(writer, child.children, depth+1)
+			writeCommandOverviewChildren(writer, child.children, prefix+continuation)
 			continue
 		}
-		fmt.Fprintf(writer, "%s%s\n", indent, child.usage)
+		fmt.Fprintf(writer, "%s%s└── Usage: %s\n", prefix, continuation, child.usage)
 	}
 }

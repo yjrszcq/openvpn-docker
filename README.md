@@ -51,19 +51,7 @@ services:
     environment:
       OVPN_BOOTSTRAP_FROM_ENV: "true"
       OVPN_BOOTSTRAP_ENDPOINT: vpn.example.com
-      OVPN_BOOTSTRAP_PROTOCOL: udp
-      OVPN_BOOTSTRAP_FAMILY: auto
-      OVPN_BOOTSTRAP_PORT: "1194"
-      OVPN_BOOTSTRAP_CLIENT_TO_CLIENT: "true"
       OVPN_BOOTSTRAP_IPV4_NETWORK: 10.42.0.0/24
-      OVPN_BOOTSTRAP_DYNAMIC_POOL_SIZE: "64"
-      OVPN_BOOTSTRAP_NAT_ENABLED: "false"
-      OVPN_BOOTSTRAP_NAT_INTERFACE: auto
-      OVPN_BOOTSTRAP_REDIRECT_GATEWAY: "false"
-      OVPN_BOOTSTRAP_DNS: ""
-      OVPN_BOOTSTRAP_ROUTES: ""
-      OVPN_BOOTSTRAP_LOG_MAX_BYTES: "10485760"
-      OVPN_BOOTSTRAP_LOG_BACKUPS: "5"
     <<: *openvpn-data
     cap_add:
       - NET_ADMIN
@@ -88,7 +76,16 @@ services:
 
 Docker Hub tags follow the embedded OpenVPN version. The image shown here contains OpenVPN 2.7.5. Pin a concrete tag in production.
 
-The example generates the initial canonical YAML in the empty `openvpn-config` directory. After the first successful start, change `OVPN_BOOTSTRAP_FROM_ENV` to `"false"`; later bootstrap values are ignored and never overwrite YAML or SQLite. To manage YAML manually from the beginning, copy and edit [config.example.yaml](config.example.yaml), set the bootstrap switch to `"false"`, and omit the remaining `OVPN_BOOTSTRAP_*` entries. Only `server.endpoint` and `ipv4.network` are required beyond `version: 1`.
+The example shows only the three values required for one-time environment initialization; all omitted settings use the normal defaults. See the [environment-variable table](#environment-variables), [.env.example](.env.example), or the [bootstrap command reference](docs/en/v4/commands.md#one-time-environment-bootstrap) for every optional variable. After the first successful start, change `OVPN_BOOTSTRAP_FROM_ENV` to `"false"`; later bootstrap values are ignored and never overwrite YAML or SQLite.
+
+To skip environment initialization and manage the configuration file yourself, create it before the first start:
+
+```bash
+cp config.example.yaml openvpn-config/config.yaml
+$EDITOR openvpn-config/config.yaml
+```
+
+Then remove the entire `environment:` block from the `openvpn` service in the Compose example. The mounted file becomes the desired configuration; only `version`, `server.endpoint`, and `ipv4.network` are required, and the example file documents the remaining defaults.
 
 ### Initialize and start
 

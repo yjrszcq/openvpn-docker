@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestCommandOverviewContainsEveryLeafUsage(t *testing.T) {
+func TestCommandOverviewContainsExpandedCommands(t *testing.T) {
 	var output bytes.Buffer
 	writeCommandOverview(&output)
 	text := output.String()
@@ -20,11 +20,15 @@ func TestCommandOverviewContainsEveryLeafUsage(t *testing.T) {
 	var check func(command)
 	check = func(current command) {
 		for _, child := range current.children {
+			entry := child.name + " - " + child.summary + "\n"
+			if child.summary == "" || !strings.Contains(text, entry) {
+				t.Errorf("overview is missing command summary for %s: %q", child.name, text)
+			}
 			if len(child.children) > 0 {
 				check(child)
 				continue
 			}
-			if child.usage == "" || !strings.Contains(text, child.usage+"\n") {
+			if child.usage == "" || !strings.Contains(text, "Usage: "+child.usage+"\n") {
 				t.Errorf("overview is missing leaf usage for %s: %q", child.name, child.usage)
 			}
 		}
@@ -32,7 +36,7 @@ func TestCommandOverviewContainsEveryLeafUsage(t *testing.T) {
 	check(rootCommand)
 }
 
-func TestBareCommandUsesCompactOverviewAndHelpRemainsDetailed(t *testing.T) {
+func TestBareCommandUsesExpandedOverviewAndHelpRemainsDetailed(t *testing.T) {
 	var overview, detailed, stderr bytes.Buffer
 	if code := Run(nil, &overview, &stderr); code != 0 || stderr.Len() != 0 {
 		t.Fatalf("bare command code=%d stderr=%q", code, stderr.String())

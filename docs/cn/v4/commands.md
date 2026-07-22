@@ -32,7 +32,7 @@ maintenance 服务的 entrypoint 已经是 `ovpn`，因此 `<command>` 直接从
 
 `OVPN_MAINTENANCE=true` 授权离线迁移。批量地址编辑器依次取 `OVPN_EDITOR`、`EDITOR`，最后使用 `nano`。外部二进制与模板覆盖变量只用于测试和开发，不属于常规部署配置。
 
-`ovpn client`、`ovpn state`、`ovpn runtime` 是 `client list`、`state doctor`、`runtime status` 的安全快捷方式。顶层 `-v` 只输出项目版本，`-V` 与 `--version` 输出完整版本报告。裸执行 `ovpn` 会显示包含全部 leaf usage 的精简命令树；`ovpn -h` 仍显示详细根帮助。
+`ovpn client`、`ovpn state`、`ovpn runtime` 是 `client list`、`state doctor`、`runtime status` 的安全快捷方式。顶层 `-v` 只输出项目版本，`-V` 与 `--version` 输出完整版本报告。裸执行 `ovpn` 会显示带说明和全部 leaf usage 的完整展开命令树；`ovpn -h` 仍显示详细根帮助。
 
 ## 一次性环境变量初始化
 
@@ -103,15 +103,46 @@ mutation 会先执行只读验证、目标选择和 plan，再请求确认。无
 
 ```text
 ovpn
-├── server       初始化、运行或渲染 OpenVPN 服务端。
-├── config       验证、查看、规划或应用声明式配置。
-├── client       管理客户端身份、profile 和地址。
-├── state        检查权威实例状态。
-├── repair       规划或应用状态修复。
-├── migrate      规划或应用持久数据迁移。
-├── runtime      检查和控制正在运行的 OpenVPN 服务。
-├── completion   生成 ovpn shell completion。
-└── version      输出构建和数据格式版本。
+├── server
+│   ├── init            初始化空的 OpenVPN 实例。
+│   ├── run             监督 OpenVPN 和 management broker。
+│   └── render          渲染 applied 服务端配置。
+├── config
+│   ├── validate        验证期望 YAML 配置。
+│   ├── show            显示 applied SQLite 配置。
+│   ├── export          将 applied 配置导出为 YAML。
+│   ├── plan            规划期望配置到 applied 配置的变更。
+│   └── apply           在 OpenVPN 停止时应用期望配置。
+├── client
+│   ├── create          创建客户端及其凭据。
+│   ├── list            列出 active 和 revoked 客户端。
+│   ├── export          导出 active 客户端 profile。
+│   ├── rename          改名但不改变客户端 UUID。
+│   ├── revoke          吊销客户端证书。
+│   ├── reissue         重签客户端证书和 profile。
+│   ├── delete          删除本地凭据并保留 UUID tombstone。
+│   └── address
+│       ├── set         设置一个 active 客户端的 IPv4 意图。
+│       ├── edit        原子编辑多个 IPv4 分配。
+│       └── release     释放 revoked 客户端保留的静态 IPv4。
+├── state
+│   ├── show            显示实例汇总状态。
+│   └── doctor          诊断 SQLite、PKI 和 artifact 一致性。
+├── repair
+│   ├── plan            规划安全修复并报告阻塞项。
+│   └── apply           以事务方式应用可执行修复。
+├── migrate
+│   ├── plan            规划离线旧数据迁移。
+│   └── apply           将旧状态迁移到当前数据格式。
+├── runtime
+│   ├── status          显示 daemon 和已连接客户端状态。
+│   ├── disconnect      断开客户端 session。
+│   ├── health          检查 broker 和 OpenVPN 健康状态。
+│   ├── capabilities    检查 OpenVPN 兼容性。
+│   ├── logs            读取或跟随持久 OpenVPN 日志。
+│   └── events          读取或跟随面向用户的 runtime 事件。
+├── completion          生成 ovpn shell completion。
+└── version             输出构建和数据格式版本。
 ```
 
 所有命令组和 leaf command 都接受 `--help` 或 `-h`。
