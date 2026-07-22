@@ -113,7 +113,7 @@ Persistent server settings belong in declarative YAML. Environment variables con
 | `OVPN_DATA_DIR` | `/etc/openvpn` | unset | Persistent data directory containing SQLite, PKI, artifacts, logs, and locks. |
 | `OVPN_RUNTIME_DIR` | `/run/openvpn-container` | unset | Ephemeral directory for runtime sockets and the server-process lock. |
 | `OVPN_MAINTENANCE` | unset | unset | Must be exactly `true` for `migrate apply`; the Compose maintenance service sets it automatically. |
-| `OVPN_EDITOR` | `EDITOR`, then `nano` | unset | Default editor executable for `client address edit` when `--editor/-e` is omitted. |
+| `OVPN_EDITOR` | `EDITOR`, then `nano` | unset | Default editor executable for `client address edit` when `--editor/-e` is omitted. The image includes `nano`, `vim`, and `vi`. |
 | `EDITOR` | `nano` | unset | Standard fallback editor executable when both `--editor/-e` and `OVPN_EDITOR` are unset. |
 
 ### One-time environment bootstrap
@@ -188,7 +188,7 @@ Existing clients may be selected by positional `NAME`, explicit `--name NAME`, o
 
 `ovpn client`, `ovpn state`, and `ovpn runtime` default to `list`, `doctor`, and `status`. Client mutations support `--json`; create and reissue can return the new profile with `--output`. Revoke, reissue, delete, and address changes try to disconnect affected live sessions after the durable commit. A runtime warning means the state change succeeded and `runtime disconnect` can be used as a manual retry.
 
-Batch address editing selects its editor from `--editor/-e`, `OVPN_EDITOR`, `EDITOR`, then the installed `nano`. The command-line or environment value must be one executable name or path without additional arguments.
+Batch address editing selects its editor from `--editor/-e`, `OVPN_EDITOR`, `EDITOR`, then the installed `nano`. The image provides `nano`, `vim`, and `vi`; another editor may be used when its executable is installed or mounted inside the container. The command-line or environment value must be one executable name or path without additional arguments.
 
 Generate shell completion without an external CLI framework:
 

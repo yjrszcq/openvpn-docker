@@ -111,7 +111,7 @@ chmod 600 laptop.ovpn
 | `OVPN_DATA_DIR` | `/etc/openvpn` | 未设置 | 保存 SQLite、PKI、artifact、日志和锁的持久数据目录。 |
 | `OVPN_RUNTIME_DIR` | `/run/openvpn-container` | 未设置 | 保存 runtime socket 和服务进程锁的临时目录。 |
 | `OVPN_MAINTENANCE` | 未设置 | 未设置 | `migrate apply` 要求该值严格等于 `true`；Compose maintenance 服务会自动设置。 |
-| `OVPN_EDITOR` | `EDITOR`，然后 `nano` | 未设置 | 省略 `--editor/-e` 时，`client address edit` 使用的默认编辑器可执行文件。 |
+| `OVPN_EDITOR` | `EDITOR`，然后 `nano` | 未设置 | 省略 `--editor/-e` 时，`client address edit` 使用的默认编辑器可执行文件；镜像内置 `nano`、`vim` 和 `vi`。 |
 | `EDITOR` | `nano` | 未设置 | 同时省略 `--editor/-e` 且未设置 `OVPN_EDITOR` 时使用的标准后备编辑器。 |
 
 ### 一次性环境变量初始化
@@ -186,7 +186,7 @@ docker compose exec openvpn ovpn runtime events --lines 100 --json
 
 `ovpn client`、`ovpn state`、`ovpn runtime` 分别默认执行 `list`、`doctor`、`status`。所有客户端 mutation 支持 `--json`；create/reissue 可同时用 `--output` 返回新 profile。revoke、reissue、delete 和地址变更在持久化提交后会尝试断开受影响的在线 session。若出现 runtime warning，说明状态变更已经成功，可用 `runtime disconnect` 手动重试。
 
-批量地址编辑依次从 `--editor/-e`、`OVPN_EDITOR`、`EDITOR`、镜像内安装的 `nano` 选择编辑器。命令参数或环境变量的值只能是单个可执行文件名或路径，不能附带其他参数。
+批量地址编辑依次从 `--editor/-e`、`OVPN_EDITOR`、`EDITOR`、镜像内安装的 `nano` 选择编辑器。镜像可直接使用 `nano`、`vim` 和 `vi`；也可以使用其他已经安装或挂载到容器内的编辑器。命令参数或环境变量的值只能是单个可执行文件名或路径，不能附带其他参数。
 
 无需额外 CLI 框架即可生成 shell completion：
 

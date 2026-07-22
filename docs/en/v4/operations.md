@@ -226,7 +226,7 @@ docker compose exec openvpn \
   ovpn client address edit -n laptop -n phone -e vim -y
 ```
 
-The file contains one `client,ipv4` row per selected active client. Use `auto`, `dynamic`, or a static address. The whole file is validated and committed atomically. Use `--editor/-e` for this invocation, `OVPN_EDITOR` for the command default, or `EDITOR` for the general default. Selection order is `--editor/-e`, `OVPN_EDITOR`, `EDITOR`, then the installed `nano`. An editor value must be one executable name or path without arguments.
+The file contains one `client,ipv4` row per selected active client. Use `auto`, `dynamic`, or a static address. The whole file is validated and committed atomically. Use `--editor/-e` for this invocation, `OVPN_EDITOR` for the command default, or `EDITOR` for the general default. Selection order is `--editor/-e`, `OVPN_EDITOR`, `EDITOR`, then the installed `nano`. The image includes `nano`, `vim`, and `vi`; another editor can be used if its executable is installed or mounted inside the container. An editor value must be one executable name or path without arguments.
 
 ### Release a revoked reservation
 
