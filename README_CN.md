@@ -25,33 +25,14 @@
 - 客户端可访问的公网域名或 IP，主机与云防火墙开放所选 OpenVPN 端口。
 - 一个不与服务器和客户端现有网络重叠的私有 IPv4 CIDR。
 
-### 创建配置
+### 创建部署
 
 ```bash
 mkdir -p openvpn-data openvpn-config
 chmod 750 openvpn-data openvpn-config
 ```
 
-复制经过严格解析验证、带注释的[示例配置](config.example.yaml)，再修改公网 endpoint 和网络选项：
-
-```bash
-cp config.example.yaml openvpn-config/config.yaml
-$EDITOR openvpn-config/config.yaml
-```
-
-除 `version: 1` 外，只有 `server.endpoint` 与 `ipv4.network` 必填。其他字段使用示例中说明的默认值；`dynamicPoolSize` 未设置时取可用客户端地址数的一半。
-
-也可以保持 `openvpn-config` 为空，在 `.env` 中设置以下值，自动生成初始 YAML：
-
-```dotenv
-OVPN_BOOTSTRAP_FROM_ENV=true
-OVPN_BOOTSTRAP_ENDPOINT=vpn.example.com
-OVPN_BOOTSTRAP_IPV4_NETWORK=10.42.0.0/24
-```
-
-可选的 `OVPN_BOOTSTRAP_*` 字段见 [v4 命令参考](docs/cn/v4/commands.md#一次性环境变量初始化)。
-
-创建 `compose.yaml`：
+创建 `compose.yaml`。以下版本可以独立使用，不需要 `.env` 文件。启动前必须替换 `vpn.example.com`，并选择不重叠的 IPv4 网段：
 
 ```yaml
 x-openvpn-data: &openvpn-data
@@ -61,14 +42,26 @@ x-openvpn-data: &openvpn-data
 
 services:
   openvpn:
-    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
+    image: szcq/openvpn:2.7.5
     container_name: openvpn
     restart: unless-stopped
     network_mode: host
     environment:
-      OVPN_BOOTSTRAP_FROM_ENV: "${OVPN_BOOTSTRAP_FROM_ENV:-false}"
-      OVPN_BOOTSTRAP_ENDPOINT: "${OVPN_BOOTSTRAP_ENDPOINT:-}"
-      OVPN_BOOTSTRAP_IPV4_NETWORK: "${OVPN_BOOTSTRAP_IPV4_NETWORK:-}"
+      OVPN_BOOTSTRAP_FROM_ENV: "true"
+      OVPN_BOOTSTRAP_ENDPOINT: vpn.example.com
+      OVPN_BOOTSTRAP_PROTOCOL: udp
+      OVPN_BOOTSTRAP_FAMILY: auto
+      OVPN_BOOTSTRAP_PORT: "1194"
+      OVPN_BOOTSTRAP_CLIENT_TO_CLIENT: "true"
+      OVPN_BOOTSTRAP_IPV4_NETWORK: 10.42.0.0/24
+      OVPN_BOOTSTRAP_DYNAMIC_POOL_SIZE: "64"
+      OVPN_BOOTSTRAP_NAT_ENABLED: "false"
+      OVPN_BOOTSTRAP_NAT_INTERFACE: auto
+      OVPN_BOOTSTRAP_REDIRECT_GATEWAY: "false"
+      OVPN_BOOTSTRAP_DNS: ""
+      OVPN_BOOTSTRAP_ROUTES: ""
+      OVPN_BOOTSTRAP_LOG_MAX_BYTES: "10485760"
+      OVPN_BOOTSTRAP_LOG_BACKUPS: "5"
     <<: *openvpn-data
     cap_add:
       - NET_ADMIN
@@ -76,7 +69,7 @@ services:
       - /dev/net/tun:/dev/net/tun
 
   openvpn-maintenance:
-    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
+    image: szcq/openvpn:2.7.5
     restart: "no"
     network_mode: host
     environment:
@@ -93,6 +86,8 @@ services:
 
 Docker Hub tag 使用镜像内 OpenVPN 版本。这里的项目镜像版本为 4.0.0，内含 OpenVPN 2.7.5；生产环境应固定明确 tag。
 
+该示例会在空的 `openvpn-config` 目录中生成第一份规范 YAML。首次启动成功后，将 `OVPN_BOOTSTRAP_FROM_ENV` 改为 `"false"`；之后 bootstrap 变量会被忽略，绝不会覆盖 YAML 或 SQLite。若希望从一开始就手动管理 YAML，请复制并编辑 [config.example.yaml](config.example.yaml)，将 bootstrap 开关设为 `"false"`，并删除其余 `OVPN_BOOTSTRAP_*` 项。除 `version: 1` 外，只有 `server.endpoint` 与 `ipv4.network` 必填。
+
 ### 初始化并启动
 
 ```bash
@@ -100,7 +95,7 @@ docker compose up -d openvpn
 docker compose logs -f openvpn
 ```
 
-entrypoint 只会初始化空数据目录，新实例必须提供有效 YAML 或启用 bootstrap 环境变量。环境初始化会先写入规范 YAML，再在 staging 中创建 SQLite、PKI、服务端身份、CRL、tls-crypt 和派生文件，验证后统一安装。首次启动成功后应将 `OVPN_BOOTSTRAP_FROM_ENV=false`；后续环境变量变化会被忽略，绝不会覆盖 YAML 或 SQLite。
+entrypoint 只会初始化空数据目录，新实例必须提供有效 YAML 或启用 bootstrap 环境变量。环境初始化会先写入规范 YAML，再在 staging 中创建 SQLite、PKI、服务端身份、CRL、tls-crypt 和派生文件，验证后统一安装。
 
 YAML 是期望配置，SQLite 保存最近一次经操作员确认的 applied revision。之后 YAML 缺失或与 applied revision 不同时，`server run` 只告警并继续使用数据库快照，不会自动应用配置。
 
@@ -121,6 +116,59 @@ chmod 600 laptop.ovpn
 ```
 
 将 profile 导入 OpenVPN 客户端。profile 内含私钥，必须按凭据安全传输和保存。
+
+## 环境变量
+
+服务端持久配置应写入声明式 YAML。环境变量只用于配置 Compose、文件系统路径、一次性初始化、maintenance 授权和开发覆盖，并不是第二套长期配置来源。
+
+### 部署与运维
+
+| 变量 | 运行时默认值 / Compose 回退值 | `.env.example` 值 | 说明 |
+|---|---|---|---|
+| `OVPN_IMAGE` | `szcq/openvpn:2.7.5` | `szcq/openvpn:2.7.5` | Compose 使用的镜像。生产环境应固定已发布 tag。 |
+| `OVPN_CONFIG_FILE` | `/etc/openvpn-config/config.yaml` | 未设置 | 期望状态声明式 YAML 的路径。 |
+| `OVPN_DATA_DIR` | `/etc/openvpn` | 未设置 | 保存 SQLite、PKI、artifact、日志和锁的持久数据目录。 |
+| `OVPN_RUNTIME_DIR` | `/run/openvpn-container` | 未设置 | 保存 runtime socket 和服务进程锁的临时目录。 |
+| `OVPN_MAINTENANCE` | 未设置 | 未设置 | `migrate apply` 要求该值严格等于 `true`；Compose maintenance 服务会自动设置。 |
+| `OVPN_EDITOR` | `EDITOR`，然后 `nano` | 未设置 | `client address edit` 使用的编辑器命令。 |
+| `EDITOR` | `nano` | 未设置 | 未设置 `OVPN_EDITOR` 时使用的标准后备编辑器。 |
+
+### 一次性环境变量初始化
+
+仅当空的 schema 4 实例以 `OVPN_BOOTSTRAP_FROM_ENV=true` 初始化时才读取这些变量，并据此生成第一份规范 YAML。初始化完成后，程序只会告警并忽略这些变量，绝不会覆盖 YAML 或 SQLite；首次启动成功后应将开关设为 `false`。
+
+| 变量 | 初始配置默认值 | `.env.example` 值 | 说明 |
+|---|---|---|---|
+| `OVPN_BOOTSTRAP_FROM_ENV` | `false` | `true` | 启用通过其余 bootstrap 变量生成初始 YAML。 |
+| `OVPN_BOOTSTRAP_ENDPOINT` | 必填 | `vpn.example.com` | 写入客户端 profile 的公网域名或 IP，启动前必须替换示例值。 |
+| `OVPN_BOOTSTRAP_PROTOCOL` | `udp` | `udp` | 公网传输协议：`udp` 或 `tcp`。 |
+| `OVPN_BOOTSTRAP_FAMILY` | `auto` | `auto` | 公网传输地址族：`auto`、`ipv4` 或 `ipv6`；不会因此启用 IPv6 隧道地址。 |
+| `OVPN_BOOTSTRAP_PORT` | `1194` | `1194` | OpenVPN 监听端口。 |
+| `OVPN_BOOTSTRAP_CLIENT_TO_CLIENT` | `true` | `true` | 允许 VPN 客户端直接互访。 |
+| `OVPN_BOOTSTRAP_IPV4_NETWORK` | 必填 | `10.42.0.0/24` | `/30` 至 `/0` 范围内规范且不重叠的 IPv4 隧道网段。 |
+| `OVPN_BOOTSTRAP_DYNAMIC_POOL_SIZE` | 可用客户端地址数的一半 | `64` | 从可用地址尾部划出的动态池；`0` 表示禁用动态池。 |
+| `OVPN_BOOTSTRAP_NAT_ENABLED` | `false` | `false` | 对离开 VPN 网络命名空间的客户端流量执行 NAT。 |
+| `OVPN_BOOTSTRAP_NAT_INTERFACE` | `auto` | `auto` | NAT 出口接口；`auto` 表示从路由表解析。 |
+| `OVPN_BOOTSTRAP_REDIRECT_GATEWAY` | `false` | `false` | 将客户端默认流量通过 VPN 转发。 |
+| `OVPN_BOOTSTRAP_DNS` | 空 | 空 | 推送给客户端的逗号分隔 IPv4 DNS 服务器。 |
+| `OVPN_BOOTSTRAP_ROUTES` | 空 | 空 | 推送给客户端的逗号分隔规范 IPv4 CIDR。 |
+| `OVPN_BOOTSTRAP_LOG_MAX_BYTES` | `10485760` | `10485760` | 持久 OpenVPN 日志触发轮转前的最大字节数。 |
+| `OVPN_BOOTSTRAP_LOG_BACKUPS` | `5` | `5` | 保留的轮转日志备份数量；`0` 表示不保留备份。 |
+
+### 开发与测试覆盖
+
+这些变量会替换可信文件、可执行文件或宿主网络接口。生产镜像已提供有效默认值，常规部署不应设置。
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `OVPN_COMPATIBILITY_FILE` | `/usr/local/share/openvpn-container/compatibility/contract.json` | 渲染、初始化和 repair 读取的兼容性契约。 |
+| `OVPN_TEMPLATE_ROOT` | `/usr/local/share/openvpn-container/templates` | compatibility contract 所选模板族的根目录。 |
+| `OVPN_OPENVPN_BIN` | `openvpn` | runtime 监督、PKI 校验和 capability 检查使用的 OpenVPN 可执行文件。 |
+| `OVPN_BROKER_BIN` | `ovpn-broker` | `server run` 监督的 management broker 可执行文件。 |
+| `OVPN_EASYRSA_BIN` | `/usr/share/easy-rsa/easyrsa`，否则 `easyrsa` | PKI 生命周期操作使用的 Easy-RSA 可执行文件。 |
+| `OVPN_IP_BIN` | `ip` | 网络 reconcile 使用的 Linux `ip` 可执行文件。 |
+| `OVPN_IPTABLES_BIN` | `iptables` | 防火墙 reconcile 使用的 Linux `iptables` 可执行文件。 |
+| `OVPN_IP_FORWARD_FILE` | `/proc/sys/net/ipv4/ip_forward` | 网络 reconcile 使用的宿主机 IPv4 forwarding 控制文件。 |
 
 ## 配置工作流
 

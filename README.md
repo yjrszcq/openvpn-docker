@@ -25,7 +25,7 @@ The project does not currently provide a web UI, TAP, LDAP/RADIUS/OIDC, Kubernet
 - A public hostname or IP reachable by clients, with the selected OpenVPN port allowed by host and cloud firewalls.
 - A private IPv4 CIDR that does not overlap the server or client networks.
 
-### Create the configuration
+### Create the deployment
 
 Create the persistent and configuration directories:
 
@@ -34,26 +34,7 @@ mkdir -p openvpn-data openvpn-config
 chmod 750 openvpn-data openvpn-config
 ```
 
-Copy the strict, commented [example configuration](config.example.yaml), then change its public endpoint and network choices:
-
-```bash
-cp config.example.yaml openvpn-config/config.yaml
-$EDITOR openvpn-config/config.yaml
-```
-
-Only `server.endpoint` and `ipv4.network` are required beyond `version: 1`. Omitted values use the defaults documented in the example, except `dynamicPoolSize`, which defaults to half of the usable client addresses.
-
-Alternatively, leave `openvpn-config` empty and set these values in `.env` to generate the initial YAML automatically:
-
-```dotenv
-OVPN_BOOTSTRAP_FROM_ENV=true
-OVPN_BOOTSTRAP_ENDPOINT=vpn.example.com
-OVPN_BOOTSTRAP_IPV4_NETWORK=10.42.0.0/24
-```
-
-Optional `OVPN_BOOTSTRAP_*` fields are listed in the [v4 command reference](docs/en/v4/commands.md#one-time-environment-bootstrap).
-
-Create `compose.yaml`:
+Create `compose.yaml`. This version is self-contained and does not require a `.env` file. Replace `vpn.example.com` and choose a non-overlapping IPv4 network before starting:
 
 ```yaml
 x-openvpn-data: &openvpn-data
@@ -63,14 +44,26 @@ x-openvpn-data: &openvpn-data
 
 services:
   openvpn:
-    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
+    image: szcq/openvpn:2.7.5
     container_name: openvpn
     restart: unless-stopped
     network_mode: host
     environment:
-      OVPN_BOOTSTRAP_FROM_ENV: "${OVPN_BOOTSTRAP_FROM_ENV:-false}"
-      OVPN_BOOTSTRAP_ENDPOINT: "${OVPN_BOOTSTRAP_ENDPOINT:-}"
-      OVPN_BOOTSTRAP_IPV4_NETWORK: "${OVPN_BOOTSTRAP_IPV4_NETWORK:-}"
+      OVPN_BOOTSTRAP_FROM_ENV: "true"
+      OVPN_BOOTSTRAP_ENDPOINT: vpn.example.com
+      OVPN_BOOTSTRAP_PROTOCOL: udp
+      OVPN_BOOTSTRAP_FAMILY: auto
+      OVPN_BOOTSTRAP_PORT: "1194"
+      OVPN_BOOTSTRAP_CLIENT_TO_CLIENT: "true"
+      OVPN_BOOTSTRAP_IPV4_NETWORK: 10.42.0.0/24
+      OVPN_BOOTSTRAP_DYNAMIC_POOL_SIZE: "64"
+      OVPN_BOOTSTRAP_NAT_ENABLED: "false"
+      OVPN_BOOTSTRAP_NAT_INTERFACE: auto
+      OVPN_BOOTSTRAP_REDIRECT_GATEWAY: "false"
+      OVPN_BOOTSTRAP_DNS: ""
+      OVPN_BOOTSTRAP_ROUTES: ""
+      OVPN_BOOTSTRAP_LOG_MAX_BYTES: "10485760"
+      OVPN_BOOTSTRAP_LOG_BACKUPS: "5"
     <<: *openvpn-data
     cap_add:
       - NET_ADMIN
@@ -78,7 +71,7 @@ services:
       - /dev/net/tun:/dev/net/tun
 
   openvpn-maintenance:
-    image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
+    image: szcq/openvpn:2.7.5
     restart: "no"
     network_mode: host
     environment:
@@ -95,6 +88,8 @@ services:
 
 Docker Hub tags follow the embedded OpenVPN version. The v4.0.0 project image shown here contains OpenVPN 2.7.5. Pin a concrete tag in production.
 
+The example generates the initial canonical YAML in the empty `openvpn-config` directory. After the first successful start, change `OVPN_BOOTSTRAP_FROM_ENV` to `"false"`; later bootstrap values are ignored and never overwrite YAML or SQLite. To manage YAML manually from the beginning, copy and edit [config.example.yaml](config.example.yaml), set the bootstrap switch to `"false"`, and omit the remaining `OVPN_BOOTSTRAP_*` entries. Only `server.endpoint` and `ipv4.network` are required beyond `version: 1`.
+
 ### Initialize and start
 
 ```bash
@@ -102,7 +97,7 @@ docker compose up -d openvpn
 docker compose logs -f openvpn
 ```
 
-The entrypoint initializes only an empty data directory and requires either a valid YAML file or enabled bootstrap environment for a new instance. Environment bootstrap writes the canonical YAML first; initialization then creates the SQLite database, PKI, server identity, CRL, tls-crypt key, and derived runtime files as one staged operation. Set `OVPN_BOOTSTRAP_FROM_ENV=false` after the first successful start. Later environment changes are ignored and never override YAML or SQLite.
+The entrypoint initializes only an empty data directory and requires either a valid YAML file or enabled bootstrap environment for a new instance. Environment bootstrap writes the canonical YAML first; initialization then creates the SQLite database, PKI, server identity, CRL, tls-crypt key, and derived runtime files as one staged operation.
 
 YAML is the desired configuration; SQLite stores the last operator-confirmed applied revision. If YAML later becomes missing or differs from that revision, `server run` warns and continues with the applied SQLite snapshot. It never applies configuration implicitly.
 
@@ -123,6 +118,59 @@ chmod 600 laptop.ovpn
 ```
 
 Import the resulting profile into an OpenVPN client. Profiles contain private keys and must be transported and stored as credentials.
+
+## Environment variables
+
+Persistent server settings belong in declarative YAML. Environment variables configure Compose, filesystem locations, one-time initialization, maintenance authorization, and development overrides; they are not a second long-lived configuration source.
+
+### Deployment and operation
+
+| Variable | Runtime default / Compose fallback | `.env.example` value | Purpose |
+|---|---|---|---|
+| `OVPN_IMAGE` | `szcq/openvpn:2.7.5` | `szcq/openvpn:2.7.5` | Image used by Compose. Pin a released tag in production. |
+| `OVPN_CONFIG_FILE` | `/etc/openvpn-config/config.yaml` | unset | Desired declarative YAML path. |
+| `OVPN_DATA_DIR` | `/etc/openvpn` | unset | Persistent data directory containing SQLite, PKI, artifacts, logs, and locks. |
+| `OVPN_RUNTIME_DIR` | `/run/openvpn-container` | unset | Ephemeral directory for runtime sockets and the server-process lock. |
+| `OVPN_MAINTENANCE` | unset | unset | Must be exactly `true` for `migrate apply`; the Compose maintenance service sets it automatically. |
+| `OVPN_EDITOR` | `EDITOR`, then `nano` | unset | Editor command used by `client address edit`. |
+| `EDITOR` | `nano` | unset | Standard fallback editor when `OVPN_EDITOR` is unset. |
+
+### One-time environment bootstrap
+
+These variables are read only while initializing an empty schema 4 instance with `OVPN_BOOTSTRAP_FROM_ENV=true`. They produce the first canonical YAML file. After initialization they are ignored with a warning and never overwrite YAML or SQLite; set the switch to `false` after the first successful start.
+
+| Variable | Initial configuration default | `.env.example` value | Purpose |
+|---|---|---|---|
+| `OVPN_BOOTSTRAP_FROM_ENV` | `false` | `true` | Enables generation of the initial YAML from the remaining bootstrap variables. |
+| `OVPN_BOOTSTRAP_ENDPOINT` | required | `vpn.example.com` | Public hostname or IP used by client profiles. Replace the example before starting. |
+| `OVPN_BOOTSTRAP_PROTOCOL` | `udp` | `udp` | Public transport protocol: `udp` or `tcp`. |
+| `OVPN_BOOTSTRAP_FAMILY` | `auto` | `auto` | Public transport family: `auto`, `ipv4`, or `ipv6`; this does not enable IPv6 tunnel addressing. |
+| `OVPN_BOOTSTRAP_PORT` | `1194` | `1194` | OpenVPN listen port. |
+| `OVPN_BOOTSTRAP_CLIENT_TO_CLIENT` | `true` | `true` | Allows direct traffic between VPN clients. |
+| `OVPN_BOOTSTRAP_IPV4_NETWORK` | required | `10.42.0.0/24` | Canonical, non-overlapping IPv4 tunnel network from `/30` through `/0`. |
+| `OVPN_BOOTSTRAP_DYNAMIC_POOL_SIZE` | half of usable client addresses | `64` | Tail of the usable range reserved for dynamic clients; `0` disables the dynamic pool. |
+| `OVPN_BOOTSTRAP_NAT_ENABLED` | `false` | `false` | Masquerades client traffic leaving the VPN network namespace. |
+| `OVPN_BOOTSTRAP_NAT_INTERFACE` | `auto` | `auto` | NAT egress interface, or `auto` to resolve it from the route table. |
+| `OVPN_BOOTSTRAP_REDIRECT_GATEWAY` | `false` | `false` | Routes client default traffic through the VPN. |
+| `OVPN_BOOTSTRAP_DNS` | empty | empty | Comma-separated IPv4 DNS servers pushed to clients. |
+| `OVPN_BOOTSTRAP_ROUTES` | empty | empty | Comma-separated canonical IPv4 CIDRs pushed to clients. |
+| `OVPN_BOOTSTRAP_LOG_MAX_BYTES` | `10485760` | `10485760` | Maximum persistent OpenVPN log size in bytes before rotation. |
+| `OVPN_BOOTSTRAP_LOG_BACKUPS` | `5` | `5` | Rotated log backups to retain; `0` disables backup retention. |
+
+### Development and test overrides
+
+These variables replace trusted files, executables, or host networking interfaces. The production image supplies valid defaults; normal deployments should not set them.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `OVPN_COMPATIBILITY_FILE` | `/usr/local/share/openvpn-container/compatibility/contract.json` | Compatibility contract read by rendering, initialization, and repair. |
+| `OVPN_TEMPLATE_ROOT` | `/usr/local/share/openvpn-container/templates` | Root containing the template family selected by the compatibility contract. |
+| `OVPN_OPENVPN_BIN` | `openvpn` | OpenVPN executable used by runtime supervision, PKI validation, and capability inspection. |
+| `OVPN_BROKER_BIN` | `ovpn-broker` | Management broker executable supervised by `server run`. |
+| `OVPN_EASYRSA_BIN` | `/usr/share/easy-rsa/easyrsa`, otherwise `easyrsa` | Easy-RSA executable used for PKI lifecycle operations. |
+| `OVPN_IP_BIN` | `ip` | Linux `ip` executable used by network reconciliation. |
+| `OVPN_IPTABLES_BIN` | `iptables` | Linux `iptables` executable used by firewall reconciliation. |
+| `OVPN_IP_FORWARD_FILE` | `/proc/sys/net/ipv4/ip_forward` | Host IPv4 forwarding control file used by network reconciliation. |
 
 ## Configuration workflow
 
