@@ -111,8 +111,8 @@ chmod 600 laptop.ovpn
 | `OVPN_DATA_DIR` | `/etc/openvpn` | 未设置 | 保存 SQLite、PKI、artifact、日志和锁的持久数据目录。 |
 | `OVPN_RUNTIME_DIR` | `/run/openvpn-container` | 未设置 | 保存 runtime socket 和服务进程锁的临时目录。 |
 | `OVPN_MAINTENANCE` | 未设置 | 未设置 | `migrate apply` 要求该值严格等于 `true`；Compose maintenance 服务会自动设置。 |
-| `OVPN_EDITOR` | `EDITOR`，然后 `nano` | 未设置 | `client address edit` 使用的编辑器命令。 |
-| `EDITOR` | `nano` | 未设置 | 未设置 `OVPN_EDITOR` 时使用的标准后备编辑器。 |
+| `OVPN_EDITOR` | `EDITOR`，然后 `nano` | 未设置 | 省略 `--editor/-e` 时，`client address edit` 使用的默认编辑器可执行文件。 |
+| `EDITOR` | `nano` | 未设置 | 同时省略 `--editor/-e` 且未设置 `OVPN_EDITOR` 时使用的标准后备编辑器。 |
 
 ### 一次性环境变量初始化
 

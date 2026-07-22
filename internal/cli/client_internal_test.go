@@ -98,20 +98,27 @@ func TestProfileDestinationAndCommittedFailureReporting(t *testing.T) {
 func TestSelectAddressEditorUsesOverridesThenNano(t *testing.T) {
 	t.Setenv("OVPN_EDITOR", "")
 	t.Setenv("EDITOR", "")
-	if editor, err := selectAddressEditor(); err != nil || editor != "nano" {
+	if editor, err := selectAddressEditor(""); err != nil || editor != "nano" {
 		t.Fatalf("default editor=%q err=%v", editor, err)
 	}
 	t.Setenv("EDITOR", "vim")
-	if editor, err := selectAddressEditor(); err != nil || editor != "vim" {
+	if editor, err := selectAddressEditor(""); err != nil || editor != "vim" {
 		t.Fatalf("EDITOR selection=%q err=%v", editor, err)
 	}
 	t.Setenv("OVPN_EDITOR", "/usr/bin/nano")
-	if editor, err := selectAddressEditor(); err != nil || editor != "/usr/bin/nano" {
+	if editor, err := selectAddressEditor(""); err != nil || editor != "/usr/bin/nano" {
 		t.Fatalf("OVPN_EDITOR selection=%q err=%v", editor, err)
 	}
 	t.Setenv("OVPN_EDITOR", "nano --softwrap")
-	if _, err := selectAddressEditor(); err == nil {
+	if _, err := selectAddressEditor(""); err == nil {
 		t.Fatal("editor command with arguments was accepted")
+	}
+	t.Setenv("OVPN_EDITOR", "vim")
+	if editor, err := selectAddressEditor("/usr/bin/nano"); err != nil || editor != "/usr/bin/nano" {
+		t.Fatalf("command-line editor selection=%q err=%v", editor, err)
+	}
+	if _, err := selectAddressEditor("vim --clean"); err == nil {
+		t.Fatal("command-line editor with arguments was accepted")
 	}
 }
 

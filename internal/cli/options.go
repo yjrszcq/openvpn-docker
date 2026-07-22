@@ -20,6 +20,8 @@ func canonicalOption(value string) string {
 		return "--all"
 	case "-d":
 		return "--detail"
+	case "-e":
+		return "--editor"
 	case "-u":
 		return "--full-id"
 	case "-l":

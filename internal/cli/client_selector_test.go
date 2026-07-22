@@ -43,6 +43,26 @@ func TestAddressEditDefaultsPositionalsToNames(t *testing.T) {
 	if code := runClientAddressEdit([]string{"laptop", "--id", "11111111", "--yes"}, &stdout, &stderr); code != 64 {
 		t.Fatalf("mixed positional and ID code=%d stderr=%q", code, stderr.String())
 	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := runClientAddressEdit([]string{"laptop", "-e", "true", "--yes"}, &stdout, &stderr); code == 64 {
+		t.Fatalf("editor option rejected as usage: %q", stderr.String())
+	}
+
+	for _, args := range [][]string{{"laptop", "--editor"}, {"laptop", "-e", "nano", "--editor", "vim", "--yes"}} {
+		stdout.Reset()
+		stderr.Reset()
+		if code := runClientAddressEdit(args, &stdout, &stderr); code != 64 {
+			t.Fatalf("invalid editor args=%v code=%d stderr=%q", args, code, stderr.String())
+		}
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	if code := runClientAddressEdit([]string{"laptop", "--editor", "vim --clean", "--yes"}, &stdout, &stderr); code != 65 {
+		t.Fatalf("editor with arguments code=%d stderr=%q", code, stderr.String())
+	}
 }
 
 func TestIPv4OptionDefaultsMissingValueToAuto(t *testing.T) {

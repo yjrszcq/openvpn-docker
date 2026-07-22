@@ -113,8 +113,8 @@ Persistent server settings belong in declarative YAML. Environment variables con
 | `OVPN_DATA_DIR` | `/etc/openvpn` | unset | Persistent data directory containing SQLite, PKI, artifacts, logs, and locks. |
 | `OVPN_RUNTIME_DIR` | `/run/openvpn-container` | unset | Ephemeral directory for runtime sockets and the server-process lock. |
 | `OVPN_MAINTENANCE` | unset | unset | Must be exactly `true` for `migrate apply`; the Compose maintenance service sets it automatically. |
-| `OVPN_EDITOR` | `EDITOR`, then `nano` | unset | Editor command used by `client address edit`. |
-| `EDITOR` | `nano` | unset | Standard fallback editor when `OVPN_EDITOR` is unset. |
+| `OVPN_EDITOR` | `EDITOR`, then `nano` | unset | Default editor executable for `client address edit` when `--editor/-e` is omitted. |
+| `EDITOR` | `nano` | unset | Standard fallback editor executable when both `--editor/-e` and `OVPN_EDITOR` are unset. |
 
 ### One-time environment bootstrap
 

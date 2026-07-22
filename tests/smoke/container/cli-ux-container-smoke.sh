@@ -151,6 +151,7 @@ bash -n "$WORK_DIR/ovpn.bash"
 grep -Fq -- '--release-ipv4' "$WORK_DIR/ovpn.bash"
 grep -Fq -- '--full-id' "$WORK_DIR/ovpn.bash"
 grep -Fq -- '--force' "$WORK_DIR/ovpn.bash"
+grep -Fq -- '--editor' "$WORK_DIR/ovpn.bash"
 bash -ec 'source "$1"; COMP_WORDS=(ovpn help client ""); COMP_CWORD=3; _ovpn_completion; printf "%s\n" "${COMPREPLY[@]}"' \
   _ "$WORK_DIR/ovpn.bash" >"$WORK_DIR/help-client-completion.out"
 grep -Fxq create "$WORK_DIR/help-client-completion.out"

@@ -223,10 +223,10 @@ Batch changes always open an editor. Use `--yes` only to skip the confirmation p
 
 ```bash
 docker compose exec openvpn \
-  ovpn client address edit -n laptop -n phone -y
+  ovpn client address edit -n laptop -n phone -e vim -y
 ```
 
-The file contains one `client,ipv4` row per selected active client. Use `auto`, `dynamic`, or a static address. The whole file is validated and committed atomically. The default editor is the installed `nano`; set `EDITOR` to change the general default or `OVPN_EDITOR` to override it only for this command. Selection order is `OVPN_EDITOR`, `EDITOR`, then `nano`.
+The file contains one `client,ipv4` row per selected active client. Use `auto`, `dynamic`, or a static address. The whole file is validated and committed atomically. Use `--editor/-e` for this invocation, `OVPN_EDITOR` for the command default, or `EDITOR` for the general default. Selection order is `--editor/-e`, `OVPN_EDITOR`, `EDITOR`, then the installed `nano`. An editor value must be one executable name or path without arguments.
 
 ### Release a revoked reservation
 

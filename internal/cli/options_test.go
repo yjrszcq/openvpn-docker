@@ -18,6 +18,7 @@ func TestCanonicalOptionContract(t *testing.T) {
 		"-4": "--ipv4",
 		"-a": "--all",
 		"-d": "--detail",
+		"-e": "--editor",
 		"-u": "--full-id",
 		"-l": "--lines",
 		"-f": "--follow",

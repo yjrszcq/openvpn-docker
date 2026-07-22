@@ -32,7 +32,7 @@ Default paths:
 | Runtime sockets | `/run/openvpn-container` | `OVPN_RUNTIME_DIR` |
 | SQLite authority | `/etc/openvpn/meta/state.db` | derived from data dir |
 
-`OVPN_MAINTENANCE=true` authorizes offline migration. `OVPN_EDITOR`, then `EDITOR`, selects the batch address editor. Binary/template overrides are test and development interfaces, not normal deployment configuration.
+`OVPN_MAINTENANCE=true` authorizes offline migration. The batch address editor is selected from `--editor/-e`, `OVPN_EDITOR`, `EDITOR`, then `nano`. Binary/template overrides are test and development interfaces, not normal deployment configuration.
 
 `ovpn client`, `ovpn state`, and `ovpn runtime` are safe shortcuts for `client list`, `state doctor`, and `runtime status`. At the top level, `-v` prints only the project version while `-V` and `--version` print the full version report. Running `ovpn` without arguments prints the fully expanded command tree with descriptions and every leaf usage; `ovpn -h` retains the detailed root help.
 
@@ -90,6 +90,7 @@ Every public multi-letter option has a single-token short alias. Long and short 
 | `--output` | `-o` |
 | `--yes` | `-y` |
 | `--force` | `-f` within `config apply` |
+| `--editor` | `-e` within `client address edit` |
 | `--name` | `-n` |
 | `--id` | `-i` |
 | `--ipv4` | `-4` |
@@ -347,7 +348,7 @@ Changes one active client's assignment atomically and updates the CCD artifact. 
 Syntax:
 
 ```text
-ovpn client address edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--yes|-y] [--json|-j]
+ovpn client address edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--editor|-e EDITOR] [--yes|-y] [--json|-j]
 ```
 
 Selects all active clients or repeated names/IDs and opens a private CSV file:
@@ -359,7 +360,7 @@ phone,dynamic
 tablet,10.42.0.20
 ```
 
-Every selected client must appear exactly once. Values are `auto`, `dynamic`, or a static IPv4 address. Positional names, `--name`, `--id`, and `--all` cannot be mixed. The complete set is validated and committed atomically, so address swaps are supported. The editor is selected from `OVPN_EDITOR`, then `EDITOR`, then installed `nano`; selected live sessions are disconnected after commit.
+Every selected client must appear exactly once. Values are `auto`, `dynamic`, or a static IPv4 address. Positional names, `--name`, `--id`, and `--all` cannot be mixed. The complete set is validated and committed atomically, so address swaps are supported. The editor is selected from `--editor/-e`, `OVPN_EDITOR`, `EDITOR`, then installed `nano`. The value must be one executable name or path without embedded arguments. Selected live sessions are disconnected after commit.
 
 ### `ovpn client address release`
 

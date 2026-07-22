@@ -221,10 +221,10 @@ docker compose exec openvpn \
 
 ```bash
 docker compose exec openvpn \
-  ovpn client address edit -n laptop -n phone -y
+  ovpn client address edit -n laptop -n phone -e vim -y
 ```
 
-文件中每个选中 active 客户端占一行 `client,ipv4`，值使用 `auto`、`dynamic` 或静态地址。完整文件统一验证并原子提交。默认编辑器是镜像内已安装的 `nano`；设置 `EDITOR` 可修改通用默认编辑器，设置 `OVPN_EDITOR` 可仅覆盖该命令。选择顺序为 `OVPN_EDITOR`、`EDITOR`、`nano`。
+文件中每个选中 active 客户端占一行 `client,ipv4`，值使用 `auto`、`dynamic` 或静态地址。完整文件统一验证并原子提交。可用 `--editor/-e` 指定本次编辑器，`OVPN_EDITOR` 设置该命令的默认编辑器，`EDITOR` 设置通用默认编辑器。选择顺序为 `--editor/-e`、`OVPN_EDITOR`、`EDITOR`、镜像内已安装的 `nano`。编辑器值只能是单个可执行文件名或路径，不能附带参数。
 
 ### 释放 revoked 客户端地址
 

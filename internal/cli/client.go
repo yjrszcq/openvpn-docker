@@ -473,7 +473,7 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 	}
 	request := clientservice.AddressEditRequest{}
 	positionalNames := make([]string, 0)
-	yes, selectorKind := false, ""
+	yes, selectorKind, editorOverride := false, "", ""
 	for index := 0; index < len(args); index++ {
 		option := canonicalOption(args[index])
 		switch option {
@@ -487,6 +487,15 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 				return writeErrorMode(stderr, usageError("--yes may only be specified once"), options.JSON)
 			}
 			yes = true
+		case "--editor":
+			if editorOverride != "" {
+				return writeErrorMode(stderr, usageError("--editor may only be specified once"), options.JSON)
+			}
+			if index+1 >= len(args) || args[index+1] == "" || strings.HasPrefix(args[index+1], "-") {
+				return writeErrorMode(stderr, usageError("--editor requires an executable name or path"), options.JSON)
+			}
+			index++
+			editorOverride = args[index]
 		case "--name", "--id":
 			if index+1 >= len(args) {
 				return writeErrorMode(stderr, usageError("client selector requires a value"), options.JSON)
@@ -506,7 +515,7 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 			request.Selectors = append(request.Selectors, selector)
 		default:
 			if strings.HasPrefix(args[index], "-") {
-				return writeErrorMode(stderr, usageError("usage: ovpn client address edit (--all|NAME...|--name NAME...|--id ID...) [--yes] [--json]"), options.JSON)
+				return writeErrorMode(stderr, usageError("usage: ovpn client address edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--editor|-e EDITOR] [--yes|-y] [--json|-j]"), options.JSON)
 			}
 			positionalNames = append(positionalNames, args[index])
 		}
@@ -521,6 +530,10 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 	}
 	if request.All == (len(request.Selectors) > 0) {
 		return writeErrorMode(stderr, usageError("select exactly one of --all, positional names, --name, or --id"), options.JSON)
+	}
+	selectedEditor, err := selectAddressEditor(editorOverride)
+	if err != nil {
+		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	service, queryState, err := openClientService(context.Background())
 	if err != nil {
@@ -547,7 +560,9 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 			return writeErrorMode(stderr, apperror.New(apperror.ExitPolicy, "confirmation_required", "batch address edit was not confirmed"), options.JSON)
 		}
 	}
-	request.Edit = runAddressEditor
+	request.Edit = func(path string) error {
+		return runAddressEditor(selectedEditor, path)
+	}
 	manager, state, err := openClientManager(context.Background())
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
@@ -568,8 +583,8 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 	return int(apperror.ExitSuccess)
 }
 
-func runAddressEditor(path string) error {
-	editor, err := selectAddressEditor()
+func runAddressEditor(override, path string) error {
+	editor, err := selectAddressEditor(override)
 	if err != nil {
 		return err
 	}
@@ -590,8 +605,11 @@ func runAddressEditor(path string) error {
 	return command.Run()
 }
 
-func selectAddressEditor() (string, error) {
-	editor := os.Getenv("OVPN_EDITOR")
+func selectAddressEditor(override string) (string, error) {
+	editor := override
+	if editor == "" {
+		editor = os.Getenv("OVPN_EDITOR")
+	}
 	if editor == "" {
 		editor = os.Getenv("EDITOR")
 	}

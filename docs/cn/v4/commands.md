@@ -30,7 +30,7 @@ maintenance 服务的 entrypoint 已经是 `ovpn`，因此 `<command>` 直接从
 | runtime socket | `/run/openvpn-container` | `OVPN_RUNTIME_DIR` |
 | SQLite 权威库 | `/etc/openvpn/meta/state.db` | 由 data dir 派生 |
 
-`OVPN_MAINTENANCE=true` 授权离线迁移。批量地址编辑器依次取 `OVPN_EDITOR`、`EDITOR`，最后使用 `nano`。外部二进制与模板覆盖变量只用于测试和开发，不属于常规部署配置。
+`OVPN_MAINTENANCE=true` 授权离线迁移。批量地址编辑器依次取 `--editor/-e`、`OVPN_EDITOR`、`EDITOR`，最后使用 `nano`。外部二进制与模板覆盖变量只用于测试和开发，不属于常规部署配置。
 
 `ovpn client`、`ovpn state`、`ovpn runtime` 是 `client list`、`state doctor`、`runtime status` 的安全快捷方式。顶层 `-v` 只输出项目版本，`-V` 与 `--version` 输出完整版本报告。裸执行 `ovpn` 会显示带说明和全部 leaf usage 的完整展开命令树；`ovpn -h` 仍显示详细根帮助。
 
@@ -88,6 +88,7 @@ mutation 会先执行只读验证、目标选择和 plan，再请求确认。无
 | `--output` | `-o` |
 | `--yes` | `-y` |
 | `--force` | `config apply` 中使用 `-f` |
+| `--editor` | `client address edit` 中使用 `-e` |
 | `--name` | `-n` |
 | `--id` | `-i` |
 | `--ipv4` | `-4` |
@@ -345,7 +346,7 @@ ovpn client address set (NAME|--name|-n NAME|--id|-i ID) --ipv4|-4 [auto|dynamic
 语法：
 
 ```text
-ovpn client address edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--yes|-y] [--json|-j]
+ovpn client address edit (--all|-a|NAME...|--name|-n NAME...|--id|-i ID...) [--editor|-e EDITOR] [--yes|-y] [--json|-j]
 ```
 
 选择全部 active 客户端或重复指定 name/ID，然后打开私有 CSV：
@@ -357,7 +358,7 @@ phone,dynamic
 tablet,10.42.0.20
 ```
 
-每个选中客户端必须恰好出现一次，值只能是 `auto`、`dynamic` 或静态 IPv4。位置名称、`--name`、`--id` 与 `--all` 不能混用。完整集合统一验证并原子提交，因此支持地址交换。编辑器依次取 `OVPN_EDITOR`、`EDITOR`、已安装的 `nano`；提交后会断开选中的在线 session。
+每个选中客户端必须恰好出现一次，值只能是 `auto`、`dynamic` 或静态 IPv4。位置名称、`--name`、`--id` 与 `--all` 不能混用。完整集合统一验证并原子提交，因此支持地址交换。编辑器依次取 `--editor/-e`、`OVPN_EDITOR`、`EDITOR`、已安装的 `nano`；参数值只能是单个可执行文件名或路径，不能包含额外参数。提交后会断开选中的在线 session。
 
 ### `ovpn client address release`
 
