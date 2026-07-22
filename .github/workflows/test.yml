@@ -54,7 +54,6 @@ jobs:
           docker run --rm -v "$PWD:/work:ro" -w /work rhysd/actionlint:1.7.7
           docker run --rm -v "$PWD:/work:ro" -w /work koalaman/shellcheck:v0.10.0 -e SC1091,SC2016 \
             scripts/docker-build.sh \
-            scripts/check-docs.sh \
             scripts/fetch-openvpn-source.sh \
             scripts/go-tool.sh \
             scripts/release-policy.sh \
@@ -80,7 +79,6 @@ jobs:
             tests/smoke/shell/workflow-smoke.sh
           docker run --rm -v "$PWD:/work:ro" -w /work mvdan/shfmt:v3.10.0 -i 2 -d \
             scripts/docker-build.sh \
-            scripts/check-docs.sh \
             scripts/fetch-openvpn-source.sh \
             scripts/go-tool.sh \
             scripts/release-policy.sh \
