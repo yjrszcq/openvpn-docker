@@ -9,7 +9,6 @@ services:
     container_name: openvpn
     restart: unless-stopped
     network_mode: host
-
     environment:
       OVPN_BOOTSTRAP_FROM_ENV: "${OVPN_BOOTSTRAP_FROM_ENV:-false}"
       OVPN_BOOTSTRAP_ENDPOINT: "${OVPN_BOOTSTRAP_ENDPOINT:-}"
@@ -26,12 +25,9 @@ services:
       OVPN_BOOTSTRAP_ROUTES: "${OVPN_BOOTSTRAP_ROUTES:-}"
       OVPN_BOOTSTRAP_LOG_MAX_BYTES: "${OVPN_BOOTSTRAP_LOG_MAX_BYTES:-}"
       OVPN_BOOTSTRAP_LOG_BACKUPS: "${OVPN_BOOTSTRAP_LOG_BACKUPS:-}"
-
     <<: *openvpn-data
-
     cap_add:
       - NET_ADMIN
-
     devices:
       - /dev/net/tun:/dev/net/tun
 
@@ -39,15 +35,11 @@ services:
     image: ${OVPN_IMAGE:-szcq/openvpn:2.7.5}
     restart: "no"
     network_mode: host
-
     environment:
       OVPN_MAINTENANCE: "true"
-
     <<: *openvpn-data
-
     profiles:
       - maintenance
-
     command:
       - state
       - doctor
