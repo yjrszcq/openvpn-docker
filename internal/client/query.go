@@ -297,18 +297,24 @@ func normalizeIDPrefix(value string) (string, error) {
 }
 
 func newView(state storesqlite.ClientState) View {
-	view := View{ID: state.Client.ID, Name: state.Client.Name, Status: state.Client.Status, IPv4: IPv4View{Mode: "none", State: "none"}}
+	view := View{ID: state.Client.ID, Name: state.Client.Name, Status: state.Client.Status, IPv4: IPv4View{Mode: "none", State: "unavailable"}}
 	if state.Assignment == nil {
 		return view
 	}
 	view.IPv4.Mode = state.Assignment.Kind
-	view.IPv4.State = string(state.Assignment.Status)
+	if state.Assignment.Kind == "static" {
+		view.IPv4.State = "configured"
+		if state.Assignment.Status == storesqlite.AssignmentRetained {
+			view.IPv4.State = "retained"
+		}
+	}
 	if state.Assignment.Address != nil {
 		value := state.Assignment.Address.String()
 		view.IPv4.Address = &value
 	} else if state.Lease != nil {
 		value := state.Lease.Address.String()
 		view.IPv4.Address = &value
+		view.IPv4.State = "last-known"
 	}
 	return view
 }

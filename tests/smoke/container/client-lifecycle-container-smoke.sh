@@ -103,8 +103,10 @@ test -n "$replacement_id"
 test "$replacement_id" != "$client_id"
 run_ovpn client list --detail --json >"$WORK_DIR/list.json"
 grep -Fq "\"id\":\"$replacement_id\"" "$WORK_DIR/list.json"
+grep -Fq '"ipv4":{"mode":"static","address":"10.70.0.2","state":"configured"}' "$WORK_DIR/list.json"
 run_ovpn client list --detail >"$WORK_DIR/list-detail.txt"
 test "$(head -n 1 "$WORK_DIR/list-detail.txt" | tr -s ' ')" = 'CLIENT ID NAME STATUS CONNECTION IPV4 MODE IPV4 ADDRESS IPV4 STATE'
+grep -Fq 'configured' "$WORK_DIR/list-detail.txt"
 run_ovpn state doctor --json >"$WORK_DIR/doctor.json"
 grep -Fq '"state":"HEALTHY"' "$WORK_DIR/doctor.json"
 

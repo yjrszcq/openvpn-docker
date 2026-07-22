@@ -281,7 +281,7 @@ ovpn client create NAME [--ipv4|-4 [auto|dynamic|ADDRESS]] [--output|-o FILE|-] 
 ovpn client list [--detail|-d] [--full-id|-u] [--json|-j]
 ```
 
-列出当前客户端。`--detail` 的列顺序为 `CLIENT ID`、`NAME`、`STATUS`、`CONNECTION`、`IPV4 MODE`、`IPV4 ADDRESS`、`IPV4 STATE`；runtime broker 可用时 `CONNECTION` 为 `online` 或 `offline`，无法查询时为 `unknown`。文本模式默认缩短 ID，`--full-id` 显示完整 UUID；JSON 使用稳定对象，并在指定 `--detail` 时包含 `connection`。
+列出当前客户端。`--detail` 的列顺序为 `CLIENT ID`、`NAME`、`STATUS`、`CONNECTION`、`IPV4 MODE`、`IPV4 ADDRESS`、`IPV4 STATE`；runtime broker 可用时 `CONNECTION` 为 `online` 或 `offline`，无法查询时为 `unknown`。静态 IPv4 状态为 `configured`，撤销后保留地址则为 `retained`；动态状态为当前 runtime 地址对应的 `connected`、缓存 lease 对应的 `last-known` 或无已知地址时的 `unavailable`；没有 assignment 时也显示 `unavailable`。文本模式默认缩短 ID，`--full-id` 显示完整 UUID；JSON 使用稳定对象，并在指定 `--detail` 时包含 `connection`。
 
 ### `ovpn client export`
 

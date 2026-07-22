@@ -283,7 +283,7 @@ Syntax:
 ovpn client list [--detail|-d] [--full-id|-u] [--json|-j]
 ```
 
-Lists current clients. `--detail` adds columns in this order: `CLIENT ID`, `NAME`, `STATUS`, `CONNECTION`, `IPV4 MODE`, `IPV4 ADDRESS`, and `IPV4 STATE`. `CONNECTION` is `online` or `offline` when the runtime broker is available and `unknown` when it cannot be queried. The default text ID is shortened; `--full-id` prints the full UUID. JSON uses a stable object representation and includes `connection` when `--detail` is requested.
+Lists current clients. `--detail` adds columns in this order: `CLIENT ID`, `NAME`, `STATUS`, `CONNECTION`, `IPV4 MODE`, `IPV4 ADDRESS`, and `IPV4 STATE`. `CONNECTION` is `online` or `offline` when the runtime broker is available and `unknown` when it cannot be queried. Static IPv4 state is `configured`, or `retained` after revocation. Dynamic state is `connected` for a current runtime address, `last-known` for a cached lease, or `unavailable`; clients without an assignment are also `unavailable`. The default text ID is shortened; `--full-id` prints the full UUID. JSON uses a stable object representation and includes `connection` when `--detail` is requested.
 
 ### `ovpn client export`
 

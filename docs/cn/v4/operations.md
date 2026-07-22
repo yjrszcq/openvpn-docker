@@ -133,7 +133,7 @@ docker exec openvpn ovpn client list -d
 docker exec openvpn ovpn client list -u
 ```
 
-详细列的顺序为 `CLIENT ID`、`NAME`、`STATUS`、`CONNECTION`、`IPV4 MODE`、`IPV4 ADDRESS`、`IPV4 STATE`。`STATUS` 表示凭据生命周期状态；runtime broker 可用时 `CONNECTION` 为 `online` 或 `offline`，服务停止或无法查询时为 `unknown`。`IPV4 MODE` 为 `static`、`dynamic` 或 `none`；动态地址显示最近记录的 lease，首次连接前可能为 `-`。`IPV4 STATE` 表示 assignment 状态，例如 `active`、`retained` 或 `none`。使用 `--full-id/-u` 显示完整 UUID，自动化应使用 `--json/-j`。
+详细列的顺序为 `CLIENT ID`、`NAME`、`STATUS`、`CONNECTION`、`IPV4 MODE`、`IPV4 ADDRESS`、`IPV4 STATE`。`STATUS` 表示凭据生命周期状态；runtime broker 可用时 `CONNECTION` 为 `online` 或 `offline`，服务停止或无法查询时为 `unknown`。`IPV4 MODE` 为 `static`、`dynamic` 或 `none`。在 IPv4 视图下，静态分配为 `configured`，撤销后保留地址则为 `retained`；动态地址在当前 runtime session 报告地址时为 `connected`，仅有缓存 lease 时为 `last-known`，无已知地址时为 `unavailable`；没有 assignment 的客户端同样显示 `unavailable`。使用 `--full-id/-u` 显示完整 UUID，自动化应使用 `--json/-j`。
 
 默认显示的短 ID 可以直接用于 `--id/-i`。位置值是精确名称；`--name/-n` 是对应的显式形式：
 

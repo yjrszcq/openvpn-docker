@@ -502,9 +502,11 @@ func createClientPreflightFixture(t *testing.T) string {
 	}
 	instance, err := store.LoadOnlyInstance(context.Background())
 	if err == nil {
+		now := time.Now().UTC().Truncate(time.Second)
 		err = store.CreateClient(context.Background(), instance.ID, storesqlite.ClientState{
-			Client:    domain.Client{ID: "20000000-0000-4000-8000-000000000002", Name: "laptop", Status: domain.ClientActive},
-			CreatedAt: time.Now().UTC().Truncate(time.Second),
+			Client:     domain.Client{ID: "20000000-0000-4000-8000-000000000002", Name: "laptop", Status: domain.ClientActive},
+			CreatedAt:  now,
+			Assignment: &storesqlite.AddressAssignment{ID: "21000000-0000-4000-8000-000000000002", NetworkID: instance.NetworkID, Kind: "dynamic", Status: storesqlite.AssignmentActive, CreatedAt: now, UpdatedAt: now},
 		})
 	}
 	closeErr := store.Close()

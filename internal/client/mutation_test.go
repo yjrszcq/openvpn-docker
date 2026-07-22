@@ -362,7 +362,7 @@ func TestRevokeRetainsAssignmentAndReissueRestoresArtifacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reissued.KickRequired || !reissued.ProfileRedistributionRequired || reissued.Client.Status != "active" || reissued.Client.IPv4.State != "active" || reissued.Client.IPv4.Address == nil || *reissued.Client.IPv4.Address != "10.42.0.20" {
+	if !reissued.KickRequired || !reissued.ProfileRedistributionRequired || reissued.Client.Status != "active" || reissued.Client.IPv4.State != "configured" || reissued.Client.IPv4.Address == nil || *reissued.Client.IPv4.Address != "10.42.0.20" {
 		t.Fatalf("reissued result=%+v", reissued)
 	}
 	certificateAfter := readMutationArtifact(t, fixture.artifacts, "pki/issued/"+created.Client.ID+".crt")
@@ -385,7 +385,7 @@ func TestRevokeReleaseAndReissueDynamic(t *testing.T) {
 		t.Fatal(err)
 	}
 	revoked, err := fixture.manager.Revoke(context.Background(), Selector{Name: "phone"}, true)
-	if err != nil || revoked.Client.IPv4.State != "none" {
+	if err != nil || revoked.Client.IPv4.State != "unavailable" {
 		t.Fatalf("released revoke=%+v err=%v", revoked, err)
 	}
 	reissued, err := fixture.manager.Reissue(context.Background(), Selector{IDPrefix: ShortID(created.Client.ID)}, "dynamic")
@@ -405,7 +405,7 @@ func TestDeleteActiveClientKeepsTombstoneAndAllowsNameReuse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !deleted.KickRequired || deleted.Client.Status != "deleted" || deleted.Client.ID != created.Client.ID || deleted.Client.IPv4.State != "none" {
+	if !deleted.KickRequired || deleted.Client.Status != "deleted" || deleted.Client.ID != created.Client.ID || deleted.Client.IPv4.State != "unavailable" {
 		t.Fatalf("deleted result=%+v", deleted)
 	}
 	for _, path := range []string{
@@ -582,7 +582,7 @@ func TestRevokedAddressSetAndReleaseRemainOffline(t *testing.T) {
 	}
 	assertMutationMissing(t, filepath.Join(fixture.root, "ccd", created.Client.ID))
 	released, err := fixture.manager.AddressRelease(context.Background(), Selector{Name: "tablet"})
-	if err != nil || released.Clients[0].IPv4.State != "none" {
+	if err != nil || released.Clients[0].IPv4.State != "unavailable" {
 		t.Fatalf("address release=%+v err=%v", released, err)
 	}
 	if _, err := fixture.manager.AddressRelease(context.Background(), Selector{Name: "tablet"}); !errors.Is(err, ErrInvalidRequest) {

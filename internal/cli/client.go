@@ -111,14 +111,18 @@ func populateClientConnections(ctx context.Context, result *clientservice.ListRe
 	if err != nil {
 		return
 	}
-	online := make(map[string]struct{}, len(status.Clients))
+	online := make(map[string]string, len(status.Clients))
 	for _, connected := range status.Clients {
-		online[connected.ClientID] = struct{}{}
+		online[connected.ClientID] = connected.VirtualAddress
 	}
 	for index := range result.Clients {
 		result.Clients[index].Connection = "offline"
-		if _, ok := online[result.Clients[index].ID]; ok {
+		if address, ok := online[result.Clients[index].ID]; ok {
 			result.Clients[index].Connection = "online"
+			if result.Clients[index].IPv4.Mode == "dynamic" && address != "" {
+				result.Clients[index].IPv4.Address = &address
+				result.Clients[index].IPv4.State = "connected"
+			}
 		}
 	}
 }

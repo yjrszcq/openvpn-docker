@@ -86,8 +86,11 @@ func TestListAndSelectCurrentClients(t *testing.T) {
 	if result.Version != 1 || len(result.Clients) != 2 || result.Clients[0].Name != "alpha" || result.Clients[1].Name != "beta" {
 		t.Fatalf("unexpected list: %+v", result)
 	}
-	if result.Clients[0].IPv4.Mode != "static" || result.Clients[0].IPv4.Address == nil || *result.Clients[0].IPv4.Address != "10.42.0.10" {
+	if result.Clients[0].IPv4.Mode != "static" || result.Clients[0].IPv4.State != "configured" || result.Clients[0].IPv4.Address == nil || *result.Clients[0].IPv4.Address != "10.42.0.10" {
 		t.Fatalf("unexpected address view: %+v", result.Clients[0].IPv4)
+	}
+	if result.Clients[1].IPv4.Mode != "none" || result.Clients[1].IPv4.State != "unavailable" || result.Clients[1].IPv4.Address != nil {
+		t.Fatalf("unexpected unavailable view: %+v", result.Clients[1].IPv4)
 	}
 	_, selected, err := fixture.service.Select(context.Background(), Selector{Name: "alpha"})
 	if err != nil || selected.Client.ID != activeID {

@@ -135,7 +135,7 @@ docker exec openvpn ovpn client list -d
 docker exec openvpn ovpn client list -u
 ```
 
-Detailed columns are ordered as `CLIENT ID`, `NAME`, `STATUS`, `CONNECTION`, `IPV4 MODE`, `IPV4 ADDRESS`, and `IPV4 STATE`. `STATUS` is the credential lifecycle state. `CONNECTION` is `online` or `offline` when the runtime broker is available and `unknown` when the service is stopped or cannot be queried. `IPV4 MODE` is `static`, `dynamic`, or `none`; a dynamic address is the last recorded lease and may be `-` before the first connection. `IPV4 STATE` is assignment state such as `active`, `retained`, or `none`. Use `--full-id/-u` for complete UUIDs and `--json/-j` for automation.
+Detailed columns are ordered as `CLIENT ID`, `NAME`, `STATUS`, `CONNECTION`, `IPV4 MODE`, `IPV4 ADDRESS`, and `IPV4 STATE`. `STATUS` is the credential lifecycle state. `CONNECTION` is `online` or `offline` when the runtime broker is available and `unknown` when the service is stopped or cannot be queried. `IPV4 MODE` is `static`, `dynamic`, or `none`. In the IPv4 view, a static assignment is `configured`, or `retained` after revocation. A dynamic address is `connected` when reported by the current runtime session, `last-known` when only a cached lease exists, or `unavailable` when no address is known. A client without an assignment is also `unavailable`. Use `--full-id/-u` for complete UUIDs and `--json/-j` for automation.
 
 The default shortened ID can be copied after `--id/-i`. Positional values are exact names; `--name/-n` is the explicit equivalent:
 

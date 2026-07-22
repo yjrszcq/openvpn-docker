@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yjrszcq/openvpn-docker/internal/domain"
 	storesqlite "github.com/yjrszcq/openvpn-docker/internal/store/sqlite"
@@ -42,7 +43,7 @@ func TestClientListDetailCombinesRuntimeConnectionState(t *testing.T) {
 	t.Setenv("OVPN_DATA_DIR", root)
 	t.Setenv("OVPN_RUNTIME_DIR", runtimeDir)
 	code, stdout, stderr := run("client", "list", "--detail")
-	if code != 0 || stderr != "" || !strings.Contains(stdout, "CONNECTION") || !strings.Contains(stdout, "online") {
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "CONNECTION") || !strings.Contains(stdout, "online") || !strings.Contains(stdout, "connected") || !strings.Contains(stdout, "10.42.0.2") {
 		t.Fatalf("online detail code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	header := strings.Join(strings.Fields(strings.SplitN(stdout, "\n", 2)[0]), " ")
@@ -55,7 +56,7 @@ func TestClientListDetailCombinesRuntimeConnectionState(t *testing.T) {
 
 	t.Setenv("OVPN_RUNTIME_DIR", t.TempDir())
 	code, stdout, stderr = run("client", "list", "--detail", "--json")
-	if code != 0 || stderr != "" || !strings.Contains(stdout, `"connection":"unknown"`) {
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"connection":"unknown"`) || !strings.Contains(stdout, `"state":"unavailable"`) {
 		t.Fatalf("unknown detail code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	code, stdout, stderr = run("client", "list", "--json")
@@ -66,6 +67,19 @@ func TestClientListDetailCombinesRuntimeConnectionState(t *testing.T) {
 
 func TestClientListDetailReportsOfflineWhenRuntimeIsAvailable(t *testing.T) {
 	root := createClientPreflightFixture(t)
+	store, err := storesqlite.Open(context.Background(), filepath.Join(root, "meta", "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance, err := store.LoadOnlyInstance(context.Background())
+	leaseAddress, addressErr := domain.ParseAddress("10.42.0.200")
+	if err == nil && addressErr == nil {
+		err = store.RecordLease(context.Background(), "20000000-0000-4000-8000-000000000002", storesqlite.ClientLease{NetworkID: instance.NetworkID, Address: leaseAddress, UpdatedAt: time.Now().UTC()})
+	}
+	closeErr := store.Close()
+	if err != nil || addressErr != nil || closeErr != nil {
+		t.Fatalf("record cached lease err=%v address=%v close=%v", err, addressErr, closeErr)
+	}
 	runtimeDir := t.TempDir()
 	commands := startCLIBrokerSequence(t, filepath.Join(runtimeDir, "management.sock"), [][]string{
 		{"HEADER\tCLIENT_LIST\tCommon Name\tReal Address\tVirtual Address", "END"},
@@ -73,7 +87,7 @@ func TestClientListDetailReportsOfflineWhenRuntimeIsAvailable(t *testing.T) {
 	t.Setenv("OVPN_DATA_DIR", root)
 	t.Setenv("OVPN_RUNTIME_DIR", runtimeDir)
 	code, stdout, stderr := run("client", "list", "-d")
-	if code != 0 || stderr != "" || !strings.Contains(stdout, "offline") {
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "offline") || !strings.Contains(stdout, "last-known") || !strings.Contains(stdout, "10.42.0.200") {
 		t.Fatalf("offline detail code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	if command := <-commands; command != "status 3" {
