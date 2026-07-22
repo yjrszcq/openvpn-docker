@@ -27,7 +27,7 @@ When the target requires a newer schema, normal runtime refuses old state. The o
 
 ## Tag policy
 
-GHCR receives project image tags (`4.0.0`, `4.0`, `4`, and `latest`) plus the verified OpenVPN tag. Docker Hub keeps the public OpenVPN-version tag used by existing deployments. Production users should always pin a concrete tag and verify `ovpn version --json` after update.
+GHCR receives project image tags (`4.0.1`, `4.0`, `4`, and `latest`) plus the verified OpenVPN tag. Docker Hub keeps the public OpenVPN-version tag used by existing deployments. Production users should always pin a concrete tag and verify `ovpn version --json` after update.
 
 Every candidate image is tested before publication. The candidate range may block stable promotion, but it does not suppress the tested candidate image. A prerelease `IMAGE_VERSION` is not eligible for stable promotion. OpenVPN cross-minor updates require the configured approval boundary.
 
