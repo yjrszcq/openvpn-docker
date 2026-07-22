@@ -58,7 +58,7 @@ services:
 
 Docker Hub tags follow the embedded OpenVPN version. The image shown here contains OpenVPN 2.7.5. Pin a concrete tag in production.
 
-The quick-start file intentionally contains only the live service. See the [operations guide](docs/en/v4/operations.md#runtime-conventions) for the `openvpn-maintenance` service definition and offline diagnosis, repair, migration, backup, and recovery workflows.
+The quick-start file intentionally contains only the live service. For a complete configuration including `openvpn-maintenance`, use the repository's [docker-compose.yaml](docker-compose.yaml); see the [operations guide](docs/en/v4/operations.md#runtime-conventions) for offline diagnosis, repair, migration, backup, and recovery workflows.
 
 The example shows only the three values required for one-time environment initialization; all omitted settings use the normal defaults. See the [environment-variable table](#environment-variables), [.env.example](.env.example), or the [bootstrap command reference](docs/en/v4/commands.md#one-time-environment-bootstrap) for every optional variable. After the first successful start, change `OVPN_BOOTSTRAP_FROM_ENV` to `"false"`; later bootstrap values are ignored and never overwrite YAML or SQLite.
 

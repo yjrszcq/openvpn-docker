@@ -56,7 +56,7 @@ services:
 
 Docker Hub tag 使用镜像内 OpenVPN 版本。这里的镜像内含 OpenVPN 2.7.5；生产环境应固定明确 tag。
 
-快速部署文件有意只保留在线服务。`openvpn-maintenance` 的服务配置，以及离线诊断、修复、迁移、备份和恢复流程见[操作手册](docs/cn/v4/operations.md#运行环境约定)。
+快速部署文件有意只保留在线服务。包含 `openvpn-maintenance` 的完整配置可直接使用仓库根目录的 [docker-compose.yaml](docker-compose.yaml)；离线诊断、修复、迁移、备份和恢复流程见[操作手册](docs/cn/v4/operations.md#运行环境约定)。
 
 该示例只列出一次性环境初始化所需的三个值，其余设置使用正常默认值。全部可选变量见[环境变量表](#环境变量)、[.env.example](.env.example) 和[初始化命令参考](docs/cn/v4/commands.md#一次性环境变量初始化)。首次启动成功后，将 `OVPN_BOOTSTRAP_FROM_ENV` 改为 `"false"`；之后 bootstrap 变量会被忽略，绝不会覆盖 YAML 或 SQLite。
 
