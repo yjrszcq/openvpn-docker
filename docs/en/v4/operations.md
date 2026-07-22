@@ -19,6 +19,29 @@ docker compose run --rm openvpn-maintenance state doctor
 
 Both services must use the same target image and mount the same `openvpn-data` and `openvpn-config` directories.
 
+Add the following service next to `openvpn` in `compose.yaml`. It deliberately has no `devices`, `cap_add`, or published ports:
+
+```yaml
+  openvpn-maintenance:
+    image: szcq/openvpn:2.7.5
+    restart: "no"
+    network_mode: host
+    environment:
+      OVPN_MAINTENANCE: "true"
+    volumes:
+      - ./openvpn-data:/etc/openvpn
+      - ./openvpn-config:/etc/openvpn-config
+    profiles:
+      - maintenance
+    entrypoint:
+      - /usr/local/bin/ovpn
+    command:
+      - state
+      - doctor
+```
+
+Use the same pinned image tag as the live service. The default `state doctor` command runs only when the service is started without an explicit command; `docker compose run --rm openvpn-maintenance config plan` replaces it with `config plan`.
+
 ---
 
 ## Initial deployment
@@ -111,6 +134,17 @@ docker compose exec openvpn ovpn client list -d
 docker compose exec openvpn ovpn client list -u
 ```
 
+Typical `client list --detail` output looks like this (IDs and addresses are examples):
+
+```text
+CLIENT ID     NAME      STATUS   IPV4 MODE  IPV4 ADDRESS  IPV4 STATE
+111111111111  laptop    active   static     10.42.0.2    active
+222222222222  phone     active   dynamic    10.42.0.129  active
+333333333333  retired   revoked  static     10.42.0.20   retained
+```
+
+`STATUS` is the credential lifecycle state. `IPV4 MODE` is `static`, `dynamic`, or `none`; a dynamic address is the last recorded lease and may be `-` before the first connection. `IPV4 STATE` is assignment state such as `active`, `retained`, or `none`. Use `--full-id/-u` for complete UUIDs and `--json/-j` for automation.
+
 The default shortened ID can be copied after `--id/-i`. Positional values are exact names; `--name/-n` is the explicit equivalent:
 
 ```bash
@@ -201,7 +235,7 @@ docker compose exec openvpn \
   ovpn client address edit -n laptop -n phone -y
 ```
 
-The file contains one `client,ipv4` row per selected active client. Use `auto`, `dynamic`, or a static address. The whole file is validated and committed atomically. The editor is selected from `OVPN_EDITOR`, then `EDITOR`, then installed `nano`.
+The file contains one `client,ipv4` row per selected active client. Use `auto`, `dynamic`, or a static address. The whole file is validated and committed atomically. The default editor is the installed `nano`; set `EDITOR` to change the general default or `OVPN_EDITOR` to override it only for this command. Selection order is `OVPN_EDITOR`, `EDITOR`, then `nano`.
 
 ### Release a revoked reservation
 

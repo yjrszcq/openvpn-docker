@@ -17,6 +17,29 @@ docker compose run --rm openvpn-maintenance state doctor
 
 两个服务必须使用相同目标镜像，并挂载同一个 `openvpn-data` 和 `openvpn-config`。
 
+在 `compose.yaml` 中将以下服务添加到 `openvpn` 旁边。它有意不配置 `devices`、`cap_add` 或端口映射：
+
+```yaml
+  openvpn-maintenance:
+    image: szcq/openvpn:2.7.5
+    restart: "no"
+    network_mode: host
+    environment:
+      OVPN_MAINTENANCE: "true"
+    volumes:
+      - ./openvpn-data:/etc/openvpn
+      - ./openvpn-config:/etc/openvpn-config
+    profiles:
+      - maintenance
+    entrypoint:
+      - /usr/local/bin/ovpn
+    command:
+      - state
+      - doctor
+```
+
+镜像 tag 必须与在线服务固定为同一版本。仅在不指定命令启动该服务时才执行默认的 `state doctor`；`docker compose run --rm openvpn-maintenance config plan` 会用 `config plan` 替换默认命令。
+
 ---
 
 ## 首次部署
@@ -109,6 +132,17 @@ docker compose exec openvpn ovpn client list -d
 docker compose exec openvpn ovpn client list -u
 ```
 
+`client list --detail` 的典型输出如下（ID 和地址仅为示例）：
+
+```text
+CLIENT ID     NAME      STATUS   IPV4 MODE  IPV4 ADDRESS  IPV4 STATE
+111111111111  laptop    active   static     10.42.0.2    active
+222222222222  phone     active   dynamic    10.42.0.129  active
+333333333333  retired   revoked  static     10.42.0.20   retained
+```
+
+`STATUS` 表示凭据生命周期状态。`IPV4 MODE` 为 `static`、`dynamic` 或 `none`；动态地址显示最近记录的 lease，首次连接前可能为 `-`。`IPV4 STATE` 表示 assignment 状态，例如 `active`、`retained` 或 `none`。使用 `--full-id/-u` 显示完整 UUID，自动化应使用 `--json/-j`。
+
 默认显示的短 ID 可以直接用于 `--id/-i`。位置值是精确名称；`--name/-n` 是对应的显式形式：
 
 ```bash
@@ -199,7 +233,7 @@ docker compose exec openvpn \
   ovpn client address edit -n laptop -n phone -y
 ```
 
-文件中每个选中 active 客户端占一行 `client,ipv4`，值使用 `auto`、`dynamic` 或静态地址。完整文件统一验证并原子提交。编辑器依次取 `OVPN_EDITOR`、`EDITOR`，最后使用已安装的 `nano`。
+文件中每个选中 active 客户端占一行 `client,ipv4`，值使用 `auto`、`dynamic` 或静态地址。完整文件统一验证并原子提交。默认编辑器是镜像内已安装的 `nano`；设置 `EDITOR` 可修改通用默认编辑器，设置 `OVPN_EDITOR` 可仅覆盖该命令。选择顺序为 `OVPN_EDITOR`、`EDITOR`、`nano`。
 
 ### 释放 revoked 客户端地址
 
