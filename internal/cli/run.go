@@ -78,14 +78,14 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if args[0] == "completion" {
 		return runCompletion(args[1:], stdout, stderr)
 	}
-	if len(args) == 1 {
+	if len(args) == 1 || strings.HasPrefix(args[1], "-") {
 		switch args[0] {
 		case "client":
-			return runClientList(nil, stdout, stderr)
+			return runClientList(args[1:], stdout, stderr)
 		case "state":
-			return runState(nil, stdout, stderr, true)
+			return runState(args[1:], stdout, stderr, true)
 		case "runtime":
-			return runRuntimeStatus(nil, stdout, stderr)
+			return runRuntimeStatus(args[1:], stdout, stderr)
 		}
 	}
 	if len(args) >= 2 && args[0] == "config" && args[1] == "validate" {

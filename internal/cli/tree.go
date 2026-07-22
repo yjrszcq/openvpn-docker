@@ -22,7 +22,7 @@ var rootCommand = command{
 	details: []string{
 		"Run 'ovpn help COMMAND' or 'ovpn COMMAND -h' for command help.",
 		"Use -v for the short version, or -V/--version for the full version report.",
-		"Client, state, and runtime groups default to list, doctor, and status respectively.",
+		"Client, state, and runtime groups default to list, doctor, and status respectively, including their options.",
 	},
 	children: []command{
 		group("server", "initialize, run, or render the OpenVPN server",

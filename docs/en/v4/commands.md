@@ -36,7 +36,7 @@ Default paths:
 
 `OVPN_MAINTENANCE=true` authorizes offline migration. The batch address editor is selected from `--editor/-e`, `OVPN_EDITOR`, `EDITOR`, then `nano`. The image includes `nano`, `vim`, and `vi`; any other editor must be installed or mounted inside the container. Binary/template overrides are test and development interfaces, not normal deployment configuration.
 
-`ovpn client`, `ovpn state`, and `ovpn runtime` are safe shortcuts for `client list`, `state doctor`, and `runtime status`. At the top level, `-v` prints only the project version while `-V` and `--version` print the full version report. Running `ovpn` without arguments prints the fully expanded command tree with descriptions and every leaf usage; `ovpn -h` retains the detailed root help.
+`ovpn client`, `ovpn state`, and `ovpn runtime` are safe shortcuts for `client list`, `state doctor`, and `runtime status`, including their options. For example, `ovpn client -d -j` is equivalent to `ovpn client list -d -j`. At the top level, `-v` prints only the project version while `-V` and `--version` print the full version report. Running `ovpn` without arguments prints the fully expanded command tree with descriptions and every leaf usage; `ovpn -h` retains the detailed root help.
 
 ## One-time environment bootstrap
 

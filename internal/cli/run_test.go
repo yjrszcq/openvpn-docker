@@ -145,6 +145,23 @@ func TestSafeGroupDefaults(t *testing.T) {
 	if code != 78 || stdout != "" || !strings.Contains(stderr, "runtime state is invalid") {
 		t.Fatalf("runtime default code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
+
+	code, stdout, stderr = run("state", "-j")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"state":"EMPTY"`) {
+		t.Fatalf("state option forwarding code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, stdout, stderr = run("runtime", "-j")
+	if code != 78 || stdout != "" || !strings.Contains(stderr, `"kind":"runtime_state_refused"`) {
+		t.Fatalf("runtime option forwarding code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+
+	clientRoot := createClientPreflightFixture(t)
+	t.Setenv("OVPN_DATA_DIR", clientRoot)
+	aliasCode, aliasOutput, aliasError := run("client", "-d", "-j")
+	listCode, listOutput, listError := run("client", "list", "-d", "-j")
+	if aliasCode != listCode || aliasOutput != listOutput || aliasError != listError {
+		t.Fatalf("client option forwarding differs: alias=(%d, %q, %q) list=(%d, %q, %q)", aliasCode, aliasOutput, aliasError, listCode, listOutput, listError)
+	}
 }
 
 func TestVersionJSONUsageError(t *testing.T) {
@@ -508,9 +525,11 @@ func TestUnknownCommandIsUsageError(t *testing.T) {
 }
 
 func TestUnknownNestedCommandIsUsageError(t *testing.T) {
-	code, _, stderr := run("server", "unknown")
-	if code != 64 || !strings.Contains(stderr, "unknown command server unknown") {
-		t.Fatalf("unknown nested command code=%d stderr=%q", code, stderr)
+	for _, args := range [][]string{{"server", "unknown"}, {"client", "createe"}} {
+		code, _, stderr := run(args...)
+		if code != 64 || !strings.Contains(stderr, "unknown command "+strings.Join(args, " ")) {
+			t.Fatalf("unknown nested command args=%v code=%d stderr=%q", args, code, stderr)
+		}
 	}
 }
 

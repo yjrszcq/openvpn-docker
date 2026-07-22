@@ -173,6 +173,7 @@ grep -Fq '"network":"10.42.0.0/24"' "$WORK_DIR/validate.json"
 run_ovpn server init >"$WORK_DIR/init.out"
 test "$(run_ovpn client)" = "$(run_ovpn client list)"
 test "$(run_ovpn client)" = 'No clients.'
+test "$(run_ovpn client -d -j)" = "$(run_ovpn client list -d -j)"
 test "$(run_ovpn state)" = "$(run_ovpn state doctor)"
 
 set +e

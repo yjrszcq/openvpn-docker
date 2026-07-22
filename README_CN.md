@@ -187,7 +187,7 @@ docker exec openvpn ovpn runtime events --lines 100 --json
 
 已有客户端可用位置参数 `NAME`、显式 `--name NAME` 或 `--id ID` 选择。未提供 `--name` 或 `--id` 时，位置参数默认按客户端名称处理。`--id` 接受至少八位且唯一的 UUID 十六进制前缀。可能删除或批量改写状态的命令需要交互确认或 `--yes`。
 
-`ovpn client`、`ovpn state`、`ovpn runtime` 分别默认执行 `list`、`doctor`、`status`。所有客户端 mutation 支持 `--json`；create/reissue 可同时用 `--output` 返回新 profile。revoke、reissue、delete 和地址变更在持久化提交后会尝试断开受影响的在线 session。若出现 runtime warning，说明状态变更已经成功，可用 `runtime disconnect` 手动重试。
+`ovpn client`、`ovpn state`、`ovpn runtime` 分别默认执行 `list`、`doctor`、`status`，并继承对应子命令的参数。例如 `ovpn client -d -j` 等同于 `ovpn client list -d -j`；`state` 和 `runtime` 也遵循同样规则。所有客户端 mutation 支持 `--json`；create/reissue 可同时用 `--output` 返回新 profile。revoke、reissue、delete 和地址变更在持久化提交后会尝试断开受影响的在线 session。若出现 runtime warning，说明状态变更已经成功，可用 `runtime disconnect` 手动重试。
 
 批量地址编辑依次从 `--editor/-e`、`OVPN_EDITOR`、`EDITOR`、镜像内安装的 `nano` 选择编辑器。镜像可直接使用 `nano`、`vim` 和 `vi`；也可以使用其他已经安装或挂载到容器内的编辑器。命令参数或环境变量的值只能是单个可执行文件名或路径，不能附带其他参数。
 

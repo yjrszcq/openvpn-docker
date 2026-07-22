@@ -34,7 +34,7 @@ maintenance 服务的 entrypoint 已经是 `ovpn`，因此 `<command>` 直接从
 
 `OVPN_MAINTENANCE=true` 授权离线迁移。批量地址编辑器依次取 `--editor/-e`、`OVPN_EDITOR`、`EDITOR`，最后使用 `nano`。镜像内置 `nano`、`vim` 和 `vi`；其他编辑器必须已经安装或挂载到容器内。外部二进制与模板覆盖变量只用于测试和开发，不属于常规部署配置。
 
-`ovpn client`、`ovpn state`、`ovpn runtime` 是 `client list`、`state doctor`、`runtime status` 的安全快捷方式。顶层 `-v` 只输出项目版本，`-V` 与 `--version` 输出完整版本报告。裸执行 `ovpn` 会显示带说明和全部 leaf usage 的完整展开命令树；`ovpn -h` 仍显示详细根帮助。
+`ovpn client`、`ovpn state`、`ovpn runtime` 是 `client list`、`state doctor`、`runtime status` 的安全快捷方式，并继承对应子命令的参数。例如 `ovpn client -d -j` 等同于 `ovpn client list -d -j`。顶层 `-v` 只输出项目版本，`-V` 与 `--version` 输出完整版本报告。裸执行 `ovpn` 会显示带说明和全部 leaf usage 的完整展开命令树；`ovpn -h` 仍显示详细根帮助。
 
 ## 一次性环境变量初始化
 
