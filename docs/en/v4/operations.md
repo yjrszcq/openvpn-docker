@@ -405,8 +405,7 @@ SQLite and file artifacts must always be backed up and restored together.
 
 ```bash
 docker compose stop
-sudo tar --numeric-owner -czf openvpn-v4-$(date +%Y%m%d%H%M%S).tar.gz \
-  data config
+sudo tar --numeric-owner -czf openvpn-v4-$(date +%Y%m%d%H%M%S).tar.gz data config
 docker compose start
 ```
 

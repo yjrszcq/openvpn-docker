@@ -209,8 +209,7 @@ ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 
 ```bash
 docker compose stop
-sudo tar --numeric-owner -czf openvpn-backup.tar.gz \
-  data config
+sudo tar --numeric-owner -czf openvpn-backup.tar.gz data config
 docker compose start
 ```
 

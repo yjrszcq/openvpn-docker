@@ -403,8 +403,7 @@ SQLite 和文件 artifact 始终必须一起备份和恢复：
 
 ```bash
 docker compose stop
-sudo tar --numeric-owner -czf openvpn-v4-$(date +%Y%m%d%H%M%S).tar.gz \
-  data config
+sudo tar --numeric-owner -czf openvpn-v4-$(date +%Y%m%d%H%M%S).tar.gz data config
 docker compose start
 ```
 

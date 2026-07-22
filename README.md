@@ -211,8 +211,7 @@ The database and all PKI/artifact files are one restore unit. Never copy only `s
 
 ```bash
 docker compose stop
-sudo tar --numeric-owner -czf openvpn-backup.tar.gz \
-  data config
+sudo tar --numeric-owner -czf openvpn-backup.tar.gz data config
 docker compose start
 ```
 
