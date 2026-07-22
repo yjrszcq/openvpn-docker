@@ -51,14 +51,18 @@ func runClientList(args []string, stdout, stderr io.Writer) int {
 			return writeErrorMode(stderr, usageError("usage: ovpn client list [--detail] [--full-id] [--json]"), jsonMode)
 		}
 	}
-	service, state, err := openClientService(context.Background())
+	ctx := context.Background()
+	service, state, err := openClientService(ctx)
 	if err != nil {
 		return writeClientError(stderr, err, jsonMode)
 	}
 	defer state.Close()
-	result, err := service.List(context.Background())
+	result, err := service.List(ctx)
 	if err != nil {
 		return writeClientError(stderr, err, jsonMode)
+	}
+	if detail && len(result.Clients) != 0 {
+		populateClientConnections(ctx, &result)
 	}
 	if jsonMode {
 		if err := json.NewEncoder(stdout).Encode(result); err != nil {
@@ -72,7 +76,7 @@ func runClientList(args []string, stdout, stderr io.Writer) int {
 	}
 	writer := tabwriter.NewWriter(stdout, 0, 4, 2, ' ', 0)
 	if detail {
-		fmt.Fprintln(writer, "CLIENT ID\tNAME\tSTATUS\tIPV4 MODE\tIPV4 ADDRESS\tIPV4 STATE")
+		fmt.Fprintln(writer, "CLIENT ID\tNAME\tSTATUS\tIPV4 MODE\tIPV4 ADDRESS\tIPV4 STATE\tCONNECTION")
 	} else {
 		fmt.Fprintln(writer, "CLIENT ID\tNAME\tSTATUS")
 	}
@@ -86,7 +90,7 @@ func runClientList(args []string, stdout, stderr io.Writer) int {
 			if value.IPv4.Address != nil {
 				address = *value.IPv4.Address
 			}
-			fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\t%s\n", id, value.Name, value.Status, value.IPv4.Mode, address, value.IPv4.State)
+			fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", id, value.Name, value.Status, value.IPv4.Mode, address, value.IPv4.State, value.Connection)
 		} else {
 			fmt.Fprintf(writer, "%s\t%s\t%s\n", id, value.Name, value.Status)
 		}
@@ -95,6 +99,28 @@ func runClientList(args []string, stdout, stderr io.Writer) int {
 		return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "output_failure", "write client list", err))
 	}
 	return int(apperror.ExitSuccess)
+}
+
+func populateClientConnections(ctx context.Context, result *clientservice.ListResult) {
+	identities := make(map[string]string, len(result.Clients))
+	for index := range result.Clients {
+		result.Clients[index].Connection = "unknown"
+		identities[result.Clients[index].ID] = result.Clients[index].Name
+	}
+	status, err := runtimecontrol.QueryStatus(ctx, runtimecontrol.SocketPath(environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)), identities)
+	if err != nil {
+		return
+	}
+	online := make(map[string]struct{}, len(status.Clients))
+	for _, connected := range status.Clients {
+		online[connected.ClientID] = struct{}{}
+	}
+	for index := range result.Clients {
+		result.Clients[index].Connection = "offline"
+		if _, ok := online[result.Clients[index].ID]; ok {
+			result.Clients[index].Connection = "online"
+		}
+	}
 }
 
 func runClientExport(args []string, stdout, stderr io.Writer) int {

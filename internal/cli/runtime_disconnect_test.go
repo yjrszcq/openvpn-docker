@@ -32,6 +32,51 @@ func TestRuntimeDisconnectUsesResolvedUUIDAndJSON(t *testing.T) {
 	}
 }
 
+func TestClientListDetailCombinesRuntimeConnectionState(t *testing.T) {
+	root := createClientPreflightFixture(t)
+	runtimeDir := t.TempDir()
+	clientID := "20000000-0000-4000-8000-000000000002"
+	commands := startCLIBrokerSequence(t, filepath.Join(runtimeDir, "management.sock"), [][]string{
+		{"HEADER\tCLIENT_LIST\tCommon Name\tReal Address\tVirtual Address", "CLIENT_LIST\t" + clientID + "\t192.0.2.10:44321\t10.42.0.2", "END"},
+	})
+	t.Setenv("OVPN_DATA_DIR", root)
+	t.Setenv("OVPN_RUNTIME_DIR", runtimeDir)
+	code, stdout, stderr := run("client", "list", "--detail")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "CONNECTION") || !strings.Contains(stdout, "online") {
+		t.Fatalf("online detail code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if command := <-commands; command != "status 3" {
+		t.Fatalf("command=%q", command)
+	}
+
+	t.Setenv("OVPN_RUNTIME_DIR", t.TempDir())
+	code, stdout, stderr = run("client", "list", "--detail", "--json")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, `"connection":"unknown"`) {
+		t.Fatalf("unknown detail code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	code, stdout, stderr = run("client", "list", "--json")
+	if code != 0 || stderr != "" || strings.Contains(stdout, `"connection"`) {
+		t.Fatalf("plain list code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestClientListDetailReportsOfflineWhenRuntimeIsAvailable(t *testing.T) {
+	root := createClientPreflightFixture(t)
+	runtimeDir := t.TempDir()
+	commands := startCLIBrokerSequence(t, filepath.Join(runtimeDir, "management.sock"), [][]string{
+		{"HEADER\tCLIENT_LIST\tCommon Name\tReal Address\tVirtual Address", "END"},
+	})
+	t.Setenv("OVPN_DATA_DIR", root)
+	t.Setenv("OVPN_RUNTIME_DIR", runtimeDir)
+	code, stdout, stderr := run("client", "list", "-d")
+	if code != 0 || stderr != "" || !strings.Contains(stdout, "offline") {
+		t.Fatalf("offline detail code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if command := <-commands; command != "status 3" {
+		t.Fatalf("command=%q", command)
+	}
+}
+
 func TestRuntimeDisconnectSupportsOfflineAndDeletedIdentities(t *testing.T) {
 	root := createClientPreflightFixture(t)
 	store, err := storesqlite.Open(context.Background(), filepath.Join(root, "meta", "state.db"))

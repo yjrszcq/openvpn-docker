@@ -135,13 +135,13 @@ docker compose exec openvpn ovpn client list -u
 `client list --detail` 的典型输出如下（ID 和地址仅为示例）：
 
 ```text
-CLIENT ID     NAME      STATUS   IPV4 MODE  IPV4 ADDRESS  IPV4 STATE
-111111111111  laptop    active   static     10.42.0.2    active
-222222222222  phone     active   dynamic    10.42.0.129  active
-333333333333  retired   revoked  static     10.42.0.20   retained
+CLIENT ID     NAME      STATUS   IPV4 MODE  IPV4 ADDRESS  IPV4 STATE  CONNECTION
+111111111111  laptop    active   static     10.42.0.2    active      online
+222222222222  phone     active   dynamic    10.42.0.129  active      offline
+333333333333  retired   revoked  static     10.42.0.20   retained    offline
 ```
 
-`STATUS` 表示凭据生命周期状态。`IPV4 MODE` 为 `static`、`dynamic` 或 `none`；动态地址显示最近记录的 lease，首次连接前可能为 `-`。`IPV4 STATE` 表示 assignment 状态，例如 `active`、`retained` 或 `none`。使用 `--full-id/-u` 显示完整 UUID，自动化应使用 `--json/-j`。
+`STATUS` 表示凭据生命周期状态。`IPV4 MODE` 为 `static`、`dynamic` 或 `none`；动态地址显示最近记录的 lease，首次连接前可能为 `-`。`IPV4 STATE` 表示 assignment 状态，例如 `active`、`retained` 或 `none`。runtime broker 可用时 `CONNECTION` 为 `online` 或 `offline`，服务停止或无法查询时为 `unknown`。使用 `--full-id/-u` 显示完整 UUID，自动化应使用 `--json/-j`。
 
 默认显示的短 ID 可以直接用于 `--id/-i`。位置值是精确名称；`--name/-n` 是对应的显式形式：
 

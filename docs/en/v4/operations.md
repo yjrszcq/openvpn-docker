@@ -137,13 +137,13 @@ docker compose exec openvpn ovpn client list -u
 Typical `client list --detail` output looks like this (IDs and addresses are examples):
 
 ```text
-CLIENT ID     NAME      STATUS   IPV4 MODE  IPV4 ADDRESS  IPV4 STATE
-111111111111  laptop    active   static     10.42.0.2    active
-222222222222  phone     active   dynamic    10.42.0.129  active
-333333333333  retired   revoked  static     10.42.0.20   retained
+CLIENT ID     NAME      STATUS   IPV4 MODE  IPV4 ADDRESS  IPV4 STATE  CONNECTION
+111111111111  laptop    active   static     10.42.0.2    active      online
+222222222222  phone     active   dynamic    10.42.0.129  active      offline
+333333333333  retired   revoked  static     10.42.0.20   retained    offline
 ```
 
-`STATUS` is the credential lifecycle state. `IPV4 MODE` is `static`, `dynamic`, or `none`; a dynamic address is the last recorded lease and may be `-` before the first connection. `IPV4 STATE` is assignment state such as `active`, `retained`, or `none`. Use `--full-id/-u` for complete UUIDs and `--json/-j` for automation.
+`STATUS` is the credential lifecycle state. `IPV4 MODE` is `static`, `dynamic`, or `none`; a dynamic address is the last recorded lease and may be `-` before the first connection. `IPV4 STATE` is assignment state such as `active`, `retained`, or `none`. `CONNECTION` is `online` or `offline` when the runtime broker is available and `unknown` when the service is stopped or cannot be queried. Use `--full-id/-u` for complete UUIDs and `--json/-j` for automation.
 
 The default shortened ID can be copied after `--id/-i`. Positional values are exact names; `--name/-n` is the explicit equivalent:
 

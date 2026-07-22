@@ -50,10 +50,11 @@ type IPv4View struct {
 }
 
 type View struct {
-	ID     string              `json:"id"`
-	Name   string              `json:"name"`
-	Status domain.ClientStatus `json:"status"`
-	IPv4   IPv4View            `json:"ipv4"`
+	ID         string              `json:"id"`
+	Name       string              `json:"name"`
+	Status     domain.ClientStatus `json:"status"`
+	IPv4       IPv4View            `json:"ipv4"`
+	Connection string              `json:"connection,omitempty"`
 }
 
 type ListResult struct {

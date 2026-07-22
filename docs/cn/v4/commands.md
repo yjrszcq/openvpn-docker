@@ -277,7 +277,7 @@ ovpn client create NAME [--ipv4|-4 [auto|dynamic|ADDRESS]] [--output|-o FILE|-] 
 ovpn client list [--detail|-d] [--full-id|-u] [--json|-j]
 ```
 
-列出当前客户端。`--detail` 增加 assignment 与 lease；文本模式默认缩短 ID，`--full-id` 显示完整 UUID；JSON 使用稳定对象。
+列出当前客户端。`--detail` 增加 assignment、lease 与实时连接状态；runtime broker 可用时 `CONNECTION` 为 `online` 或 `offline`，无法查询时为 `unknown`。文本模式默认缩短 ID，`--full-id` 显示完整 UUID；JSON 使用稳定对象，并在指定 `--detail` 时包含 `connection`。
 
 ### `ovpn client export`
 

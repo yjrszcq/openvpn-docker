@@ -279,7 +279,7 @@ Syntax:
 ovpn client list [--detail|-d] [--full-id|-u] [--json|-j]
 ```
 
-Lists current clients. `--detail` includes assignment and lease information. The default text ID is shortened; `--full-id` prints the full UUID. JSON uses a stable object representation.
+Lists current clients. `--detail` includes assignment, lease, and live connection information. `CONNECTION` is `online` or `offline` when the runtime broker is available and `unknown` when it cannot be queried. The default text ID is shortened; `--full-id` prints the full UUID. JSON uses a stable object representation and includes `connection` when `--detail` is requested.
 
 ### `ovpn client export`
 
