@@ -177,6 +177,7 @@ The container remains running, but connected VPN clients are disconnected during
 
 ```bash
 docker compose exec openvpn ovpn client list --detail
+docker compose exec openvpn ovpn client address edit laptop phone --editor vim --yes
 docker compose exec openvpn ovpn runtime status
 docker compose exec openvpn ovpn runtime disconnect laptop
 docker compose exec openvpn ovpn runtime logs --lines 100 --follow
@@ -186,6 +187,8 @@ docker compose exec openvpn ovpn runtime events --lines 100 --json
 Existing clients may be selected by positional `NAME`, explicit `--name NAME`, or `--id ID`. When neither selector option is present, the positional value is treated as the client name. `--id` accepts an unambiguous UUID prefix of at least eight hexadecimal characters. Mutating commands that can destroy or broadly rewrite state require interactive confirmation or `--yes`.
 
 `ovpn client`, `ovpn state`, and `ovpn runtime` default to `list`, `doctor`, and `status`. Client mutations support `--json`; create and reissue can return the new profile with `--output`. Revoke, reissue, delete, and address changes try to disconnect affected live sessions after the durable commit. A runtime warning means the state change succeeded and `runtime disconnect` can be used as a manual retry.
+
+Batch address editing selects its editor from `--editor/-e`, `OVPN_EDITOR`, `EDITOR`, then the installed `nano`. The command-line or environment value must be one executable name or path without additional arguments.
 
 Generate shell completion without an external CLI framework:
 
