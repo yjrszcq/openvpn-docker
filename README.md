@@ -208,10 +208,10 @@ ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 The database and all PKI/artifact files are one restore unit. Never copy only `state.db`, and never copy a database while the service can write it. For an operator backup, stop the server and archive both mounted directories:
 
 ```bash
-docker compose stop openvpn
+docker compose stop
 sudo tar --numeric-owner -czf openvpn-backup.tar.gz \
   openvpn-data openvpn-config
-docker compose up -d
+docker compose start
 ```
 
 Restore into empty target directories while the service is stopped, preserve ownership and permissions, then run `state doctor` before startup. Backups contain CA and client private keys and must be encrypted and access-controlled.

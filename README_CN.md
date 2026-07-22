@@ -206,10 +206,10 @@ ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 数据库和全部 PKI/artifact 文件是同一个恢复单元。不能只复制 `state.db`，也不能在服务仍可能写入时复制数据库。操作员备份应先停止服务，同时归档两个挂载目录：
 
 ```bash
-docker compose stop openvpn
+docker compose stop
 sudo tar --numeric-owner -czf openvpn-backup.tar.gz \
   openvpn-data openvpn-config
-docker compose up -d
+docker compose start
 ```
 
 恢复时保持服务停止，将备份解压到空目标目录并保留所有者和权限，启动前先运行 `state doctor`。备份包含 CA 和客户端私钥，必须加密并限制访问。

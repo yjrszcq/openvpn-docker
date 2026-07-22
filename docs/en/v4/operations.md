@@ -252,16 +252,16 @@ docker compose exec openvpn ovpn config apply --yes
 The offline maintenance workflow remains available when the live runtime is unhealthy or an operator explicitly wants the server stopped:
 
 ```bash
-docker compose stop openvpn
+docker compose stop
 docker compose run --rm openvpn-maintenance config validate
 docker compose run --rm openvpn-maintenance config plan
 docker compose run --rm openvpn-maintenance config apply -y
 docker compose run --rm openvpn-maintenance state doctor
-docker compose up -d
+docker compose start
 docker compose exec openvpn ovpn runtime health
 ```
 
-The maintenance command does not start or restart OpenVPN; `docker compose up -d` performs activation afterward without starting the profiled maintenance service. Inspect the plan before applying. Endpoint/transport changes require profile redistribution. Network/pool changes can remap static assignments and require CCD/server regeneration. NAT, routes, and redirect-gateway changes are reconciled during the managed restart.
+The maintenance command does not start or restart OpenVPN; `docker compose start` restarts the existing live container afterward without starting the profiled maintenance service. Inspect the plan before applying. Endpoint/transport changes require profile redistribution. Network/pool changes can remap static assignments and require CCD/server regeneration. NAT, routes, and redirect-gateway changes are reconciled during startup.
 
 If YAML differs but has not been applied, restarting the server continues with the old applied revision and prints a warning. This protects the running service from accidental file edits.
 
@@ -286,7 +286,7 @@ Read-only diagnosis can run online, but offline diagnosis produces a stable view
 docker compose exec openvpn ovpn state show
 docker compose exec openvpn ovpn state doctor -j
 
-docker compose stop openvpn
+docker compose stop
 docker compose run --rm openvpn-maintenance state doctor
 docker compose run --rm openvpn-maintenance repair plan
 ```
@@ -354,7 +354,7 @@ Before migration:
 Plan and apply:
 
 ```bash
-docker compose stop openvpn
+docker compose stop
 docker compose run --rm openvpn-maintenance migrate plan
 docker compose run --rm openvpn-maintenance migrate plan --json
 docker compose run --rm openvpn-maintenance migrate apply --yes
@@ -374,7 +374,7 @@ Migration preserves schema 3 UUID certificate identities and imports current cli
 An image switch is not sufficient. Restore the complete migration snapshot and then run `sh-ver`:
 
 ```bash
-docker compose stop openvpn
+docker compose stop
 
 sudo cp openvpn-data/repair/migrations/schema3-pre-v4.tar.gz .
 sudo cp openvpn-data/repair/migrations/schema3-pre-v4.tar.gz.sha256 .
@@ -402,10 +402,10 @@ SQLite and file artifacts must always be backed up and restored together.
 ### Backup
 
 ```bash
-docker compose stop openvpn
+docker compose stop
 sudo tar --numeric-owner -czf openvpn-v4-$(date +%Y%m%d%H%M%S).tar.gz \
   openvpn-data openvpn-config
-docker compose up -d
+docker compose start
 ```
 
 Store the archive encrypted. It contains the CA, server/client private keys, tls-crypt key, profiles, and database.
@@ -424,7 +424,7 @@ mv restore-work/openvpn-data ./openvpn-data
 mv restore-work/openvpn-config ./openvpn-config
 
 docker compose run --rm openvpn-maintenance state doctor
-docker compose up -d
+docker compose start
 docker compose exec openvpn ovpn runtime health
 ```
 
@@ -435,7 +435,7 @@ Do not merge a backup into an existing data directory and do not restore only `s
 When both images use schema 4:
 
 ```bash
-docker compose stop openvpn
+docker compose stop
 # Update OVPN_IMAGE, then:
 docker compose pull openvpn openvpn-maintenance
 docker compose run --rm openvpn-maintenance state doctor

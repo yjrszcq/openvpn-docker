@@ -250,16 +250,16 @@ docker compose exec openvpn ovpn config apply --yes
 当在线 runtime 异常，或管理员明确希望停服操作时，仍可使用离线 maintenance 流程：
 
 ```bash
-docker compose stop openvpn
+docker compose stop
 docker compose run --rm openvpn-maintenance config validate
 docker compose run --rm openvpn-maintenance config plan
 docker compose run --rm openvpn-maintenance config apply -y
 docker compose run --rm openvpn-maintenance state doctor
-docker compose up -d
+docker compose start
 docker compose exec openvpn ovpn runtime health
 ```
 
-maintenance 命令不会启动或重启 OpenVPN，之后由 `docker compose up -d` 完成激活，带 profile 的 maintenance 服务不会随之启动。apply 前必须阅读 plan。endpoint/transport 变化要求重分发 profile；网段/动态池变化可能重映射静态地址并重建 CCD/server config；NAT、route 和 redirect-gateway 变化会在受控重启期间 reconcile。
+maintenance 命令不会启动或重启 OpenVPN，之后由 `docker compose start` 重新启动已有在线容器，带 profile 的 maintenance 服务不会随之启动。apply 前必须阅读 plan。endpoint/transport 变化要求重分发 profile；网段/动态池变化可能重映射静态地址并重建 CCD/server config；NAT、route 和 redirect-gateway 变化会在启动期间 reconcile。
 
 YAML 发生漂移但未 apply 时，重启仍使用旧 applied revision 并输出警告，避免意外文件编辑直接改变运行服务。
 
@@ -284,7 +284,7 @@ docker compose run --rm -T openvpn-maintenance \
 docker compose exec openvpn ovpn state show
 docker compose exec openvpn ovpn state doctor -j
 
-docker compose stop openvpn
+docker compose stop
 docker compose run --rm openvpn-maintenance state doctor
 docker compose run --rm openvpn-maintenance repair plan
 ```
@@ -352,7 +352,7 @@ ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 计划并执行：
 
 ```bash
-docker compose stop openvpn
+docker compose stop
 docker compose run --rm openvpn-maintenance migrate plan
 docker compose run --rm openvpn-maintenance migrate plan --json
 docker compose run --rm openvpn-maintenance migrate apply --yes
@@ -372,7 +372,7 @@ docker compose exec openvpn ovpn runtime health
 只切换镜像不够；必须恢复完整迁移快照，再运行 `sh-ver`：
 
 ```bash
-docker compose stop openvpn
+docker compose stop
 
 sudo cp openvpn-data/repair/migrations/schema3-pre-v4.tar.gz .
 sudo cp openvpn-data/repair/migrations/schema3-pre-v4.tar.gz.sha256 .
@@ -400,10 +400,10 @@ SQLite 和文件 artifact 始终必须一起备份和恢复：
 ### 备份
 
 ```bash
-docker compose stop openvpn
+docker compose stop
 sudo tar --numeric-owner -czf openvpn-v4-$(date +%Y%m%d%H%M%S).tar.gz \
   openvpn-data openvpn-config
-docker compose up -d
+docker compose start
 ```
 
 归档包含 CA、服务端/客户端私钥、tls-crypt、profile 和数据库，必须加密保存。
@@ -422,7 +422,7 @@ mv restore-work/openvpn-data ./openvpn-data
 mv restore-work/openvpn-config ./openvpn-config
 
 docker compose run --rm openvpn-maintenance state doctor
-docker compose up -d
+docker compose start
 docker compose exec openvpn ovpn runtime health
 ```
 
@@ -433,7 +433,7 @@ docker compose exec openvpn ovpn runtime health
 新旧镜像都使用 schema 4 时：
 
 ```bash
-docker compose stop openvpn
+docker compose stop
 # 更新 OVPN_IMAGE 后：
 docker compose pull openvpn openvpn-maintenance
 docker compose run --rm openvpn-maintenance state doctor
