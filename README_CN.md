@@ -72,9 +72,10 @@ $EDITOR openvpn-config/config.yaml
 ### 初始化并启动
 
 ```bash
-docker compose up -d openvpn
-docker compose logs -f openvpn
+docker compose up -d
 ```
+
+仓库完整 Compose 中的 `openvpn-maintenance` 属于 `maintenance` profile，不会被这条命令启动。
 
 entrypoint 只会初始化空数据目录，新实例必须提供有效 YAML 或启用 bootstrap 环境变量。环境初始化会先写入规范 YAML，再在 staging 中创建 SQLite、PKI、服务端身份、CRL、tls-crypt 和派生文件，验证后统一安装。
 
@@ -208,7 +209,7 @@ ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 docker compose stop openvpn
 sudo tar --numeric-owner -czf openvpn-backup.tar.gz \
   openvpn-data openvpn-config
-docker compose up -d openvpn
+docker compose up -d
 ```
 
 恢复时保持服务停止，将备份解压到空目标目录并保留所有者和权限，启动前先运行 `state doctor`。备份包含 CA 和客户端私钥，必须加密并限制访问。

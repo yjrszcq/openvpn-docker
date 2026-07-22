@@ -40,7 +40,7 @@ Add the following service next to `openvpn` in `docker-compose.yaml`. It deliber
       - doctor
 ```
 
-Use the same pinned image tag as the live service. The default `state doctor` command runs only when the service is started without an explicit command; `docker compose run --rm openvpn-maintenance config plan` replaces it with `config plan`.
+Use the same pinned image tag as the live service. The maintenance service belongs to the `maintenance` profile, so a normal `docker compose up -d` starts only the live service. The default `state doctor` command runs only when the maintenance service is explicitly started without another command; `docker compose run --rm openvpn-maintenance config plan` replaces it with `config plan`.
 
 ---
 
@@ -57,8 +57,7 @@ chmod 750 openvpn-data openvpn-config
 cp config.example.yaml openvpn-config/config.yaml
 $EDITOR openvpn-config/config.yaml
 
-docker compose up -d openvpn
-docker compose logs openvpn
+docker compose up -d
 docker compose exec openvpn ovpn state doctor
 docker compose exec openvpn ovpn runtime health
 ```
@@ -258,11 +257,11 @@ docker compose run --rm openvpn-maintenance config validate
 docker compose run --rm openvpn-maintenance config plan
 docker compose run --rm openvpn-maintenance config apply -y
 docker compose run --rm openvpn-maintenance state doctor
-docker compose up -d openvpn
+docker compose up -d
 docker compose exec openvpn ovpn runtime health
 ```
 
-The maintenance command does not start or restart OpenVPN; `docker compose up -d openvpn` performs activation afterward. Inspect the plan before applying. Endpoint/transport changes require profile redistribution. Network/pool changes can remap static assignments and require CCD/server regeneration. NAT, routes, and redirect-gateway changes are reconciled during the managed restart.
+The maintenance command does not start or restart OpenVPN; `docker compose up -d` performs activation afterward without starting the profiled maintenance service. Inspect the plan before applying. Endpoint/transport changes require profile redistribution. Network/pool changes can remap static assignments and require CCD/server regeneration. NAT, routes, and redirect-gateway changes are reconciled during the managed restart.
 
 If YAML differs but has not been applied, restarting the server continues with the old applied revision and prints a warning. This protects the running service from accidental file edits.
 
@@ -364,7 +363,7 @@ umask 077
 docker compose run --rm -T openvpn-maintenance \
   config export --output - > openvpn-config/config.yaml.new &&
   mv openvpn-config/config.yaml.new openvpn-config/config.yaml
-docker compose up -d openvpn
+docker compose up -d
 docker compose exec openvpn ovpn runtime health
 ```
 
@@ -391,7 +390,7 @@ mv openvpn-data-schema3 openvpn-data
 
 # Point OVPN_IMAGE to the stable sh-ver image before startup.
 docker compose run --rm openvpn-maintenance state doctor
-docker compose up -d openvpn
+docker compose up -d
 ```
 
 Keep `openvpn-data-schema4` until the rollback is verified. The restored schema 3 tree and `sh-ver` image are a matched unit.
@@ -406,7 +405,7 @@ SQLite and file artifacts must always be backed up and restored together.
 docker compose stop openvpn
 sudo tar --numeric-owner -czf openvpn-v4-$(date +%Y%m%d%H%M%S).tar.gz \
   openvpn-data openvpn-config
-docker compose up -d openvpn
+docker compose up -d
 ```
 
 Store the archive encrypted. It contains the CA, server/client private keys, tls-crypt key, profiles, and database.
@@ -425,7 +424,7 @@ mv restore-work/openvpn-data ./openvpn-data
 mv restore-work/openvpn-config ./openvpn-config
 
 docker compose run --rm openvpn-maintenance state doctor
-docker compose up -d openvpn
+docker compose up -d
 docker compose exec openvpn ovpn runtime health
 ```
 
@@ -440,7 +439,7 @@ docker compose stop openvpn
 # Update OVPN_IMAGE, then:
 docker compose pull openvpn openvpn-maintenance
 docker compose run --rm openvpn-maintenance state doctor
-docker compose up -d openvpn
+docker compose up -d
 docker compose exec openvpn ovpn version --json
 docker compose exec openvpn ovpn runtime health
 ```

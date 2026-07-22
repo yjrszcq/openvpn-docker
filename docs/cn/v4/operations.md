@@ -38,7 +38,7 @@ docker compose run --rm openvpn-maintenance state doctor
       - doctor
 ```
 
-镜像 tag 必须与在线服务固定为同一版本。仅在不指定命令启动该服务时才执行默认的 `state doctor`；`docker compose run --rm openvpn-maintenance config plan` 会用 `config plan` 替换默认命令。
+镜像 tag 必须与在线服务固定为同一版本。maintenance 服务属于 `maintenance` profile，因此普通的 `docker compose up -d` 只会启动在线服务。只有显式启动 maintenance 服务且未指定其他命令时才执行默认的 `state doctor`；`docker compose run --rm openvpn-maintenance config plan` 会用 `config plan` 替换默认命令。
 
 ---
 
@@ -55,8 +55,7 @@ chmod 750 openvpn-data openvpn-config
 cp config.example.yaml openvpn-config/config.yaml
 $EDITOR openvpn-config/config.yaml
 
-docker compose up -d openvpn
-docker compose logs openvpn
+docker compose up -d
 docker compose exec openvpn ovpn state doctor
 docker compose exec openvpn ovpn runtime health
 ```
@@ -256,11 +255,11 @@ docker compose run --rm openvpn-maintenance config validate
 docker compose run --rm openvpn-maintenance config plan
 docker compose run --rm openvpn-maintenance config apply -y
 docker compose run --rm openvpn-maintenance state doctor
-docker compose up -d openvpn
+docker compose up -d
 docker compose exec openvpn ovpn runtime health
 ```
 
-maintenance 命令不会启动或重启 OpenVPN，之后由 `docker compose up -d openvpn` 完成激活。apply 前必须阅读 plan。endpoint/transport 变化要求重分发 profile；网段/动态池变化可能重映射静态地址并重建 CCD/server config；NAT、route 和 redirect-gateway 变化会在受控重启期间 reconcile。
+maintenance 命令不会启动或重启 OpenVPN，之后由 `docker compose up -d` 完成激活，带 profile 的 maintenance 服务不会随之启动。apply 前必须阅读 plan。endpoint/transport 变化要求重分发 profile；网段/动态池变化可能重映射静态地址并重建 CCD/server config；NAT、route 和 redirect-gateway 变化会在受控重启期间 reconcile。
 
 YAML 发生漂移但未 apply 时，重启仍使用旧 applied revision 并输出警告，避免意外文件编辑直接改变运行服务。
 
@@ -362,7 +361,7 @@ umask 077
 docker compose run --rm -T openvpn-maintenance \
   config export --output - > openvpn-config/config.yaml.new &&
   mv openvpn-config/config.yaml.new openvpn-config/config.yaml
-docker compose up -d openvpn
+docker compose up -d
 docker compose exec openvpn ovpn runtime health
 ```
 
@@ -389,7 +388,7 @@ mv openvpn-data-schema3 openvpn-data
 
 # 启动前把 OVPN_IMAGE 指向稳定的 sh-ver 镜像。
 docker compose run --rm openvpn-maintenance state doctor
-docker compose up -d openvpn
+docker compose up -d
 ```
 
 验证完成前保留 `openvpn-data-schema4`。恢复后的 schema 3 数据树与 `sh-ver` 镜像必须作为匹配单元使用。
@@ -404,7 +403,7 @@ SQLite 和文件 artifact 始终必须一起备份和恢复：
 docker compose stop openvpn
 sudo tar --numeric-owner -czf openvpn-v4-$(date +%Y%m%d%H%M%S).tar.gz \
   openvpn-data openvpn-config
-docker compose up -d openvpn
+docker compose up -d
 ```
 
 归档包含 CA、服务端/客户端私钥、tls-crypt、profile 和数据库，必须加密保存。
@@ -423,7 +422,7 @@ mv restore-work/openvpn-data ./openvpn-data
 mv restore-work/openvpn-config ./openvpn-config
 
 docker compose run --rm openvpn-maintenance state doctor
-docker compose up -d openvpn
+docker compose up -d
 docker compose exec openvpn ovpn runtime health
 ```
 
@@ -438,7 +437,7 @@ docker compose stop openvpn
 # 更新 OVPN_IMAGE 后：
 docker compose pull openvpn openvpn-maintenance
 docker compose run --rm openvpn-maintenance state doctor
-docker compose up -d openvpn
+docker compose up -d
 docker compose exec openvpn ovpn version --json
 docker compose exec openvpn ovpn runtime health
 ```

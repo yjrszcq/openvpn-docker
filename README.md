@@ -74,9 +74,10 @@ Then remove the entire `environment:` block from the `openvpn` service in the Co
 ### Initialize and start
 
 ```bash
-docker compose up -d openvpn
-docker compose logs -f openvpn
+docker compose up -d
 ```
+
+In the repository's complete Compose file, `openvpn-maintenance` belongs to the `maintenance` profile and is not started by this command.
 
 The entrypoint initializes only an empty data directory and requires either a valid YAML file or enabled bootstrap environment for a new instance. Environment bootstrap writes the canonical YAML first; initialization then creates the SQLite database, PKI, server identity, CRL, tls-crypt key, and derived runtime files as one staged operation.
 
@@ -210,7 +211,7 @@ The database and all PKI/artifact files are one restore unit. Never copy only `s
 docker compose stop openvpn
 sudo tar --numeric-owner -czf openvpn-backup.tar.gz \
   openvpn-data openvpn-config
-docker compose up -d openvpn
+docker compose up -d
 ```
 
 Restore into empty target directories while the service is stopped, preserve ownership and permissions, then run `state doctor` before startup. Backups contain CA and client private keys and must be encrypted and access-controlled.
