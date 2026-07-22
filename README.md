@@ -2,7 +2,7 @@
 
 [中文](README_CN.md)
 
-This image runs OpenVPN Community Edition with a Go control plane and SQLite schema 4 state. It is intended for Linux hosts that need certificate-based IPv4 TUN access without a web interface.
+This image runs OpenVPN Community Edition with a Go control plane and SQLite state. It is intended for Linux hosts that need certificate-based IPv4 TUN access without a web interface.
 
 ## Features
 
@@ -137,7 +137,7 @@ Persistent server settings belong in declarative YAML. Environment variables con
 
 ### One-time environment bootstrap
 
-These variables are read only while initializing an empty schema 4 instance with `OVPN_BOOTSTRAP_FROM_ENV=true`. They produce the first canonical YAML file. After initialization they are ignored with a warning and never overwrite YAML or SQLite; set the switch to `false` after the first successful start.
+These variables are read only while initializing an empty instance with `OVPN_BOOTSTRAP_FROM_ENV=true`. They produce the first canonical YAML file. After initialization they are ignored with a warning and never overwrite YAML or SQLite; set the switch to `false` after the first successful start.
 
 | Variable | Initial configuration default | `.env.example` value | Purpose |
 |---|---|---|---|
@@ -223,24 +223,6 @@ ovpn completion zsh > ~/.zfunc/_ovpn
 ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 ```
 
-## Schema 3 migration
-
-The current image directly migrates schema 3 only. Schema 1 or 2 instances must first be upgraded to schema 3 with the `sh-ver` image.
-
-```bash
-docker compose stop openvpn
-docker compose run --rm openvpn-maintenance migrate plan
-docker compose run --rm openvpn-maintenance migrate apply --yes
-docker compose run --rm openvpn-maintenance state doctor
-umask 077
-docker compose run --rm -T openvpn-maintenance \
-  config export --output - > openvpn-config/config.yaml.new &&
-  mv openvpn-config/config.yaml.new openvpn-config/config.yaml
-docker compose up -d openvpn
-```
-
-Migration creates a complete snapshot and matching SHA-256 sidecar before installing schema 4. To roll back after a successful migration, stop all containers, verify and restore that snapshot, then run the `sh-ver` image. Switching the image alone is not a data rollback.
-
 ## Backup and restore
 
 The database and all PKI/artifact files are one restore unit. Never copy only `state.db`, and never copy a database while the service can write it. For an operator backup, stop the server and archive both mounted directories:
@@ -258,7 +240,7 @@ Restore into empty target directories while the service is stopped, preserve own
 
 - [command reference](docs/en/v4/commands.md)
 - [operations guide](docs/en/v4/operations.md)
-- [data schema upgrade policy](docs/en/data-schema-upgrade-policy.md)
+- [data upgrade and migration policy](docs/en/data-schema-upgrade-policy.md)
 - [image update policy](docs/en/image-update-policy.md)
 - Historical references: [v1](docs/en/v1/commands.md), [v2](docs/en/v2/commands.md), and [v3](docs/en/v3/commands.md)
 
@@ -273,7 +255,7 @@ tests/smoke/shell/workflow-smoke.sh
 scripts/docker-build.sh -t szcq/openvpn-server:dev .
 ```
 
-CI runs Go formatting, vet, unit and race tests, dependency-license checks, retained Shell contracts, schema 3 handoff/rollback, real UDP/TCP tunnels, and amd64/arm64 builds.
+CI runs Go formatting, vet, unit and race tests, dependency-license checks, retained Shell contracts, data migration and rollback, real UDP/TCP tunnels, and amd64/arm64 builds.
 
 ## License
 

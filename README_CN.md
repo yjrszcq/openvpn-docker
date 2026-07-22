@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-本镜像使用 Go 控制面和 SQLite schema 4 运行 OpenVPN Community Edition，适合在 Linux 主机上部署基于证书的 IPv4 TUN VPN，不提供 Web 管理界面。
+本镜像使用 Go 控制面和 SQLite 运行 OpenVPN Community Edition，适合在 Linux 主机上部署基于证书的 IPv4 TUN VPN，不提供 Web 管理界面。
 
 ## 主要能力
 
@@ -135,7 +135,7 @@ chmod 600 laptop.ovpn
 
 ### 一次性环境变量初始化
 
-仅当空的 schema 4 实例以 `OVPN_BOOTSTRAP_FROM_ENV=true` 初始化时才读取这些变量，并据此生成第一份规范 YAML。初始化完成后，程序只会告警并忽略这些变量，绝不会覆盖 YAML 或 SQLite；首次启动成功后应将开关设为 `false`。
+仅当空实例以 `OVPN_BOOTSTRAP_FROM_ENV=true` 初始化时才读取这些变量，并据此生成第一份规范 YAML。初始化完成后，程序只会告警并忽略这些变量，绝不会覆盖 YAML 或 SQLite；首次启动成功后应将开关设为 `false`。
 
 | 变量 | 初始配置默认值 | `.env.example` 值 | 说明 |
 |---|---|---|---|
@@ -221,24 +221,6 @@ ovpn completion zsh > ~/.zfunc/_ovpn
 ovpn completion fish > ~/.config/fish/completions/ovpn.fish
 ```
 
-## schema 3 迁移
-
-当前镜像只直接迁移 schema 3。schema 1/2 必须先使用 `sh-ver` 镜像升级到 schema 3。
-
-```bash
-docker compose stop openvpn
-docker compose run --rm openvpn-maintenance migrate plan
-docker compose run --rm openvpn-maintenance migrate apply --yes
-docker compose run --rm openvpn-maintenance state doctor
-umask 077
-docker compose run --rm -T openvpn-maintenance \
-  config export --output - > openvpn-config/config.yaml.new &&
-  mv openvpn-config/config.yaml.new openvpn-config/config.yaml
-docker compose up -d openvpn
-```
-
-迁移安装 schema 4 前会创建完整快照及其 SHA-256 sidecar。迁移成功后若要回滚，必须停止全部容器、校验并恢复该快照，再运行 `sh-ver` 镜像；只切换镜像不等于数据回滚。
-
 ## 备份与恢复
 
 数据库和全部 PKI/artifact 文件是同一个恢复单元。不能只复制 `state.db`，也不能在服务仍可能写入时复制数据库。操作员备份应先停止服务，同时归档两个挂载目录：
@@ -256,7 +238,7 @@ docker compose up -d openvpn
 
 - [命令参考](docs/cn/v4/commands.md)
 - [操作手册](docs/cn/v4/operations.md)
-- [数据 schema 升级政策](docs/cn/data-schema-upgrade-policy.md)
+- [数据升级与迁移政策](docs/cn/data-schema-upgrade-policy.md)
 - [镜像更新政策](docs/cn/image-update-policy.md)
 - 历史版本：[v1](docs/cn/v1/commands.md)、[v2](docs/cn/v2/commands.md)、[v3](docs/cn/v3/commands.md)
 
@@ -271,7 +253,7 @@ tests/smoke/shell/workflow-smoke.sh
 scripts/docker-build.sh -t szcq/openvpn-server:dev .
 ```
 
-CI 覆盖 Go format、vet、unit/race、依赖许可证、保留的 Shell 契约、schema 3 迁移/回滚、真实 UDP/TCP 隧道以及 amd64/arm64 构建。
+CI 覆盖 Go format、vet、unit/race、依赖许可证、保留的 Shell 契约、数据迁移与回滚、真实 UDP/TCP 隧道以及 amd64/arm64 构建。
 
 ## 许可证
 
