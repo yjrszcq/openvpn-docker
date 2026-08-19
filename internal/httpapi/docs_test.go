@@ -75,6 +75,9 @@ func TestDocumentationShowsExplicitRequestContracts(t *testing.T) {
 	if !strings.Contains(styles, `.contract-tab[aria-selected="true"]`) || !strings.Contains(styles, ".contract-pane[hidden]") {
 		t.Fatal("documentation contracts must render as switchable request and response tabs")
 	}
+	if !strings.Contains(styles, ".language-switch button {") || !strings.Contains(styles, "width: 46px;") {
+		t.Fatal("documentation language buttons must have equal fixed widths")
+	}
 }
 
 func TestDocumentationSupportsCompleteChineseAndEnglishRendering(t *testing.T) {

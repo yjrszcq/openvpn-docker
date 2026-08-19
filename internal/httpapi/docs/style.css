@@ -68,7 +68,8 @@ code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospac
   font-size: 12px;
   font-weight: 700;
   height: 38px;
-  padding: 0 10px;
+  padding: 0;
+  width: 46px;
 }
 .language-switch button:first-child { border-radius: 6px 0 0 6px; }
 .language-switch button:last-child { border-left: 0; border-radius: 0 6px 6px 0; }
