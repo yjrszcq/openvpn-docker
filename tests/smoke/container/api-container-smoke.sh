@@ -111,8 +111,14 @@ grep -Fq '.parameter-table' "$WORK_DIR/docs.css"
 grep -Fq '.contract-tabs' "$WORK_DIR/docs.css"
 grep -Fq 'tab.addEventListener("click", () => activate(index))' "$WORK_DIR/docs.js"
 grep -Fq '.contract-stack' "$WORK_DIR/docs.css"
-! grep -Fq 'Host: vpn-admin.example.com' "$WORK_DIR/docs.js"
-! grep -Fq '.contract-grid' "$WORK_DIR/docs.css"
+if grep -Fq 'Host: vpn-admin.example.com' "$WORK_DIR/docs.js"; then
+  printf 'REST API smoke failed: documentation JavaScript contains a synthetic Host header\n' >&2
+  exit 1
+fi
+if grep -Fq '.contract-grid' "$WORK_DIR/docs.css"; then
+  printf 'REST API smoke failed: documentation CSS contains the retired side-by-side contract layout\n' >&2
+  exit 1
+fi
 test "$(grep -o '"operationId"' "$WORK_DIR/openapi.json" | wc -l)" -eq 22
 grep -Eiq '^content-security-policy:.*default-src' "$WORK_DIR/docs.headers"
 docs_redirect_code="$(curl -sS -o /dev/null -D "$WORK_DIR/docs-redirect.headers" -w '%{http_code}' "$api_url/docs")"

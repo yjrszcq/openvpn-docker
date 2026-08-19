@@ -77,7 +77,7 @@ printf '%s\n' "$maintenance_service" | grep -Fq 'entrypoint:'
 printf '%s\n' "$maintenance_service" | grep -Fq -- '- /usr/local/bin/ovpn'
 printf '%s\n' "$maintenance_service" | grep -Fq 'command:'
 printf '%s\n' "$maintenance_service" | grep -Fq -- '- doctor'
-printf '%s\n' "$maintenance_service" | grep -Fq 'restart: "no"'
+printf '%s\n' "$maintenance_service" | grep -Eq "restart: ['\"]no['\"]"
 printf '%s\n' "$maintenance_service" | grep -Fq 'OVPN_MAINTENANCE: "true"'
 printf '%s\n' "$maintenance_service" | grep -Fq 'network_mode: host'
 printf '%s\n' "$maintenance_service" | grep -Fq '/etc/ovpn-conf'
