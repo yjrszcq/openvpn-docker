@@ -44,14 +44,15 @@
         </div>
         <div class="base-info"><span id="base-path-label">Base path</span><code>/api/v1</code><span id="format-label">Format</span><code>application/json</code></div>
         <h2 id="api-key-title" class="intro-section-title">API key commands</h2>
+        <p><span id="api-key-convention-before">When running commands from the host, use</span> <code>docker exec openvpn ovpn &lt;command&gt;</code><span id="api-key-convention-after">. The table uses shortened commands.</span></p>
         <div class="parameter-table-wrap api-key-table-wrap">
           <table id="api-key-table" class="parameter-table api-key-table">
             <thead><tr><th>Command</th><th>Description</th></tr></thead>
             <tbody>
-              <tr><td><code>docker exec openvpn ovpn api key create frontend-production</code></td><td id="api-key-create-description">Creates a key and prints its complete secret once.</td></tr>
-              <tr><td><code>docker exec openvpn ovpn api key create frontend-production --output /etc/openvpn/frontend.key</code></td><td id="api-key-output-description">Creates a key and writes it to a new mode-0600 file inside the container.</td></tr>
-              <tr><td><code>docker exec openvpn ovpn api key list</code></td><td id="api-key-list-description">Lists key metadata without revealing secrets.</td></tr>
-              <tr><td><code>docker exec openvpn ovpn api key delete frontend-production --yes</code></td><td id="api-key-delete-description">Deletes the named key and invalidates it immediately.</td></tr>
+              <tr><td><code>ovpn api key create frontend-production</code></td><td id="api-key-create-description">Creates a key and prints its complete secret once.</td></tr>
+              <tr><td><code>ovpn api key create frontend-production --output /etc/openvpn/frontend.key</code></td><td id="api-key-output-description">Creates a key and writes it to a new mode-0600 file inside the container.</td></tr>
+              <tr><td><code>ovpn api key list</code></td><td id="api-key-list-description">Lists key metadata without revealing secrets.</td></tr>
+              <tr><td><code>ovpn api key delete frontend-production --yes</code></td><td id="api-key-delete-description">Deletes the named key and invalidates it immediately.</td></tr>
             </tbody>
           </table>
         </div>

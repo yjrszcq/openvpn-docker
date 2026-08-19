@@ -438,6 +438,8 @@
     document.getElementById("cors-values").textContent = text("corsValues");
     document.getElementById("cors-description").textContent = text("corsDescription");
     document.getElementById("api-key-title").textContent = text("apiKeyTitle");
+    document.getElementById("api-key-convention-before").textContent = text("apiKeyConventionBefore");
+    document.getElementById("api-key-convention-after").textContent = text("apiKeyConventionAfter");
     document.querySelectorAll("#api-key-table th").forEach((header, index) => {
       header.textContent = text("apiKeyHeaders")[index];
     });
