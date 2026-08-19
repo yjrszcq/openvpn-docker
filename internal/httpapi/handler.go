@@ -100,9 +100,9 @@ func AuthenticatedKey(ctx context.Context) (apikey.Key, bool) {
 
 // NewHandler constructs the HTTP foundation. Resource handlers are added in
 // later phases; every versioned route is authenticated before route lookup.
-func NewHandler(authenticator Authenticator, allowedOrigins []string, resources ...Resources) (http.Handler, error) {
-	if authenticator == nil || len(resources) > 1 {
-		return nil, errors.New("API authenticator and valid resources are required")
+func NewHandler(authenticator Authenticator, allowedOrigins []string, resources Resources) (http.Handler, error) {
+	if authenticator == nil {
+		return nil, errors.New("API authenticator is required")
 	}
 	origins := make(map[string]struct{}, len(allowedOrigins))
 	for _, origin := range allowedOrigins {
@@ -114,11 +114,7 @@ func NewHandler(authenticator Authenticator, allowedOrigins []string, resources 
 		}
 		origins[origin] = struct{}{}
 	}
-	configured := Resources{}
-	if len(resources) == 1 {
-		configured = resources[0]
-	}
-	return &handler{authenticator: authenticator, origins: origins, resources: configured}, nil
+	return &handler{authenticator: authenticator, origins: origins, resources: resources}, nil
 }
 
 func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Request) {

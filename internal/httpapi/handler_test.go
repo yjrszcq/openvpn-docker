@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/yjrszcq/openvpn-docker/internal/apikey"
+	"github.com/yjrszcq/openvpn-docker/internal/auditactor"
 	"github.com/yjrszcq/openvpn-docker/internal/buildinfo"
 	clientservice "github.com/yjrszcq/openvpn-docker/internal/client"
 	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
@@ -103,7 +104,7 @@ func TestAuthenticationStorageFailureIsSanitized(t *testing.T) {
 }
 
 func TestAuthenticatedUnknownRouteAndCORS(t *testing.T) {
-	handler, err := NewHandler(fakeAuthenticator{key: apikey.Key{ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}}, []string{"https://console.example"})
+	handler, err := NewHandler(fakeAuthenticator{key: apikey.Key{ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}}, []string{"https://console.example"}, Resources{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +119,7 @@ func TestAuthenticatedUnknownRouteAndCORS(t *testing.T) {
 }
 
 func TestCORSPreflightUsesExactOriginsAndHeaders(t *testing.T) {
-	handler, err := NewHandler(fakeAuthenticator{}, []string{"https://console.example"})
+	handler, err := NewHandler(fakeAuthenticator{}, []string{"https://console.example"}, Resources{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,11 +145,11 @@ func TestCORSPreflightUsesExactOriginsAndHeaders(t *testing.T) {
 
 func TestOriginValidation(t *testing.T) {
 	for _, origin := range []string{"*", "https://example.test/path", "file://example.test", "https://user@example.test"} {
-		if _, err := NewHandler(fakeAuthenticator{}, []string{origin}); err == nil {
+		if _, err := NewHandler(fakeAuthenticator{}, []string{origin}, Resources{}); err == nil {
 			t.Fatalf("origin %q was accepted", origin)
 		}
 	}
-	if _, err := NewHandler(nil, nil); err == nil {
+	if _, err := NewHandler(nil, nil, Resources{}); err == nil {
 		t.Fatal("nil authenticator was accepted")
 	}
 }
@@ -209,7 +210,7 @@ func TestReadResourcesRejectMethods(t *testing.T) {
 
 func newTestHandler(t *testing.T, authenticator Authenticator) http.Handler {
 	t.Helper()
-	handler, err := NewHandler(authenticator, nil)
+	handler, err := NewHandler(authenticator, nil, Resources{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,5 +228,28 @@ func TestVersionAndStateResponsesUseAPIContract(t *testing.T) {
 	doctor := newStateResponse(report, true)
 	if summary.Issues != nil || len(doctor.Issues) != 1 || doctor.Issues[0].OwnerID != "owner" {
 		t.Fatalf("summary=%+v doctor=%+v", summary, doctor)
+	}
+}
+
+func TestAuthenticatedIdentityReachesResources(t *testing.T) {
+	keyID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	resources := Resources{State: func(ctx context.Context) (statecontrol.Report, error) {
+		key, keyOK := AuthenticatedKey(ctx)
+		actor, actorOK := auditactor.From(ctx)
+		if !keyOK || key.ID != keyID || !actorOK || actor.Kind != "api-key" || actor.ID != keyID {
+			t.Fatalf("key=%+v keyOK=%t actor=%+v actorOK=%t", key, keyOK, actor, actorOK)
+		}
+		return statecontrol.Report{Version: 1}, nil
+	}}
+	handler, err := NewHandler(fakeAuthenticator{key: apikey.Key{ID: keyID}}, nil, resources)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/state", nil)
+	request.Header.Set("Authorization", "Bearer valid-token")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("response=%d body=%q", response.Code, response.Body.String())
 	}
 }
