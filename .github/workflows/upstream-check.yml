@@ -4,10 +4,14 @@ on:
   schedule:
     - cron: '17 4 * * 1'
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Test
+    types:
+      - completed
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: upstream-check
@@ -15,7 +19,11 @@ concurrency:
 
 jobs:
   discover:
+    if: github.event_name != 'workflow_run'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       pr_created: ${{ steps.discover.outputs.pr_created }}
       pr_url: ${{ steps.discover.outputs.pr_url }}
@@ -86,19 +94,84 @@ jobs:
             echo "version=$target"
           } >> "$GITHUB_OUTPUT"
 
-  notify:
-    name: Send Gotify upstream-check notification
+  notify-discovered:
+    name: Notify that a new upstream version was found
     needs: discover
     if: needs.discover.outputs.pr_created == 'true'
     uses: yjrszcq/github-workflows/.github/workflows/gotify-notify.yml@main
     with:
-      title: ${{ format('{0} 发现 OpenVPN {1}', github.repository, needs.discover.outputs.version) }}
+      title: ${{ format('{0} 发现 OpenVPN 上游新版本 {1}', github.repository, needs.discover.outputs.version) }}
       message: |
         已成功创建新版本更新 PR。
         OpenVPN 版本：${{ needs.discover.outputs.version }}
         PR 地址：${{ needs.discover.outputs.pr_url }}
         运行详情：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       priority: 5
+    secrets:
+      gotify_url: ${{ secrets.GOTIFY_URL }}
+      gotify_token: ${{ secrets.GOTIFY_TOKEN }}
+
+  candidate-context:
+    name: Read candidate validation context
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      startsWith(github.event.workflow_run.head_branch, 'automation/openvpn-')
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.context.outputs.version }}
+    steps:
+      - id: context
+        name: Read OpenVPN version from the automation branch
+        env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          version="${HEAD_BRANCH#automation/openvpn-}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "unexpected automation branch: $HEAD_BRANCH" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  notify-candidate-success:
+    name: Notify that candidate validation passed
+    needs: candidate-context
+    if: >-
+      always() &&
+      needs.candidate-context.result == 'success' &&
+      github.event.workflow_run.conclusion == 'success'
+    uses: yjrszcq/github-workflows/.github/workflows/gotify-notify.yml@main
+    with:
+      title: ${{ format('{0} OpenVPN {1} 候选版本验证通过', github.repository, needs.candidate-context.outputs.version) }}
+      message: |
+        候选版本验证通过。
+        OpenVPN 版本：${{ needs.candidate-context.outputs.version }}
+        来源分支：${{ github.event.workflow_run.head_branch }}
+        验证详情：${{ github.event.workflow_run.html_url }}
+      priority: 5
+    secrets:
+      gotify_url: ${{ secrets.GOTIFY_URL }}
+      gotify_token: ${{ secrets.GOTIFY_TOKEN }}
+
+  notify-candidate-failure:
+    name: Notify that candidate validation failed
+    needs: candidate-context
+    if: >-
+      always() &&
+      needs.candidate-context.result == 'success' &&
+      github.event.workflow_run.conclusion != 'success'
+    uses: yjrszcq/github-workflows/.github/workflows/gotify-notify.yml@main
+    with:
+      title: ${{ format('{0} OpenVPN {1} 候选版本验证失败', github.repository, needs.candidate-context.outputs.version) }}
+      message: |
+        候选版本验证未通过。
+        OpenVPN 版本：${{ needs.candidate-context.outputs.version }}
+        验证结果：${{ github.event.workflow_run.conclusion }}
+        来源分支：${{ github.event.workflow_run.head_branch }}
+        验证详情：${{ github.event.workflow_run.html_url }}
+      priority: 8
     secrets:
       gotify_url: ${{ secrets.GOTIFY_URL }}
       gotify_token: ${{ secrets.GOTIFY_TOKEN }}
