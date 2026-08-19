@@ -190,6 +190,9 @@ func TestOpenMigratesRevisionOne(t *testing.T) {
 func TestOpenMigratesRevisionFourLeaseUniqueness(t *testing.T) {
 	store, instance := storeWithInstance(t)
 	path := store.Path()
+	if _, err := store.db.Exec("DROP TABLE api_keys"); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := store.db.Exec("DROP INDEX client_leases_network_address"); err != nil {
 		t.Fatal(err)
 	}
@@ -231,6 +234,64 @@ VALUES(?, ?, 4, ?, ?)`, client.Client.ID, instance.NetworkID, []byte{10, 42, 0, 
 	var survivor string
 	if err := opened.db.QueryRow("SELECT client_id FROM client_leases").Scan(&survivor); err != nil || survivor != clients[1].Client.ID {
 		t.Fatalf("deduplicated lease survivor=%q err=%v", survivor, err)
+	}
+}
+
+func TestOpenMigratesRevisionEightAPIKeys(t *testing.T) {
+	path := databasePath(t)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	database, err := connect(context.Background(), path, "rwc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := initialize(context.Background(), database, "4.0.0-test", time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, step := range migrations {
+		if step.revision > 8 {
+			break
+		}
+		transaction, err := database.BeginTx(context.Background(), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := step.apply(context.Background(), transaction); err != nil {
+			_ = transaction.Rollback()
+			t.Fatal(err)
+		}
+		if _, err := transaction.Exec("UPDATE schema_metadata SET database_revision = ? WHERE singleton = 1", step.revision); err != nil {
+			_ = transaction.Rollback()
+			t.Fatal(err)
+		}
+		if err := transaction.Commit(); err != nil {
+			t.Fatal(err)
+		}
+		metadata.DatabaseRevision = step.revision
+	}
+	if err := database.Close(); err != nil {
+		t.Fatal(err)
+	}
+	opened, err := Open(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer opened.Close()
+	if opened.Metadata().DatabaseRevision != 9 {
+		t.Fatalf("revision=%d", opened.Metadata().DatabaseRevision)
+	}
+	var strictSQL string
+	if err := opened.db.QueryRow("SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = 'api_keys'").Scan(&strictSQL); err != nil || !strings.HasSuffix(strictSQL, "STRICT") {
+		t.Fatalf("api_keys schema=%q err=%v", strictSQL, err)
 	}
 }
 

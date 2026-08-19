@@ -19,6 +19,28 @@ var migrations = []migration{
 	{revision: 6, apply: migrateCAKeyArtifact},
 	{revision: 7, apply: migrateReusableArtifactKeys},
 	{revision: 8, apply: migrateHistoricalNetworks},
+	{revision: 9, apply: migrateAPIKeys},
+}
+
+func migrateAPIKeys(ctx context.Context, transaction *sql.Tx) error {
+	_, err := transaction.ExecContext(ctx, `
+CREATE TABLE api_keys (
+    id TEXT PRIMARY KEY CHECK (length(id) = 36),
+    instance_id TEXT NOT NULL REFERENCES instances(id) ON DELETE CASCADE,
+    name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 64),
+    secret_digest BLOB NOT NULL CHECK (length(secret_digest) = 32),
+    created_at TEXT NOT NULL CHECK (length(created_at) > 0)
+) STRICT;
+CREATE UNIQUE INDEX api_keys_instance_name
+ON api_keys(instance_id, name);
+CREATE UNIQUE INDEX api_keys_secret_digest
+ON api_keys(secret_digest);
+CREATE INDEX api_keys_instance_created
+ON api_keys(instance_id, created_at, id)`)
+	if err != nil {
+		return classifySQLite("migrate API key state", err)
+	}
+	return nil
 }
 
 func migrateHistoricalNetworks(ctx context.Context, transaction *sql.Tx) error {
