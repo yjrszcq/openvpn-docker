@@ -209,3 +209,27 @@ jobs:
           source_image="ghcr.io/${GITHUB_REPOSITORY,,}:ovpn$OPENVPN_VERSION"
           target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:latest"
           docker buildx imagetools create --tag "$target_image" "$source_image"
+
+  notify:
+    name: Send Gotify release notification
+    needs:
+      - policy
+      - blocked
+      - publish-same-branch
+      - publish-cross-branch
+    if: always()
+    uses: yjrszcq/github-workflows/.github/workflows/gotify-notify.yml@main
+    with:
+      title: ${{ format('{0} image release', github.repository) }}
+      message: |
+        Candidate workflow: ${{ github.event.workflow_run.conclusion }}
+        Policy job: ${{ needs.policy.result }}
+        Decision: ${{ needs.policy.outputs.decision || 'not-evaluated' }}
+        Blocked report: ${{ needs.blocked.result }}
+        Same-branch publish: ${{ needs.publish-same-branch.result }}
+        Cross-branch publish: ${{ needs.publish-cross-branch.result }}
+        Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      priority: ${{ (github.event.workflow_run.conclusion != 'success' || needs.policy.result == 'failure' || needs.blocked.result == 'failure' || needs.publish-same-branch.result == 'failure' || needs.publish-cross-branch.result == 'failure') && 8 || 5 }}
+    secrets:
+      gotify_url: ${{ secrets.GOTIFY_URL }}
+      gotify_token: ${{ secrets.GOTIFY_TOKEN }}

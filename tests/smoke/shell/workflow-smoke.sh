@@ -104,6 +104,10 @@ grep -Fq 'DOCKERHUB_USERNAME: szcq' "$WORKFLOWS/release.yml"
 grep -Fq 'DOCKERHUB_IMAGE: openvpn' "$WORKFLOWS/release.yml"
 grep -Fq 'secrets.DOCKER_TOKEN' "$WORKFLOWS/release.yml"
 grep -Fq "GHCR_TOKEN: \${{ github.token }}" "$WORKFLOWS/release.yml"
+grep -Fq 'uses: yjrszcq/github-workflows/.github/workflows/gotify-notify.yml@main' "$WORKFLOWS/release.yml"
+grep -Fq 'if: always()' "$WORKFLOWS/release.yml"
+grep -Fq 'gotify_url: ${{ secrets.GOTIFY_URL }}' "$WORKFLOWS/release.yml"
+grep -Fq 'gotify_token: ${{ secrets.GOTIFY_TOKEN }}' "$WORKFLOWS/release.yml"
 # shellcheck disable=SC2016 # This asserts the literal shell assignment in the workflow.
 test "$(grep -Fc 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"' "$WORKFLOWS/release.yml")" -eq 2
 # shellcheck disable=SC2016 # This asserts the literal shell assignment in the workflow.
