@@ -152,7 +152,6 @@ docker run -d \
   -e OVPN_DATA_DIR=/etc/openvpn \
   -e OVPN_RUNTIME_DIR=/run/openvpn-container \
   -e OVPN_BROKER_BIN=/tool/ovpn-broker \
-  -e OVPN_IPTABLES_BIN="${OVPN_IPTABLES_BIN:-iptables-legacy}" \
   -v "$data_dir:/etc/openvpn" \
   -v "$config_dir:/etc/ovpn-conf" \
   -v "$bin_dir:/tool:ro" \
