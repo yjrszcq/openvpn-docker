@@ -1,0 +1,295 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenVPN Docker Management API",
+    "version": "1.0.0",
+    "description": "Authenticated REST API for frontend management of clients, runtime state, diagnostics, and declarative configuration. Except for health and documentation, send the API key as Authorization: Bearer <key>."
+  },
+  "servers": [{"url": "/", "description": "Current ovpn-api origin"}],
+  "security": [{"bearerAuth": []}],
+  "tags": [
+    {"name": "System", "description": "Process health, build metadata, and instance diagnostics."},
+    {"name": "Clients", "description": "Client credentials, profiles, IPv4 intent, and active sessions."},
+    {"name": "Runtime", "description": "OpenVPN daemon status and structured event history."},
+    {"name": "Configuration", "description": "Optimistic-concurrency desired configuration workflow."}
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": ["System"],
+        "summary": "Check API process liveness",
+        "description": "Unauthenticated liveness check. It does not report OpenVPN or storage health.",
+        "security": [],
+        "responses": {"200": {"$ref": "#/components/responses/HealthResponse"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}}
+      }
+    },
+    "/api/v1/version": {
+      "get": {
+        "operationId": "getVersion",
+        "tags": ["System"],
+        "summary": "Read build and compatibility metadata",
+        "responses": {"200": {"$ref": "#/components/responses/VersionResponse"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/state": {
+      "get": {
+        "operationId": "getState",
+        "tags": ["System"],
+        "summary": "Read instance health summary",
+        "responses": {"200": {"$ref": "#/components/responses/StateResponse"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/state/doctor": {
+      "get": {
+        "operationId": "getStateDoctor",
+        "tags": ["System"],
+        "summary": "Read detailed instance diagnostics",
+        "description": "Returns the state summary plus an issues array when diagnostic issues exist.",
+        "responses": {"200": {"$ref": "#/components/responses/StateDoctorResponse"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/clients": {
+      "get": {
+        "operationId": "listClients",
+        "tags": ["Clients"],
+        "summary": "List active, revoked, and deleted clients",
+        "responses": {"200": {"$ref": "#/components/responses/ClientListResponse"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      },
+      "post": {
+        "operationId": "createClient",
+        "tags": ["Clients"],
+        "summary": "Create client credentials and profile",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CreateClientRequest"}, "example": {"name": "alice-laptop", "ipv4": "auto"}}}},
+        "responses": {"201": {"$ref": "#/components/responses/ClientCreatedResponse"}, "400": {"$ref": "#/components/responses/BadRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"$ref": "#/components/responses/UnprocessableEntity"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/clients/{client_id}": {
+      "parameters": [{"$ref": "#/components/parameters/ClientID"}],
+      "get": {
+        "operationId": "getClient",
+        "tags": ["Clients"],
+        "summary": "Read one client",
+        "responses": {"200": {"$ref": "#/components/responses/ClientResponse"}, "400": {"$ref": "#/components/responses/BadRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      },
+      "patch": {
+        "operationId": "renameClient",
+        "tags": ["Clients"],
+        "summary": "Rename a client",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RenameClientRequest"}, "example": {"name": "alice-notebook"}}}},
+        "responses": {"200": {"$ref": "#/components/responses/ClientMutationResponse"}, "400": {"$ref": "#/components/responses/BadRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"$ref": "#/components/responses/UnprocessableEntity"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      },
+      "delete": {
+        "operationId": "deleteClient",
+        "tags": ["Clients"],
+        "summary": "Delete local client credentials",
+        "description": "Requires an empty body. The immutable client UUID tombstone remains in authoritative state.",
+        "responses": {"200": {"$ref": "#/components/responses/ClientMutationResponse"}, "400": {"$ref": "#/components/responses/BadRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"$ref": "#/components/responses/UnprocessableEntity"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/clients/{client_id}/profile": {
+      "parameters": [{"$ref": "#/components/parameters/ClientID"}],
+      "get": {
+        "operationId": "downloadClientProfile",
+        "tags": ["Clients"],
+        "summary": "Download an OpenVPN client profile",
+        "description": "The response contains a private key and must be handled as a credential.",
+        "responses": {"200": {"$ref": "#/components/responses/ProfileResponse"}, "400": {"$ref": "#/components/responses/BadRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"$ref": "#/components/responses/UnprocessableEntity"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/clients/{client_id}/revoke": {
+      "parameters": [{"$ref": "#/components/parameters/ClientID"}],
+      "post": {
+        "operationId": "revokeClient",
+        "tags": ["Clients"],
+        "summary": "Revoke client credentials",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RevokeClientRequest"}, "example": {"release_ipv4": false}}}},
+        "responses": {"200": {"$ref": "#/components/responses/ClientMutationResponse"}, "400": {"$ref": "#/components/responses/BadRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"$ref": "#/components/responses/UnprocessableEntity"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/clients/{client_id}/reissue": {
+      "parameters": [{"$ref": "#/components/parameters/ClientID"}],
+      "post": {
+        "operationId": "reissueClient",
+        "tags": ["Clients"],
+        "summary": "Reissue client credentials and profile",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReissueClientRequest"}, "example": {"ipv4": "dynamic"}}}},
+        "responses": {"200": {"$ref": "#/components/responses/ClientMutationResponse"}, "400": {"$ref": "#/components/responses/BadRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"$ref": "#/components/responses/UnprocessableEntity"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/clients/{client_id}/ipv4": {
+      "parameters": [{"$ref": "#/components/parameters/ClientID"}],
+      "put": {
+        "operationId": "setClientIPv4",
+        "tags": ["Clients"],
+        "summary": "Set client IPv4 intent",
+        "description": "Use auto or dynamic without address. Use static with an address from the configured static region.",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/IPv4Request"}, "examples": {"automatic": {"value": {"mode": "auto"}}, "dynamic": {"value": {"mode": "dynamic"}}, "static": {"value": {"mode": "static", "address": "10.42.0.30"}}}}}},
+        "responses": {"200": {"$ref": "#/components/responses/AddressMutationResponse"}, "400": {"$ref": "#/components/responses/BadRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"$ref": "#/components/responses/UnprocessableEntity"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      },
+      "delete": {
+        "operationId": "releaseClientIPv4",
+        "tags": ["Clients"],
+        "summary": "Release a revoked client's retained IPv4",
+        "description": "Requires an empty body and is valid only for a revoked client with a retained assignment.",
+        "responses": {"200": {"$ref": "#/components/responses/AddressMutationResponse"}, "400": {"$ref": "#/components/responses/BadRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"$ref": "#/components/responses/UnprocessableEntity"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/clients/{client_id}/disconnect": {
+      "parameters": [{"$ref": "#/components/parameters/ClientID"}],
+      "post": {
+        "operationId": "disconnectClient",
+        "tags": ["Clients"],
+        "summary": "Disconnect current client sessions",
+        "description": "Requires an empty body. A client with no active session returns 200 with was_connected=false.",
+        "responses": {"200": {"$ref": "#/components/responses/DisconnectResponse"}, "400": {"$ref": "#/components/responses/BadRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "404": {"$ref": "#/components/responses/NotFound"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/runtime": {
+      "get": {
+        "operationId": "getRuntime",
+        "tags": ["Runtime"],
+        "summary": "Read OpenVPN runtime status and sessions",
+        "responses": {"200": {"$ref": "#/components/responses/RuntimeResponse"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/runtime/events": {
+      "get": {
+        "operationId": "getRuntimeEvents",
+        "tags": ["Runtime"],
+        "summary": "Read recent structured runtime events",
+        "parameters": [{"$ref": "#/components/parameters/EventLines"}],
+        "responses": {"200": {"$ref": "#/components/responses/RuntimeEventsResponse"}, "400": {"$ref": "#/components/responses/BadRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/config/applied": {
+      "get": {
+        "operationId": "getAppliedConfiguration",
+        "tags": ["Configuration"],
+        "summary": "Read the applied configuration revision",
+        "responses": {"200": {"$ref": "#/components/responses/AppliedConfigurationResponse"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "409": {"$ref": "#/components/responses/Conflict"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/config/desired": {
+      "get": {
+        "operationId": "getDesiredConfiguration",
+        "tags": ["Configuration"],
+        "summary": "Read desired configuration and CAS digest",
+        "responses": {"200": {"$ref": "#/components/responses/DesiredConfigurationResponse"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"$ref": "#/components/responses/UnprocessableEntity"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      },
+      "put": {
+        "operationId": "putDesiredConfiguration",
+        "tags": ["Configuration"],
+        "summary": "Replace desired configuration with CAS",
+        "description": "Send the previous desired digest as a quoted If-Match value and the complete normalized configuration as the body.",
+        "parameters": [{"$ref": "#/components/parameters/IfMatch"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Configuration"}, "example": {"version": 1, "server": {"endpoint": "vpn.example.com", "protocol": "udp", "family": "auto", "port": 1194, "client_to_client": true}, "ipv4": {"network": "10.42.0.0/24", "dynamic_pool_size": 64, "nat_enabled": false, "nat_interface": "auto", "redirect_gateway": false, "dns": ["1.1.1.1"], "routes": ["10.20.0.0/16"]}, "logging": {"max_bytes": 10485760, "backups": 5}}}}},
+        "responses": {"200": {"$ref": "#/components/responses/DesiredConfigurationResponse"}, "400": {"$ref": "#/components/responses/BadRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"$ref": "#/components/responses/UnprocessableEntity"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/config/plan": {
+      "get": {
+        "operationId": "getConfigurationPlan",
+        "tags": ["Configuration"],
+        "summary": "Plan desired-to-applied changes",
+        "responses": {"200": {"$ref": "#/components/responses/ConfigurationPlanResponse"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"$ref": "#/components/responses/UnprocessableEntity"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    },
+    "/api/v1/config/apply": {
+      "post": {
+        "operationId": "applyConfiguration",
+        "tags": ["Configuration"],
+        "summary": "Apply the current desired configuration online",
+        "description": "Use desired_digest from GET/PUT desired and current_revision from GET plan. The API remains available while OpenVPN and the broker restart.",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApplyConfigurationRequest"}, "example": {"desired_digest": "489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca", "current_revision": 12, "force": false}}}},
+        "responses": {"200": {"$ref": "#/components/responses/ApplyConfigurationResponse"}, "400": {"$ref": "#/components/responses/BadRequest"}, "401": {"$ref": "#/components/responses/Unauthorized"}, "405": {"$ref": "#/components/responses/MethodNotAllowed"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"$ref": "#/components/responses/UnprocessableEntity"}, "500": {"$ref": "#/components/responses/InternalError"}, "503": {"$ref": "#/components/responses/ServiceUnavailable"}}
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {"bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "ovpn_v1.<uuid>.<secret>", "description": "API key created locally with `ovpn api key create`."}},
+    "parameters": {
+      "ClientID": {"name": "client_id", "in": "path", "required": true, "description": "Complete canonical immutable client UUID; names and UUID prefixes are rejected.", "schema": {"type": "string", "format": "uuid"}, "example": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e"},
+      "EventLines": {"name": "lines", "in": "query", "required": false, "description": "Number of most recent events. Defaults to 100.", "schema": {"type": "integer", "minimum": 0, "maximum": 1000, "default": 100}, "example": 100},
+      "IfMatch": {"name": "If-Match", "in": "header", "required": true, "description": "Exactly one quoted lowercase SHA-256 digest from the previous desired response ETag.", "schema": {"type": "string", "pattern": "^\"[0-9a-f]{64}\"$"}, "example": "\"be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042\""}
+    },
+    "headers": {
+      "RequestID": {"description": "UUID used to correlate the request with server logs.", "schema": {"type": "string", "format": "uuid"}},
+      "NoStore": {"description": "Responses must not be stored.", "schema": {"type": "string", "const": "no-store"}},
+      "ETag": {"description": "Quoted desired configuration SHA-256 digest for If-Match.", "schema": {"type": "string", "pattern": "^\"[0-9a-f]{64}\"$"}},
+      "Location": {"description": "Created client resource path.", "schema": {"type": "string", "pattern": "^/api/v1/clients/[0-9a-f-]{36}$"}},
+      "ContentDisposition": {"description": "Attachment filename derived from the client name.", "schema": {"type": "string", "example": "attachment; filename=alice-laptop.ovpn"}}
+    },
+    "responses": {
+      "HealthResponse": {"description": "API process is alive.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Health"}, "example": {"status": "ok"}}}},
+      "VersionResponse": {"description": "Build and compatibility metadata.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Version"}, "example": {"version": "4.0.2", "data_schema": 4, "commit": "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224", "build_date": "2026-08-19T09:45:40Z", "go_version": "go1.26.5", "dependencies": {"sqlite": "github.com/mattn/go-sqlite3 v1.14.48", "yaml": "go.yaml.in/yaml/v3 v3.0.4"}, "compatibility": {"contract_version": 1, "adapter": "openvpn-2.7", "template_family": "openvpn-2.7", "supported_openvpn_versions": ["2.7.5", "2.7.6"]}}}}},
+      "StateResponse": {"description": "Instance state summary.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/State"}, "example": {"version": 1, "state": "HEALTHY", "data_schema": 4, "instance_id": "bbffeb8c-2d11-4613-874d-b5fcc804a608", "revision": 12, "scanned_at": "2026-08-19T09:55:07Z", "issue_count": 0, "pending_operation_count": 0}}}},
+      "StateDoctorResponse": {"description": "Detailed instance diagnostics. `issues` is omitted when empty.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/State"}, "example": {"version": 1, "state": "DEGRADED_REPAIRABLE", "data_schema": 4, "instance_id": "bbffeb8c-2d11-4613-874d-b5fcc804a608", "revision": 12, "scanned_at": "2026-08-19T09:55:07Z", "issue_count": 1, "pending_operation_count": 0, "issues": [{"id": "DECLARATIVE_CONFIG_UNAVAILABLE", "severity": "repairable", "action": "export-config", "target": "/etc/ovpn-conf/config.yaml", "detail": "declarative configuration is unavailable"}]}}}},
+      "ClientListResponse": {"description": "Client list.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ClientList"}, "example": {"version": 1, "clients": [{"id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e", "name": "alice-laptop", "status": "active", "ipv4": {"mode": "static", "address": "10.42.0.30", "state": "configured"}, "connection": "connected"}]}}}},
+      "ClientResponse": {"description": "Client detail.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Client"}, "example": {"id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e", "name": "alice-laptop", "status": "active", "ipv4": {"mode": "static", "address": "10.42.0.30", "state": "configured"}}}}},
+      "ClientCreatedResponse": {"description": "Client created.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}, "Location": {"$ref": "#/components/headers/Location"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ClientMutation"}, "example": {"version": 1, "operation_id": "7a21e1f8-1ce1-4694-977f-b275eadb8651", "client": {"id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e", "name": "alice-laptop", "status": "active", "ipv4": {"mode": "static", "address": "10.42.0.2", "state": "configured"}}, "kick_required": false, "profile_redistribution_required": true}}}},
+      "ClientMutationResponse": {"description": "Committed client mutation. Runtime convergence is reported separately when required.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ClientMutation"}, "example": {"version": 1, "operation_id": "47260b5b-47dd-4f9b-814f-4803668c5934", "client": {"id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e", "name": "alice-laptop", "status": "revoked", "ipv4": {"mode": "static", "address": "10.42.0.30", "state": "retained"}}, "kick_required": true, "profile_redistribution_required": false, "runtime": {"status": "ok", "result": {"version": 1, "client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e", "client_name": "alice-laptop", "was_connected": true, "disconnected": true, "connections": 1}}}}}},
+      "AddressMutationResponse": {"description": "Committed address mutation and per-client runtime outcomes.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AddressMutation"}, "example": {"version": 1, "operation_id": "d41dbfce-b40e-4672-8a62-cb401f8c099c", "clients": [{"id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e", "name": "alice-laptop", "status": "active", "ipv4": {"mode": "static", "address": "10.42.0.30", "state": "configured"}}], "kick_required": ["c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e"], "runtime": [{"client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e", "status": "ok", "result": {"version": 1, "client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e", "client_name": "alice-laptop", "was_connected": false, "disconnected": false, "connections": 0}}]}}}},
+      "ProfileResponse": {"description": "OpenVPN profile containing private credentials.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}, "Content-Disposition": {"$ref": "#/components/headers/ContentDisposition"}}, "content": {"application/x-openvpn-profile": {"schema": {"type": "string", "format": "binary"}}}},
+      "DisconnectResponse": {"description": "Disconnect outcome, including successful no-op when no session exists.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DisconnectResult"}, "example": {"version": 1, "client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e", "client_name": "alice-laptop", "was_connected": false, "disconnected": false, "connections": 0}}}},
+      "RuntimeResponse": {"description": "OpenVPN runtime status.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RuntimeStatus"}, "example": {"version": 1, "daemon": "running", "management": "connected", "client_count": 1, "clients": [{"client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e", "client_name": "alice-laptop", "remote_address": "203.0.113.10:53210", "virtual_address": "10.42.0.30"}]}}}},
+      "RuntimeEventsResponse": {"description": "Recent structured runtime events.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RuntimeEvents"}, "example": {"version": 1, "events": [{"timestamp": "2026-08-19T09:55:07Z", "event": "client-disconnect", "operation": "runtime.disconnect", "outcome": "success", "client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e", "client_name": "alice-laptop"}]}}}},
+      "AppliedConfigurationResponse": {"description": "Applied revision and normalized configuration.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AppliedConfiguration"}}}},
+      "DesiredConfigurationResponse": {"description": "Desired digest and normalized configuration.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}, "ETag": {"$ref": "#/components/headers/ETag"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DesiredConfiguration"}}}},
+      "ConfigurationPlanResponse": {"description": "Complete desired-to-applied plan.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ConfigurationPlan"}}}},
+      "ApplyConfigurationResponse": {"description": "Apply transaction and runtime activation outcome.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ApplyConfigurationResult"}}}},
+      "BadRequest": {"description": "Malformed path, query, header, media type, body, or JSON.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}, "example": {"error": {"kind": "invalid_json", "message": "request body is invalid", "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"}}}}},
+      "Unauthorized": {"description": "Bearer API key is missing, malformed, unknown, or deleted.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}, "WWW-Authenticate": {"description": "Bearer authentication challenge.", "schema": {"type": "string", "const": "Bearer realm=\"ovpn-api\""}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}, "example": {"error": {"kind": "unauthenticated", "message": "API key is missing or invalid", "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"}}}}},
+      "NotFound": {"description": "Resource or client does not exist.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}, "example": {"error": {"kind": "client_not_found", "message": "client was not found", "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"}}}}},
+      "MethodNotAllowed": {"description": "HTTP method is not accepted; inspect the Allow header.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}, "Allow": {"description": "Accepted methods for the resource.", "schema": {"type": "string", "example": "GET, POST"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}, "example": {"error": {"kind": "method_not_allowed", "message": "method is not allowed", "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"}}}}},
+      "Conflict": {"description": "Digest, revision, state, uniqueness, lock, or recovery conflict.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}, "example": {"error": {"kind": "configuration_conflict", "message": "configuration state changed or is busy", "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"}}}}},
+      "UnprocessableEntity": {"description": "JSON is valid but violates client, IPv4, or configuration semantics.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}, "example": {"error": {"kind": "invalid_client", "message": "client request is not valid for the current state", "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"}}}}},
+      "InternalError": {"description": "Unclassified internal failure with no implementation details exposed.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}, "example": {"error": {"kind": "internal_error", "message": "request could not be completed", "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"}}}}},
+      "ServiceUnavailable": {"description": "Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.", "headers": {"X-Request-ID": {"$ref": "#/components/headers/RequestID"}, "Cache-Control": {"$ref": "#/components/headers/NoStore"}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}, "example": {"error": {"kind": "runtime_unavailable", "message": "OpenVPN runtime is unavailable", "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"}}}}}
+    },
+    "schemas": {
+      "Health": {"type": "object", "additionalProperties": false, "required": ["status"], "properties": {"status": {"type": "string", "const": "ok"}}},
+      "ErrorEnvelope": {"type": "object", "additionalProperties": false, "required": ["error"], "properties": {"error": {"$ref": "#/components/schemas/APIError"}}},
+      "APIError": {"type": "object", "additionalProperties": false, "required": ["kind", "message", "request_id"], "properties": {"kind": {"type": "string", "examples": ["invalid_json", "client_not_found", "configuration_conflict", "runtime_unavailable"]}, "message": {"type": "string"}, "request_id": {"type": "string", "format": "uuid"}}},
+      "Version": {"type": "object", "additionalProperties": false, "required": ["version", "data_schema", "commit", "build_date", "go_version", "dependencies", "compatibility"], "properties": {"version": {"type": "string"}, "data_schema": {"type": "integer"}, "commit": {"type": "string"}, "build_date": {"type": "string"}, "go_version": {"type": "string"}, "dependencies": {"type": "object", "additionalProperties": false, "required": ["sqlite", "yaml"], "properties": {"sqlite": {"type": "string"}, "yaml": {"type": "string"}}}, "compatibility": {"type": "object", "additionalProperties": false, "required": ["contract_version", "adapter", "template_family", "supported_openvpn_versions"], "properties": {"contract_version": {"type": "integer"}, "adapter": {"type": "string"}, "template_family": {"type": "string"}, "supported_openvpn_versions": {"type": "array", "items": {"type": "string"}}}}}},
+      "State": {"type": "object", "additionalProperties": false, "required": ["version", "state", "data_schema", "scanned_at", "issue_count", "pending_operation_count"], "properties": {"version": {"type": "integer", "const": 1}, "state": {"type": "string", "enum": ["EMPTY", "HEALTHY", "DEGRADED_REPAIRABLE", "DEGRADED_RECOVERABLE", "DEGRADED_REISSUABLE", "CRITICAL", "UNRECOVERABLE"]}, "data_schema": {"type": "integer"}, "instance_id": {"type": "string", "format": "uuid"}, "revision": {"type": "integer", "minimum": 1}, "scanned_at": {"type": "string", "format": "date-time"}, "issue_count": {"type": "integer", "minimum": 0}, "pending_operation_count": {"type": "integer", "minimum": 0}, "issues": {"type": "array", "items": {"$ref": "#/components/schemas/StateIssue"}}}},
+      "StateIssue": {"type": "object", "additionalProperties": false, "required": ["id", "severity", "action", "detail"], "properties": {"id": {"type": "string"}, "severity": {"type": "string", "enum": ["repairable", "recoverable", "reissuable", "critical", "unrecoverable"]}, "action": {"type": "string"}, "target": {"type": "string"}, "owner_id": {"type": "string"}, "artifact_kind": {"type": "string"}, "detail": {"type": "string"}}},
+      "IPv4View": {"type": "object", "additionalProperties": false, "required": ["mode", "address", "state"], "properties": {"mode": {"type": "string", "enum": ["none", "static", "dynamic"]}, "address": {"type": ["string", "null"], "format": "ipv4"}, "state": {"type": "string", "enum": ["configured", "retained", "unavailable"]}}},
+      "Client": {"type": "object", "additionalProperties": false, "required": ["id", "name", "status", "ipv4"], "properties": {"id": {"type": "string", "format": "uuid"}, "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"}, "status": {"type": "string", "enum": ["active", "revoked", "deleted"]}, "ipv4": {"$ref": "#/components/schemas/IPv4View"}, "connection": {"type": "string"}}},
+      "ClientList": {"type": "object", "additionalProperties": false, "required": ["version", "clients"], "properties": {"version": {"type": "integer", "const": 1}, "clients": {"type": "array", "items": {"$ref": "#/components/schemas/Client"}}}},
+      "CreateClientRequest": {"type": "object", "additionalProperties": false, "required": ["name", "ipv4"], "properties": {"name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"}, "ipv4": {"type": "string", "description": "auto, dynamic, or a valid static IPv4 address.", "examples": ["auto", "dynamic", "10.42.0.30"]}}},
+      "RenameClientRequest": {"type": "object", "additionalProperties": false, "required": ["name"], "properties": {"name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"}}},
+      "RevokeClientRequest": {"type": "object", "additionalProperties": false, "required": ["release_ipv4"], "properties": {"release_ipv4": {"type": "boolean", "description": "true releases the assignment; false retains it for later release or reissue."}}},
+      "ReissueClientRequest": {"type": "object", "additionalProperties": false, "required": ["ipv4"], "properties": {"ipv4": {"type": "string", "description": "auto, dynamic, or a valid static IPv4 address."}}},
+      "IPv4Request": {"type": "object", "additionalProperties": false, "required": ["mode"], "properties": {"mode": {"type": "string", "enum": ["auto", "dynamic", "static"]}, "address": {"type": "string", "format": "ipv4", "description": "Required only for static mode and forbidden for auto/dynamic."}}},
+      "RuntimeOutcome": {"type": "object", "additionalProperties": false, "required": ["status"], "properties": {"client_id": {"type": "string", "format": "uuid"}, "status": {"type": "string", "enum": ["ok", "unavailable"]}, "result": {"$ref": "#/components/schemas/DisconnectResult"}}},
+      "ClientMutation": {"type": "object", "additionalProperties": false, "required": ["version", "operation_id", "client", "kick_required", "profile_redistribution_required"], "properties": {"version": {"type": "integer", "const": 1}, "operation_id": {"type": "string", "format": "uuid"}, "client": {"$ref": "#/components/schemas/Client"}, "kick_required": {"type": "boolean"}, "profile_redistribution_required": {"type": "boolean"}, "runtime": {"$ref": "#/components/schemas/RuntimeOutcome"}}},
+      "AddressMutation": {"type": "object", "additionalProperties": false, "required": ["version", "operation_id", "clients", "kick_required", "runtime"], "properties": {"version": {"type": "integer", "const": 1}, "operation_id": {"type": "string", "format": "uuid"}, "clients": {"type": "array", "items": {"$ref": "#/components/schemas/Client"}}, "kick_required": {"type": "array", "items": {"type": "string", "format": "uuid"}}, "runtime": {"type": "array", "items": {"$ref": "#/components/schemas/RuntimeOutcome"}}}},
+      "DisconnectResult": {"type": "object", "additionalProperties": false, "required": ["version", "client_id", "client_name", "was_connected", "disconnected", "connections"], "properties": {"version": {"type": "integer", "const": 1}, "client_id": {"type": "string", "format": "uuid"}, "client_name": {"type": "string"}, "was_connected": {"type": "boolean"}, "disconnected": {"type": "boolean"}, "connections": {"type": "integer", "minimum": 0}}},
+      "RuntimeStatus": {"type": "object", "additionalProperties": false, "required": ["version", "daemon", "management", "client_count", "clients"], "properties": {"version": {"type": "integer", "const": 1}, "daemon": {"type": "string", "example": "running"}, "management": {"type": "string", "example": "connected"}, "client_count": {"type": "integer", "minimum": 0}, "clients": {"type": "array", "items": {"$ref": "#/components/schemas/RuntimeClient"}}}},
+      "RuntimeClient": {"type": "object", "additionalProperties": false, "required": ["client_id"], "properties": {"client_id": {"type": "string", "format": "uuid"}, "client_name": {"type": "string"}, "remote_address": {"type": "string"}, "virtual_address": {"type": "string", "format": "ipv4"}}},
+      "RuntimeEvents": {"type": "object", "additionalProperties": false, "required": ["version", "events"], "properties": {"version": {"type": "integer", "const": 1}, "events": {"type": "array", "items": {"$ref": "#/components/schemas/RuntimeEvent"}}}},
+      "RuntimeEvent": {"type": "object", "required": ["timestamp", "event", "operation", "outcome"], "properties": {"timestamp": {"type": "string", "format": "date-time"}, "event": {"type": "string"}, "operation": {"type": "string"}, "outcome": {"type": "string"}, "client_id": {"type": ["string", "null"], "format": "uuid"}, "client_name": {"type": ["string", "null"]}}, "additionalProperties": true},
+      "Configuration": {"type": "object", "additionalProperties": false, "required": ["version", "server", "ipv4", "logging"], "properties": {"version": {"type": "integer", "const": 1}, "server": {"$ref": "#/components/schemas/ServerConfiguration"}, "ipv4": {"$ref": "#/components/schemas/IPv4Configuration"}, "logging": {"$ref": "#/components/schemas/LoggingConfiguration"}}},
+      "ServerConfiguration": {"type": "object", "additionalProperties": false, "required": ["endpoint", "protocol", "family", "port", "client_to_client"], "properties": {"endpoint": {"type": "string", "example": "vpn.example.com"}, "protocol": {"type": "string", "enum": ["udp", "tcp"]}, "family": {"type": "string", "enum": ["auto", "ipv4", "ipv6"]}, "port": {"type": "integer", "minimum": 1, "maximum": 65535}, "client_to_client": {"type": "boolean"}}},
+      "IPv4Configuration": {"type": "object", "additionalProperties": false, "required": ["network", "dynamic_pool_size", "nat_enabled", "nat_interface", "redirect_gateway", "dns", "routes"], "properties": {"network": {"type": "string", "format": "ipv4-cidr", "example": "10.42.0.0/24"}, "dynamic_pool_size": {"type": "integer", "minimum": 0}, "nat_enabled": {"type": "boolean"}, "nat_interface": {"type": "string", "example": "auto"}, "redirect_gateway": {"type": "boolean"}, "dns": {"type": "array", "items": {"type": "string", "format": "ipv4"}}, "routes": {"type": "array", "items": {"type": "string", "format": "ipv4-cidr"}}}},
+      "LoggingConfiguration": {"type": "object", "additionalProperties": false, "required": ["max_bytes", "backups"], "properties": {"max_bytes": {"type": "integer", "minimum": 1}, "backups": {"type": "integer", "minimum": 0}}},
+      "AppliedConfiguration": {"type": "object", "additionalProperties": false, "required": ["revision", "digest", "config"], "properties": {"revision": {"type": "integer", "minimum": 1}, "digest": {"$ref": "#/components/schemas/Digest"}, "config": {"$ref": "#/components/schemas/Configuration"}}, "example": {"revision": 12, "digest": "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042", "config": {"version": 1, "server": {"endpoint": "vpn.example.com", "protocol": "udp", "family": "auto", "port": 1194, "client_to_client": true}, "ipv4": {"network": "10.42.0.0/24", "dynamic_pool_size": 64, "nat_enabled": false, "nat_interface": "auto", "redirect_gateway": false, "dns": [], "routes": []}, "logging": {"max_bytes": 10485760, "backups": 5}}}},
+      "DesiredConfiguration": {"type": "object", "additionalProperties": false, "required": ["digest", "config"], "properties": {"digest": {"$ref": "#/components/schemas/Digest"}, "config": {"$ref": "#/components/schemas/Configuration"}}, "example": {"digest": "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042", "config": {"version": 1, "server": {"endpoint": "vpn.example.com", "protocol": "udp", "family": "auto", "port": 1194, "client_to_client": true}, "ipv4": {"network": "10.42.0.0/24", "dynamic_pool_size": 64, "nat_enabled": false, "nat_interface": "auto", "redirect_gateway": false, "dns": [], "routes": []}, "logging": {"max_bytes": 10485760, "backups": 5}}}},
+      "Digest": {"type": "string", "pattern": "^[0-9a-f]{64}$", "example": "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042"},
+      "ConfigurationChange": {"type": "object", "additionalProperties": false, "required": ["field", "before", "after"], "properties": {"field": {"type": "string", "example": "server.endpoint"}, "before": {}, "after": {}}},
+      "ConfigurationImpact": {"type": "object", "additionalProperties": false, "required": ["restart_required", "address_remap", "firewall_reconcile", "profile_redistribution", "derived_artifacts"], "properties": {"restart_required": {"type": "boolean"}, "address_remap": {"type": "boolean"}, "firewall_reconcile": {"type": "boolean"}, "profile_redistribution": {"type": "boolean"}, "derived_artifacts": {"type": "array", "items": {"type": "string"}}}},
+      "ConfigurationComparison": {"type": "object", "additionalProperties": false, "required": ["initial", "current_revision", "target_revision", "desired_digest", "in_sync", "changes", "impact"], "properties": {"initial": {"type": "boolean"}, "current_revision": {"type": "integer", "minimum": 0}, "target_revision": {"type": "integer", "minimum": 1}, "current_digest": {"$ref": "#/components/schemas/Digest"}, "desired_digest": {"$ref": "#/components/schemas/Digest"}, "in_sync": {"type": "boolean"}, "changes": {"type": "array", "items": {"$ref": "#/components/schemas/ConfigurationChange"}}, "impact": {"$ref": "#/components/schemas/ConfigurationImpact"}}},
+      "ClientRef": {"type": "object", "additionalProperties": false, "required": ["id", "name"], "properties": {"id": {"type": "string", "format": "uuid"}, "name": {"type": "string"}}},
+      "AddressIntent": {"type": "object", "additionalProperties": false, "required": ["mode", "address", "state"], "properties": {"mode": {"type": "string"}, "address": {"type": ["string", "null"], "format": "ipv4"}, "state": {"type": "string"}}},
+      "AddressChange": {"type": "object", "additionalProperties": false, "required": ["client", "before", "after"], "properties": {"client": {"$ref": "#/components/schemas/ClientRef"}, "before": {"$ref": "#/components/schemas/AddressIntent"}, "after": {"$ref": "#/components/schemas/AddressIntent"}}},
+      "ArtifactImpact": {"type": "object", "additionalProperties": false, "required": ["owner_kind", "owner_id", "kind", "key", "action"], "properties": {"owner_kind": {"type": "string"}, "owner_id": {"type": "string"}, "kind": {"type": "string"}, "key": {"type": "string"}, "action": {"type": "string", "enum": ["regenerate", "delete"]}}},
+      "FirewallState": {"type": "object", "additionalProperties": false, "required": ["network", "nat_enabled", "nat_interface", "routes"], "properties": {"network": {"type": "string"}, "nat_enabled": {"type": "boolean"}, "nat_interface": {"type": "string"}, "routes": {"type": "array", "items": {"type": "string"}}}},
+      "FirewallImpact": {"type": "object", "additionalProperties": false, "required": ["reconcile", "before", "after"], "properties": {"reconcile": {"type": "boolean"}, "before": {"oneOf": [{"$ref": "#/components/schemas/FirewallState"}, {"type": "null"}]}, "after": {"oneOf": [{"$ref": "#/components/schemas/FirewallState"}, {"type": "null"}]}}},
+      "ConfigurationPlan": {"type": "object", "additionalProperties": false, "required": ["version", "instance_id", "configuration", "address_changes", "artifacts", "profile_redistribution", "firewall"], "properties": {"version": {"type": "integer", "const": 1}, "instance_id": {"type": "string", "format": "uuid"}, "configuration": {"$ref": "#/components/schemas/ConfigurationComparison"}, "address_changes": {"type": "array", "items": {"$ref": "#/components/schemas/AddressChange"}}, "artifacts": {"type": "array", "items": {"$ref": "#/components/schemas/ArtifactImpact"}}, "profile_redistribution": {"type": "array", "items": {"$ref": "#/components/schemas/ClientRef"}}, "firewall": {"$ref": "#/components/schemas/FirewallImpact"}}, "example": {"version": 1, "instance_id": "bbffeb8c-2d11-4613-874d-b5fcc804a608", "configuration": {"initial": false, "current_revision": 12, "target_revision": 13, "current_digest": "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042", "desired_digest": "489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca", "in_sync": false, "changes": [{"field": "server.endpoint", "before": "vpn.example.com", "after": "vpn-new.example.com"}], "impact": {"restart_required": true, "address_remap": false, "firewall_reconcile": false, "profile_redistribution": true, "derived_artifacts": ["server_config", "client_profiles"]}}, "address_changes": [], "artifacts": [], "profile_redistribution": [], "firewall": {"reconcile": false, "before": null, "after": null}}},
+      "ApplyConfigurationRequest": {"type": "object", "additionalProperties": false, "required": ["desired_digest", "current_revision"], "properties": {"desired_digest": {"$ref": "#/components/schemas/Digest"}, "current_revision": {"type": "integer", "minimum": 1}, "force": {"type": "boolean", "default": false, "description": "Bypasses only confirmed health-preflight warnings; never bypasses schema, CAS, lock, or recovery checks."}}},
+      "ActivationReport": {"type": "object", "additionalProperties": false, "required": ["restart_required", "runtime_restarted", "profile_redistribution"], "properties": {"restart_required": {"type": "boolean"}, "runtime_restarted": {"type": "boolean"}, "profile_redistribution": {"type": "array", "items": {"$ref": "#/components/schemas/ClientRef"}}}},
+      "ApplyConfigurationResult": {"type": "object", "additionalProperties": false, "required": ["version", "applied", "activation", "plan"], "properties": {"version": {"type": "integer", "const": 1}, "applied": {"type": "boolean"}, "operation_id": {"type": "string", "format": "uuid"}, "activation": {"$ref": "#/components/schemas/ActivationReport"}, "plan": {"$ref": "#/components/schemas/ConfigurationPlan"}}, "example": {"version": 1, "applied": true, "operation_id": "5b781e08-3d44-41fb-81db-42edeedc61e1", "activation": {"restart_required": true, "runtime_restarted": true, "profile_redistribution": []}, "plan": {"version": 1, "instance_id": "bbffeb8c-2d11-4613-874d-b5fcc804a608", "configuration": {"initial": false, "current_revision": 12, "target_revision": 13, "current_digest": "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042", "desired_digest": "489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca", "in_sync": false, "changes": [], "impact": {"restart_required": true, "address_remap": false, "firewall_reconcile": false, "profile_redistribution": false, "derived_artifacts": []}}, "address_changes": [], "artifacts": [], "profile_redistribution": [], "firewall": {"reconcile": false, "before": null, "after": null}}}}
+    }
+  }
+}
