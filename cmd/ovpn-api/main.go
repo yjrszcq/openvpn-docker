@@ -10,12 +10,15 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/yjrszcq/openvpn-docker/internal/apikey"
 	"github.com/yjrszcq/openvpn-docker/internal/artifact"
 	clientservice "github.com/yjrszcq/openvpn-docker/internal/client"
 	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
+	configurationservice "github.com/yjrszcq/openvpn-docker/internal/configuration"
+	"github.com/yjrszcq/openvpn-docker/internal/domain"
 	"github.com/yjrszcq/openvpn-docker/internal/httpapi"
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
 	"github.com/yjrszcq/openvpn-docker/internal/pki"
@@ -115,6 +118,29 @@ func newResources(database *storesqlite.Store, instanceID, dataDir string) (http
 		ServerName: initialize.DefaultServerName, Renderer: renderer,
 		Paths: render.Paths{DataDir: dataDir, RuntimeDir: runtimeDir},
 	}
+	configurationQueries, err := configurationservice.NewService(database)
+	if err != nil {
+		return httpapi.Resources{}, err
+	}
+	configPath := environmentOr("OVPN_CONFIG_FILE", configservice.DefaultPath)
+	loadConfigState := func(ctx context.Context, expectedDigest string, expectedRevision uint64) (domain.Config, error) {
+		desired, err := configservice.LoadFile(configPath)
+		if err != nil {
+			return domain.Config{}, err
+		}
+		digest, err := configservice.Digest(desired)
+		if err != nil || digest != expectedDigest {
+			return domain.Config{}, configservice.ErrDesiredConflict
+		}
+		instance, err := database.LoadOnlyInstance(ctx)
+		if err != nil {
+			return domain.Config{}, err
+		}
+		if uint64(instance.Applied.Revision) != expectedRevision {
+			return domain.Config{}, configurationservice.ErrPlanConflict
+		}
+		return desired, nil
+	}
 	return httpapi.Resources{
 		Version: func() httpapi.VersionResponse { return httpapi.NewVersionResponse(contract) },
 		State: func(ctx context.Context) (statecontrol.Report, error) {
@@ -142,6 +168,70 @@ func newResources(database *storesqlite.Store, instanceID, dataDir string) (http
 		},
 		Disconnect: func(ctx context.Context, id, name string) (runtimecontrol.DisconnectResult, error) {
 			return runtimecontrol.Disconnect(ctx, runtimecontrol.SocketPath(runtimeDir), id, name)
+		},
+		Applied: func(ctx context.Context) (configservice.AppliedView, error) {
+			instance, err := database.LoadOnlyInstance(ctx)
+			if err != nil {
+				return configservice.AppliedView{}, err
+			}
+			return configservice.Show(instance.Applied)
+		},
+		Desired: func(context.Context) (configservice.DesiredView, error) { return configservice.LoadDesired(configPath) },
+		PutDesired: func(_ context.Context, expected string, view configservice.View) (configservice.DesiredView, error) {
+			return configservice.UpdateDesiredFile(configPath, expected, view)
+		},
+		ConfigPlan: func(ctx context.Context) (configurationservice.Plan, error) {
+			desired, err := configservice.LoadFile(configPath)
+			if err != nil {
+				return configurationservice.Plan{}, err
+			}
+			return configurationQueries.Plan(ctx, desired)
+		},
+		ConfigApply: func(ctx context.Context, input httpapi.ConfigApplyRequest) (configurationservice.ApplyResult, error) {
+			desired, err := loadConfigState(ctx, input.DesiredDigest, input.CurrentRevision)
+			if err != nil {
+				return configurationservice.ApplyResult{}, err
+			}
+			plan, err := configurationQueries.Plan(ctx, desired)
+			if err != nil {
+				return configurationservice.ApplyResult{}, err
+			}
+			if plan.Configuration.InSync {
+				return configurationservice.ApplyResult{
+					Version: 1,
+					Activation: configurationservice.ActivationReport{
+						ProfileRedistribution: append(make([]configurationservice.ClientRef, 0, len(plan.ProfileRedistribution)), plan.ProfileRedistribution...),
+					},
+					Plan: plan,
+				}, nil
+			}
+			if !input.Force {
+				options := stateOptions
+				options.ConfigFile = ""
+				report := statecontrol.Scan(ctx, options)
+				if report.State != statecontrol.Healthy {
+					return configurationservice.ApplyResult{}, configurationservice.ErrPlanConflict
+				}
+			}
+			session, err := runtimecontrol.BeginApply(ctx, runtimeDir)
+			if err != nil {
+				return configurationservice.ApplyResult{}, err
+			}
+			desired, err = loadConfigState(ctx, input.DesiredDigest, input.CurrentRevision)
+			var result configurationservice.ApplyResult
+			if err == nil {
+				result, err = configurationservice.ApplyPersistent(ctx, desired, renderer, render.Paths{DataDir: dataDir, RuntimeDir: runtimeDir})
+			}
+			resumeCtx, cancelResume := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancelResume()
+			if resumeErr := session.Resume(resumeCtx); resumeErr != nil {
+				return configurationservice.ApplyResult{}, resumeErr
+			}
+			if err == nil {
+				result.Activation.RuntimeRestarted = true
+				result.Activation.RestartRequired = false
+			}
+			return result, err
 		},
 	}, nil
 }

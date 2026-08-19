@@ -15,6 +15,8 @@ import (
 	"github.com/yjrszcq/openvpn-docker/internal/buildinfo"
 	clientservice "github.com/yjrszcq/openvpn-docker/internal/client"
 	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
+	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
+	configurationservice "github.com/yjrszcq/openvpn-docker/internal/configuration"
 	"github.com/yjrszcq/openvpn-docker/internal/domain"
 	runtimecontrol "github.com/yjrszcq/openvpn-docker/internal/runtime"
 	statecontrol "github.com/yjrszcq/openvpn-docker/internal/state"
@@ -49,13 +51,18 @@ type ClientMutator interface {
 }
 
 type Resources struct {
-	Version    func() VersionResponse
-	State      func(context.Context) (statecontrol.Report, error)
-	Clients    ClientReader
-	Mutations  ClientMutator
-	Runtime    func(context.Context) (runtimecontrol.Status, error)
-	Events     func(context.Context, int) ([]runtimecontrol.Event, error)
-	Disconnect func(context.Context, string, string) (runtimecontrol.DisconnectResult, error)
+	Version     func() VersionResponse
+	State       func(context.Context) (statecontrol.Report, error)
+	Clients     ClientReader
+	Mutations   ClientMutator
+	Runtime     func(context.Context) (runtimecontrol.Status, error)
+	Events      func(context.Context, int) ([]runtimecontrol.Event, error)
+	Disconnect  func(context.Context, string, string) (runtimecontrol.DisconnectResult, error)
+	Applied     func(context.Context) (configservice.AppliedView, error)
+	Desired     func(context.Context) (configservice.DesiredView, error)
+	PutDesired  func(context.Context, string, configservice.View) (configservice.DesiredView, error)
+	ConfigPlan  func(context.Context) (configurationservice.Plan, error)
+	ConfigApply func(context.Context, ConfigApplyRequest) (configurationservice.ApplyResult, error)
 }
 
 type VersionResponse struct {
@@ -122,6 +129,21 @@ func NewHandler(authenticator Authenticator, allowedOrigins []string, resources 
 	if resources.Disconnect != nil && resources.Clients == nil {
 		return nil, errors.New("API disconnect requires client queries")
 	}
+	configurationResources := 0
+	for _, available := range []bool{
+		resources.Applied != nil,
+		resources.Desired != nil,
+		resources.PutDesired != nil,
+		resources.ConfigPlan != nil,
+		resources.ConfigApply != nil,
+	} {
+		if available {
+			configurationResources++
+		}
+	}
+	if configurationResources != 0 && configurationResources != 5 {
+		return nil, errors.New("API configuration resources must be provided together")
+	}
 	origins := make(map[string]struct{}, len(allowedOrigins))
 	for _, origin := range allowedOrigins {
 		if err := validateOrigin(origin); err != nil {
@@ -170,6 +192,9 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 	ctx = auditactor.With(ctx, auditactor.Actor{Kind: "api-key", ID: key.ID})
 	request = request.WithContext(ctx)
 	if handler.routeMutation(response, request, requestID) {
+		return
+	}
+	if handler.routeConfiguration(response, request, requestID) {
 		return
 	}
 	handler.routeRead(response, request, requestID)
