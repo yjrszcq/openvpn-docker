@@ -17,7 +17,7 @@ docker compose run --rm openvpn-maintenance state doctor
 
 两个服务必须使用相同目标镜像，并挂载同一个 `./data` 和 `./config`。
 
-远程自动化只能在在线服务启用 REST API v1。API 默认关闭，应绑定 loopback 并置于 HTTPS 后面；详见 [REST API 指南](api.md)。API key 仍只能通过本地 CLI 管理。
+远程自动化只能在在线服务启用 REST API v1。API 默认关闭，应绑定 loopback 并置于 HTTPS 后面；详见 [REST API 指南](rest-api.md)。API key 仍只能通过本地 CLI 管理。
 
 在线 CLI 示例使用 `docker exec openvpn`，因为 Compose 固定了 `container_name: openvpn`。如果修改该值，需要替换为实际容器名。maintenance 流程仍使用 `docker compose run --rm openvpn-maintenance`。
 

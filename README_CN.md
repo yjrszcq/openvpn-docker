@@ -16,7 +16,7 @@
 
 当前不提供 Web UI、TAP、LDAP/RADIUS/OIDC、Kubernetes、PostgreSQL/MySQL 或 HA。
 
-REST API v1 默认关闭，适合由独立前端或自动化客户端通过 HTTPS 反向代理访问。详见 [REST API 指南](docs/cn/v4/api.md)。
+REST API v1 默认关闭，适合由独立前端或自动化客户端通过 HTTPS 反向代理访问。详见 [REST API 指南](docs/cn/v4/rest-api.md)。
 
 ## 快速开始
 
@@ -224,6 +224,7 @@ docker compose start
 
 - [命令参考](docs/cn/v4/commands.md)
 - [操作手册](docs/cn/v4/operations.md)
+- [REST API 指南](docs/cn/v4/rest-api.md)
 - [数据升级与迁移政策](docs/cn/data-schema-upgrade-policy.md)
 - [镜像更新政策](docs/cn/image-update-policy.md)
 - 历史版本：[v1](docs/cn/v1/commands.md)、[v2](docs/cn/v2/commands.md)、[v3](docs/cn/v3/commands.md)

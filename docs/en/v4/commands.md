@@ -170,7 +170,7 @@ ovpn api key delete (NAME|--name|-n NAME|--id|-i ID) [--yes|-y] [--json|-j]
 
 `create` reveals the full Bearer key once. A file output is created mode `0600` and never overwrites an existing path. `list` returns only UUID, name, and creation time. `delete` requires confirmation or `--yes` and invalidates subsequent authentication immediately. Key secrets and digests never appear in list or delete output.
 
-API keys are local administrative credentials, not client certificates. They can be managed only through this CLI, not through REST. See the [REST API guide](api.md) for enabling the listener, authentication, endpoints, configuration concurrency, and security boundaries.
+API keys are local administrative credentials, not client certificates. They can be managed only through this CLI, not through REST. See the [REST API guide](rest-api.md) for enabling the listener, authentication, endpoints, configuration concurrency, and security boundaries.
 
 ## Server commands
 

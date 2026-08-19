@@ -16,7 +16,7 @@ This image runs OpenVPN Community Edition with a Go control plane and SQLite sta
 
 The project does not currently provide a web UI, TAP, LDAP/RADIUS/OIDC, Kubernetes integration, PostgreSQL/MySQL storage, or HA coordination.
 
-REST API v1 is disabled by default and intended for a separate frontend or automation client behind an HTTPS reverse proxy. See the [REST API guide](docs/en/v4/api.md).
+REST API v1 is disabled by default and intended for a separate frontend or automation client behind an HTTPS reverse proxy. See the [REST API guide](docs/en/v4/rest-api.md).
 
 ## Quick start
 
@@ -226,6 +226,7 @@ Restore into empty target directories while the service is stopped, preserve own
 
 - [command reference](docs/en/v4/commands.md)
 - [operations guide](docs/en/v4/operations.md)
+- [REST API guide](docs/en/v4/rest-api.md)
 - [data upgrade and migration policy](docs/en/data-schema-upgrade-policy.md)
 - [image update policy](docs/en/image-update-policy.md)
 - Historical references: [v1](docs/en/v1/commands.md), [v2](docs/en/v2/commands.md), and [v3](docs/en/v3/commands.md)

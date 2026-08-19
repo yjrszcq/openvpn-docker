@@ -19,7 +19,7 @@ docker compose run --rm openvpn-maintenance state doctor
 
 Both services must use the same target image and mount the same `./data` and `./config` directories.
 
-Remote automation can enable REST API v1 only on the live service. It is disabled by default and should be bound to loopback behind HTTPS; see the [REST API guide](api.md). API keys remain local-CLI-managed credentials.
+Remote automation can enable REST API v1 only on the live service. It is disabled by default and should be bound to loopback behind HTTPS; see the [REST API guide](rest-api.md). API keys remain local-CLI-managed credentials.
 
 Live CLI examples use `docker exec openvpn` because the Compose service fixes `container_name: openvpn`. Substitute the actual container name if you change it. Maintenance workflows continue to use `docker compose run --rm openvpn-maintenance`.
 

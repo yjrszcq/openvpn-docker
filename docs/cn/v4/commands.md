@@ -168,7 +168,7 @@ ovpn api key delete (NAME|--name|-n NAME|--id|-i ID) [--yes|-y] [--json|-j]
 
 `create` 只显示一次完整 Bearer key。文件输出以 mode `0600` 创建，并拒绝覆盖已有路径。`list` 只返回 UUID、名称和创建时间。`delete` 需要交互确认或 `--yes`，并立即使后续认证失效。list 和 delete 输出都不会包含 key secret 或 digest。
 
-API key 是本地管理凭据，不是客户端证书；只能通过该 CLI 管理，不能通过 REST 管理。监听启用、认证、endpoint、配置并发和安全边界见 [REST API 指南](api.md)。
+API key 是本地管理凭据，不是客户端证书；只能通过该 CLI 管理，不能通过 REST 管理。监听启用、认证、endpoint、配置并发和安全边界见 [REST API 指南](rest-api.md)。
 
 ## Server 命令
 
