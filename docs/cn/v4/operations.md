@@ -4,7 +4,7 @@
 
 ## 运行环境约定
 
-- `openvpn`：在线服务，拥有 `/dev/net/tun`、`NET_ADMIN`、management broker 和 OpenVPN。
+- `openvpn`：在线服务，拥有 `/dev/net/tun`、`NET_ADMIN`、management broker、OpenVPN 和可选 REST API。
 - `openvpn-maintenance`：挂载相同数据与 YAML 的 one-shot CLI，不请求 TUN 或 `NET_ADMIN`，并设置 `OVPN_MAINTENANCE=true`。
 
 ```bash
@@ -17,13 +17,15 @@ docker compose run --rm openvpn-maintenance state doctor
 
 两个服务必须使用相同目标镜像，并挂载同一个 `./data` 和 `./config`。
 
+远程自动化只能在在线服务启用 REST API v1。API 默认关闭，应绑定 loopback 并置于 HTTPS 后面；详见 [REST API 指南](rest-api.md)。API key 仍只能通过本地 CLI 管理。
+
 在线 CLI 示例使用 `docker exec openvpn`，因为 Compose 固定了 `container_name: openvpn`。如果修改该值，需要替换为实际容器名。maintenance 流程仍使用 `docker compose run --rm openvpn-maintenance`。
 
 在 `docker-compose.yaml` 中将以下服务添加到 `openvpn` 旁边。它有意不配置 `devices`、`cap_add` 或端口映射：
 
 ```yaml
   openvpn-maintenance:
-    image: szcq/openvpn:2.7.5
+    image: szcq/openvpn:latest
     restart: "no"
     network_mode: host
     environment:

@@ -11,6 +11,7 @@ import (
 
 	"github.com/yjrszcq/openvpn-docker/internal/apperror"
 	"github.com/yjrszcq/openvpn-docker/internal/artifact"
+	"github.com/yjrszcq/openvpn-docker/internal/auditactor"
 	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
 	configurationservice "github.com/yjrszcq/openvpn-docker/internal/configuration"
@@ -187,7 +188,7 @@ func runConfigApply(args []string, stdout, stderr io.Writer) int {
 	}
 	dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
 	runtimeDir := environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)
-	ctx := context.Background()
+	ctx := auditactor.LocalCLI(context.Background())
 	var session *runtimecontrol.ApplySession
 	if os.Getenv("OVPN_MAINTENANCE") != "true" {
 		session, err = runtimecontrol.BeginApply(ctx, runtimeDir)

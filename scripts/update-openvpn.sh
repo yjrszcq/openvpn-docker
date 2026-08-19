@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSIONS_ENV="${OVPN_VERSIONS_ENV:-$ROOT_DIR/versions.env}"
+COMPATIBILITY_FILE="${OVPN_COMPATIBILITY_FILE:-$ROOT_DIR/compatibility/contract.json}"
 CURL_BIN="${OPENVPN_UPDATE_CURL:-curl}"
 
 usage() {
@@ -23,6 +24,14 @@ fi
   echo "versions file is unreadable: $VERSIONS_ENV" >&2
   exit 66
 }
+[ -r "$COMPATIBILITY_FILE" ] || {
+  echo "compatibility file is unreadable: $COMPATIBILITY_FILE" >&2
+  exit 66
+}
+command -v jq >/dev/null 2>&1 || {
+  echo 'jq is required to update the compatibility contract' >&2
+  exit 69
+}
 
 if [ -z "$source_sha256" ]; then
   temporary_archive="$(mktemp)"
@@ -38,6 +47,7 @@ if ! [[ "$source_sha256" =~ ^[[:xdigit:]]{64}$ ]]; then
 fi
 
 temporary_versions="$VERSIONS_ENV.tmp"
+temporary_compatibility="$COMPATIBILITY_FILE.tmp"
 awk -v version="$version" -v source_sha256="$source_sha256" '
   $0 ~ /^OPENVPN_VERSION=/ {
     print "OPENVPN_VERSION=" version
@@ -60,5 +70,17 @@ awk -v version="$version" -v source_sha256="$source_sha256" '
   echo 'versions file must define OPENVPN_VERSION and OPENVPN_SOURCE_SHA256' >&2
   exit 65
 }
+jq --arg version "$version" '
+  if (.supported_openvpn_versions | type) != "array" then
+    error("supported_openvpn_versions must be an array")
+  else
+    .supported_openvpn_versions = [$version]
+  end
+' "$COMPATIBILITY_FILE" >"$temporary_compatibility" || {
+  rm -f "$temporary_versions" "$temporary_compatibility"
+  echo 'compatibility file must be valid JSON with supported_openvpn_versions' >&2
+  exit 65
+}
+mv "$temporary_compatibility" "$COMPATIBILITY_FILE"
 mv "$temporary_versions" "$VERSIONS_ENV"
-printf 'updated OpenVPN source to %s\n' "$version"
+printf 'updated OpenVPN source and compatibility contract to %s\n' "$version"

@@ -73,7 +73,7 @@ grep -Fq 'broker configuration is invalid' <<<"$broker_error"
 test "$(docker image inspect "$IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')" = "$IMAGE_VERSION"
 test "$(docker image inspect "$IMAGE" --format '{{ index .Config.Labels "org.opencontainers.image.licenses" }}')" = GPL-2.0-only
 
-for binary in /usr/local/bin/ovpn /usr/local/bin/ovpn-broker; do
+for binary in /usr/local/bin/ovpn /usr/local/bin/ovpn-broker /usr/local/bin/ovpn-api; do
   ldd_output="$(docker run --rm --entrypoint ldd "$IMAGE" "$binary")"
   if grep -Fq 'not found' <<<"$ldd_output"; then
     printf '%s\n' "$ldd_output" >&2
@@ -90,6 +90,7 @@ docker run --rm --entrypoint sh "$IMAGE" -ec '
   ! command -v python3 >/dev/null
   test "$(readlink /usr/local/bin/docker-entrypoint)" = ovpn
   test "$(readlink /usr/local/bin/ovpn-hook)" = ovpn
+  test -x /usr/local/bin/ovpn-api
   test ! -e /usr/local/lib/openvpn-container/go
   test ! -e /usr/local/lib/openvpn-container
   test ! -e /usr/local/share/openvpn-container/build-info.json

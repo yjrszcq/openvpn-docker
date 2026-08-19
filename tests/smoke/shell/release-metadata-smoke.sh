@@ -6,7 +6,7 @@ TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 OUTPUT="$("$ROOT_DIR/scripts/verify-release-metadata.sh")"
 
-grep -Fqx 'image_version=4.0.2' <<<"$OUTPUT"
+grep -Fqx 'image_version=4.1.0' <<<"$OUTPUT"
 grep -Fqx 'data_schema=4' <<<"$OUTPUT"
 grep -Fqx 'go_version=1.26.5' <<<"$OUTPUT"
 grep -Fqx 'sqlite=github.com/mattn/go-sqlite3 v1.14.48; license=MIT' <<<"$OUTPUT"

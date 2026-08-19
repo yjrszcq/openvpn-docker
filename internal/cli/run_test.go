@@ -27,7 +27,7 @@ func TestHelpShowsPlannedGroups(t *testing.T) {
 	if code != 0 || stderr != "" {
 		t.Fatalf("help code=%d stderr=%q", code, stderr)
 	}
-	for _, group := range []string{"server", "config", "client", "state", "repair", "migrate", "runtime", "completion", "version"} {
+	for _, group := range []string{"api", "server", "config", "client", "state", "repair", "migrate", "runtime", "completion", "version"} {
 		if !strings.Contains(stdout, group) {
 			t.Errorf("help is missing %q", group)
 		}
@@ -43,6 +43,7 @@ func TestNestedHelp(t *testing.T) {
 
 func TestHelpFormsShareDetailedLeafOutput(t *testing.T) {
 	paths := [][]string{
+		{"api", "key", "create"},
 		{"server", "init"},
 		{"config", "apply"},
 		{"client", "create"},
@@ -72,6 +73,7 @@ func TestHelpFormsShareDetailedLeafOutput(t *testing.T) {
 
 func TestEveryCommandHasUsefulHelp(t *testing.T) {
 	paths := [][]string{
+		{"api"}, {"api", "key"}, {"api", "key", "create"}, {"api", "key", "list"}, {"api", "key", "delete"},
 		{"server"}, {"server", "init"}, {"server", "run"}, {"server", "render"},
 		{"config"}, {"config", "validate"}, {"config", "show"}, {"config", "export"}, {"config", "plan"}, {"config", "apply"},
 		{"client"}, {"client", "create"}, {"client", "list"}, {"client", "export"}, {"client", "rename"}, {"client", "revoke"}, {"client", "reissue"}, {"client", "delete"},
@@ -102,19 +104,19 @@ func TestVersionJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &info); err != nil {
 		t.Fatalf("decode version JSON: %v", err)
 	}
-	if info.Version != "4.0.2" || info.DataSchema != 4 || info.GoVersion == "" || info.Dependencies.SQLite == "" || info.Dependencies.YAML == "" {
+	if info.Version != "4.1.0" || info.DataSchema != 4 || info.GoVersion == "" || info.Dependencies.SQLite == "" || info.Dependencies.YAML == "" {
 		t.Fatalf("unexpected version info: %+v", info)
 	}
 }
 
 func TestTopLevelVersionAliases(t *testing.T) {
 	code, stdout, stderr := run("-v")
-	if code != 0 || strings.TrimSpace(stdout) != "4.0.2" || stderr != "" {
+	if code != 0 || strings.TrimSpace(stdout) != "4.1.0" || stderr != "" {
 		t.Fatalf("short alias code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	for _, alias := range []string{"-V", "--version"} {
 		code, aliasOutput, aliasError := run(alias)
-		if code != 0 || aliasError != "" || !strings.Contains(aliasOutput, "ovpn 4.0.2") || !strings.Contains(aliasOutput, "data schema: 4") {
+		if code != 0 || aliasError != "" || !strings.Contains(aliasOutput, "ovpn 4.1.0") || !strings.Contains(aliasOutput, "data schema: 4") {
 			t.Errorf("alias %s code=%d stdout=%q stderr=%q", alias, code, aliasOutput, aliasError)
 		}
 	}
@@ -294,13 +296,13 @@ func TestServerRunUsageAndMissingState(t *testing.T) {
 func TestEntrypointDispatchesOVPNAndDefaultCommands(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cli.RunEntrypoint([]string{"ovpn", "version", "--short"}, &stdout, &stderr)
-	if code != 0 || strings.TrimSpace(stdout.String()) != "4.0.2" || stderr.Len() != 0 {
+	if code != 0 || strings.TrimSpace(stdout.String()) != "4.1.0" || stderr.Len() != 0 {
 		t.Fatalf("ovpn entrypoint code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	stdout.Reset()
 	stderr.Reset()
 	code = cli.RunEntrypoint([]string{"version", "--short"}, &stdout, &stderr)
-	if code != 0 || strings.TrimSpace(stdout.String()) != "4.0.2" || stderr.Len() != 0 {
+	if code != 0 || strings.TrimSpace(stdout.String()) != "4.1.0" || stderr.Len() != 0 {
 		t.Fatalf("default entrypoint code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }

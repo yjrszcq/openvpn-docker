@@ -1,7 +1,7 @@
 {
   "version": 1,
   "supported_openvpn_versions": [
-    "2.7.5"
+    "2.7.6"
   ],
   "adapter": {
     "name": "openvpn-2.7",

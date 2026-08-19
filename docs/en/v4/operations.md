@@ -6,7 +6,7 @@ Persistent compatibility follows the [data schema upgrade policy](../data-schema
 
 ## Runtime conventions
 
-- `openvpn`: live service with `/dev/net/tun`, `NET_ADMIN`, the management broker, and OpenVPN.
+- `openvpn`: live service with `/dev/net/tun`, `NET_ADMIN`, the management broker, OpenVPN, and the optional REST API.
 - `openvpn-maintenance`: one-shot CLI container mounting the same data and YAML without TUN or `NET_ADMIN`. It sets `OVPN_MAINTENANCE=true`.
 
 ```bash
@@ -19,13 +19,15 @@ docker compose run --rm openvpn-maintenance state doctor
 
 Both services must use the same target image and mount the same `./data` and `./config` directories.
 
+Remote automation can enable REST API v1 only on the live service. It is disabled by default and should be bound to loopback behind HTTPS; see the [REST API guide](rest-api.md). API keys remain local-CLI-managed credentials.
+
 Live CLI examples use `docker exec openvpn` because the Compose service fixes `container_name: openvpn`. Substitute the actual container name if you change it. Maintenance workflows continue to use `docker compose run --rm openvpn-maintenance`.
 
 Add the following service next to `openvpn` in `docker-compose.yaml`. It deliberately has no `devices`, `cap_add`, or published ports:
 
 ```yaml
   openvpn-maintenance:
-    image: szcq/openvpn:2.7.5
+    image: szcq/openvpn:latest
     restart: "no"
     network_mode: host
     environment:

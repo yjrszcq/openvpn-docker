@@ -51,6 +51,14 @@ for variable in "${bootstrap_variables[@]}"; do
   printf '%s\n' "$openvpn_service" | grep -Fq "$variable:"
   grep -Eq "^${variable}=" "$ROOT_DIR/.env.example"
 done
+for variable in OVPN_API_LISTEN OVPN_API_CORS_ORIGINS; do
+  printf '%s\n' "$openvpn_service" | grep -Fq "$variable:"
+  grep -Eq "^${variable}=" "$ROOT_DIR/.env.example"
+  if printf '%s\n' "$maintenance_service" | grep -Fq "$variable:"; then
+    echo "maintenance service must not expose API variable $variable" >&2
+    exit 1
+  fi
+done
 printf '%s\n' "$openvpn_service" | grep -Fq 'OVPN_BOOTSTRAP_FROM_ENV: "false"'
 for variable in OVPN_ENDPOINT OVPN_NETWORK OVPN_TOPOLOGY OVPN_DYNAMIC_POOL_SIZE OVPN_LOG_MAX_BYTES OVPN_CRITICAL_MODE; do
   if printf '%s\n' "$openvpn_service" | grep -Fq "$variable:"; then
@@ -69,7 +77,7 @@ printf '%s\n' "$maintenance_service" | grep -Fq 'entrypoint:'
 printf '%s\n' "$maintenance_service" | grep -Fq -- '- /usr/local/bin/ovpn'
 printf '%s\n' "$maintenance_service" | grep -Fq 'command:'
 printf '%s\n' "$maintenance_service" | grep -Fq -- '- doctor'
-printf '%s\n' "$maintenance_service" | grep -Fq 'restart: "no"'
+printf '%s\n' "$maintenance_service" | grep -Eq "restart: ['\"]no['\"]"
 printf '%s\n' "$maintenance_service" | grep -Fq 'OVPN_MAINTENANCE: "true"'
 printf '%s\n' "$maintenance_service" | grep -Fq 'network_mode: host'
 printf '%s\n' "$maintenance_service" | grep -Fq '/etc/ovpn-conf'

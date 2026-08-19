@@ -103,7 +103,6 @@ YAML
     --network "$network" \
     --cap-add NET_ADMIN \
     --device /dev/net/tun \
-    -e OVPN_IPTABLES_BIN=iptables-legacy \
     -v "$data_dir:/etc/openvpn" \
     -v "$config_dir:/etc/ovpn-conf:ro" \
     "$IMAGE" >"$protocol_dir/server.id"

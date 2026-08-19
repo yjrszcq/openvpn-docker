@@ -86,6 +86,18 @@ func (service *Service) List(ctx context.Context) (ListResult, error) {
 	return ListResult{Version: 1, Clients: views}, nil
 }
 
+// Get returns one current client selected by its complete immutable UUID.
+func (service *Service) Get(ctx context.Context, id string) (View, error) {
+	if !domain.ValidUUID(id) {
+		return View{}, ErrInvalidRequest
+	}
+	_, state, err := service.Select(ctx, Selector{IDPrefix: id})
+	if err != nil {
+		return View{}, err
+	}
+	return newView(state), nil
+}
+
 func (service *Service) Select(ctx context.Context, selector Selector) (storesqlite.InstanceState, storesqlite.ClientState, error) {
 	instance, clients, err := service.load(ctx)
 	if err != nil {

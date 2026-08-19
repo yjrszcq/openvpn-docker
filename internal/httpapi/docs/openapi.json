@@ -1,0 +1,3533 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenVPN Docker Management API",
+    "version": "1.0.0",
+    "description": "Authenticated REST API for frontend management of clients, runtime state, diagnostics, and declarative configuration. Except for health and documentation, send the API key as Authorization: Bearer <key>."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Current ovpn-api origin"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "System",
+      "description": "Process health, build metadata, and instance diagnostics."
+    },
+    {
+      "name": "Clients",
+      "description": "Client credentials, profiles, IPv4 intent, and active sessions."
+    },
+    {
+      "name": "Runtime",
+      "description": "OpenVPN daemon status and structured event history."
+    },
+    {
+      "name": "Configuration",
+      "description": "Optimistic-concurrency desired configuration workflow."
+    }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": [
+          "System"
+        ],
+        "summary": "Check API process liveness",
+        "description": "Unauthenticated liveness check. It does not report OpenVPN or storage health.",
+        "security": [],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/HealthResponse"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          }
+        }
+      }
+    },
+    "/api/v1/version": {
+      "get": {
+        "operationId": "getVersion",
+        "tags": [
+          "System"
+        ],
+        "summary": "Read build and compatibility metadata",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/VersionResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/state": {
+      "get": {
+        "operationId": "getState",
+        "tags": [
+          "System"
+        ],
+        "summary": "Read instance health summary",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/StateResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/state/doctor": {
+      "get": {
+        "operationId": "getStateDoctor",
+        "tags": [
+          "System"
+        ],
+        "summary": "Read detailed instance diagnostics",
+        "description": "Returns the state summary plus an issues array when diagnostic issues exist.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/StateDoctorResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/clients": {
+      "get": {
+        "operationId": "listClients",
+        "tags": [
+          "Clients"
+        ],
+        "summary": "List active, revoked, and deleted clients",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ClientListResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createClient",
+        "tags": [
+          "Clients"
+        ],
+        "summary": "Create client credentials and profile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateClientRequest"
+              },
+              "example": {
+                "name": "alice-laptop",
+                "ipv4": "auto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ClientCreatedResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/clients/{client_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ClientID"
+        }
+      ],
+      "get": {
+        "operationId": "getClient",
+        "tags": [
+          "Clients"
+        ],
+        "summary": "Read one client",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ClientResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "renameClient",
+        "tags": [
+          "Clients"
+        ],
+        "summary": "Rename a client",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameClientRequest"
+              },
+              "example": {
+                "name": "alice-notebook"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RenamedClientResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteClient",
+        "tags": [
+          "Clients"
+        ],
+        "summary": "Delete local client credentials",
+        "description": "Requires an empty body. The immutable client UUID tombstone remains in authoritative state.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/DeletedClientResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/clients/{client_id}/profile": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ClientID"
+        }
+      ],
+      "get": {
+        "operationId": "downloadClientProfile",
+        "tags": [
+          "Clients"
+        ],
+        "summary": "Download an OpenVPN client profile",
+        "description": "The response contains a private key and must be handled as a credential.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ProfileResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/clients/{client_id}/revoke": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ClientID"
+        }
+      ],
+      "post": {
+        "operationId": "revokeClient",
+        "tags": [
+          "Clients"
+        ],
+        "summary": "Revoke client credentials",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeClientRequest"
+              },
+              "example": {
+                "release_ipv4": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ClientMutationResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/clients/{client_id}/reissue": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ClientID"
+        }
+      ],
+      "post": {
+        "operationId": "reissueClient",
+        "tags": [
+          "Clients"
+        ],
+        "summary": "Reissue client credentials and profile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReissueClientRequest"
+              },
+              "example": {
+                "ipv4": "dynamic"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ReissuedClientResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/clients/{client_id}/ipv4": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ClientID"
+        }
+      ],
+      "put": {
+        "operationId": "setClientIPv4",
+        "tags": [
+          "Clients"
+        ],
+        "summary": "Set client IPv4 intent",
+        "description": "Use auto or dynamic without address. Use static with an address from the configured static region.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IPv4Request"
+              },
+              "examples": {
+                "automatic": {
+                  "value": {
+                    "mode": "auto"
+                  }
+                },
+                "dynamic": {
+                  "value": {
+                    "mode": "dynamic"
+                  }
+                },
+                "static": {
+                  "value": {
+                    "mode": "static",
+                    "address": "10.42.0.30"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AddressMutationResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "releaseClientIPv4",
+        "tags": [
+          "Clients"
+        ],
+        "summary": "Release a revoked client's retained IPv4",
+        "description": "Requires an empty body and is valid only for a revoked client with a retained assignment.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ReleasedIPv4Response"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/clients/{client_id}/disconnect": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ClientID"
+        }
+      ],
+      "post": {
+        "operationId": "disconnectClient",
+        "tags": [
+          "Clients"
+        ],
+        "summary": "Disconnect current client sessions",
+        "description": "Requires an empty body. A client with no active session returns 200 with was_connected=false.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/DisconnectResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/runtime": {
+      "get": {
+        "operationId": "getRuntime",
+        "tags": [
+          "Runtime"
+        ],
+        "summary": "Read OpenVPN runtime status and sessions",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RuntimeResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/runtime/events": {
+      "get": {
+        "operationId": "getRuntimeEvents",
+        "tags": [
+          "Runtime"
+        ],
+        "summary": "Read recent structured runtime events",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EventLines"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RuntimeEventsResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/config/applied": {
+      "get": {
+        "operationId": "getAppliedConfiguration",
+        "tags": [
+          "Configuration"
+        ],
+        "summary": "Read the applied configuration revision",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AppliedConfigurationResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/config/desired": {
+      "get": {
+        "operationId": "getDesiredConfiguration",
+        "tags": [
+          "Configuration"
+        ],
+        "summary": "Read desired configuration and CAS digest",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/DesiredConfigurationResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      },
+      "put": {
+        "operationId": "putDesiredConfiguration",
+        "tags": [
+          "Configuration"
+        ],
+        "summary": "Replace desired configuration with CAS",
+        "description": "Send the previous desired digest as a quoted If-Match value and the complete normalized configuration as the body.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Configuration"
+              },
+              "example": {
+                "version": 1,
+                "server": {
+                  "endpoint": "vpn.example.com",
+                  "protocol": "udp",
+                  "family": "auto",
+                  "port": 1194,
+                  "client_to_client": true
+                },
+                "ipv4": {
+                  "network": "10.42.0.0/24",
+                  "dynamic_pool_size": 64,
+                  "nat_enabled": false,
+                  "nat_interface": "auto",
+                  "redirect_gateway": false,
+                  "dns": [
+                    "1.1.1.1"
+                  ],
+                  "routes": [
+                    "10.20.0.0/16"
+                  ]
+                },
+                "logging": {
+                  "max_bytes": 10485760,
+                  "backups": 5
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/DesiredConfigurationResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/config/plan": {
+      "get": {
+        "operationId": "getConfigurationPlan",
+        "tags": [
+          "Configuration"
+        ],
+        "summary": "Plan desired-to-applied changes",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ConfigurationPlanResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/config/apply": {
+      "post": {
+        "operationId": "applyConfiguration",
+        "tags": [
+          "Configuration"
+        ],
+        "summary": "Apply the current desired configuration online",
+        "description": "Use desired_digest from GET/PUT desired and current_revision from GET plan. The API remains available while OpenVPN and the broker restart.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyConfigurationRequest"
+              },
+              "example": {
+                "desired_digest": "489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca",
+                "current_revision": 12,
+                "force": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ApplyConfigurationResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "405": {
+            "$ref": "#/components/responses/MethodNotAllowed"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "ovpn_v1.<uuid>.<secret>",
+        "description": "API key created locally with `ovpn api key create`."
+      }
+    },
+    "parameters": {
+      "ClientID": {
+        "name": "client_id",
+        "in": "path",
+        "required": true,
+        "description": "Complete canonical immutable client UUID; names and UUID prefixes are rejected.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "example": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e"
+      },
+      "EventLines": {
+        "name": "lines",
+        "in": "query",
+        "required": false,
+        "description": "Number of most recent events. Defaults to 100.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 100
+        },
+        "example": 100
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": true,
+        "description": "Exactly one quoted lowercase SHA-256 digest from the previous desired response ETag.",
+        "schema": {
+          "type": "string",
+          "pattern": "^\"[0-9a-f]{64}\"$"
+        },
+        "example": "\"be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042\""
+      }
+    },
+    "headers": {
+      "RequestID": {
+        "description": "UUID used to correlate the request with server logs.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "NoStore": {
+        "description": "Responses must not be stored.",
+        "schema": {
+          "type": "string",
+          "const": "no-store"
+        }
+      },
+      "ETag": {
+        "description": "Quoted desired configuration SHA-256 digest for If-Match.",
+        "schema": {
+          "type": "string",
+          "pattern": "^\"[0-9a-f]{64}\"$"
+        }
+      },
+      "Location": {
+        "description": "Created client resource path.",
+        "schema": {
+          "type": "string",
+          "pattern": "^/api/v1/clients/[0-9a-f-]{36}$"
+        }
+      },
+      "ContentDisposition": {
+        "description": "Attachment filename derived from the client name.",
+        "schema": {
+          "type": "string",
+          "example": "attachment; filename=alice-laptop.ovpn"
+        }
+      }
+    },
+    "responses": {
+      "HealthResponse": {
+        "description": "API process is alive.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Health"
+            },
+            "example": {
+              "status": "ok"
+            }
+          }
+        }
+      },
+      "VersionResponse": {
+        "description": "Build and compatibility metadata.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Version"
+            },
+            "example": {
+              "version": "4.1.0",
+              "data_schema": 4,
+              "commit": "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224",
+              "build_date": "2026-08-19T09:45:40Z",
+              "go_version": "go1.26.5",
+              "dependencies": {
+                "sqlite": "github.com/mattn/go-sqlite3 v1.14.48",
+                "yaml": "go.yaml.in/yaml/v3 v3.0.4"
+              },
+              "compatibility": {
+                "contract_version": 1,
+                "adapter": "openvpn-2.7",
+                "template_family": "openvpn-2.7",
+                "supported_openvpn_versions": [
+                  "2.7.6"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "StateResponse": {
+        "description": "Instance state summary.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/State"
+            },
+            "example": {
+              "version": 1,
+              "state": "HEALTHY",
+              "data_schema": 4,
+              "instance_id": "bbffeb8c-2d11-4613-874d-b5fcc804a608",
+              "revision": 12,
+              "scanned_at": "2026-08-19T09:55:07Z",
+              "issue_count": 0,
+              "pending_operation_count": 0
+            }
+          }
+        }
+      },
+      "StateDoctorResponse": {
+        "description": "Detailed instance diagnostics. `issues` is omitted when empty.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/State"
+            },
+            "example": {
+              "version": 1,
+              "state": "DEGRADED_REPAIRABLE",
+              "data_schema": 4,
+              "instance_id": "bbffeb8c-2d11-4613-874d-b5fcc804a608",
+              "revision": 12,
+              "scanned_at": "2026-08-19T09:55:07Z",
+              "issue_count": 1,
+              "pending_operation_count": 0,
+              "issues": [
+                {
+                  "id": "DECLARATIVE_CONFIG_UNAVAILABLE",
+                  "severity": "repairable",
+                  "action": "export-config",
+                  "target": "/etc/ovpn-conf/config.yaml",
+                  "detail": "declarative configuration is unavailable"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ClientListResponse": {
+        "description": "Client list.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ClientList"
+            },
+            "example": {
+              "version": 1,
+              "clients": [
+                {
+                  "id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+                  "name": "alice-laptop",
+                  "status": "active",
+                  "ipv4": {
+                    "mode": "static",
+                    "address": "10.42.0.30",
+                    "state": "configured"
+                  },
+                  "connection": "connected"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ClientResponse": {
+        "description": "Client detail.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Client"
+            },
+            "example": {
+              "id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+              "name": "alice-laptop",
+              "status": "active",
+              "ipv4": {
+                "mode": "static",
+                "address": "10.42.0.30",
+                "state": "configured"
+              }
+            }
+          }
+        }
+      },
+      "ClientCreatedResponse": {
+        "description": "Client created.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "Location": {
+            "$ref": "#/components/headers/Location"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ClientMutation"
+            },
+            "example": {
+              "version": 1,
+              "operation_id": "7a21e1f8-1ce1-4694-977f-b275eadb8651",
+              "client": {
+                "id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+                "name": "alice-laptop",
+                "status": "active",
+                "ipv4": {
+                  "mode": "static",
+                  "address": "10.42.0.2",
+                  "state": "configured"
+                }
+              },
+              "kick_required": false,
+              "profile_redistribution_required": true
+            }
+          }
+        }
+      },
+      "RenamedClientResponse": {
+        "description": "Client renamed and profile regenerated.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ClientMutation"
+            },
+            "example": {
+              "version": 1,
+              "operation_id": "47260b5b-47dd-4f9b-814f-4803668c5934",
+              "client": {
+                "id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+                "name": "alice-notebook",
+                "status": "active",
+                "ipv4": {
+                  "mode": "static",
+                  "address": "10.42.0.30",
+                  "state": "configured"
+                }
+              },
+              "kick_required": false,
+              "profile_redistribution_required": true
+            }
+          }
+        }
+      },
+      "ReissuedClientResponse": {
+        "description": "Client credentials and profile reissued.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ClientMutation"
+            },
+            "example": {
+              "version": 1,
+              "operation_id": "47260b5b-47dd-4f9b-814f-4803668c5934",
+              "client": {
+                "id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+                "name": "alice-notebook",
+                "status": "active",
+                "ipv4": {
+                  "mode": "dynamic",
+                  "address": null,
+                  "state": "configured"
+                }
+              },
+              "kick_required": true,
+              "profile_redistribution_required": true,
+              "runtime": {
+                "status": "unavailable"
+              }
+            }
+          }
+        }
+      },
+      "DeletedClientResponse": {
+        "description": "Client credentials deleted; the UUID tombstone remains.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ClientMutation"
+            },
+            "example": {
+              "version": 1,
+              "operation_id": "47260b5b-47dd-4f9b-814f-4803668c5934",
+              "client": {
+                "id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+                "name": "alice-notebook",
+                "status": "deleted",
+                "ipv4": {
+                  "mode": "none",
+                  "address": null,
+                  "state": "unavailable"
+                }
+              },
+              "kick_required": false,
+              "profile_redistribution_required": false
+            }
+          }
+        }
+      },
+      "ClientMutationResponse": {
+        "description": "Committed client mutation. Runtime convergence is reported separately when required.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ClientMutation"
+            },
+            "example": {
+              "version": 1,
+              "operation_id": "47260b5b-47dd-4f9b-814f-4803668c5934",
+              "client": {
+                "id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+                "name": "alice-laptop",
+                "status": "revoked",
+                "ipv4": {
+                  "mode": "static",
+                  "address": "10.42.0.30",
+                  "state": "retained"
+                }
+              },
+              "kick_required": true,
+              "profile_redistribution_required": false,
+              "runtime": {
+                "status": "ok",
+                "result": {
+                  "version": 1,
+                  "client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+                  "client_name": "alice-laptop",
+                  "was_connected": true,
+                  "disconnected": true,
+                  "connections": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "AddressMutationResponse": {
+        "description": "Committed address mutation and per-client runtime outcomes.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AddressMutation"
+            },
+            "example": {
+              "version": 1,
+              "operation_id": "d41dbfce-b40e-4672-8a62-cb401f8c099c",
+              "clients": [
+                {
+                  "id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+                  "name": "alice-laptop",
+                  "status": "active",
+                  "ipv4": {
+                    "mode": "static",
+                    "address": "10.42.0.30",
+                    "state": "configured"
+                  }
+                }
+              ],
+              "kick_required": [
+                "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e"
+              ],
+              "runtime": [
+                {
+                  "client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+                  "status": "ok",
+                  "result": {
+                    "version": 1,
+                    "client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+                    "client_name": "alice-laptop",
+                    "was_connected": false,
+                    "disconnected": false,
+                    "connections": 0
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ReleasedIPv4Response": {
+        "description": "Revoked client's retained address released.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AddressMutation"
+            },
+            "example": {
+              "version": 1,
+              "operation_id": "d41dbfce-b40e-4672-8a62-cb401f8c099c",
+              "clients": [
+                {
+                  "id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+                  "name": "alice-notebook",
+                  "status": "revoked",
+                  "ipv4": {
+                    "mode": "none",
+                    "address": null,
+                    "state": "unavailable"
+                  }
+                }
+              ],
+              "kick_required": [],
+              "runtime": []
+            }
+          }
+        }
+      },
+      "ProfileResponse": {
+        "description": "OpenVPN profile containing private credentials.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "Content-Disposition": {
+            "$ref": "#/components/headers/ContentDisposition"
+          }
+        },
+        "content": {
+          "application/x-openvpn-profile": {
+            "schema": {
+              "type": "string",
+              "format": "binary"
+            }
+          }
+        }
+      },
+      "DisconnectResponse": {
+        "description": "Disconnect outcome, including successful no-op when no session exists.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DisconnectResult"
+            },
+            "example": {
+              "version": 1,
+              "client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+              "client_name": "alice-laptop",
+              "was_connected": false,
+              "disconnected": false,
+              "connections": 0
+            }
+          }
+        }
+      },
+      "RuntimeResponse": {
+        "description": "OpenVPN runtime status.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RuntimeStatus"
+            },
+            "example": {
+              "version": 1,
+              "daemon": "running",
+              "management": "connected",
+              "client_count": 1,
+              "clients": [
+                {
+                  "client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+                  "client_name": "alice-laptop",
+                  "remote_address": "203.0.113.10:53210",
+                  "virtual_address": "10.42.0.30"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "RuntimeEventsResponse": {
+        "description": "Recent structured runtime events.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RuntimeEvents"
+            },
+            "example": {
+              "version": 1,
+              "events": [
+                {
+                  "timestamp": "2026-08-19T09:55:07Z",
+                  "event": "client-disconnect",
+                  "operation": "runtime.disconnect",
+                  "outcome": "success",
+                  "client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+                  "client_name": "alice-laptop"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "AppliedConfigurationResponse": {
+        "description": "Applied revision and normalized configuration.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/AppliedConfiguration"
+            }
+          }
+        }
+      },
+      "DesiredConfigurationResponse": {
+        "description": "Desired digest and normalized configuration.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "ETag": {
+            "$ref": "#/components/headers/ETag"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DesiredConfiguration"
+            }
+          }
+        }
+      },
+      "ConfigurationPlanResponse": {
+        "description": "Complete desired-to-applied plan.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ConfigurationPlan"
+            }
+          }
+        }
+      },
+      "ApplyConfigurationResponse": {
+        "description": "Apply transaction and runtime activation outcome.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApplyConfigurationResult"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Malformed path, query, header, media type, body, or JSON.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "error": {
+                "kind": "invalid_json",
+                "message": "request body is invalid",
+                "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"
+              }
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Bearer API key is missing, malformed, unknown, or deleted.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "WWW-Authenticate": {
+            "description": "Bearer authentication challenge.",
+            "schema": {
+              "type": "string",
+              "const": "Bearer realm=\"ovpn-api\""
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "error": {
+                "kind": "unauthenticated",
+                "message": "API key is missing or invalid",
+                "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"
+              }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource or client does not exist.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "error": {
+                "kind": "client_not_found",
+                "message": "client was not found",
+                "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"
+              }
+            }
+          }
+        }
+      },
+      "MethodNotAllowed": {
+        "description": "HTTP method is not accepted; inspect the Allow header.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          },
+          "Allow": {
+            "description": "Accepted methods for the resource.",
+            "schema": {
+              "type": "string",
+              "example": "GET, POST"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "error": {
+                "kind": "method_not_allowed",
+                "message": "method is not allowed",
+                "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"
+              }
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Digest, revision, state, uniqueness, lock, or recovery conflict.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "error": {
+                "kind": "configuration_conflict",
+                "message": "configuration state changed or is busy",
+                "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"
+              }
+            }
+          }
+        }
+      },
+      "UnprocessableEntity": {
+        "description": "JSON is valid but violates client, IPv4, or configuration semantics.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "error": {
+                "kind": "invalid_client",
+                "message": "client request is not valid for the current state",
+                "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"
+              }
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Unclassified internal failure with no implementation details exposed.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "error": {
+                "kind": "internal_error",
+                "message": "request could not be completed",
+                "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"
+              }
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.",
+        "headers": {
+          "X-Request-ID": {
+            "$ref": "#/components/headers/RequestID"
+          },
+          "Cache-Control": {
+            "$ref": "#/components/headers/NoStore"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            },
+            "example": {
+              "error": {
+                "kind": "runtime_unavailable",
+                "message": "OpenVPN runtime is unavailable",
+                "request_id": "33ba813e-fc63-4af8-b338-7f7486f82202"
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "description": "Liveness state; always ok for a successful response.",
+            "x-description-zh": "存活状态；成功响应时始终为 ok。"
+          }
+        },
+        "description": "API process liveness response.",
+        "x-description-zh": "API 进程存活响应。"
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/APIError"
+          }
+        },
+        "description": "Stable envelope used for every JSON error response.",
+        "x-description-zh": "所有 JSON 错误响应使用的稳定封装。"
+      },
+      "APIError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "message",
+          "request_id"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "examples": [
+              "invalid_json",
+              "client_not_found",
+              "configuration_conflict",
+              "runtime_unavailable"
+            ],
+            "description": "Stable machine-readable error kind.",
+            "x-description-zh": "稳定且可供程序读取的错误类型。"
+          },
+          "message": {
+            "type": "string",
+            "description": "Safe human-readable error message.",
+            "x-description-zh": "可安全展示的错误消息。"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID used to correlate the request with server logs.",
+            "x-description-zh": "用于关联请求与服务器日志的 UUID。"
+          }
+        },
+        "description": "Machine-readable API error details.",
+        "x-description-zh": "可供程序读取的 API 错误详情。"
+      },
+      "Version": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "data_schema",
+          "commit",
+          "build_date",
+          "go_version",
+          "dependencies",
+          "compatibility"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "OpenVPN Docker release version.",
+            "x-description-zh": "OpenVPN Docker 发布版本。"
+          },
+          "data_schema": {
+            "type": "integer",
+            "description": "Authoritative data schema version.",
+            "x-description-zh": "权威数据 schema 版本。"
+          },
+          "commit": {
+            "type": "string",
+            "description": "Source control revision used to build the binary.",
+            "x-description-zh": "构建二进制时使用的源码版本。"
+          },
+          "build_date": {
+            "type": "string",
+            "description": "UTC timestamp when the binary was built.",
+            "x-description-zh": "二进制构建时的 UTC 时间。"
+          },
+          "go_version": {
+            "type": "string",
+            "description": "Go toolchain version used to build the binary.",
+            "x-description-zh": "构建二进制时使用的 Go 工具链版本。"
+          },
+          "dependencies": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sqlite",
+              "yaml"
+            ],
+            "properties": {
+              "sqlite": {
+                "type": "string",
+                "description": "SQLite driver module and version.",
+                "x-description-zh": "SQLite 驱动模块及版本。"
+              },
+              "yaml": {
+                "type": "string",
+                "description": "YAML parser module and version.",
+                "x-description-zh": "YAML 解析模块及版本。"
+              }
+            },
+            "description": "Build-time library dependency versions.",
+            "x-description-zh": "构建时使用的库依赖版本。"
+          },
+          "compatibility": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "contract_version",
+              "adapter",
+              "template_family",
+              "supported_openvpn_versions"
+            ],
+            "properties": {
+              "contract_version": {
+                "type": "integer",
+                "description": "Compatibility contract schema version.",
+                "x-description-zh": "兼容性契约 schema 版本。"
+              },
+              "adapter": {
+                "type": "string",
+                "description": "Compatibility adapter selected for this runtime.",
+                "x-description-zh": "为当前运行时选择的兼容性适配器。"
+              },
+              "template_family": {
+                "type": "string",
+                "description": "Template family selected for generated OpenVPN files.",
+                "x-description-zh": "生成 OpenVPN 文件时选择的模板系列。"
+              },
+              "supported_openvpn_versions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "OpenVPN versions accepted by this compatibility contract.",
+                "x-description-zh": "该兼容性契约接受的 OpenVPN 版本。"
+              }
+            },
+            "description": "Runtime compatibility contract and supported versions.",
+            "x-description-zh": "运行时兼容性契约及支持的版本。"
+          }
+        },
+        "description": "Build, dependency, and compatibility metadata.",
+        "x-description-zh": "构建、依赖和兼容性元数据。"
+      },
+      "State": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "state",
+          "data_schema",
+          "scanned_at",
+          "issue_count",
+          "pending_operation_count"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "description": "Response contract schema version.",
+            "x-description-zh": "响应契约 schema 版本。"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "EMPTY",
+              "HEALTHY",
+              "DEGRADED_REPAIRABLE",
+              "DEGRADED_RECOVERABLE",
+              "DEGRADED_REISSUABLE",
+              "CRITICAL",
+              "UNRECOVERABLE"
+            ],
+            "description": "Overall authoritative instance health state.",
+            "x-description-zh": "权威实例整体健康状态。"
+          },
+          "data_schema": {
+            "type": "integer",
+            "description": "Authoritative data schema version.",
+            "x-description-zh": "权威数据 schema 版本。"
+          },
+          "instance_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Immutable UUID of the initialized OpenVPN instance.",
+            "x-description-zh": "已初始化 OpenVPN 实例的不可变 UUID。"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Monotonic applied configuration revision.",
+            "x-description-zh": "单调递增的已应用配置版本。"
+          },
+          "scanned_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC timestamp of the state scan.",
+            "x-description-zh": "状态扫描的 UTC 时间。"
+          },
+          "issue_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of diagnostic issues currently detected.",
+            "x-description-zh": "当前检测到的诊断问题数量。"
+          },
+          "pending_operation_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of incomplete journal operations.",
+            "x-description-zh": "未完成 journal 操作的数量。"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StateIssue"
+            },
+            "description": "Detailed diagnostic issues; omitted when empty.",
+            "x-description-zh": "详细诊断问题；为空时省略。"
+          }
+        },
+        "description": "Current authoritative instance health summary.",
+        "x-description-zh": "当前权威实例健康摘要。"
+      },
+      "StateIssue": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "severity",
+          "action",
+          "detail"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable diagnostic issue identifier.",
+            "x-description-zh": "稳定的诊断问题标识符。"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "repairable",
+              "recoverable",
+              "reissuable",
+              "critical",
+              "unrecoverable"
+            ],
+            "description": "Diagnostic severity and recovery class.",
+            "x-description-zh": "诊断严重程度和恢复类别。"
+          },
+          "action": {
+            "type": "string",
+            "description": "Recommended operator action for this issue.",
+            "x-description-zh": "针对该问题建议执行的运维动作。"
+          },
+          "target": {
+            "type": "string",
+            "description": "Affected path or resource when applicable.",
+            "x-description-zh": "适用时受影响的路径或资源。"
+          },
+          "owner_id": {
+            "type": "string",
+            "description": "Stable identifier of the owning object.",
+            "x-description-zh": "所属对象的稳定标识符。"
+          },
+          "artifact_kind": {
+            "type": "string",
+            "description": "Kind of affected derived artifact.",
+            "x-description-zh": "受影响派生制品的类型。"
+          },
+          "detail": {
+            "type": "string",
+            "description": "Human-readable diagnostic detail.",
+            "x-description-zh": "可读的诊断详情。"
+          }
+        },
+        "description": "One diagnostic issue detected in authoritative state.",
+        "x-description-zh": "权威状态中检测到的一项诊断问题。"
+      },
+      "IPv4View": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "address",
+          "state"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "none",
+              "static",
+              "dynamic"
+            ],
+            "description": "IPv4 allocation mode.",
+            "x-description-zh": "IPv4 分配模式。"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "ipv4",
+            "description": "IPv4 address, or null when no address is assigned.",
+            "x-description-zh": "IPv4 地址；未分配地址时为 null。"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "configured",
+              "retained",
+              "unavailable"
+            ],
+            "description": "Availability state of the client address assignment.",
+            "x-description-zh": "客户端地址分配的可用状态。"
+          }
+        },
+        "description": "Current client IPv4 assignment view.",
+        "x-description-zh": "当前客户端 IPv4 分配视图。"
+      },
+      "Client": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "status",
+          "ipv4"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier of this object.",
+            "x-description-zh": "该对象的稳定标识符。"
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+            "description": "Stable human-readable name.",
+            "x-description-zh": "稳定且可读的名称。"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "revoked",
+              "deleted"
+            ],
+            "description": "Client credential lifecycle status.",
+            "x-description-zh": "客户端凭据生命周期状态。"
+          },
+          "ipv4": {
+            "$ref": "#/components/schemas/IPv4View"
+          },
+          "connection": {
+            "type": "string",
+            "description": "Current connection state when runtime data is available.",
+            "x-description-zh": "运行时数据可用时的当前连接状态。"
+          }
+        },
+        "description": "Authoritative client identity and lifecycle state.",
+        "x-description-zh": "权威客户端身份与生命周期状态。"
+      },
+      "ClientList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "clients"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "description": "Response contract schema version.",
+            "x-description-zh": "响应契约 schema 版本。"
+          },
+          "clients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Client"
+            },
+            "description": "Clients included in this response.",
+            "x-description-zh": "该响应包含的客户端。"
+          }
+        },
+        "description": "Versioned collection of clients.",
+        "x-description-zh": "带版本的客户端集合。"
+      },
+      "CreateClientRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "ipv4"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+            "description": "Stable client name. Starts with an alphanumeric character and may contain letters, digits, underscores, dots, and hyphens.",
+            "x-description-zh": "稳定的客户端名称。必须以字母或数字开头，可包含字母、数字、下划线、点和连字符。"
+          },
+          "ipv4": {
+            "type": "string",
+            "description": "IPv4 allocation intent: auto, dynamic, or a valid static IPv4 address.",
+            "examples": [
+              "auto",
+              "dynamic",
+              "10.42.0.30"
+            ],
+            "x-description-zh": "IPv4 分配方式：auto、dynamic 或有效的静态 IPv4 地址。"
+          }
+        },
+        "description": "Fields required to create a client.",
+        "x-description-zh": "创建客户端所需的字段。"
+      },
+      "RenameClientRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+            "description": "New stable client name. Uses the same format as client creation.",
+            "x-description-zh": "新的稳定客户端名称，格式与创建客户端时相同。"
+          }
+        },
+        "description": "Fields required to rename a client.",
+        "x-description-zh": "重命名客户端所需的字段。"
+      },
+      "RevokeClientRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "release_ipv4"
+        ],
+        "properties": {
+          "release_ipv4": {
+            "type": "boolean",
+            "description": "true releases the assignment; false retains it for later release or reissue.",
+            "x-description-zh": "true 表示释放地址分配；false 表示保留，以便之后释放或重新签发。"
+          }
+        },
+        "description": "Options controlling client credential revocation.",
+        "x-description-zh": "控制客户端凭据吊销的选项。"
+      },
+      "ReissueClientRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ipv4"
+        ],
+        "properties": {
+          "ipv4": {
+            "type": "string",
+            "description": "auto, dynamic, or a valid static IPv4 address.",
+            "x-description-zh": "auto、dynamic 或有效的静态 IPv4 地址。"
+          }
+        },
+        "description": "Address intent used when reissuing client credentials.",
+        "x-description-zh": "重新签发客户端凭据时使用的地址分配方式。"
+      },
+      "IPv4Request": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "dynamic",
+              "static"
+            ],
+            "description": "Address selection mode: automatic allocation, dynamic allocation, or a specific static address.",
+            "x-description-zh": "地址选择模式：自动分配、动态分配或指定静态地址。"
+          },
+          "address": {
+            "type": "string",
+            "format": "ipv4",
+            "description": "Static IPv4 address. Required only for static mode and forbidden for auto/dynamic.",
+            "x-description-zh": "静态 IPv4 地址。仅 static 模式必填，auto/dynamic 模式禁止提供。"
+          }
+        },
+        "description": "Requested client IPv4 allocation mode and optional address.",
+        "x-description-zh": "请求的客户端 IPv4 分配模式及可选地址。"
+      },
+      "RuntimeOutcome": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Immutable client UUID.",
+            "x-description-zh": "不可变的客户端 UUID。"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "description": "Whether the requested runtime action completed or was unavailable.",
+            "x-description-zh": "请求的运行时操作是否完成或不可用。"
+          },
+          "result": {
+            "$ref": "#/components/schemas/DisconnectResult"
+          }
+        },
+        "description": "Per-client runtime convergence result after a mutation.",
+        "x-description-zh": "变更后单个客户端的运行时收敛结果。"
+      },
+      "ClientMutation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "operation_id",
+          "client",
+          "kick_required",
+          "profile_redistribution_required"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "description": "Response contract schema version.",
+            "x-description-zh": "响应契约 schema 版本。"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the committed journal operation.",
+            "x-description-zh": "已提交 journal 操作的 UUID。"
+          },
+          "client": {
+            "$ref": "#/components/schemas/Client"
+          },
+          "kick_required": {
+            "type": "boolean",
+            "description": "Whether the mutated client's active session must be disconnected.",
+            "x-description-zh": "是否必须断开已变更客户端的活动会话。"
+          },
+          "profile_redistribution_required": {
+            "type": "boolean",
+            "description": "Whether the client's generated profile must be redistributed.",
+            "x-description-zh": "是否必须重新分发该客户端生成的配置文件。"
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/RuntimeOutcome"
+          }
+        },
+        "description": "Committed client mutation and its runtime consequences.",
+        "x-description-zh": "已提交的客户端变更及其运行时影响。"
+      },
+      "AddressMutation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "operation_id",
+          "clients",
+          "kick_required",
+          "runtime"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "description": "Response contract schema version.",
+            "x-description-zh": "响应契约 schema 版本。"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the committed journal operation.",
+            "x-description-zh": "已提交 journal 操作的 UUID。"
+          },
+          "clients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Client"
+            },
+            "description": "Clients included in this response.",
+            "x-description-zh": "该响应包含的客户端。"
+          },
+          "kick_required": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Clients whose active sessions must be disconnected.",
+            "x-description-zh": "必须断开活动会话的客户端。"
+          },
+          "runtime": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuntimeOutcome"
+            },
+            "description": "Runtime convergence result when a live action was attempted.",
+            "x-description-zh": "尝试实时操作时的运行时收敛结果。"
+          }
+        },
+        "description": "Committed address mutation affecting one or more clients.",
+        "x-description-zh": "影响一个或多个客户端的已提交地址变更。"
+      },
+      "DisconnectResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "client_id",
+          "client_name",
+          "was_connected",
+          "disconnected",
+          "connections"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "description": "Response contract schema version.",
+            "x-description-zh": "响应契约 schema 版本。"
+          },
+          "client_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Immutable client UUID.",
+            "x-description-zh": "不可变的客户端 UUID。"
+          },
+          "client_name": {
+            "type": "string",
+            "description": "Human-readable client name associated with the session.",
+            "x-description-zh": "与会话关联的可读客户端名称。"
+          },
+          "was_connected": {
+            "type": "boolean",
+            "description": "Whether a matching session existed before the request.",
+            "x-description-zh": "请求前是否存在匹配会话。"
+          },
+          "disconnected": {
+            "type": "boolean",
+            "description": "Whether at least one matching session was disconnected.",
+            "x-description-zh": "是否至少断开了一个匹配会话。"
+          },
+          "connections": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of matching sessions processed by the disconnect request.",
+            "x-description-zh": "断开请求处理的匹配会话数量。"
+          }
+        },
+        "description": "Result of requesting client session disconnection.",
+        "x-description-zh": "请求断开客户端会话的结果。"
+      },
+      "RuntimeStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "daemon",
+          "management",
+          "client_count",
+          "clients"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "description": "Response contract schema version.",
+            "x-description-zh": "响应契约 schema 版本。"
+          },
+          "daemon": {
+            "type": "string",
+            "example": "running",
+            "description": "OpenVPN daemon process state.",
+            "x-description-zh": "OpenVPN daemon 进程状态。"
+          },
+          "management": {
+            "type": "string",
+            "example": "connected",
+            "description": "OpenVPN management interface connection state.",
+            "x-description-zh": "OpenVPN 管理接口连接状态。"
+          },
+          "client_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of client sessions reported by the runtime.",
+            "x-description-zh": "运行时报告的客户端会话数量。"
+          },
+          "clients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuntimeClient"
+            },
+            "description": "Clients included in this response.",
+            "x-description-zh": "该响应包含的客户端。"
+          }
+        },
+        "description": "OpenVPN daemon, management interface, and connected-client status.",
+        "x-description-zh": "OpenVPN daemon、管理接口和已连接客户端状态。"
+      },
+      "RuntimeClient": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "client_id"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Immutable client UUID.",
+            "x-description-zh": "不可变的客户端 UUID。"
+          },
+          "client_name": {
+            "type": "string",
+            "description": "Human-readable client name associated with the session.",
+            "x-description-zh": "与会话关联的可读客户端名称。"
+          },
+          "remote_address": {
+            "type": "string",
+            "description": "Remote network address of the connected client.",
+            "x-description-zh": "已连接客户端的远端网络地址。"
+          },
+          "virtual_address": {
+            "type": "string",
+            "format": "ipv4",
+            "description": "VPN virtual IPv4 address assigned to the session.",
+            "x-description-zh": "分配给会话的 VPN 虚拟 IPv4 地址。"
+          }
+        },
+        "description": "One client session reported by the OpenVPN runtime.",
+        "x-description-zh": "OpenVPN 运行时报告的一条客户端会话。"
+      },
+      "RuntimeEvents": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "events"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "description": "Response contract schema version.",
+            "x-description-zh": "响应契约 schema 版本。"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuntimeEvent"
+            },
+            "description": "Recent structured runtime events in chronological order.",
+            "x-description-zh": "按时间顺序排列的最近结构化运行事件。"
+          }
+        },
+        "description": "Versioned collection of recent runtime events.",
+        "x-description-zh": "带版本的最近运行事件集合。"
+      },
+      "RuntimeEvent": {
+        "type": "object",
+        "required": [
+          "timestamp",
+          "event",
+          "operation",
+          "outcome"
+        ],
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "UTC timestamp when the runtime event occurred.",
+            "x-description-zh": "运行事件发生时的 UTC 时间。"
+          },
+          "event": {
+            "type": "string",
+            "description": "Stable runtime event name.",
+            "x-description-zh": "稳定的运行事件名称。"
+          },
+          "operation": {
+            "type": "string",
+            "description": "Stable operation name that emitted the event.",
+            "x-description-zh": "产生该事件的稳定操作名称。"
+          },
+          "outcome": {
+            "type": "string",
+            "description": "Stable event outcome value.",
+            "x-description-zh": "稳定的事件结果值。"
+          },
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Client UUID associated with the event, or null for non-client events.",
+            "x-description-zh": "与事件关联的客户端 UUID；非客户端事件时为 null。"
+          },
+          "client_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Client name associated with the event, or null when unavailable.",
+            "x-description-zh": "与事件关联的客户端名称；不可用时为 null。"
+          }
+        },
+        "additionalProperties": true,
+        "description": "One structured OpenVPN runtime event.",
+        "x-description-zh": "一条结构化 OpenVPN 运行事件。"
+      },
+      "Configuration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "server",
+          "ipv4",
+          "logging"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "description": "Configuration schema version. Must be 1.",
+            "x-description-zh": "配置 schema 版本，必须为 1。"
+          },
+          "server": {
+            "$ref": "#/components/schemas/ServerConfiguration"
+          },
+          "ipv4": {
+            "$ref": "#/components/schemas/IPv4Configuration"
+          },
+          "logging": {
+            "$ref": "#/components/schemas/LoggingConfiguration"
+          }
+        },
+        "description": "Complete normalized OpenVPN server configuration.",
+        "x-description-zh": "完整且规范化的 OpenVPN 服务端配置。"
+      },
+      "ServerConfiguration": {
+        "type": "object",
+        "description": "OpenVPN listener and transport settings.",
+        "additionalProperties": false,
+        "required": [
+          "endpoint",
+          "protocol",
+          "family",
+          "port",
+          "client_to_client"
+        ],
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "example": "vpn.example.com",
+            "description": "Public hostname or IP address placed in generated client profiles.",
+            "x-description-zh": "写入生成客户端配置文件的公网主机名或 IP 地址。"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "udp",
+              "tcp"
+            ],
+            "description": "OpenVPN transport protocol.",
+            "x-description-zh": "OpenVPN 传输协议。"
+          },
+          "family": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "ipv4",
+              "ipv6"
+            ],
+            "description": "Address family used for the server transport.",
+            "x-description-zh": "服务端传输使用的地址族。"
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535,
+            "description": "OpenVPN listener port.",
+            "x-description-zh": "OpenVPN 监听端口。"
+          },
+          "client_to_client": {
+            "type": "boolean",
+            "description": "Whether connected VPN clients may communicate directly.",
+            "x-description-zh": "是否允许已连接的 VPN 客户端直接通信。"
+          }
+        },
+        "x-description-zh": "OpenVPN 监听和传输设置。"
+      },
+      "IPv4Configuration": {
+        "type": "object",
+        "description": "Server IPv4 network, allocation, NAT, DNS, and route settings.",
+        "additionalProperties": false,
+        "required": [
+          "network",
+          "dynamic_pool_size",
+          "nat_enabled",
+          "nat_interface",
+          "redirect_gateway",
+          "dns",
+          "routes"
+        ],
+        "properties": {
+          "network": {
+            "type": "string",
+            "format": "ipv4-cidr",
+            "example": "10.42.0.0/24",
+            "description": "VPN IPv4 network in CIDR notation.",
+            "x-description-zh": "CIDR 格式的 VPN IPv4 网络。"
+          },
+          "dynamic_pool_size": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of addresses reserved for dynamic allocation.",
+            "x-description-zh": "为动态分配保留的地址数量。"
+          },
+          "nat_enabled": {
+            "type": "boolean",
+            "description": "Whether outbound traffic from the VPN network is masqueraded.",
+            "x-description-zh": "是否对 VPN 网络的出站流量执行地址伪装。"
+          },
+          "nat_interface": {
+            "type": "string",
+            "example": "auto",
+            "description": "Outbound interface for NAT, or auto for automatic detection.",
+            "x-description-zh": "NAT 使用的出口接口；使用 auto 时自动检测。"
+          },
+          "redirect_gateway": {
+            "type": "boolean",
+            "description": "Whether generated profiles redirect the default IPv4 route through VPN.",
+            "x-description-zh": "生成的配置文件是否将默认 IPv4 路由重定向到 VPN。"
+          },
+          "dns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "ipv4"
+            },
+            "description": "IPv4 DNS servers pushed to clients.",
+            "x-description-zh": "推送给客户端的 IPv4 DNS 服务器。"
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "ipv4-cidr"
+            },
+            "description": "Additional IPv4 CIDR routes pushed to clients.",
+            "x-description-zh": "推送给客户端的其他 IPv4 CIDR 路由。"
+          }
+        },
+        "x-description-zh": "服务端 IPv4 网络、地址分配、NAT、DNS 和路由设置。"
+      },
+      "LoggingConfiguration": {
+        "type": "object",
+        "description": "Runtime log rotation settings.",
+        "additionalProperties": false,
+        "required": [
+          "max_bytes",
+          "backups"
+        ],
+        "properties": {
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum active log file size before rotation.",
+            "x-description-zh": "触发轮转前活动日志文件的最大字节数。"
+          },
+          "backups": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of rotated log files retained.",
+            "x-description-zh": "保留的轮转日志文件数量。"
+          }
+        },
+        "x-description-zh": "运行时日志轮转设置。"
+      },
+      "AppliedConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision",
+          "digest",
+          "config"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Monotonic applied configuration revision.",
+            "x-description-zh": "单调递增的已应用配置版本。"
+          },
+          "digest": {
+            "$ref": "#/components/schemas/Digest"
+          },
+          "config": {
+            "$ref": "#/components/schemas/Configuration"
+          }
+        },
+        "example": {
+          "revision": 12,
+          "digest": "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042",
+          "config": {
+            "version": 1,
+            "server": {
+              "endpoint": "vpn.example.com",
+              "protocol": "udp",
+              "family": "auto",
+              "port": 1194,
+              "client_to_client": true
+            },
+            "ipv4": {
+              "network": "10.42.0.0/24",
+              "dynamic_pool_size": 64,
+              "nat_enabled": false,
+              "nat_interface": "auto",
+              "redirect_gateway": false,
+              "dns": [],
+              "routes": []
+            },
+            "logging": {
+              "max_bytes": 10485760,
+              "backups": 5
+            }
+          }
+        },
+        "description": "Currently applied configuration and revision.",
+        "x-description-zh": "当前已应用的配置及版本号。"
+      },
+      "DesiredConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "digest",
+          "config"
+        ],
+        "properties": {
+          "digest": {
+            "$ref": "#/components/schemas/Digest"
+          },
+          "config": {
+            "$ref": "#/components/schemas/Configuration"
+          }
+        },
+        "example": {
+          "digest": "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042",
+          "config": {
+            "version": 1,
+            "server": {
+              "endpoint": "vpn.example.com",
+              "protocol": "udp",
+              "family": "auto",
+              "port": 1194,
+              "client_to_client": true
+            },
+            "ipv4": {
+              "network": "10.42.0.0/24",
+              "dynamic_pool_size": 64,
+              "nat_enabled": false,
+              "nat_interface": "auto",
+              "redirect_gateway": false,
+              "dns": [],
+              "routes": []
+            },
+            "logging": {
+              "max_bytes": 10485760,
+              "backups": 5
+            }
+          }
+        },
+        "description": "Desired configuration and its content digest.",
+        "x-description-zh": "期望配置及其内容摘要。"
+      },
+      "Digest": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$",
+        "example": "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042",
+        "description": "Lowercase SHA-256 digest identifying an exact desired configuration.",
+        "x-description-zh": "用于精确标识期望配置的小写 SHA-256 摘要。"
+      },
+      "ConfigurationChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "field",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "field": {
+            "type": "string",
+            "example": "server.endpoint",
+            "description": "Canonical dotted path of the changed configuration field.",
+            "x-description-zh": "发生变更的配置字段规范点分路径。"
+          },
+          "before": {
+            "description": "Applied value before the proposed configuration change.",
+            "x-description-zh": "建议配置变更前的已应用值。"
+          },
+          "after": {
+            "description": "Desired value after the proposed configuration change.",
+            "x-description-zh": "建议配置变更后的期望值。"
+          }
+        },
+        "description": "One field-level difference between applied and desired configuration.",
+        "x-description-zh": "已应用配置与期望配置之间的一项字段级差异。"
+      },
+      "ConfigurationImpact": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "restart_required",
+          "address_remap",
+          "firewall_reconcile",
+          "profile_redistribution",
+          "derived_artifacts"
+        ],
+        "properties": {
+          "restart_required": {
+            "type": "boolean",
+            "description": "Whether applying the plan requires an OpenVPN restart.",
+            "x-description-zh": "应用该计划是否需要重启 OpenVPN。"
+          },
+          "address_remap": {
+            "type": "boolean",
+            "description": "Whether client address assignments must be recalculated.",
+            "x-description-zh": "是否必须重新计算客户端地址分配。"
+          },
+          "firewall_reconcile": {
+            "type": "boolean",
+            "description": "Whether firewall rules must be reconciled.",
+            "x-description-zh": "是否必须协调防火墙规则。"
+          },
+          "profile_redistribution": {
+            "type": "boolean",
+            "description": "Clients whose generated profiles must be redistributed.",
+            "x-description-zh": "必须重新分发生成配置文件的客户端。"
+          },
+          "derived_artifacts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Derived artifacts that must be regenerated or removed.",
+            "x-description-zh": "必须重新生成或删除的派生制品。"
+          }
+        },
+        "description": "Runtime and artifact impact of configuration changes.",
+        "x-description-zh": "配置变更对运行时和制品的影响。"
+      },
+      "ConfigurationComparison": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "initial",
+          "current_revision",
+          "target_revision",
+          "desired_digest",
+          "in_sync",
+          "changes",
+          "impact"
+        ],
+        "properties": {
+          "initial": {
+            "type": "boolean",
+            "description": "Whether the plan creates the first applied revision.",
+            "x-description-zh": "该计划是否创建首个已应用版本。"
+          },
+          "current_revision": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Currently applied configuration revision used for comparison.",
+            "x-description-zh": "用于比较的当前已应用配置版本。"
+          },
+          "target_revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Applied revision that would result from this plan.",
+            "x-description-zh": "执行该计划后将产生的已应用版本。"
+          },
+          "current_digest": {
+            "$ref": "#/components/schemas/Digest"
+          },
+          "desired_digest": {
+            "$ref": "#/components/schemas/Digest"
+          },
+          "in_sync": {
+            "type": "boolean",
+            "description": "Whether desired and applied configuration are identical.",
+            "x-description-zh": "期望配置与已应用配置是否一致。"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigurationChange"
+            },
+            "description": "Field-level configuration changes in this plan.",
+            "x-description-zh": "该计划中的字段级配置变更。"
+          },
+          "impact": {
+            "$ref": "#/components/schemas/ConfigurationImpact"
+          }
+        },
+        "description": "Revision, digest, changes, and impact comparison.",
+        "x-description-zh": "版本、摘要、变更和影响的对比结果。"
+      },
+      "ClientRef": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable identifier of this object.",
+            "x-description-zh": "该对象的稳定标识符。"
+          },
+          "name": {
+            "type": "string",
+            "description": "Stable human-readable name.",
+            "x-description-zh": "稳定且可读的名称。"
+          }
+        },
+        "description": "Stable client identity used in plan reports.",
+        "x-description-zh": "计划报告中使用的稳定客户端身份。"
+      },
+      "AddressIntent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "address",
+          "state"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "description": "IPv4 allocation mode.",
+            "x-description-zh": "IPv4 分配模式。"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "ipv4",
+            "description": "IPv4 address, or null when no address is assigned.",
+            "x-description-zh": "IPv4 地址；未分配地址时为 null。"
+          },
+          "state": {
+            "type": "string",
+            "description": "Lifecycle state of this address intent.",
+            "x-description-zh": "该地址意图的生命周期状态。"
+          }
+        },
+        "description": "Client IPv4 allocation intent at one point in time.",
+        "x-description-zh": "某一时刻的客户端 IPv4 分配意图。"
+      },
+      "AddressChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "client",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "client": {
+            "$ref": "#/components/schemas/ClientRef"
+          },
+          "before": {
+            "$ref": "#/components/schemas/AddressIntent"
+          },
+          "after": {
+            "$ref": "#/components/schemas/AddressIntent"
+          }
+        },
+        "description": "Before-and-after IPv4 intent for one client.",
+        "x-description-zh": "单个客户端 IPv4 意图的变更前后状态。"
+      },
+      "ArtifactImpact": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "owner_kind",
+          "owner_id",
+          "kind",
+          "key",
+          "action"
+        ],
+        "properties": {
+          "owner_kind": {
+            "type": "string",
+            "description": "Kind of object that owns the artifact.",
+            "x-description-zh": "拥有该制品的对象类型。"
+          },
+          "owner_id": {
+            "type": "string",
+            "description": "Stable identifier of the owning object.",
+            "x-description-zh": "所属对象的稳定标识符。"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Derived artifact type.",
+            "x-description-zh": "派生制品类型。"
+          },
+          "key": {
+            "type": "string",
+            "description": "Stable key identifying the derived artifact.",
+            "x-description-zh": "用于标识派生制品的稳定 key。"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "regenerate",
+              "delete"
+            ],
+            "description": "Whether to regenerate or delete the artifact.",
+            "x-description-zh": "重新生成还是删除该制品。"
+          }
+        },
+        "description": "Required regeneration or deletion of one derived artifact.",
+        "x-description-zh": "一个派生制品所需的重新生成或删除操作。"
+      },
+      "FirewallState": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "network",
+          "nat_enabled",
+          "nat_interface",
+          "routes"
+        ],
+        "properties": {
+          "network": {
+            "type": "string",
+            "description": "VPN IPv4 network in CIDR notation.",
+            "x-description-zh": "CIDR 格式的 VPN IPv4 网络。"
+          },
+          "nat_enabled": {
+            "type": "boolean",
+            "description": "Whether source NAT is enabled for the VPN network.",
+            "x-description-zh": "是否为 VPN 网络启用源 NAT。"
+          },
+          "nat_interface": {
+            "type": "string",
+            "description": "Outbound interface used for VPN source NAT.",
+            "x-description-zh": "VPN 源 NAT 使用的出口接口。"
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "IPv4 CIDR routes represented by this firewall state.",
+            "x-description-zh": "该防火墙状态包含的 IPv4 CIDR 路由。"
+          }
+        },
+        "description": "Firewall-relevant network and NAT settings.",
+        "x-description-zh": "与防火墙相关的网络和 NAT 设置。"
+      },
+      "FirewallImpact": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reconcile",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "reconcile": {
+            "type": "boolean",
+            "description": "Whether firewall state must be reconciled during apply.",
+            "x-description-zh": "应用期间是否必须协调防火墙状态。"
+          },
+          "before": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FirewallState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Firewall state before apply, or null for initial configuration.",
+            "x-description-zh": "应用前的防火墙状态；初始配置时为 null。"
+          },
+          "after": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FirewallState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Firewall state required by the desired configuration, or null when absent.",
+            "x-description-zh": "期望配置要求的防火墙状态；不存在时为 null。"
+          }
+        },
+        "description": "Before-and-after firewall state and reconciliation requirement.",
+        "x-description-zh": "防火墙变更前后状态及协调要求。"
+      },
+      "ConfigurationPlan": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "instance_id",
+          "configuration",
+          "address_changes",
+          "artifacts",
+          "profile_redistribution",
+          "firewall"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "description": "Response contract schema version.",
+            "x-description-zh": "响应契约 schema 版本。"
+          },
+          "instance_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Immutable UUID of the initialized OpenVPN instance.",
+            "x-description-zh": "已初始化 OpenVPN 实例的不可变 UUID。"
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/ConfigurationComparison"
+          },
+          "address_changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddressChange"
+            },
+            "description": "Client address changes required by this plan.",
+            "x-description-zh": "该计划要求执行的客户端地址变更。"
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactImpact"
+            },
+            "description": "Derived artifact operations required by this plan.",
+            "x-description-zh": "该计划要求执行的派生制品操作。"
+          },
+          "profile_redistribution": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientRef"
+            },
+            "description": "Clients whose generated profiles must be redistributed.",
+            "x-description-zh": "必须重新分发生成配置文件的客户端。"
+          },
+          "firewall": {
+            "$ref": "#/components/schemas/FirewallImpact"
+          }
+        },
+        "example": {
+          "version": 1,
+          "instance_id": "bbffeb8c-2d11-4613-874d-b5fcc804a608",
+          "configuration": {
+            "initial": false,
+            "current_revision": 12,
+            "target_revision": 13,
+            "current_digest": "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042",
+            "desired_digest": "489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca",
+            "in_sync": false,
+            "changes": [
+              {
+                "field": "server.endpoint",
+                "before": "vpn.example.com",
+                "after": "vpn-new.example.com"
+              }
+            ],
+            "impact": {
+              "restart_required": true,
+              "address_remap": false,
+              "firewall_reconcile": false,
+              "profile_redistribution": true,
+              "derived_artifacts": [
+                "server_config",
+                "client_profiles"
+              ]
+            }
+          },
+          "address_changes": [],
+          "artifacts": [],
+          "profile_redistribution": [],
+          "firewall": {
+            "reconcile": false,
+            "before": null,
+            "after": null
+          }
+        },
+        "description": "Complete plan for applying the desired configuration.",
+        "x-description-zh": "应用期望配置的完整计划。"
+      },
+      "ApplyConfigurationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "desired_digest",
+          "current_revision"
+        ],
+        "properties": {
+          "desired_digest": {
+            "$ref": "#/components/schemas/Digest"
+          },
+          "current_revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Applied revision returned by the configuration plan.",
+            "x-description-zh": "配置计划返回的已应用版本号。"
+          },
+          "force": {
+            "type": "boolean",
+            "default": false,
+            "description": "Bypasses only confirmed health-preflight warnings; never bypasses schema, CAS, lock, or recovery checks.",
+            "x-description-zh": "仅绕过已确认的健康预检警告；不会绕过 schema、CAS、锁或恢复检查。"
+          }
+        },
+        "description": "Optimistic-concurrency inputs for applying desired configuration.",
+        "x-description-zh": "应用期望配置时使用的乐观并发输入。"
+      },
+      "ActivationReport": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "restart_required",
+          "runtime_restarted",
+          "profile_redistribution"
+        ],
+        "properties": {
+          "restart_required": {
+            "type": "boolean",
+            "description": "Whether applying the plan requires an OpenVPN restart.",
+            "x-description-zh": "应用该计划是否需要重启 OpenVPN。"
+          },
+          "runtime_restarted": {
+            "type": "boolean",
+            "description": "Whether the managed OpenVPN runtime was restarted.",
+            "x-description-zh": "是否已重启受管 OpenVPN 运行时。"
+          },
+          "profile_redistribution": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClientRef"
+            },
+            "description": "Clients whose generated profiles must be redistributed.",
+            "x-description-zh": "必须重新分发生成配置文件的客户端。"
+          }
+        },
+        "description": "Runtime activation actions performed after configuration commit.",
+        "x-description-zh": "配置提交后执行的运行时激活动作。"
+      },
+      "ApplyConfigurationResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "applied",
+          "activation",
+          "plan"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "description": "Response contract schema version.",
+            "x-description-zh": "响应契约 schema 版本。"
+          },
+          "applied": {
+            "type": "boolean",
+            "description": "Whether this request committed a new applied revision.",
+            "x-description-zh": "本次请求是否提交了新的已应用版本。"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID of the committed journal operation.",
+            "x-description-zh": "已提交 journal 操作的 UUID。"
+          },
+          "activation": {
+            "$ref": "#/components/schemas/ActivationReport"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/ConfigurationPlan"
+          }
+        },
+        "example": {
+          "version": 1,
+          "applied": true,
+          "operation_id": "5b781e08-3d44-41fb-81db-42edeedc61e1",
+          "activation": {
+            "restart_required": true,
+            "runtime_restarted": true,
+            "profile_redistribution": []
+          },
+          "plan": {
+            "version": 1,
+            "instance_id": "bbffeb8c-2d11-4613-874d-b5fcc804a608",
+            "configuration": {
+              "initial": false,
+              "current_revision": 12,
+              "target_revision": 13,
+              "current_digest": "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042",
+              "desired_digest": "489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca",
+              "in_sync": false,
+              "changes": [],
+              "impact": {
+                "restart_required": true,
+                "address_remap": false,
+                "firewall_reconcile": false,
+                "profile_redistribution": false,
+                "derived_artifacts": []
+              }
+            },
+            "address_changes": [],
+            "artifacts": [],
+            "profile_redistribution": [],
+            "firewall": {
+              "reconcile": false,
+              "before": null,
+              "after": null
+            }
+          }
+        },
+        "description": "Configuration apply result, activation report, and evaluated plan.",
+        "x-description-zh": "配置应用结果、激活报告和已评估计划。"
+      }
+    }
+  }
+}

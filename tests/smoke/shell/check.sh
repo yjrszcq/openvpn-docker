@@ -16,4 +16,10 @@ done < <(
     -print0
 )
 
+non_executable="$(git -C "$ROOT_DIR" ls-files --stage '*.sh' | awk '$1 != "100755" { print $4 }')"
+if [ -n "$non_executable" ]; then
+  printf 'tracked shell scripts must use Git mode 100755:\n%s\n' "$non_executable" >&2
+  exit 1
+fi
+
 printf 'basic checks passed (%s shell files)\n' "$checked"

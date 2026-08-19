@@ -6,7 +6,7 @@
 
 ## 主要能力
 
-- CLI、entrypoint、OpenVPN hook、进程监督器和 management broker 均由 Go 二进制提供。
+- CLI、entrypoint、OpenVPN hook、进程监督器、management broker 和可选的认证 REST API 均由 Go 二进制提供。
 - `/etc/openvpn/meta/state.db` 是配置、客户端、地址、artifact 元数据、审计和 operation 状态的唯一结构化权威来源。
 - Easy-RSA 仍是 PKI 签发权威。证书、私钥、CRL、tls-crypt、profile、CCD 和日志仍作为数据目录中的文件保存。
 - 使用严格 YAML 声明期望配置，拒绝未知字段、重复字段、错误类型、null 和多文档。
@@ -15,6 +15,8 @@
 - 从校验和固定的 OpenVPN 源码构建 `linux/amd64` 和 `linux/arm64` 镜像。
 
 当前不提供 Web UI、TAP、LDAP/RADIUS/OIDC、Kubernetes、PostgreSQL/MySQL 或 HA。
+
+REST API v1 默认关闭，适合由独立前端或自动化客户端通过 HTTPS 反向代理访问。详见 [REST API 指南](docs/cn/v4/rest-api.md)。
 
 ## 快速开始
 
@@ -37,7 +39,7 @@ chmod 750 data config
 ```yaml
 services:
   openvpn:
-    image: szcq/openvpn:2.7.5
+    image: szcq/openvpn:latest
     container_name: openvpn
     restart: unless-stopped
     network_mode: host
@@ -54,7 +56,7 @@ services:
       - /dev/net/tun:/dev/net/tun
 ```
 
-Docker Hub tag 使用镜像内 OpenVPN 版本。这里的镜像内含 OpenVPN 2.7.5；生产环境应固定明确 tag。
+Docker Hub 同时发布示例使用的滚动 `latest` tag，以及与镜像内 OpenVPN 版本一致的版本 tag；生产环境应固定明确的版本 tag。
 
 快速部署文件有意只保留在线服务。包含 `openvpn-maintenance` 的完整配置可直接使用仓库根目录的 [docker-compose.yaml](docker-compose.yaml)；离线诊断、修复、迁移、备份和恢复流程见[操作手册](docs/cn/v4/operations.md#运行环境约定)。
 
@@ -109,10 +111,12 @@ chmod 600 laptop.ovpn
 
 | 变量 | 运行时默认值 / Compose 回退值 | `.env.example` 值 | 说明 |
 |---|---|---|---|
-| `OVPN_IMAGE` | `szcq/openvpn:2.7.5` | `szcq/openvpn:2.7.5` | Compose 使用的镜像。生产环境应固定已发布 tag。 |
+| `OVPN_IMAGE` | `szcq/openvpn:latest` | `szcq/openvpn:latest` | Compose 使用的镜像。生产环境应固定已发布的版本 tag。 |
 | `OVPN_CONFIG_FILE` | `/etc/ovpn-conf/config.yaml` | 未设置 | 期望状态声明式 YAML 的路径。 |
 | `OVPN_DATA_DIR` | `/etc/openvpn` | 未设置 | 保存 SQLite、PKI、artifact、日志和锁的持久数据目录。 |
 | `OVPN_RUNTIME_DIR` | `/run/openvpn-container` | 未设置 | 保存 runtime socket 和服务进程锁的临时目录。 |
+| `OVPN_API_LISTEN` | 未设置 | 空 | REST API v1 HTTP 监听地址，格式为 `地址:端口`；未设置或空值会关闭 API。仅宿主机访问填写 `127.0.0.1:<空闲端口>`，监听所有 IPv4 网卡填写 `0.0.0.0:<空闲端口>`；host network 不需要 `ports` 映射。 |
+| `OVPN_API_CORS_ORIGINS` | 未设置 | 空 | 填写不带协议、可带端口的域名或 IP，多个值用英文逗号分隔；未设置或空值会关闭 CORS。例如 `vpn-admin.example.com,192.0.2.10:3000`；单独填写 `*` 允许任意 HTTP(S) origin。 |
 | `OVPN_MAINTENANCE` | 未设置 | 未设置 | `migrate apply` 要求该值严格等于 `true`；Compose maintenance 服务会自动设置。 |
 | `OVPN_EDITOR` | `EDITOR`，然后 `nano` | 未设置 | 省略 `--editor/-e` 时，`client address edit` 使用的默认编辑器可执行文件；镜像内置 `nano`、`vim` 和 `vi`。 |
 | `EDITOR` | `nano` | 未设置 | 同时省略 `--editor/-e` 且未设置 `OVPN_EDITOR` 时使用的标准后备编辑器。 |
@@ -149,6 +153,7 @@ chmod 600 laptop.ovpn
 | `OVPN_TEMPLATE_ROOT` | `/usr/local/share/openvpn-container/templates` | compatibility contract 所选模板族的根目录。 |
 | `OVPN_OPENVPN_BIN` | `openvpn` | runtime 监督、PKI 校验和 capability 检查使用的 OpenVPN 可执行文件。 |
 | `OVPN_BROKER_BIN` | `ovpn-broker` | `server run` 监督的 management broker 可执行文件。 |
+| `OVPN_API_BIN` | `ovpn-api` | 仅当 `OVPN_API_LISTEN` 非空时使用的 REST API 可执行文件。 |
 | `OVPN_EASYRSA_BIN` | `/usr/share/easy-rsa/easyrsa`，否则 `easyrsa` | PKI 生命周期操作使用的 Easy-RSA 可执行文件。 |
 | `OVPN_IP_BIN` | `ip` | 网络 reconcile 使用的 Linux `ip` 可执行文件。 |
 | `OVPN_IPTABLES_BIN` | `iptables` | 防火墙 reconcile 使用的 Linux `iptables` 可执行文件。 |
@@ -219,6 +224,7 @@ docker compose start
 
 - [命令参考](docs/cn/v4/commands.md)
 - [操作手册](docs/cn/v4/operations.md)
+- [REST API 指南](docs/cn/v4/rest-api.md)
 - [数据升级与迁移政策](docs/cn/data-schema-upgrade-policy.md)
 - [镜像更新政策](docs/cn/image-update-policy.md)
 - 历史版本：[v1](docs/cn/v1/commands.md)、[v2](docs/cn/v2/commands.md)、[v3](docs/cn/v3/commands.md)

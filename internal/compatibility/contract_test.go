@@ -18,12 +18,28 @@ func repositoryContract(t *testing.T) []byte {
 	return data
 }
 
+func repositoryOpenVPNVersion(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "..", "versions.env"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if version, found := strings.CutPrefix(line, "OPENVPN_VERSION="); found {
+			return version
+		}
+	}
+	t.Fatal("versions.env does not define OPENVPN_VERSION")
+	return ""
+}
+
 func TestRepositoryContract(t *testing.T) {
 	contract, err := compatibility.Parse(repositoryContract(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !contract.SupportsVersion("2.7.5") || contract.SupportsVersion("2.7.6") {
+	expected := repositoryOpenVPNVersion(t)
+	if len(contract.SupportedOpenVPNVersions) != 1 || !contract.SupportsVersion(expected) {
 		t.Fatalf("unexpected supported versions: %v", contract.SupportedOpenVPNVersions)
 	}
 	if contract.Adapter.Name != "openvpn-2.7" || contract.Adapter.TemplateFamily != "openvpn-2.7" {
@@ -36,11 +52,12 @@ func TestRepositoryContract(t *testing.T) {
 
 func TestContractStrictness(t *testing.T) {
 	valid := string(repositoryContract(t))
+	supported := repositoryOpenVPNVersion(t)
 	tests := map[string]string{
 		"unknown-field":      strings.Replace(valid, `"version": 1,`, `"version": 1, "unknown": true,`, 1),
 		"duplicate-field":    strings.Replace(valid, `"version": 1,`, `"version": 1, "version": 1,`, 1),
 		"trailing-document":  valid + `{}`,
-		"unordered-versions": strings.Replace(valid, `"2.7.5"`, `"2.7.6", "2.7.5"`, 1),
+		"unordered-versions": strings.Replace(valid, `"`+supported+`"`, `"99.0.0", "`+supported+`"`, 1),
 		"duplicate-feature":  strings.Replace(valid, `"name": "data-ciphers"`, `"name": "tls-crypt"`, 1),
 		"empty-probes":       strings.Replace(valid, `["--tls-crypt key"]`, `[]`, 1),
 	}
@@ -54,7 +71,8 @@ func TestContractStrictness(t *testing.T) {
 }
 
 func TestContractRequiresCanonicalVersions(t *testing.T) {
-	data := strings.Replace(string(repositoryContract(t)), `"2.7.5"`, `"02.7.5"`, 1)
+	supported := repositoryOpenVPNVersion(t)
+	data := strings.Replace(string(repositoryContract(t)), `"`+supported+`"`, `"0`+supported+`"`, 1)
 	if _, err := compatibility.Parse([]byte(data)); err == nil {
 		t.Fatal("noncanonical OpenVPN version was accepted")
 	}

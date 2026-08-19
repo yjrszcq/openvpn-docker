@@ -132,6 +132,14 @@ jobs:
           source_image="ghcr.io/${GITHUB_REPOSITORY,,}:ovpn$OPENVPN_VERSION"
           target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"
           docker buildx imagetools create --tag "$target_image" "$source_image"
+      - name: Publish latest tag to Docker Hub
+        run: |
+          set -a
+          . ./versions.env
+          set +a
+          source_image="ghcr.io/${GITHUB_REPOSITORY,,}:ovpn$OPENVPN_VERSION"
+          target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:latest"
+          docker buildx imagetools create --tag "$target_image" "$source_image"
 
   publish-cross-branch:
     name: Promote cross-branch candidate after approval
@@ -193,3 +201,35 @@ jobs:
           source_image="ghcr.io/${GITHUB_REPOSITORY,,}:ovpn$OPENVPN_VERSION"
           target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"
           docker buildx imagetools create --tag "$target_image" "$source_image"
+      - name: Publish latest tag to Docker Hub
+        run: |
+          set -a
+          . ./versions.env
+          set +a
+          source_image="ghcr.io/${GITHUB_REPOSITORY,,}:ovpn$OPENVPN_VERSION"
+          target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:latest"
+          docker buildx imagetools create --tag "$target_image" "$source_image"
+
+  notify:
+    name: Send Gotify release notification
+    needs:
+      - policy
+      - blocked
+      - publish-same-branch
+      - publish-cross-branch
+    if: always()
+    uses: yjrszcq/github-workflows/.github/workflows/gotify-notify.yml@main
+    with:
+      title: ${{ format('{0} 镜像发布', github.repository) }}
+      message: |
+        候选工作流：${{ github.event.workflow_run.conclusion }}
+        发布策略任务：${{ needs.policy.result }}
+        发布决策：${{ needs.policy.outputs.decision || '未评估' }}
+        阻止报告任务：${{ needs.blocked.result }}
+        同分支发布：${{ needs.publish-same-branch.result }}
+        跨分支发布：${{ needs.publish-cross-branch.result }}
+        运行详情：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      priority: ${{ (github.event.workflow_run.conclusion != 'success' || needs.policy.result == 'failure' || needs.blocked.result == 'failure' || needs.publish-same-branch.result == 'failure' || needs.publish-cross-branch.result == 'failure') && 8 || 5 }}
+    secrets:
+      gotify_url: ${{ secrets.GOTIFY_URL }}
+      gotify_token: ${{ secrets.GOTIFY_TOKEN }}

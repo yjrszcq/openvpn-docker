@@ -12,6 +12,7 @@ import (
 
 	"github.com/yjrszcq/openvpn-docker/internal/apperror"
 	"github.com/yjrszcq/openvpn-docker/internal/artifact"
+	"github.com/yjrszcq/openvpn-docker/internal/auditactor"
 	"github.com/yjrszcq/openvpn-docker/internal/buildinfo"
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
 	migrationservice "github.com/yjrszcq/openvpn-docker/internal/migration"
@@ -89,7 +90,7 @@ func runMigrationApply(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	runtimeDir := environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)
-	result, err := migrationservice.Apply(context.Background(), migrationservice.ApplyOptions{DataDir: dataDir, RuntimeDir: runtimeDir, Maintenance: true, Version: buildinfo.Current().Version, Renderer: renderer, Paths: render.Paths{DataDir: dataDir, RuntimeDir: runtimeDir}, Now: now})
+	result, err := migrationservice.Apply(auditactor.LocalCLI(context.Background()), migrationservice.ApplyOptions{DataDir: dataDir, RuntimeDir: runtimeDir, Maintenance: true, Version: buildinfo.Current().Version, Renderer: renderer, Paths: render.Paths{DataDir: dataDir, RuntimeDir: runtimeDir}, Now: now})
 	if err != nil {
 		return writeMigrationError(stderr, err, jsonMode)
 	}

@@ -15,6 +15,9 @@ tracked_files=(
   tests/smoke/shell/release-metadata-smoke.sh
   docs/en/image-update-policy.md
   docs/cn/image-update-policy.md
+  internal/httpapi/docs/openapi.json
+  docs/en/v4/rest-api.md
+  docs/cn/v4/rest-api.md
 )
 for file in "${tracked_files[@]}"; do
   cp "$ROOT_DIR/$file" "$FIXTURE/$file"
@@ -24,8 +27,12 @@ git -C "$FIXTURE" init -q
 git -C "$FIXTURE" add "${tracked_files[@]}"
 
 SCRIPT="$FIXTURE/scripts/update-image-version.sh"
-"$SCRIPT" 4.0.2 >"$TMP_DIR/same.out"
-grep -Fqx 'image version is already 4.0.2; metadata is consistent' "$TMP_DIR/same.out"
+current_version="$(sed -n 's/^IMAGE_VERSION=//p' "$FIXTURE/versions.env")"
+current_major="${current_version%%.*}"
+next_major=$((current_major + 1))
+next_version="$next_major.0.0"
+"$SCRIPT" "$current_version" >"$TMP_DIR/same.out"
+grep -Fqx "image version is already $current_version; metadata is consistent" "$TMP_DIR/same.out"
 
 before="$(git -C "$FIXTURE" hash-object internal/buildinfo/info.go)"
 set +e
@@ -36,22 +43,29 @@ test "$status" -eq 64
 grep -Fqx 'VERSION must use numeric major.minor.patch form' "$TMP_DIR/invalid.err"
 test "$before" = "$(git -C "$FIXTURE" hash-object internal/buildinfo/info.go)"
 
-"$SCRIPT" 4.0.3 >"$TMP_DIR/update.out"
-grep -Fqx 'updated project image version from 4.0.2 to 4.0.3' "$TMP_DIR/update.out"
-grep -Fqx 'IMAGE_VERSION=4.0.3' "$FIXTURE/versions.env"
-grep -Fq 'Version   = "4.0.3"' "$FIXTURE/internal/buildinfo/info.go"
+"$SCRIPT" "$next_version" >"$TMP_DIR/update.out"
+grep -Fqx "updated project image version from $current_version to $next_version" "$TMP_DIR/update.out"
+grep -Fqx "IMAGE_VERSION=$next_version" "$FIXTURE/versions.env"
+grep -Fq "Version   = \"$next_version\"" "$FIXTURE/internal/buildinfo/info.go"
+grep -Fq "\"version\": \"$next_version\"" "$FIXTURE/internal/httpapi/docs/openapi.json"
+test "$(grep -Fc "$next_version" "$FIXTURE/docs/en/v4/rest-api.md")" -eq 2
+test "$(grep -Fc "$next_version" "$FIXTURE/docs/cn/v4/rest-api.md")" -eq 2
+grep -Fq "\`$next_major.0\`" "$FIXTURE/docs/en/image-update-policy.md"
+grep -Fq "\`$next_major\`" "$FIXTURE/docs/en/image-update-policy.md"
+grep -Fq "\`$next_major.0\`" "$FIXTURE/docs/cn/image-update-policy.md"
+grep -Fq "\`$next_major\`" "$FIXTURE/docs/cn/image-update-policy.md"
 "$FIXTURE/scripts/verify-release-metadata.sh" >/dev/null
 
-"$SCRIPT" 4.0.2 >/dev/null
-sed -i 's/Version   = "4.0.2"/Version   = "9.9.9"/' "$FIXTURE/internal/buildinfo/info.go"
+"$SCRIPT" "$current_version" >/dev/null
+sed -i "s/Version   = \"$current_version\"/Version   = \"9.9.9\"/" "$FIXTURE/internal/buildinfo/info.go"
 set +e
-"$SCRIPT" 4.0.2 >"$TMP_DIR/drift.out" 2>"$TMP_DIR/drift.err"
+"$SCRIPT" "$current_version" >"$TMP_DIR/drift.out" 2>"$TMP_DIR/drift.err"
 status=$?
 set -e
 test "$status" -eq 65
-grep -Fq 'internal/buildinfo/info.go: expected 1 occurrence(s) of 4.0.2, found 0' "$TMP_DIR/drift.err"
+grep -Fq "internal/buildinfo/info.go: expected 1 occurrence(s) of $current_version, found 0" "$TMP_DIR/drift.err"
 
-sed -i 's/Version   = "9.9.9"/Version   = "4.0.2"/' "$FIXTURE/internal/buildinfo/info.go"
+sed -i "s/Version   = \"9.9.9\"/Version   = \"$current_version\"/" "$FIXTURE/internal/buildinfo/info.go"
 before_hashes="$(for file in "${tracked_files[@]}"; do git -C "$FIXTURE" hash-object "$file"; done)"
 cat >"$FIXTURE/scripts/verify-release-metadata.sh" <<'FAIL_SECOND_VALIDATION'
 #!/usr/bin/env bash
@@ -69,7 +83,7 @@ fi
 FAIL_SECOND_VALIDATION
 chmod +x "$FIXTURE/scripts/verify-release-metadata.sh"
 set +e
-"$SCRIPT" 4.0.3 >"$TMP_DIR/rollback.out" 2>"$TMP_DIR/rollback.err"
+"$SCRIPT" "$next_version" >"$TMP_DIR/rollback.out" 2>"$TMP_DIR/rollback.err"
 status=$?
 set -e
 test "$status" -eq 65

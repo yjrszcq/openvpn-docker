@@ -20,6 +20,7 @@ grep -Fq 'test "$DATA_SCHEMA" = 4' "$dockerfile"
 grep -Fq 'org.opencontainers.image.version="$IMAGE_VERSION"' "$dockerfile"
 grep -Fq 'org.opencontainers.image.licenses="GPL-2.0-only"' "$dockerfile"
 grep -Fq '/usr/local/lib/openvpn-container/go/ovpn-broker' "$dockerfile"
+grep -Fq '/usr/local/lib/openvpn-container/go/ovpn-api' "$dockerfile"
 grep -Fq "grep -Fq 'CGO_ENABLED=1'" "$dockerfile"
 
 for removed in embedded-management openvpn-bootstrap.sh trusted-management-keys \

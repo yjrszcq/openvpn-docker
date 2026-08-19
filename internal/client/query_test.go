@@ -92,6 +92,13 @@ func TestListAndSelectCurrentClients(t *testing.T) {
 	if result.Clients[1].IPv4.Mode != "none" || result.Clients[1].IPv4.State != "unavailable" || result.Clients[1].IPv4.Address != nil {
 		t.Fatalf("unexpected unavailable view: %+v", result.Clients[1].IPv4)
 	}
+	view, err := fixture.service.Get(context.Background(), activeID)
+	if err != nil || view.ID != activeID || view.Name != "alpha" {
+		t.Fatalf("Get()=%+v err=%v", view, err)
+	}
+	if _, err := fixture.service.Get(context.Background(), "11111111"); !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("short Get error=%v", err)
+	}
 	_, selected, err := fixture.service.Select(context.Background(), Selector{Name: "alpha"})
 	if err != nil || selected.Client.ID != activeID {
 		t.Fatalf("name selection=%+v err=%v", selected.Client, err)

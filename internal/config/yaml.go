@@ -305,3 +305,18 @@ func NewView(value domain.Config) View {
 	view.Logging.Backups = value.Logging.Backups
 	return view
 }
+
+// FromView validates and normalizes the stable JSON configuration shape.
+func FromView(view View) (domain.Config, error) {
+	protocol, family, port := view.Server.Protocol, view.Server.Family, view.Server.Port
+	clientToClient := view.Server.ClientToClient
+	dynamicPoolSize := view.IPv4.DynamicPoolSize
+	natInterface := view.IPv4.NATInterface
+	maxBytes, backups := view.Logging.MaxBytes, view.Logging.Backups
+	return normalize(yamlConfig{
+		Version: view.Version,
+		Server:  yamlServer{Endpoint: view.Server.Endpoint, ClientToClient: &clientToClient, Transport: yamlTransport{Protocol: &protocol, Family: &family, Port: &port}},
+		IPv4:    yamlIPv4{Network: view.IPv4.Network, DynamicPoolSize: &dynamicPoolSize, NAT: yamlNAT{Enabled: view.IPv4.NATEnabled, Interface: &natInterface}, RedirectGateway: view.IPv4.RedirectGateway, DNS: view.IPv4.DNS, Routes: view.IPv4.Routes},
+		Logging: yamlLogging{MaxBytes: &maxBytes, Backups: &backups},
+	})
+}

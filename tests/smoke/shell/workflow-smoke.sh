@@ -20,11 +20,14 @@ grep -Fq 'GOPROXY: direct' "$WORKFLOWS/test.yml"
 grep -Fq 'gofmt -l cmd internal' "$WORKFLOWS/test.yml"
 grep -Fq 'go vet ./...' "$WORKFLOWS/test.yml"
 grep -Fq 'go test -race ./...' "$WORKFLOWS/test.yml"
+grep -Fq 'go build -buildvcs=false -trimpath -o "$RUNNER_TEMP/ovpn-api" ./cmd/ovpn-api' "$WORKFLOWS/test.yml"
 grep -Fq 'scripts/verify-go-licenses.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'scripts/verify-release-metadata.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/release-metadata-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/shell/update-image-version-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/container/runtime-image-smoke.sh' "$WORKFLOWS/test.yml"
+grep -Fq 'tests/smoke/container/api-container-smoke.sh' "$WORKFLOWS/test.yml"
+grep -Fq 'OVPN_API_REQUIRED=1' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/container/backup-restore-container-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/container/client-lifecycle-container-smoke.sh' "$WORKFLOWS/test.yml"
 grep -Fq 'tests/smoke/container/cli-ux-container-smoke.sh' "$WORKFLOWS/test.yml"
@@ -85,11 +88,30 @@ if grep -Eq 'upgrade-state|OVPN_UPGRADE_' "$WORKFLOWS/test.yml"; then
   exit 1
 fi
 grep -Fq 'schedule:' "$WORKFLOWS/upstream-check.yml"
+grep -Fq 'workflow_run:' "$WORKFLOWS/upstream-check.yml"
+grep -Fq "if: github.event_name != 'workflow_run'" "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'scripts/update-openvpn.sh' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'scripts/verify-release-metadata.sh' "$WORKFLOWS/upstream-check.yml"
+grep -Fq 'git add versions.env compatibility/contract.json' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'OPENVPN_CANDIDATE_RANGE' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'in_range=true' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'gh pr create' "$WORKFLOWS/upstream-check.yml"
+grep -Fq 'uses: yjrszcq/github-workflows/.github/workflows/gotify-notify.yml@main' "$WORKFLOWS/upstream-check.yml"
+grep -Fq "if: needs.discover.outputs.pr_created == 'true'" "$WORKFLOWS/upstream-check.yml"
+grep -Fq 'pr_created=true' "$WORKFLOWS/upstream-check.yml"
+grep -Fq 'pr_url=$pr_url' "$WORKFLOWS/upstream-check.yml"
+grep -Fq 'version=$target' "$WORKFLOWS/upstream-check.yml"
+grep -Fq 'OpenVPN 版本：${{ needs.discover.outputs.version }}' "$WORKFLOWS/upstream-check.yml"
+grep -Fq '发现 OpenVPN 上游新版本' "$WORKFLOWS/upstream-check.yml"
+grep -Fq 'github.event.workflow_run.head_repository.full_name == github.repository' "$WORKFLOWS/upstream-check.yml"
+grep -Fq "startsWith(github.event.workflow_run.head_branch, 'automation/openvpn-')" "$WORKFLOWS/upstream-check.yml"
+grep -Fq "github.event.workflow_run.conclusion == 'success'" "$WORKFLOWS/upstream-check.yml"
+grep -Fq "github.event.workflow_run.conclusion != 'success'" "$WORKFLOWS/upstream-check.yml"
+grep -Fq '候选版本验证通过' "$WORKFLOWS/upstream-check.yml"
+grep -Fq '候选版本验证失败' "$WORKFLOWS/upstream-check.yml"
+grep -Fq '验证结果：${{ github.event.workflow_run.conclusion }}' "$WORKFLOWS/upstream-check.yml"
+grep -Fq 'gotify_url: ${{ secrets.GOTIFY_URL }}' "$WORKFLOWS/upstream-check.yml"
+grep -Fq 'gotify_token: ${{ secrets.GOTIFY_TOKEN }}' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'workflow_run:' "$WORKFLOWS/release.yml"
 grep -Fq 'name: Image Release' "$WORKFLOWS/release.yml"
 grep -Fq 'image_required == '\''true'\''' "$WORKFLOWS/release.yml"
@@ -100,6 +122,22 @@ grep -Fq 'DOCKERHUB_USERNAME: szcq' "$WORKFLOWS/release.yml"
 grep -Fq 'DOCKERHUB_IMAGE: openvpn' "$WORKFLOWS/release.yml"
 grep -Fq 'secrets.DOCKER_TOKEN' "$WORKFLOWS/release.yml"
 grep -Fq "GHCR_TOKEN: \${{ github.token }}" "$WORKFLOWS/release.yml"
+grep -Fq 'uses: yjrszcq/github-workflows/.github/workflows/gotify-notify.yml@main' "$WORKFLOWS/release.yml"
+grep -Fq 'if: always()' "$WORKFLOWS/release.yml"
+grep -Fq 'gotify_url: ${{ secrets.GOTIFY_URL }}' "$WORKFLOWS/release.yml"
+grep -Fq 'gotify_token: ${{ secrets.GOTIFY_TOKEN }}' "$WORKFLOWS/release.yml"
 # shellcheck disable=SC2016 # This asserts the literal shell assignment in the workflow.
-grep -Fq 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"' "$WORKFLOWS/release.yml"
+test "$(grep -Fc 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"' "$WORKFLOWS/release.yml")" -eq 2
+# shellcheck disable=SC2016 # This asserts the literal shell assignment in the workflow.
+test "$(grep -Fc 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:latest"' "$WORKFLOWS/release.yml")" -eq 2
+for publish_block in \
+  "$(sed -n '/^  publish-same-branch:/,/^  publish-cross-branch:/p' "$WORKFLOWS/release.yml")" \
+  "$(sed -n '/^  publish-cross-branch:/,$p' "$WORKFLOWS/release.yml")"; do
+  version_line="$(grep -nF 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"' <<<"$publish_block" | cut -d: -f1)"
+  latest_line="$(grep -nF 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:latest"' <<<"$publish_block" | cut -d: -f1)"
+  if [ -z "$version_line" ] || [ -z "$latest_line" ] || [ "$version_line" -ge "$latest_line" ]; then
+    echo 'Docker Hub latest tag must be published after the OpenVPN version tag' >&2
+    exit 1
+  fi
+done
 printf 'workflow smoke passed\n'

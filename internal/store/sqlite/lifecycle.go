@@ -22,7 +22,7 @@ const (
 	DefaultPath     = "/etc/openvpn/meta/state.db"
 	DataSchema      = buildinfo.DataSchema
 	InitialRevision = 1
-	CurrentRevision = 8
+	CurrentRevision = 9
 	BusyTimeoutMS   = 30000
 )
 
@@ -404,6 +404,7 @@ func validateSchemaObjects(ctx context.Context, database *sql.DB) error {
 		"artifacts":           {},
 		"audit_events":        {},
 		"operations":          {},
+		"api_keys":            {},
 	}
 	rows, err := database.QueryContext(ctx, `
 SELECT name, sql FROM sqlite_schema
@@ -445,6 +446,8 @@ WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`)
 		"assignments_current_client_network",
 		"assignments_current_network_address",
 		"client_leases_network_address",
+		"api_keys_instance_name",
+		"api_keys_secret_digest",
 	} {
 		var definition string
 		if err := database.QueryRowContext(ctx, "SELECT sql FROM sqlite_schema WHERE type = 'index' AND name = ?", name).Scan(&definition); err != nil {

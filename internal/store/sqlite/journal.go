@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yjrszcq/openvpn-docker/internal/auditactor"
 	"github.com/yjrszcq/openvpn-docker/internal/domain"
 )
 
@@ -180,7 +181,7 @@ func appendAudit(ctx context.Context, transaction *sql.Tx, instanceID, operation
 	if err != nil {
 		return err
 	}
-	encoded, err := json.Marshal(payload)
+	encoded, err := json.Marshal(withAuditActor(ctx, payload))
 	if err != nil {
 		return fmt.Errorf("encode audit payload: %w", err)
 	}
@@ -190,6 +191,26 @@ VALUES(?, ?, ?, ?, 1, ?, ?)`, eventID, instanceID, operationID, eventType, strin
 		return classifySQLite("append audit event", err)
 	}
 	return nil
+}
+
+func withAuditActor(ctx context.Context, payload any) any {
+	actor, ok := auditactor.From(ctx)
+	if !ok {
+		return payload
+	}
+	values, ok := payload.(map[string]any)
+	if !ok {
+		return payload
+	}
+	copy := make(map[string]any, len(values)+2)
+	for key, value := range values {
+		copy[key] = value
+	}
+	copy["actor_kind"] = actor.Kind
+	if actor.ID != "" {
+		copy["actor_id"] = actor.ID
+	}
+	return copy
 }
 
 func validateOperation(operation Operation) error {
