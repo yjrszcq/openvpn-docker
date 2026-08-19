@@ -6,11 +6,18 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/yjrszcq/openvpn-docker/internal/apikey"
 	"github.com/yjrszcq/openvpn-docker/internal/auditactor"
+	"github.com/yjrszcq/openvpn-docker/internal/buildinfo"
+	clientservice "github.com/yjrszcq/openvpn-docker/internal/client"
+	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 	"github.com/yjrszcq/openvpn-docker/internal/domain"
+	runtimecontrol "github.com/yjrszcq/openvpn-docker/internal/runtime"
+	statecontrol "github.com/yjrszcq/openvpn-docker/internal/state"
 )
 
 const maxAuthorizationBytes = 512
@@ -22,6 +29,65 @@ type Authenticator interface {
 type handler struct {
 	authenticator Authenticator
 	origins       map[string]struct{}
+	resources     Resources
+}
+
+type ClientReader interface {
+	List(context.Context) (clientservice.ListResult, error)
+	Get(context.Context, string) (clientservice.View, error)
+}
+
+type Resources struct {
+	Version func() VersionResponse
+	State   func(context.Context) (statecontrol.Report, error)
+	Clients ClientReader
+	Runtime func(context.Context) (runtimecontrol.Status, error)
+	Events  func(context.Context, int) ([]runtimecontrol.Event, error)
+}
+
+type VersionResponse struct {
+	buildinfo.Info
+	Compatibility CompatibilityResponse `json:"compatibility"`
+}
+
+type CompatibilityResponse struct {
+	ContractVersion          int      `json:"contract_version"`
+	Adapter                  string   `json:"adapter"`
+	TemplateFamily           string   `json:"template_family"`
+	SupportedOpenVPNVersions []string `json:"supported_openvpn_versions"`
+}
+
+func NewVersionResponse(contract compatibility.Contract) VersionResponse {
+	return VersionResponse{
+		Info: buildinfo.Current(),
+		Compatibility: CompatibilityResponse{
+			ContractVersion: contract.Version, Adapter: contract.Adapter.Name,
+			TemplateFamily:           contract.Adapter.TemplateFamily,
+			SupportedOpenVPNVersions: append([]string(nil), contract.SupportedOpenVPNVersions...),
+		},
+	}
+}
+
+type stateResponse struct {
+	Version               int                         `json:"version"`
+	State                 statecontrol.Classification `json:"state"`
+	DataSchema            int                         `json:"data_schema"`
+	InstanceID            string                      `json:"instance_id,omitempty"`
+	Revision              uint64                      `json:"revision,omitempty"`
+	ScannedAt             time.Time                   `json:"scanned_at"`
+	IssueCount            int                         `json:"issue_count"`
+	PendingOperationCount int                         `json:"pending_operation_count"`
+	Issues                []stateIssueResponse        `json:"issues,omitempty"`
+}
+
+type stateIssueResponse struct {
+	ID           string                `json:"id"`
+	Severity     statecontrol.Severity `json:"severity"`
+	Action       string                `json:"action"`
+	Target       string                `json:"target,omitempty"`
+	OwnerID      string                `json:"owner_id,omitempty"`
+	ArtifactKind string                `json:"artifact_kind,omitempty"`
+	Detail       string                `json:"detail"`
 }
 
 type keyContextKey struct{}
@@ -34,9 +100,9 @@ func AuthenticatedKey(ctx context.Context) (apikey.Key, bool) {
 
 // NewHandler constructs the HTTP foundation. Resource handlers are added in
 // later phases; every versioned route is authenticated before route lookup.
-func NewHandler(authenticator Authenticator, allowedOrigins []string) (http.Handler, error) {
-	if authenticator == nil {
-		return nil, errors.New("API authenticator is required")
+func NewHandler(authenticator Authenticator, allowedOrigins []string, resources ...Resources) (http.Handler, error) {
+	if authenticator == nil || len(resources) > 1 {
+		return nil, errors.New("API authenticator and valid resources are required")
 	}
 	origins := make(map[string]struct{}, len(allowedOrigins))
 	for _, origin := range allowedOrigins {
@@ -48,7 +114,11 @@ func NewHandler(authenticator Authenticator, allowedOrigins []string) (http.Hand
 		}
 		origins[origin] = struct{}{}
 	}
-	return &handler{authenticator: authenticator, origins: origins}, nil
+	configured := Resources{}
+	if len(resources) == 1 {
+		configured = resources[0]
+	}
+	return &handler{authenticator: authenticator, origins: origins, resources: configured}, nil
 }
 
 func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
@@ -85,7 +155,123 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 	ctx := context.WithValue(request.Context(), keyContextKey{}, key)
 	ctx = auditactor.With(ctx, auditactor.Actor{Kind: "api-key", ID: key.ID})
 	request = request.WithContext(ctx)
+	handler.routeRead(response, request, requestID)
+}
+
+func (handler *handler) routeRead(response http.ResponseWriter, request *http.Request, requestID string) {
+	if request.Method != http.MethodGet {
+		response.Header().Set("Allow", http.MethodGet)
+		writeAPIError(response, http.StatusMethodNotAllowed, "method_not_allowed", "method is not allowed", requestID)
+		return
+	}
+	if request.URL.RawQuery != "" && request.URL.Path != "/api/v1/runtime/events" {
+		writeAPIError(response, http.StatusBadRequest, "invalid_query", "query parameters are not accepted", requestID)
+		return
+	}
+	ctx := request.Context()
+	switch request.URL.Path {
+	case "/api/v1/version":
+		if handler.resources.Version != nil {
+			writeJSON(response, http.StatusOK, handler.resources.Version())
+			return
+		}
+	case "/api/v1/state", "/api/v1/state/doctor":
+		if handler.resources.State != nil {
+			value, err := handler.resources.State(ctx)
+			handler.writeResult(response, newStateResponse(value, request.URL.Path == "/api/v1/state/doctor"), err, requestID)
+			return
+		}
+	case "/api/v1/clients":
+		if handler.resources.Clients != nil {
+			value, err := handler.resources.Clients.List(ctx)
+			handler.writeResult(response, value, err, requestID)
+			return
+		}
+	case "/api/v1/runtime":
+		if handler.resources.Runtime != nil {
+			value, err := handler.resources.Runtime(ctx)
+			handler.writeResult(response, value, err, requestID)
+			return
+		}
+	case "/api/v1/runtime/events":
+		if handler.resources.Events != nil {
+			lines, err := parseLines(request)
+			if err != nil {
+				writeAPIError(response, http.StatusBadRequest, "invalid_query", "lines must be an integer between 0 and 1000", requestID)
+				return
+			}
+			value, err := handler.resources.Events(ctx, lines)
+			handler.writeResult(response, map[string]any{"version": 1, "events": value}, err, requestID)
+			return
+		}
+	default:
+		if handler.resources.Clients != nil && strings.HasPrefix(request.URL.Path, "/api/v1/clients/") && strings.Count(strings.TrimPrefix(request.URL.Path, "/api/v1/clients/"), "/") == 0 {
+			id := strings.TrimPrefix(request.URL.Path, "/api/v1/clients/")
+			if domain.ValidUUID(id) {
+				value, err := handler.resources.Clients.Get(ctx, id)
+				handler.writeResult(response, value, err, requestID)
+				return
+			}
+			writeAPIError(response, http.StatusBadRequest, "invalid_client_id", "client ID must be a complete UUID", requestID)
+			return
+		}
+	}
 	writeAPIError(response, http.StatusNotFound, "not_found", "resource was not found", requestID)
+}
+
+func newStateResponse(report statecontrol.Report, includeIssues bool) stateResponse {
+	response := stateResponse{
+		Version: report.Version, State: report.State, DataSchema: report.DataSchema,
+		InstanceID: report.InstanceID, Revision: report.Revision, ScannedAt: report.ScannedAt,
+		IssueCount: report.IssueCount, PendingOperationCount: report.PendingCount,
+	}
+	if includeIssues {
+		response.Issues = make([]stateIssueResponse, len(report.Issues))
+		for index, issue := range report.Issues {
+			response.Issues[index] = stateIssueResponse{
+				ID: issue.ID, Severity: issue.Severity, Action: issue.Action, Target: issue.Target,
+				OwnerID: issue.OwnerID, ArtifactKind: issue.ArtifactKind, Detail: issue.Detail,
+			}
+		}
+	}
+	return response
+}
+
+func (handler *handler) writeResult(response http.ResponseWriter, value any, err error, requestID string) {
+	switch {
+	case err == nil:
+		writeJSON(response, http.StatusOK, value)
+	case errors.Is(err, clientservice.ErrNotFound):
+		writeAPIError(response, http.StatusNotFound, "client_not_found", "client was not found", requestID)
+	case errors.Is(err, clientservice.ErrInvalidRequest):
+		writeAPIError(response, http.StatusBadRequest, "invalid_request", "request is invalid", requestID)
+	case errors.Is(err, runtimecontrol.ErrUnavailable):
+		writeAPIError(response, http.StatusServiceUnavailable, "runtime_unavailable", "OpenVPN runtime is unavailable", requestID)
+	default:
+		writeAPIError(response, http.StatusInternalServerError, "internal_error", "request could not be completed", requestID)
+	}
+}
+
+func parseLines(request *http.Request) (int, error) {
+	if len(request.URL.Query()) > 1 {
+		return 0, errors.New("unexpected query")
+	}
+	query := request.URL.Query()
+	values, ok := query["lines"]
+	if !ok && len(query) == 0 {
+		return 100, nil
+	}
+	if !ok {
+		return 0, errors.New("unexpected query")
+	}
+	if len(values) != 1 {
+		return 0, errors.New("repeated lines")
+	}
+	value, err := strconv.Atoi(values[0])
+	if err != nil || value < 0 || value > 1000 {
+		return 0, errors.New("invalid lines")
+	}
+	return value, nil
 }
 
 func (handler *handler) health(response http.ResponseWriter, request *http.Request, requestID string) {

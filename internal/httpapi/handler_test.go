@@ -9,12 +9,30 @@ import (
 	"testing"
 
 	"github.com/yjrszcq/openvpn-docker/internal/apikey"
+	"github.com/yjrszcq/openvpn-docker/internal/buildinfo"
+	clientservice "github.com/yjrszcq/openvpn-docker/internal/client"
+	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 	"github.com/yjrszcq/openvpn-docker/internal/domain"
+	runtimecontrol "github.com/yjrszcq/openvpn-docker/internal/runtime"
+	statecontrol "github.com/yjrszcq/openvpn-docker/internal/state"
 )
 
 type fakeAuthenticator struct {
 	key apikey.Key
 	err error
+}
+
+type fakeClients struct {
+	list clientservice.ListResult
+	view clientservice.View
+	err  error
+}
+
+func (fake fakeClients) List(context.Context) (clientservice.ListResult, error) {
+	return fake.list, fake.err
+}
+func (fake fakeClients) Get(context.Context, string) (clientservice.View, error) {
+	return fake.view, fake.err
 }
 
 func (fake fakeAuthenticator) Authenticate(_ context.Context, token string) (apikey.Key, error) {
@@ -135,6 +153,60 @@ func TestOriginValidation(t *testing.T) {
 	}
 }
 
+func TestReadResourceRoutingAndErrors(t *testing.T) {
+	key := apikey.Key{ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
+	clientID := "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+	resources := Resources{
+		Version: func() VersionResponse { return VersionResponse{Info: buildinfo.Current()} },
+		Clients: fakeClients{list: clientservice.ListResult{Version: 1}, view: clientservice.View{ID: clientID, Name: "laptop"}},
+		Runtime: func(context.Context) (runtimecontrol.Status, error) {
+			return runtimecontrol.Status{}, runtimecontrol.ErrUnavailable
+		},
+		Events: func(_ context.Context, lines int) ([]runtimecontrol.Event, error) {
+			return []runtimecontrol.Event{{"lines": lines}}, nil
+		},
+	}
+	handler, err := NewHandler(fakeAuthenticator{key: key}, nil, resources)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		path   string
+		status int
+		body   string
+	}{
+		{"/api/v1/version", http.StatusOK, `"data_schema":4`},
+		{"/api/v1/clients", http.StatusOK, `"clients":null`},
+		{"/api/v1/clients/" + clientID, http.StatusOK, `"name":"laptop"`},
+		{"/api/v1/clients/not-a-uuid", http.StatusBadRequest, `"kind":"invalid_client_id"`},
+		{"/api/v1/runtime", http.StatusServiceUnavailable, `"kind":"runtime_unavailable"`},
+		{"/api/v1/runtime/events?lines=12", http.StatusOK, `"lines":12`},
+		{"/api/v1/runtime/events?other=12", http.StatusBadRequest, `"kind":"invalid_query"`},
+	} {
+		request := httptest.NewRequest(http.MethodGet, test.path, nil)
+		request.Header.Set("Authorization", "Bearer valid-token")
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != test.status || !strings.Contains(response.Body.String(), test.body) {
+			t.Fatalf("GET %s response=%d body=%q", test.path, response.Code, response.Body.String())
+		}
+	}
+}
+
+func TestReadResourcesRejectMethods(t *testing.T) {
+	handler, err := NewHandler(fakeAuthenticator{key: apikey.Key{ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}}, nil, Resources{Version: func() VersionResponse { return VersionResponse{Info: buildinfo.Current()} }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/version", nil)
+	request.Header.Set("Authorization", "Bearer valid-token")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusMethodNotAllowed || response.Header().Get("Allow") != http.MethodGet {
+		t.Fatalf("response=%d headers=%v", response.Code, response.Header())
+	}
+}
+
 func newTestHandler(t *testing.T, authenticator Authenticator) http.Handler {
 	t.Helper()
 	handler, err := NewHandler(authenticator, nil)
@@ -142,4 +214,18 @@ func newTestHandler(t *testing.T, authenticator Authenticator) http.Handler {
 		t.Fatal(err)
 	}
 	return handler
+}
+
+func TestVersionAndStateResponsesUseAPIContract(t *testing.T) {
+	contract := compatibility.Contract{Version: 1, SupportedOpenVPNVersions: []string{"2.7.6"}, Adapter: compatibility.Adapter{Name: "openvpn-2.7", TemplateFamily: "openvpn-2.7"}}
+	version := NewVersionResponse(contract)
+	if version.Compatibility.Adapter != "openvpn-2.7" || len(version.Compatibility.SupportedOpenVPNVersions) != 1 {
+		t.Fatalf("version response=%+v", version)
+	}
+	report := statecontrol.Report{Version: 1, DataSchema: 4, Issues: []statecontrol.Issue{{ID: "TEST", OwnerID: "owner", ArtifactKind: "profile"}}, IssueCount: 1}
+	summary := newStateResponse(report, false)
+	doctor := newStateResponse(report, true)
+	if summary.Issues != nil || len(doctor.Issues) != 1 || doctor.Issues[0].OwnerID != "owner" {
+		t.Fatalf("summary=%+v doctor=%+v", summary, doctor)
+	}
 }
