@@ -39,12 +39,13 @@ func runAPIKeyCreate(args []string, stdout, stderr io.Writer) int {
 		return writeErrorMode(stderr, usageError("usage: ovpn api key create NAME [--output FILE|-] [--json]"), jsonMode)
 	}
 	name := positionals[0]
-	service, store, err := openAPIKeyService(auditactor.LocalCLI(context.Background()))
+	ctx := auditactor.LocalCLI(context.Background())
+	service, store, err := openAPIKeyService(ctx)
 	if err != nil {
 		return writeAPIKeyError(stderr, err, jsonMode)
 	}
 	defer store.Close()
-	result, err := service.Create(auditactor.LocalCLI(context.Background()), name)
+	result, err := service.Create(ctx, name)
 	if err != nil {
 		return writeAPIKeyError(stderr, err, jsonMode)
 	}

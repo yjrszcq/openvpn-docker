@@ -59,8 +59,11 @@ func TestAPIKeyCLISecretFileAndUsage(t *testing.T) {
 		t.Fatalf("file create code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	info, err := os.Stat(output)
-	if err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("secret file mode=%v err=%v", info.Mode(), err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("secret file mode=%v", info.Mode())
 	}
 	for _, args := range [][]string{
 		{"api", "key", "create"},

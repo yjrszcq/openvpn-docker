@@ -64,7 +64,7 @@ func appendAuditAt(ctx context.Context, transaction *sql.Tx, instanceID, operati
 	if err != nil {
 		return err
 	}
-	encoded, err := json.Marshal(payload)
+	encoded, err := json.Marshal(withAuditActor(ctx, payload))
 	if err != nil {
 		return fmt.Errorf("encode audit payload: %w", err)
 	}
