@@ -194,7 +194,7 @@ Response example:
 
 ```json
 {
-  "version": "4.0.2",
+  "version": "4.1.0",
   "data_schema": 4,
   "commit": "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224",
   "build_date": "2026-08-19T09:45:40Z",
@@ -218,7 +218,7 @@ Response fields:
 
 | Field | Type | Required | Format / example / constraints | Purpose |
 |---|---|---|---|---|
-| `version` | `string` | yes | example: "4.0.2" | OpenVPN Docker release version. |
+| `version` | `string` | yes | example: "4.1.0" | OpenVPN Docker release version. |
 | `data_schema` | `integer` | yes | example: 4 | Authoritative data schema version. |
 | `commit` | `string` | yes | example: "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224" | Source control revision used to build the binary. |
 | `build_date` | `string` | yes | example: "2026-08-19T09:45:40Z" | UTC timestamp when the binary was built. |

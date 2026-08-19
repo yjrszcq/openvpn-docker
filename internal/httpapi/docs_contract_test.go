@@ -189,8 +189,8 @@ func TestFrontendGuidesDocumentEachOperationIndependently(t *testing.T) {
 	paths := object(t, document["paths"], "paths")
 	englishContractText, chineseContractText := localizedContractText(document)
 	for _, guide := range []string{
-		filepath.Join("..", "..", "docs", "cn", "v4", "api.md"),
-		filepath.Join("..", "..", "docs", "en", "v4", "api.md"),
+		filepath.Join("..", "..", "docs", "cn", "v4", "rest-api.md"),
+		filepath.Join("..", "..", "docs", "en", "v4", "rest-api.md"),
 	} {
 		content, err := os.ReadFile(guide)
 		if err != nil {

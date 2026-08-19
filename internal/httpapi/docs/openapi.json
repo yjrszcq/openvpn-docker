@@ -1028,7 +1028,7 @@
               "$ref": "#/components/schemas/Version"
             },
             "example": {
-              "version": "4.0.2",
+              "version": "4.1.0",
               "data_schema": 4,
               "commit": "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224",
               "build_date": "2026-08-19T09:45:40Z",

@@ -194,7 +194,7 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 ```json
 {
-  "version": "4.0.2",
+  "version": "4.1.0",
   "data_schema": 4,
   "commit": "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224",
   "build_date": "2026-08-19T09:45:40Z",
@@ -218,7 +218,7 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `string` | 是 | 示例: "4.0.2" | OpenVPN Docker 发布版本。 |
+| `version` | `string` | 是 | 示例: "4.1.0" | OpenVPN Docker 发布版本。 |
 | `data_schema` | `integer` | 是 | 示例: 4 | 权威数据 schema 版本。 |
 | `commit` | `string` | 是 | 示例: "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224" | 构建二进制时使用的源码版本。 |
 | `build_date` | `string` | 是 | 示例: "2026-08-19T09:45:40Z" | 二进制构建时的 UTC 时间。 |
