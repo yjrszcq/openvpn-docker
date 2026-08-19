@@ -18,6 +18,7 @@ import (
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
 	"github.com/yjrszcq/openvpn-docker/internal/httpapi"
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
+	"github.com/yjrszcq/openvpn-docker/internal/pki"
 	"github.com/yjrszcq/openvpn-docker/internal/render"
 	runtimecontrol "github.com/yjrszcq/openvpn-docker/internal/runtime"
 	statecontrol "github.com/yjrszcq/openvpn-docker/internal/state"
@@ -98,6 +99,17 @@ func newResources(database *storesqlite.Store, instanceID, dataDir string) (http
 		return httpapi.Resources{}, err
 	}
 	runtimeDir := environmentOr("OVPN_RUNTIME_DIR", initialize.DefaultRuntimeDir)
+	runner, err := pki.NewRunner(pki.Config{
+		EasyRSABinary: apiEasyRSABinary(),
+		OpenVPNBinary: environmentOr("OVPN_OPENVPN_BIN", "openvpn"),
+	}, nil)
+	if err != nil {
+		return httpapi.Resources{}, err
+	}
+	manager, err := clientservice.NewManager(database, local, runner, renderer, render.Paths{DataDir: dataDir, RuntimeDir: runtimeDir})
+	if err != nil {
+		return httpapi.Resources{}, err
+	}
 	stateOptions := statecontrol.Options{
 		DataDir: dataDir, ConfigFile: environmentOr("OVPN_CONFIG_FILE", configservice.DefaultPath),
 		ServerName: initialize.DefaultServerName, Renderer: renderer,
@@ -108,7 +120,8 @@ func newResources(database *storesqlite.Store, instanceID, dataDir string) (http
 		State: func(ctx context.Context) (statecontrol.Report, error) {
 			return statecontrol.Scan(ctx, stateOptions), nil
 		},
-		Clients: clients,
+		Clients:   clients,
+		Mutations: manager,
 		Runtime: func(ctx context.Context) (runtimecontrol.Status, error) {
 			identities, err := database.ClientIdentities(ctx, instanceID)
 			if err != nil {
@@ -127,6 +140,9 @@ func newResources(database *storesqlite.Store, instanceID, dataDir string) (http
 			})
 			return values, err
 		},
+		Disconnect: func(ctx context.Context, id, name string) (runtimecontrol.DisconnectResult, error) {
+			return runtimecontrol.Disconnect(ctx, runtimecontrol.SocketPath(runtimeDir), id, name)
+		},
 	}, nil
 }
 
@@ -135,6 +151,16 @@ func environmentOr(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func apiEasyRSABinary() string {
+	if value := os.Getenv("OVPN_EASYRSA_BIN"); value != "" {
+		return value
+	}
+	if info, err := os.Stat("/usr/share/easy-rsa/easyrsa"); err == nil && info.Mode().IsRegular() {
+		return "/usr/share/easy-rsa/easyrsa"
+	}
+	return "easyrsa"
 }
 
 func parseOrigins(value string) ([]string, error) {

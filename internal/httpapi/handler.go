@@ -35,14 +35,27 @@ type handler struct {
 type ClientReader interface {
 	List(context.Context) (clientservice.ListResult, error)
 	Get(context.Context, string) (clientservice.View, error)
+	Export(context.Context, clientservice.Selector) ([]byte, clientservice.View, error)
+}
+
+type ClientMutator interface {
+	Create(context.Context, clientservice.CreateRequest) (clientservice.MutationResult, error)
+	Rename(context.Context, clientservice.Selector, string) (clientservice.MutationResult, error)
+	Revoke(context.Context, clientservice.Selector, bool) (clientservice.MutationResult, error)
+	Reissue(context.Context, clientservice.Selector, string) (clientservice.MutationResult, error)
+	Delete(context.Context, clientservice.Selector) (clientservice.MutationResult, error)
+	AddressSet(context.Context, clientservice.Selector, string) (clientservice.AddressResult, error)
+	AddressRelease(context.Context, clientservice.Selector) (clientservice.AddressResult, error)
 }
 
 type Resources struct {
-	Version func() VersionResponse
-	State   func(context.Context) (statecontrol.Report, error)
-	Clients ClientReader
-	Runtime func(context.Context) (runtimecontrol.Status, error)
-	Events  func(context.Context, int) ([]runtimecontrol.Event, error)
+	Version    func() VersionResponse
+	State      func(context.Context) (statecontrol.Report, error)
+	Clients    ClientReader
+	Mutations  ClientMutator
+	Runtime    func(context.Context) (runtimecontrol.Status, error)
+	Events     func(context.Context, int) ([]runtimecontrol.Event, error)
+	Disconnect func(context.Context, string, string) (runtimecontrol.DisconnectResult, error)
 }
 
 type VersionResponse struct {
@@ -98,11 +111,16 @@ func AuthenticatedKey(ctx context.Context) (apikey.Key, bool) {
 	return key, ok && key.ID != ""
 }
 
-// NewHandler constructs the HTTP foundation. Resource handlers are added in
-// later phases; every versioned route is authenticated before route lookup.
+// NewHandler constructs the authenticated HTTP management surface.
 func NewHandler(authenticator Authenticator, allowedOrigins []string, resources Resources) (http.Handler, error) {
 	if authenticator == nil {
 		return nil, errors.New("API authenticator is required")
+	}
+	if resources.Mutations != nil && resources.Clients == nil {
+		return nil, errors.New("API client mutations require client queries")
+	}
+	if resources.Disconnect != nil && resources.Clients == nil {
+		return nil, errors.New("API disconnect requires client queries")
 	}
 	origins := make(map[string]struct{}, len(allowedOrigins))
 	for _, origin := range allowedOrigins {
@@ -151,6 +169,9 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 	ctx := context.WithValue(request.Context(), keyContextKey{}, key)
 	ctx = auditactor.With(ctx, auditactor.Actor{Kind: "api-key", ID: key.ID})
 	request = request.WithContext(ctx)
+	if handler.routeMutation(response, request, requestID) {
+		return
+	}
 	handler.routeRead(response, request, requestID)
 }
 
@@ -201,6 +222,13 @@ func (handler *handler) routeRead(response http.ResponseWriter, request *http.Re
 			return
 		}
 	default:
+		if handler.resources.Clients != nil && strings.HasSuffix(request.URL.Path, "/profile") {
+			id := strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/api/v1/clients/"), "/profile")
+			if domain.ValidUUID(id) {
+				handler.writeProfile(response, request, id, requestID)
+				return
+			}
+		}
 		if handler.resources.Clients != nil && strings.HasPrefix(request.URL.Path, "/api/v1/clients/") && strings.Count(strings.TrimPrefix(request.URL.Path, "/api/v1/clients/"), "/") == 0 {
 			id := strings.TrimPrefix(request.URL.Path, "/api/v1/clients/")
 			if domain.ValidUUID(id) {

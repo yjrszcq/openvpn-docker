@@ -35,6 +35,9 @@ func (fake fakeClients) List(context.Context) (clientservice.ListResult, error) 
 func (fake fakeClients) Get(context.Context, string) (clientservice.View, error) {
 	return fake.view, fake.err
 }
+func (fake fakeClients) Export(context.Context, clientservice.Selector) ([]byte, clientservice.View, error) {
+	return []byte("client\n"), fake.view, fake.err
+}
 
 func (fake fakeAuthenticator) Authenticate(_ context.Context, token string) (apikey.Key, error) {
 	if fake.err != nil {
