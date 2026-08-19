@@ -61,8 +61,17 @@ func TestOpenAPIContractCoversImplementedOperations(t *testing.T) {
 				t.Fatalf("%s %s has no summary", method, path)
 			}
 			responses := object(t, operation["responses"], method+" "+path+" responses")
-			if responses[successStatus(method, path)] == nil {
+			success := responses[successStatus(method, path)]
+			if success == nil {
 				t.Fatalf("%s %s has no success response", method, path)
+			}
+			response := referencedObject(t, document, success, method+" "+path+" success response")
+			if len(object(t, response["content"], method+" "+path+" success content")) == 0 {
+				t.Fatalf("%s %s success response has no content", method, path)
+			}
+			headers := object(t, response["headers"], method+" "+path+" success headers")
+			if headers["X-Request-ID"] == nil {
+				t.Fatalf("%s %s success response has no X-Request-ID header", method, path)
 			}
 			if path != "/healthz" && responses["401"] == nil {
 				t.Fatalf("%s %s has no 401 response", method, path)
@@ -117,6 +126,23 @@ func successStatus(method, path string) string {
 		return "201"
 	}
 	return "200"
+}
+
+func referencedObject(t *testing.T, root map[string]any, value any, label string) map[string]any {
+	t.Helper()
+	result := object(t, value, label)
+	reference, ok := result["$ref"].(string)
+	if !ok {
+		return result
+	}
+	current := any(root)
+	for _, segment := range strings.Split(strings.TrimPrefix(reference, "#/"), "/") {
+		current = object(t, current, reference)[segment]
+		if current == nil {
+			t.Fatalf("unresolved reference in %s: %q", label, reference)
+		}
+	}
+	return object(t, current, label)
 }
 
 func resolveLocalReferences(t *testing.T, root map[string]any, value any, location string) {
