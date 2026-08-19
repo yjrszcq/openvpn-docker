@@ -220,15 +220,15 @@ jobs:
     if: always()
     uses: yjrszcq/github-workflows/.github/workflows/gotify-notify.yml@main
     with:
-      title: ${{ format('{0} image release', github.repository) }}
+      title: ${{ format('{0} 镜像发布', github.repository) }}
       message: |
-        Candidate workflow: ${{ github.event.workflow_run.conclusion }}
-        Policy job: ${{ needs.policy.result }}
-        Decision: ${{ needs.policy.outputs.decision || 'not-evaluated' }}
-        Blocked report: ${{ needs.blocked.result }}
-        Same-branch publish: ${{ needs.publish-same-branch.result }}
-        Cross-branch publish: ${{ needs.publish-cross-branch.result }}
-        Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        候选工作流：${{ github.event.workflow_run.conclusion }}
+        发布策略任务：${{ needs.policy.result }}
+        发布决策：${{ needs.policy.outputs.decision || '未评估' }}
+        阻止报告任务：${{ needs.blocked.result }}
+        同分支发布：${{ needs.publish-same-branch.result }}
+        跨分支发布：${{ needs.publish-cross-branch.result }}
+        运行详情：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       priority: ${{ (github.event.workflow_run.conclusion != 'success' || needs.policy.result == 'failure' || needs.blocked.result == 'failure' || needs.publish-same-branch.result == 'failure' || needs.publish-cross-branch.result == 'failure') && 8 || 5 }}
     secrets:
       gotify_url: ${{ secrets.GOTIFY_URL }}

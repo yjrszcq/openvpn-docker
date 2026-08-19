@@ -80,11 +80,11 @@ jobs:
     if: always()
     uses: yjrszcq/github-workflows/.github/workflows/gotify-notify.yml@main
     with:
-      title: ${{ format('{0} upstream check', github.repository) }}
+      title: ${{ format('{0} 上游版本检查', github.repository) }}
       message: |
-        Discover job: ${{ needs.discover.result }}
-        Trigger: ${{ github.event_name }}
-        Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        检查结果：${{ needs.discover.result }}
+        触发方式：${{ github.event_name }}
+        运行详情：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       priority: ${{ needs.discover.result == 'failure' && 8 || 5 }}
     secrets:
       gotify_url: ${{ secrets.GOTIFY_URL }}
