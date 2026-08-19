@@ -4,6 +4,13 @@ REST API 为现有客户端、配置、状态和 runtime service 提供经过认
 
 API 默认关闭，内部仅使用 HTTP，不管理 TLS 证书。远程访问时必须放在 HTTPS 反向代理后面。
 
+启用 API 后可直接访问内置开发文档：
+
+- `http://<OVPN_API_LISTEN>/docs/`：可浏览的完整接口文档，无外部 CDN 依赖。
+- `http://<OVPN_API_LISTEN>/docs/openapi.json`：OpenAPI 3.1 规范，可导入 Orval、OpenAPI Generator、NSwag 或 API 客户端。
+
+文档页面和 OpenAPI 文件不要求 API key；实际 `/api/v1/*` 资源仍然必须认证。
+
 ## 启用 API
 
 在在线 `openvpn` 服务中设置非空监听地址：
@@ -97,6 +104,394 @@ curl --fail --silent --show-error \
 | `PUT` | `/api/v1/config/desired` | 验证并原子替换 desired YAML。 |
 | `GET` | `/api/v1/config/plan` | 规划 desired 到 applied 的变更。 |
 | `POST` | `/api/v1/config/apply` | 在线应用当前 desired 配置。 |
+
+## 前端接口契约
+
+下表覆盖全部 22 个 operation。除 `/healthz` 外，每个请求都必须发送 `Authorization: Bearer <API_KEY>`。标记为“空 body”的接口不能发送 `{}`、`null` 或任何其他内容。
+
+### System
+
+| 请求 | Path/query/header | JSON body | 成功返回 |
+|---|---|---|---|
+| `GET /healthz` | 无认证、无 query | 无 | `200 HealthResponse` |
+| `GET /api/v1/version` | 无 query | 无 | `200 VersionResponse` |
+| `GET /api/v1/state` | 无 query | 无 | `200 StateResponse`，不包含 `issues` |
+| `GET /api/v1/state/doctor` | 无 query | 无 | `200 StateResponse`，发现问题时包含 `issues` |
+
+### Clients
+
+所有 `{client_id}` 都必须是完整 canonical UUID，例如 `c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e`，不能使用名称或 UUID 前缀。
+
+| 请求 | Path/query/header | JSON body | 成功返回 |
+|---|---|---|---|
+| `GET /api/v1/clients` | 无 query | 无 | `200 ClientListResponse` |
+| `POST /api/v1/clients` | 无 query | `CreateClientRequest` | `201 ClientMutationResponse`；含 `Location` header |
+| `GET /api/v1/clients/{client_id}` | `client_id` path 参数 | 无 | `200 Client` |
+| `PATCH /api/v1/clients/{client_id}` | `client_id` path 参数 | `RenameClientRequest` | `200 ClientMutationResponse` |
+| `DELETE /api/v1/clients/{client_id}` | `client_id` path 参数 | 空 body | `200 ClientMutationResponse`，`client.status="deleted"` |
+| `GET /api/v1/clients/{client_id}/profile` | `client_id` path 参数 | 无 | `200 application/x-openvpn-profile`，不是 JSON |
+| `POST /api/v1/clients/{client_id}/revoke` | `client_id` path 参数 | `RevokeClientRequest` | `200 ClientMutationResponse` |
+| `POST /api/v1/clients/{client_id}/reissue` | `client_id` path 参数 | `ReissueClientRequest` | `200 ClientMutationResponse` |
+| `PUT /api/v1/clients/{client_id}/ipv4` | `client_id` path 参数 | `IPv4Request` | `200 AddressMutationResponse` |
+| `DELETE /api/v1/clients/{client_id}/ipv4` | `client_id` path 参数 | 空 body | `200 AddressMutationResponse` |
+| `POST /api/v1/clients/{client_id}/disconnect` | `client_id` path 参数 | 空 body | `200 DisconnectResponse`；无在线 session 也是成功 |
+
+### Runtime
+
+| 请求 | Path/query/header | JSON body | 成功返回 |
+|---|---|---|---|
+| `GET /api/v1/runtime` | 无 query | 无 | `200 RuntimeResponse` |
+| `GET /api/v1/runtime/events` | 可选 `lines=0..1000`，默认 `100` | 无 | `200 RuntimeEventsResponse` |
+
+### Configuration
+
+| 请求 | Path/query/header | JSON body | 成功返回 |
+|---|---|---|---|
+| `GET /api/v1/config/applied` | 无 query | 无 | `200 AppliedConfigurationResponse` |
+| `GET /api/v1/config/desired` | 无 query | 无 | `200 DesiredConfigurationResponse`；含 `ETag: "<digest>"` |
+| `PUT /api/v1/config/desired` | 必须发送 `If-Match: "<旧 digest>"` | 完整的裸 `Configuration`，不能包在 `config` 字段中 | `200 DesiredConfigurationResponse`；含新 `ETag` |
+| `GET /api/v1/config/plan` | 无 query | 无 | `200 ConfigurationPlanResponse` |
+| `POST /api/v1/config/apply` | 无 query | `ApplyConfigurationRequest` | `200 ApplyConfigurationResponse` |
+
+### 请求内容
+
+```ts
+interface CreateClientRequest {
+  name: string;
+  // "auto"、"dynamic"，或静态区内的 IPv4 地址
+  ipv4: string;
+}
+
+interface RenameClientRequest {
+  name: string;
+}
+
+interface RevokeClientRequest {
+  // false 保留当前地址；true 立即释放
+  release_ipv4: boolean;
+}
+
+interface ReissueClientRequest {
+  // "auto"、"dynamic"，或静态区内的 IPv4 地址
+  ipv4: string;
+}
+
+type IPv4Request =
+  | { mode: "auto" }
+  | { mode: "dynamic" }
+  | { mode: "static"; address: string };
+
+interface ApplyConfigurationRequest {
+  desired_digest: string;   // 64 位小写 SHA-256
+  current_revision: number; // config/plan.configuration.current_revision
+  force?: boolean;          // 默认 false
+}
+```
+
+请求示例：
+
+```http
+POST /api/v1/clients HTTP/1.1
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+Content-Type: application/json
+
+{"name":"alice-laptop","ipv4":"auto"}
+```
+
+```http
+PUT /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e/ipv4 HTTP/1.1
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+Content-Type: application/json
+
+{"mode":"static","address":"10.42.0.30"}
+```
+
+### 通用返回模型
+
+以下定义与实际 JSON 字段一致。标有 `?` 的字段可能被省略；`null` 与字段省略是不同状态。
+
+```ts
+type UUID = string;
+type Digest = string;
+
+interface HealthResponse {
+  status: "ok";
+}
+
+interface APIErrorResponse {
+  error: {
+    kind: string;
+    message: string;
+    request_id: UUID;
+  };
+}
+
+interface VersionResponse {
+  version: string;
+  data_schema: number;
+  commit: string;
+  build_date: string;
+  go_version: string;
+  dependencies: { sqlite: string; yaml: string };
+  compatibility: {
+    contract_version: number;
+    adapter: string;
+    template_family: string;
+    supported_openvpn_versions: string[];
+  };
+}
+
+type StateClassification =
+  | "EMPTY" | "HEALTHY" | "DEGRADED_REPAIRABLE"
+  | "DEGRADED_RECOVERABLE" | "DEGRADED_REISSUABLE"
+  | "CRITICAL" | "UNRECOVERABLE";
+
+interface StateIssue {
+  id: string;
+  severity: "repairable" | "recoverable" | "reissuable" | "critical" | "unrecoverable";
+  action: string;
+  target?: string;
+  owner_id?: string;
+  artifact_kind?: string;
+  detail: string;
+}
+
+interface StateResponse {
+  version: 1;
+  state: StateClassification;
+  data_schema: number;
+  instance_id?: UUID;
+  revision?: number;
+  scanned_at: string;
+  issue_count: number;
+  pending_operation_count: number;
+  issues?: StateIssue[];
+}
+
+interface ClientIPv4 {
+  mode: "none" | "static" | "dynamic";
+  address: string | null;
+  state: "configured" | "retained" | "unavailable";
+}
+
+interface Client {
+  id: UUID;
+  name: string;
+  status: "active" | "revoked" | "deleted";
+  ipv4: ClientIPv4;
+  connection?: string;
+}
+
+interface ClientListResponse {
+  version: 1;
+  clients: Client[];
+}
+
+interface DisconnectResponse {
+  version: 1;
+  client_id: UUID;
+  client_name: string;
+  was_connected: boolean;
+  disconnected: boolean;
+  connections: number;
+}
+
+interface RuntimeOutcome {
+  client_id?: UUID;
+  status: "ok" | "unavailable";
+  result?: DisconnectResponse;
+}
+
+interface ClientMutationResponse {
+  version: 1;
+  operation_id: UUID;
+  client: Client;
+  kick_required: boolean;
+  profile_redistribution_required: boolean;
+  runtime?: RuntimeOutcome;
+}
+
+interface AddressMutationResponse {
+  version: 1;
+  operation_id: UUID;
+  clients: Client[];
+  kick_required: UUID[];
+  runtime: RuntimeOutcome[];
+}
+```
+
+客户端 mutation 返回示例：
+
+```json
+{
+  "version": 1,
+  "operation_id": "47260b5b-47dd-4f9b-814f-4803668c5934",
+  "client": {
+    "id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+    "name": "alice-laptop",
+    "status": "revoked",
+    "ipv4": {"mode": "static", "address": "10.42.0.30", "state": "retained"}
+  },
+  "kick_required": true,
+  "profile_redistribution_required": false,
+  "runtime": {
+    "status": "ok",
+    "result": {
+      "version": 1,
+      "client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+      "client_name": "alice-laptop",
+      "was_connected": true,
+      "disconnected": true,
+      "connections": 1
+    }
+  }
+}
+```
+
+### Runtime 返回模型
+
+```ts
+interface RuntimeClient {
+  client_id: UUID;
+  client_name?: string;
+  remote_address?: string;
+  virtual_address?: string;
+}
+
+interface RuntimeResponse {
+  version: 1;
+  daemon: string;
+  management: string;
+  client_count: number;
+  clients: RuntimeClient[];
+}
+
+interface RuntimeEvent {
+  timestamp: string;
+  event: string;
+  operation: string;
+  outcome: string;
+  client_id?: UUID | null;
+  client_name?: string | null;
+  // 不同 event 可以附加额外字段
+  [key: string]: unknown;
+}
+
+interface RuntimeEventsResponse {
+  version: 1;
+  events: RuntimeEvent[];
+}
+```
+
+```json
+{
+  "version": 1,
+  "daemon": "running",
+  "management": "connected",
+  "client_count": 1,
+  "clients": [{
+    "client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
+    "client_name": "alice-laptop",
+    "remote_address": "203.0.113.10:53210",
+    "virtual_address": "10.42.0.30"
+  }]
+}
+```
+
+### 配置返回模型
+
+```ts
+interface Configuration {
+  version: 1;
+  server: {
+    endpoint: string;
+    protocol: "udp" | "tcp";
+    family: "auto" | "ipv4" | "ipv6";
+    port: number;
+    client_to_client: boolean;
+  };
+  ipv4: {
+    network: string;
+    dynamic_pool_size: number;
+    nat_enabled: boolean;
+    nat_interface: string;
+    redirect_gateway: boolean;
+    dns: string[];
+    routes: string[];
+  };
+  logging: { max_bytes: number; backups: number };
+}
+
+interface AppliedConfigurationResponse {
+  revision: number;
+  digest: Digest;
+  config: Configuration;
+}
+
+interface DesiredConfigurationResponse {
+  digest: Digest;
+  config: Configuration;
+}
+
+interface ConfigurationComparison {
+  initial: boolean;
+  current_revision: number;
+  target_revision: number;
+  current_digest?: Digest;
+  desired_digest: Digest;
+  in_sync: boolean;
+  changes: Array<{ field: string; before: unknown; after: unknown }>;
+  impact: {
+    restart_required: boolean;
+    address_remap: boolean;
+    firewall_reconcile: boolean;
+    profile_redistribution: boolean;
+    derived_artifacts: string[];
+  };
+}
+
+interface ConfigurationPlanResponse {
+  version: 1;
+  instance_id: UUID;
+  configuration: ConfigurationComparison;
+  address_changes: Array<{
+    client: { id: UUID; name: string };
+    before: { mode: string; address: string | null; state: string };
+    after: { mode: string; address: string | null; state: string };
+  }>;
+  artifacts: Array<{
+    owner_kind: string; owner_id: string; kind: string; key: string;
+    action: "regenerate" | "delete";
+  }>;
+  profile_redistribution: Array<{ id: UUID; name: string }>;
+  firewall: {
+    reconcile: boolean;
+    before: FirewallState | null;
+    after: FirewallState | null;
+  };
+}
+
+interface FirewallState {
+  network: string;
+  nat_enabled: boolean;
+  nat_interface: string;
+  routes: string[];
+}
+
+interface ApplyConfigurationResponse {
+  version: 1;
+  applied: boolean;
+  operation_id?: UUID;
+  activation: {
+    restart_required: boolean;
+    runtime_restarted: boolean;
+    profile_redistribution: Array<{ id: UUID; name: string }>;
+  };
+  plan: ConfigurationPlanResponse;
+}
+```
+
+完整字段约束、枚举、nullable 状态和每个错误状态以 `/docs/openapi.json` 为准。
 
 ## 客户端请求
 

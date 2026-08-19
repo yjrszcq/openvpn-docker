@@ -4,6 +4,13 @@ The REST API provides authenticated remote access to the existing client, config
 
 The API is disabled by default. It uses HTTP internally and does not manage TLS certificates. Put it behind an HTTPS reverse proxy for remote access.
 
+When enabled, the API serves development documentation directly:
+
+- `http://<OVPN_API_LISTEN>/docs/` is the self-contained browser reference with no CDN dependency.
+- `http://<OVPN_API_LISTEN>/docs/openapi.json` is the OpenAPI 3.1 contract for Orval, OpenAPI Generator, NSwag, and API clients.
+
+Documentation is public because it contains only the API contract. Actual `/api/v1/*` resources still require an API key.
+
 ## Enable the API
 
 Set a non-empty listen address on the live `openvpn` service:
@@ -97,6 +104,257 @@ Do not send keys in URLs, query strings, cookies, or request bodies.
 | `PUT` | `/api/v1/config/desired` | Validate and atomically replace desired YAML. |
 | `GET` | `/api/v1/config/plan` | Plan desired-to-applied changes. |
 | `POST` | `/api/v1/config/apply` | Apply the current desired configuration online. |
+
+## Frontend contract
+
+These tables cover all 22 operations. Except for `/healthz`, every request requires `Authorization: Bearer <API_KEY>`. An "empty body" operation rejects `{}`, `null`, and any other body content.
+
+### System
+
+| Request | Parameters | JSON body | Success response |
+|---|---|---|---|
+| `GET /healthz` | No authentication or query | None | `200 HealthResponse` |
+| `GET /api/v1/version` | No query | None | `200 VersionResponse` |
+| `GET /api/v1/state` | No query | None | `200 StateResponse` without `issues` |
+| `GET /api/v1/state/doctor` | No query | None | `200 StateResponse`; includes `issues` when present |
+
+### Clients
+
+Every `{client_id}` must be a complete canonical UUID. Names and UUID prefixes are rejected.
+
+| Request | Parameters | JSON body | Success response |
+|---|---|---|---|
+| `GET /api/v1/clients` | No query | None | `200 ClientListResponse` |
+| `POST /api/v1/clients` | No query | `CreateClientRequest` | `201 ClientMutationResponse` plus `Location` header |
+| `GET /api/v1/clients/{client_id}` | UUID path parameter | None | `200 Client` |
+| `PATCH /api/v1/clients/{client_id}` | UUID path parameter | `RenameClientRequest` | `200 ClientMutationResponse` |
+| `DELETE /api/v1/clients/{client_id}` | UUID path parameter | Empty body | `200 ClientMutationResponse` with `client.status="deleted"` |
+| `GET /api/v1/clients/{client_id}/profile` | UUID path parameter | None | `200 application/x-openvpn-profile`, not JSON |
+| `POST /api/v1/clients/{client_id}/revoke` | UUID path parameter | `RevokeClientRequest` | `200 ClientMutationResponse` |
+| `POST /api/v1/clients/{client_id}/reissue` | UUID path parameter | `ReissueClientRequest` | `200 ClientMutationResponse` |
+| `PUT /api/v1/clients/{client_id}/ipv4` | UUID path parameter | `IPv4Request` | `200 AddressMutationResponse` |
+| `DELETE /api/v1/clients/{client_id}/ipv4` | UUID path parameter | Empty body | `200 AddressMutationResponse` |
+| `POST /api/v1/clients/{client_id}/disconnect` | UUID path parameter | Empty body | `200 DisconnectResponse`; no active session is a successful no-op |
+
+### Runtime
+
+| Request | Parameters | JSON body | Success response |
+|---|---|---|---|
+| `GET /api/v1/runtime` | No query | None | `200 RuntimeResponse` |
+| `GET /api/v1/runtime/events` | Optional `lines=0..1000`, default `100` | None | `200 RuntimeEventsResponse` |
+
+### Configuration
+
+| Request | Parameters | JSON body | Success response |
+|---|---|---|---|
+| `GET /api/v1/config/applied` | No query | None | `200 AppliedConfigurationResponse` |
+| `GET /api/v1/config/desired` | No query | None | `200 DesiredConfigurationResponse` plus `ETag: "<digest>"` |
+| `PUT /api/v1/config/desired` | Required `If-Match: "<old digest>"` | Complete bare `Configuration`, not wrapped in `config` | `200 DesiredConfigurationResponse` plus new `ETag` |
+| `GET /api/v1/config/plan` | No query | None | `200 ConfigurationPlanResponse` |
+| `POST /api/v1/config/apply` | No query | `ApplyConfigurationRequest` | `200 ApplyConfigurationResponse` |
+
+### Request bodies
+
+```ts
+interface CreateClientRequest { name: string; ipv4: string }
+interface RenameClientRequest { name: string }
+interface RevokeClientRequest { release_ipv4: boolean }
+interface ReissueClientRequest { ipv4: string }
+
+type IPv4Request =
+  | { mode: "auto" }
+  | { mode: "dynamic" }
+  | { mode: "static"; address: string };
+
+interface ApplyConfigurationRequest {
+  desired_digest: string;
+  current_revision: number;
+  force?: boolean;
+}
+```
+
+`ipv4` on create/reissue accepts `auto`, `dynamic`, or a static IPv4 address. Static mode on `IPv4Request` requires `address`; auto/dynamic forbid it.
+
+### Response models
+
+The following TypeScript matches the actual JSON field names. `?` means the field may be omitted; `null` is distinct from omission.
+
+```ts
+type UUID = string;
+type Digest = string;
+
+interface HealthResponse { status: "ok" }
+interface APIErrorResponse {
+  error: { kind: string; message: string; request_id: UUID };
+}
+
+interface VersionResponse {
+  version: string;
+  data_schema: number;
+  commit: string;
+  build_date: string;
+  go_version: string;
+  dependencies: { sqlite: string; yaml: string };
+  compatibility: {
+    contract_version: number;
+    adapter: string;
+    template_family: string;
+    supported_openvpn_versions: string[];
+  };
+}
+
+interface StateIssue {
+  id: string;
+  severity: "repairable" | "recoverable" | "reissuable" | "critical" | "unrecoverable";
+  action: string;
+  target?: string;
+  owner_id?: string;
+  artifact_kind?: string;
+  detail: string;
+}
+
+interface StateResponse {
+  version: 1;
+  state: "EMPTY" | "HEALTHY" | "DEGRADED_REPAIRABLE" |
+    "DEGRADED_RECOVERABLE" | "DEGRADED_REISSUABLE" | "CRITICAL" | "UNRECOVERABLE";
+  data_schema: number;
+  instance_id?: UUID;
+  revision?: number;
+  scanned_at: string;
+  issue_count: number;
+  pending_operation_count: number;
+  issues?: StateIssue[];
+}
+
+interface ClientIPv4 {
+  mode: "none" | "static" | "dynamic";
+  address: string | null;
+  state: "configured" | "retained" | "unavailable";
+}
+
+interface Client {
+  id: UUID;
+  name: string;
+  status: "active" | "revoked" | "deleted";
+  ipv4: ClientIPv4;
+  connection?: string;
+}
+
+interface ClientListResponse { version: 1; clients: Client[] }
+interface DisconnectResponse {
+  version: 1; client_id: UUID; client_name: string;
+  was_connected: boolean; disconnected: boolean; connections: number;
+}
+interface RuntimeOutcome {
+  client_id?: UUID;
+  status: "ok" | "unavailable";
+  result?: DisconnectResponse;
+}
+interface ClientMutationResponse {
+  version: 1;
+  operation_id: UUID;
+  client: Client;
+  kick_required: boolean;
+  profile_redistribution_required: boolean;
+  runtime?: RuntimeOutcome;
+}
+interface AddressMutationResponse {
+  version: 1;
+  operation_id: UUID;
+  clients: Client[];
+  kick_required: UUID[];
+  runtime: RuntimeOutcome[];
+}
+
+interface RuntimeClient {
+  client_id: UUID;
+  client_name?: string;
+  remote_address?: string;
+  virtual_address?: string;
+}
+interface RuntimeResponse {
+  version: 1; daemon: string; management: string;
+  client_count: number; clients: RuntimeClient[];
+}
+interface RuntimeEvent {
+  timestamp: string; event: string; operation: string; outcome: string;
+  client_id?: UUID | null; client_name?: string | null;
+  [key: string]: unknown;
+}
+interface RuntimeEventsResponse { version: 1; events: RuntimeEvent[] }
+```
+
+### Configuration models
+
+```ts
+interface Configuration {
+  version: 1;
+  server: {
+    endpoint: string; protocol: "udp" | "tcp";
+    family: "auto" | "ipv4" | "ipv6"; port: number;
+    client_to_client: boolean;
+  };
+  ipv4: {
+    network: string; dynamic_pool_size: number;
+    nat_enabled: boolean; nat_interface: string;
+    redirect_gateway: boolean; dns: string[]; routes: string[];
+  };
+  logging: { max_bytes: number; backups: number };
+}
+
+interface AppliedConfigurationResponse {
+  revision: number; digest: Digest; config: Configuration;
+}
+interface DesiredConfigurationResponse { digest: Digest; config: Configuration }
+
+interface ConfigurationComparison {
+  initial: boolean;
+  current_revision: number;
+  target_revision: number;
+  current_digest?: Digest;
+  desired_digest: Digest;
+  in_sync: boolean;
+  changes: Array<{ field: string; before: unknown; after: unknown }>;
+  impact: {
+    restart_required: boolean; address_remap: boolean;
+    firewall_reconcile: boolean; profile_redistribution: boolean;
+    derived_artifacts: string[];
+  };
+}
+
+interface FirewallState {
+  network: string; nat_enabled: boolean; nat_interface: string; routes: string[];
+}
+interface ConfigurationPlanResponse {
+  version: 1;
+  instance_id: UUID;
+  configuration: ConfigurationComparison;
+  address_changes: Array<{
+    client: { id: UUID; name: string };
+    before: { mode: string; address: string | null; state: string };
+    after: { mode: string; address: string | null; state: string };
+  }>;
+  artifacts: Array<{
+    owner_kind: string; owner_id: string; kind: string; key: string;
+    action: "regenerate" | "delete";
+  }>;
+  profile_redistribution: Array<{ id: UUID; name: string }>;
+  firewall: { reconcile: boolean; before: FirewallState | null; after: FirewallState | null };
+}
+interface ApplyConfigurationResponse {
+  version: 1;
+  applied: boolean;
+  operation_id?: UUID;
+  activation: {
+    restart_required: boolean;
+    runtime_restarted: boolean;
+    profile_redistribution: Array<{ id: UUID; name: string }>;
+  };
+  plan: ConfigurationPlanResponse;
+}
+```
+
+The complete constraints, enums, nullable states, request examples, response examples, and per-operation error statuses are authoritative in `/docs/openapi.json`.
 
 ## Client requests
 
