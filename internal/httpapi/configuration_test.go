@@ -36,12 +36,13 @@ func TestConfigurationRoutesAndPreconditions(t *testing.T) {
 		body   string
 		header string
 		want   string
+		etag   bool
 	}{
-		{http.MethodGet, "/api/v1/config/applied", "", "", `"revision":4`},
-		{http.MethodGet, "/api/v1/config/desired", "", "", `"digest":"` + testConfigurationDigest + `"`},
-		{http.MethodGet, "/api/v1/config/plan", "", "", `"version":1`},
-		{http.MethodPut, "/api/v1/config/desired", `{"version":1}`, `"` + testConfigurationDigest + `"`, `"version":1`},
-		{http.MethodPost, "/api/v1/config/apply", `{"desired_digest":"` + testConfigurationDigest + `","current_revision":4,"force":true}`, "", `"version":1`},
+		{http.MethodGet, "/api/v1/config/applied", "", "", `"revision":4`, false},
+		{http.MethodGet, "/api/v1/config/desired", "", "", `"digest":"` + testConfigurationDigest + `"`, true},
+		{http.MethodGet, "/api/v1/config/plan", "", "", `"version":1`, false},
+		{http.MethodPut, "/api/v1/config/desired", `{"version":1}`, `"` + testConfigurationDigest + `"`, `"version":1`, true},
+		{http.MethodPost, "/api/v1/config/apply", `{"desired_digest":"` + testConfigurationDigest + `","current_revision":4,"force":true}`, "", `"version":1`, false},
 	} {
 		request := authenticatedConfigurationRequest(test.method, test.path, test.body)
 		if test.header != "" {
@@ -51,6 +52,9 @@ func TestConfigurationRoutesAndPreconditions(t *testing.T) {
 		handler.ServeHTTP(response, request)
 		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), test.want) {
 			t.Fatalf("%s %s response=%d body=%q", test.method, test.path, response.Code, response.Body.String())
+		}
+		if test.etag && response.Header().Get("ETag") != `"`+testConfigurationDigest+`"` {
+			t.Fatalf("%s %s ETag=%q", test.method, test.path, response.Header().Get("ETag"))
 		}
 	}
 	if putDigest != testConfigurationDigest {

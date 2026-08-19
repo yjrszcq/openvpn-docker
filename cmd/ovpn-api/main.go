@@ -196,6 +196,14 @@ func newResources(database *storesqlite.Store, instanceID, dataDir string) (http
 			if err != nil {
 				return configurationservice.ApplyResult{}, err
 			}
+			if !input.Force {
+				options := stateOptions
+				options.ConfigFile = ""
+				report := statecontrol.Scan(ctx, options)
+				if report.State != statecontrol.Healthy {
+					return configurationservice.ApplyResult{}, configurationservice.ErrPlanConflict
+				}
+			}
 			if plan.Configuration.InSync {
 				return configurationservice.ApplyResult{
 					Version: 1,
@@ -204,14 +212,6 @@ func newResources(database *storesqlite.Store, instanceID, dataDir string) (http
 					},
 					Plan: plan,
 				}, nil
-			}
-			if !input.Force {
-				options := stateOptions
-				options.ConfigFile = ""
-				report := statecontrol.Scan(ctx, options)
-				if report.State != statecontrol.Healthy {
-					return configurationservice.ApplyResult{}, configurationservice.ErrPlanConflict
-				}
 			}
 			session, err := runtimecontrol.BeginApply(ctx, runtimeDir)
 			if err != nil {

@@ -39,7 +39,7 @@ func (handler *handler) routeConfiguration(response http.ResponseWriter, request
 	case "/api/v1/config/desired":
 		if request.Method == http.MethodGet {
 			value, err := handler.resources.Desired(request.Context())
-			handler.writeConfigurationResult(response, value, err, requestID)
+			handler.writeDesiredResult(response, value, err, requestID)
 			return true
 		}
 		if request.Method != http.MethodPut {
@@ -56,7 +56,7 @@ func (handler *handler) routeConfiguration(response http.ResponseWriter, request
 			return true
 		}
 		value, err := handler.resources.PutDesired(request.Context(), expected, view)
-		handler.writeConfigurationResult(response, value, err, requestID)
+		handler.writeDesiredResult(response, value, err, requestID)
 		return true
 	case "/api/v1/config/plan":
 		if request.Method != http.MethodGet {
@@ -83,6 +83,13 @@ func (handler *handler) routeConfiguration(response http.ResponseWriter, request
 		return true
 	}
 	return false
+}
+
+func (handler *handler) writeDesiredResult(response http.ResponseWriter, value configservice.DesiredView, err error, requestID string) {
+	if err == nil {
+		response.Header().Set("ETag", `"`+value.Digest+`"`)
+	}
+	handler.writeConfigurationResult(response, value, err, requestID)
 }
 
 func parseIfMatch(value string) (string, error) {
