@@ -73,3 +73,19 @@ jobs:
             --head "$branch" \
             --title "build: update OpenVPN to $target" \
             --body "Updates versions.env and the compatibility contract for the official OpenVPN $target release and its SHA-256. Candidate and compatibility workflows must pass before promotion."
+
+  notify:
+    name: Send Gotify upstream-check notification
+    needs: discover
+    if: always()
+    uses: yjrszcq/github-workflows/.github/workflows/gotify-notify.yml@main
+    with:
+      title: ${{ format('{0} upstream check', github.repository) }}
+      message: |
+        Discover job: ${{ needs.discover.result }}
+        Trigger: ${{ github.event_name }}
+        Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      priority: ${{ needs.discover.result == 'failure' && 8 || 5 }}
+    secrets:
+      gotify_url: ${{ secrets.GOTIFY_URL }}
+      gotify_token: ${{ secrets.GOTIFY_TOKEN }}
