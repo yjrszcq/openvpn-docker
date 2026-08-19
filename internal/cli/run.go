@@ -247,7 +247,13 @@ func runServerRun(args []string, stdout, stderr io.Writer) int {
 	}
 	openvpnBinary := environmentOr("OVPN_OPENVPN_BIN", "openvpn")
 	brokerBinary := environmentOr("OVPN_BROKER_BIN", "ovpn-broker")
-	for _, dependency := range []string{openvpnBinary, brokerBinary} {
+	apiBinary := ""
+	dependencies := []string{openvpnBinary, brokerBinary}
+	if os.Getenv("OVPN_API_LISTEN") != "" {
+		apiBinary = environmentOr("OVPN_API_BIN", "ovpn-api")
+		dependencies = append(dependencies, apiBinary)
+	}
+	for _, dependency := range dependencies {
 		if _, err := exec.LookPath(dependency); err != nil {
 			return writeError(stderr, apperror.Wrap(apperror.ExitUnavailable, "dependency_unavailable", "runtime dependency is unavailable", err))
 		}
@@ -257,7 +263,7 @@ func runServerRun(args []string, stdout, stderr io.Writer) int {
 	hup := make(chan os.Signal, 1)
 	signal.Notify(hup, syscall.SIGHUP)
 	defer signal.Stop(hup)
-	supervisor := runtimecontrol.Supervisor{DataDir: dataDir, RuntimeDir: runtimeDir, OpenVPNBinary: openvpnBinary, BrokerBinary: brokerBinary}
+	supervisor := runtimecontrol.Supervisor{DataDir: dataDir, RuntimeDir: runtimeDir, OpenVPNBinary: openvpnBinary, BrokerBinary: brokerBinary, APIBinary: apiBinary}
 	if err := supervisor.Run(ctx, hup, instance); err != nil {
 		if errors.Is(err, artifact.ErrLocked) {
 			return writeError(stderr, apperror.Wrap(apperror.ExitTemporary, "lock_conflict", "runtime lock is unavailable", err))

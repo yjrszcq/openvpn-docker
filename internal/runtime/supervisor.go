@@ -29,6 +29,7 @@ type Supervisor struct {
 	RuntimeDir     string
 	OpenVPNBinary  string
 	BrokerBinary   string
+	APIBinary      string
 	StartupTimeout time.Duration
 	StopTimeout    time.Duration
 	LockTimeout    time.Duration
@@ -94,6 +95,8 @@ func (supervisor Supervisor) Run(ctx context.Context, hup <-chan os.Signal, inst
 		reload = LoadInstance
 	}
 	var processes *runtimeProcesses
+	var api *childProcess
+	var apiDone <-chan struct{}
 	networkActive := false
 	cleanupNetwork := func(strict bool) error {
 		if !networkActive {
@@ -131,13 +134,27 @@ func (supervisor Supervisor) Run(ctx context.Context, hup <-chan os.Signal, inst
 		processes = started
 		return nil
 	}
+	defer func() {
+		if processes != nil {
+			terminateAll(supervisor.StopTimeout, processes.openvpn, processes.broker, api)
+			processes = nil
+		} else {
+			terminate(api, supervisor.StopTimeout)
+		}
+		_ = cleanupNetwork(false)
+	}()
 	if err := startRuntime(); err != nil {
 		return err
 	}
-	defer func() {
-		stopRuntime()
-		_ = cleanupNetwork(false)
-	}()
+	if supervisor.APIBinary != "" {
+		apiCommand := commandBuilder(supervisor.APIBinary)
+		apiCommand.Stderr = os.Stderr
+		api, err = startProcess(apiCommand)
+		if err != nil {
+			return fmt.Errorf("start management API: %w", err)
+		}
+		apiDone = api.done
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -160,6 +177,13 @@ func (supervisor Supervisor) Run(ctx context.Context, hup <-chan os.Signal, inst
 				return fmt.Errorf("management broker exited unexpectedly")
 			}
 			return fmt.Errorf("management broker exited: %w", err)
+		case <-apiDone:
+			stopRuntime()
+			err := api.err
+			if err == nil {
+				return fmt.Errorf("management API exited unexpectedly")
+			}
+			return fmt.Errorf("management API exited: %w", err)
 		case request := <-control.requests:
 			stopRuntime()
 			if err := cleanupNetwork(true); err != nil {
@@ -331,24 +355,52 @@ func signalProcess(process *childProcess, value syscall.Signal) error {
 }
 
 func terminate(process *childProcess, timeout time.Duration) {
-	if process == nil || process.command == nil || process.command.Process == nil {
-		return
+	terminateAll(timeout, process)
+}
+
+func terminateAll(timeout time.Duration, processes ...*childProcess) {
+	active := make([]*childProcess, 0, len(processes))
+	for _, process := range processes {
+		if process == nil || process.command == nil || process.command.Process == nil {
+			continue
+		}
+		select {
+		case <-process.done:
+			continue
+		default:
+		}
+		_ = process.command.Process.Signal(syscall.SIGTERM)
+		active = append(active, process)
 	}
-	select {
-	case <-process.done:
-		return
-	default:
-	}
-	_ = process.command.Process.Signal(syscall.SIGTERM)
-	select {
-	case <-process.done:
-	case <-time.After(timeout):
-		_ = process.command.Process.Kill()
-		<-process.done
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for len(active) != 0 {
+		for index := len(active) - 1; index >= 0; index-- {
+			select {
+			case <-active[index].done:
+				active = append(active[:index], active[index+1:]...)
+			default:
+			}
+		}
+		if len(active) == 0 {
+			return
+		}
+		select {
+		case <-ticker.C:
+		case <-deadline.C:
+			for _, process := range active {
+				_ = process.command.Process.Kill()
+			}
+			for _, process := range active {
+				<-process.done
+			}
+			return
+		}
 	}
 }
 
 func waitBoth(first, second *childProcess, timeout time.Duration) {
-	terminate(first, timeout)
-	terminate(second, timeout)
+	terminateAll(timeout, first, second)
 }

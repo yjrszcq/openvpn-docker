@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -76,6 +77,14 @@ func TestRuntimeHelperProcess(t *testing.T) {
 			}
 			return
 		}
+	case "api":
+		_ = os.WriteFile(filepath.Join(markerDir, "api-started"), []byte(strconv.Itoa(os.Getpid())), 0o600)
+		if os.Getenv("OVPN_RUNTIME_API_EXIT") == "1" {
+			os.Exit(6)
+		}
+		signals := make(chan os.Signal, 1)
+		signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
+		<-signals
 	default:
 		os.Exit(2)
 	}
@@ -143,6 +152,43 @@ func TestSupervisorStopsOpenVPNWhenBrokerExits(t *testing.T) {
 	}
 	if _, statErr := os.Stat(filepath.Join(markers, "openvpn-started")); statErr != nil {
 		t.Fatalf("OpenVPN never started before broker exit: %v", statErr)
+	}
+}
+
+func TestSupervisorStartsAndStopsOptionalAPI(t *testing.T) {
+	markers := t.TempDir()
+	t.Setenv("OVPN_RUNTIME_HELPER", "1")
+	t.Setenv("OVPN_RUNTIME_MARKERS", markers)
+	installHelperBuilder(t)
+	supervisor := testSupervisor(filepath.Join(t.TempDir(), "data"), filepath.Join(t.TempDir(), "run"))
+	supervisor.APIBinary = "fake-api"
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- supervisor.Run(ctx, nil, testInstance()) }()
+	waitForFile(t, filepath.Join(markers, "api-started"))
+	waitForFile(t, filepath.Join(markers, "openvpn-started"))
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("supervisor did not stop")
+	}
+}
+
+func TestSupervisorFailsWhenOptionalAPIExits(t *testing.T) {
+	markers := t.TempDir()
+	t.Setenv("OVPN_RUNTIME_HELPER", "1")
+	t.Setenv("OVPN_RUNTIME_MARKERS", markers)
+	t.Setenv("OVPN_RUNTIME_API_EXIT", "1")
+	installHelperBuilder(t)
+	supervisor := testSupervisor(filepath.Join(t.TempDir(), "data"), filepath.Join(t.TempDir(), "run"))
+	supervisor.APIBinary = "fake-api"
+	err := supervisor.Run(context.Background(), nil, testInstance())
+	if err == nil || !strings.Contains(err.Error(), "management API exited") {
+		t.Fatalf("unexpected API exit error: %v", err)
 	}
 }
 
@@ -224,6 +270,7 @@ func TestSupervisorPausesForApplyAndRestartsRuntime(t *testing.T) {
 	runtimeDir := filepath.Join(t.TempDir(), "run")
 	network := &recordingNetwork{}
 	supervisor := testSupervisor(dataDir, runtimeDir)
+	supervisor.APIBinary = "fake-api"
 	supervisor.Network = network
 	var reloads atomic.Int32
 	supervisor.ReloadInstance = func(context.Context, string) (storesqlite.InstanceState, error) {
@@ -234,6 +281,17 @@ func TestSupervisorPausesForApplyAndRestartsRuntime(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- supervisor.Run(ctx, nil, testInstance()) }()
 	waitForFile(t, filepath.Join(markers, "openvpn-started"))
+	waitForFile(t, filepath.Join(markers, "api-started"))
+	apiPIDData, err := os.ReadFile(filepath.Join(markers, "api-started"))
+	if err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	apiPID, err := strconv.Atoi(string(apiPIDData))
+	if err != nil {
+		cancel()
+		t.Fatal(err)
+	}
 
 	session, err := BeginApply(context.Background(), runtimeDir)
 	if err != nil {
@@ -251,6 +309,10 @@ func TestSupervisorPausesForApplyAndRestartsRuntime(t *testing.T) {
 	}
 	if network.cleaned.Load() != 1 {
 		t.Fatalf("network cleanup count while paused=%d", network.cleaned.Load())
+	}
+	if err := syscall.Kill(apiPID, 0); err != nil {
+		cancel()
+		t.Fatalf("management API stopped during apply: %v", err)
 	}
 	if err := exclusive.Release(); err != nil {
 		cancel()
@@ -319,12 +381,16 @@ func TestSupervisorDoesNotStartProcessesWhenNetworkReconcileFails(t *testing.T) 
 	network := &recordingNetwork{err: errors.New("network denied")}
 	supervisor := testSupervisor(filepath.Join(t.TempDir(), "data"), filepath.Join(t.TempDir(), "run"))
 	supervisor.Network = network
+	supervisor.APIBinary = "fake-api"
 	err := supervisor.Run(context.Background(), nil, testInstance())
 	if err == nil || !strings.Contains(err.Error(), "network denied") {
 		t.Fatalf("network error=%v", err)
 	}
 	if _, err := os.Stat(filepath.Join(markers, "broker-started")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("broker started after network failure: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(markers, "api-started")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("management API started after network failure: %v", err)
 	}
 	if network.reconciled.Load() != 1 || network.cleaned.Load() != 0 {
 		t.Fatalf("network calls reconciled=%d cleaned=%d", network.reconciled.Load(), network.cleaned.Load())
@@ -338,6 +404,8 @@ func installHelperBuilder(t *testing.T) {
 		role := "openvpn"
 		if strings.Contains(name, "broker") {
 			role = "broker"
+		} else if strings.Contains(name, "api") {
+			role = "api"
 		}
 		helperArgs := []string{"-test.run=TestRuntimeHelperProcess", "--", role}
 		return exec.Command(os.Args[0], append(helperArgs, args...)...)

@@ -34,7 +34,10 @@ RUN mkdir -p /out/usr/local/lib/openvpn-container/go \
     && go build -buildvcs=false -trimpath \
        -ldflags "-s -w -X github.com/yjrszcq/openvpn-docker/internal/buildinfo.Version=$GO_RUNTIME_VERSION -X github.com/yjrszcq/openvpn-docker/internal/buildinfo.Commit=$VCS_REF -X github.com/yjrszcq/openvpn-docker/internal/buildinfo.BuildDate=$BUILD_DATE" \
        -o /out/usr/local/lib/openvpn-container/go/ovpn-broker ./cmd/ovpn-broker \
-    && for binary in /out/usr/local/lib/openvpn-container/go/ovpn /out/usr/local/lib/openvpn-container/go/ovpn-broker; do \
+    && go build -buildvcs=false -trimpath \
+       -ldflags "-s -w -X github.com/yjrszcq/openvpn-docker/internal/buildinfo.Version=$GO_RUNTIME_VERSION -X github.com/yjrszcq/openvpn-docker/internal/buildinfo.Commit=$VCS_REF -X github.com/yjrszcq/openvpn-docker/internal/buildinfo.BuildDate=$BUILD_DATE" \
+       -o /out/usr/local/lib/openvpn-container/go/ovpn-api ./cmd/ovpn-api \
+    && for binary in /out/usr/local/lib/openvpn-container/go/ovpn /out/usr/local/lib/openvpn-container/go/ovpn-broker /out/usr/local/lib/openvpn-container/go/ovpn-api; do \
          ldd "$binary" >"/tmp/$(basename "$binary").ldd" || exit 1; \
          ! grep -Fq 'not found' "/tmp/$(basename "$binary").ldd" || exit 1; \
          go version -m "$binary" >"/tmp/$(basename "$binary").buildinfo" || exit 1; \
@@ -119,6 +122,7 @@ COPY compatibility/contract.json /usr/local/share/openvpn-container/compatibilit
 
 RUN install -m 0755 /usr/local/lib/openvpn-container/go/ovpn /usr/local/bin/ovpn \
     && install -m 0755 /usr/local/lib/openvpn-container/go/ovpn-broker /usr/local/bin/ovpn-broker \
+    && install -m 0755 /usr/local/lib/openvpn-container/go/ovpn-api /usr/local/bin/ovpn-api \
     && ln -sfn ovpn /usr/local/bin/docker-entrypoint \
     && ln -sfn ovpn /usr/local/bin/ovpn-hook \
     && rm -rf /usr/local/lib/openvpn-container/go \
@@ -130,12 +134,12 @@ RUN openvpn --version >/tmp/openvpn-version \
     && ! grep -Fq 'not found' /tmp/openvpn-ldd \
     && rm /tmp/openvpn-version /tmp/openvpn-ldd
 
-RUN for binary in /usr/local/bin/ovpn /usr/local/bin/ovpn-broker; do \
+RUN for binary in /usr/local/bin/ovpn /usr/local/bin/ovpn-broker /usr/local/bin/ovpn-api; do \
       test -x "$binary" || exit 1; \
       ldd "$binary" >"/tmp/$(basename "$binary").ldd" || exit 1; \
       ! grep -Fq 'not found' "/tmp/$(basename "$binary").ldd" || exit 1; \
     done \
-    && rm /tmp/ovpn.ldd /tmp/ovpn-broker.ldd
+    && rm /tmp/ovpn.ldd /tmp/ovpn-broker.ldd /tmp/ovpn-api.ldd
 
 RUN mkdir -p /etc/openvpn /etc/ovpn-conf /usr/local/share/openvpn-container
 
