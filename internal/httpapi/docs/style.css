@@ -58,6 +58,22 @@ code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospac
   width: min(30vw, 300px);
 }
 .search input:focus { border-color: #55758f; outline: 2px solid #dbe7ef; }
+.language-switch { display: flex; }
+.language-switch button {
+  background: #fff;
+  border: 1px solid #acb6c0;
+  color: #52606c;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  height: 38px;
+  padding: 0 10px;
+}
+.language-switch button:first-child { border-radius: 6px 0 0 6px; }
+.language-switch button:last-child { border-left: 0; border-radius: 0 6px 6px 0; }
+.language-switch button[aria-pressed="true"] { background: #18212a; border-color: #18212a; color: #fff; }
+.language-switch button:focus-visible { outline: 2px solid #55758f; outline-offset: 2px; }
 .spec-link {
   border: 1px solid #acb6c0;
   border-radius: 6px;
@@ -156,9 +172,11 @@ h1 { font-size: 34px; line-height: 1.2; margin: 0; }
   .layout { grid-template-columns: 220px minmax(0, 1fr); }
 }
 @media (max-width: 720px) {
-  .topbar { height: auto; padding: 12px 16px; position: static; }
+  .topbar { flex-wrap: wrap; gap: 10px; height: auto; padding: 12px 16px; position: static; }
   .brand small { display: none; }
-  .search input { width: min(42vw, 210px); }
+  .top-actions { width: 100%; }
+  .search { flex: 1; }
+  .search input { width: 100%; }
   .spec-link { display: none; }
   .layout { display: block; }
   .sidebar { border-bottom: 1px solid var(--border); border-right: 0; height: auto; max-height: 220px; position: static; }

@@ -6,7 +6,7 @@ API 默认关闭，内部仅使用 HTTP，不管理 TLS 证书。远程访问时
 
 启用 API 后可直接访问内置开发文档：
 
-- `http://<OVPN_API_LISTEN>/docs/`：面向前端的完整接口文档。22 条接口各自独立展示自己的完整 HTTP 请求、参数、body 字段、成功返回、错误返回和 JSON 示例，不需要跳到共享模型区拼装。
+- `http://<OVPN_API_LISTEN>/docs/`：面向前端的完整接口文档。22 条接口各自独立展示自己的完整 HTTP 请求、参数、body 字段、成功返回、错误返回和 JSON 示例，不需要跳到共享模型区拼装。页面默认跟随浏览器语言（中文浏览器使用中文，其他语言使用英文），也可通过右上角手动切换并保留选择。
 - `http://<OVPN_API_LISTEN>/docs/openapi.json`：OpenAPI 3.1 规范，可导入 Orval、OpenAPI Generator、NSwag 或 API 客户端。
 
 文档页面和 OpenAPI 文件不要求 API key；实际 `/api/v1/*` 资源仍然必须认证。

@@ -6,7 +6,7 @@ The API is disabled by default. It uses HTTP internally and does not manage TLS 
 
 When enabled, the API serves development documentation directly:
 
-- `http://<OVPN_API_LISTEN>/docs/` is the frontend reference. Each of the 22 operations independently shows its complete HTTP request, parameters, body fields, success response, error responses, and JSON examples; developers do not have to assemble a call from grouped models.
+- `http://<OVPN_API_LISTEN>/docs/` is the frontend reference. Each of the 22 operations independently shows its complete HTTP request, parameters, body fields, success response, error responses, and JSON examples; developers do not have to assemble a call from grouped models. It follows the browser language by default (Chinese for Chinese browser locales and English otherwise), with a persistent manual switch in the top bar.
 - `http://<OVPN_API_LISTEN>/docs/openapi.json` is the OpenAPI 3.1 contract for Orval, OpenAPI Generator, NSwag, and API clients.
 
 Documentation is public because it contains only the API contract. Actual `/api/v1/*` resources still require an API key.

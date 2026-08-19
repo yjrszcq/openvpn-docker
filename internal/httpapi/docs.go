@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-//go:embed docs/index.html docs/app.js docs/style.css docs/openapi.json
+//go:embed docs/index.html docs/i18n.js docs/app.js docs/style.css docs/openapi.json
 var documentationFiles embed.FS
 
 const documentationCSP = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
@@ -37,6 +37,8 @@ func (handler *handler) routeDocumentation(response http.ResponseWriter, request
 		name, contentType = "docs/index.html", "text/html; charset=utf-8"
 	case "/docs/app.js":
 		name, contentType = "docs/app.js", "text/javascript; charset=utf-8"
+	case "/docs/i18n.js":
+		name, contentType = "docs/i18n.js", "text/javascript; charset=utf-8"
 	case "/docs/style.css":
 		name, contentType = "docs/style.css", "text/css; charset=utf-8"
 	case "/docs/openapi.json":

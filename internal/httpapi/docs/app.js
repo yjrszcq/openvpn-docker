@@ -3,8 +3,21 @@
 
   const methods = ["get", "post", "put", "patch", "delete"];
   const sampleUUID = "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e";
-  const statusText = {200: "OK", 201: "Created", 400: "Bad Request", 401: "Unauthorized", 404: "Not Found", 405: "Method Not Allowed", 409: "Conflict", 422: "Unprocessable Entity", 500: "Internal Server Error", 503: "Service Unavailable"};
+  const translations = window.apiDocsI18n;
+  const languageStorageKey = "ovpn-api-docs-language";
+  const browserLanguage = (navigator.language || "en").toLowerCase().startsWith("zh") ? "zh" : "en";
+  let currentLanguage = browserLanguage;
   let documentRoot;
+
+  try {
+    const savedLanguage = localStorage.getItem(languageStorageKey);
+    if (savedLanguage === "zh" || savedLanguage === "en") currentLanguage = savedLanguage;
+  } catch (_) {
+    // Browser privacy settings may disable local storage; language switching still works for this page.
+  }
+
+  const text = key => translations.ui[currentLanguage][key];
+  const translate = value => currentLanguage === "zh" && value ? (translations.zh[value] || value) : (value || "");
 
   const element = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -38,22 +51,22 @@
     if (key) nextSeen.add(key);
     if (schema.oneOf || schema.anyOf) {
       const variants = schema.oneOf || schema.anyOf;
-      return variants.flatMap((variant, index) => ["  ".repeat(depth) + `variant ${index + 1}:`, ...schemaLines(variant, depth + 1, nextSeen)]);
+      return variants.flatMap((variant, index) => ["  ".repeat(depth) + `${text("variant")} ${index + 1}:`, ...schemaLines(variant, depth + 1, nextSeen)]);
     }
-    if (schema.type === "array") return ["  ".repeat(depth) + "array of:", ...schemaLines(schema.items, depth + 1, nextSeen)];
+    if (schema.type === "array") return ["  ".repeat(depth) + text("arrayOf"), ...schemaLines(schema.items, depth + 1, nextSeen)];
     if (schema.type !== "object" && !schema.properties) return ["  ".repeat(depth) + schemaType(schema)];
     const required = new Set(schema.required || []);
     const lines = [];
     Object.entries(schema.properties || {}).forEach(([name, property]) => {
       const resolved = resolve(property);
-      const marker = required.has(name) ? "required" : "optional";
-      const description = resolved.description ? ` - ${resolved.description}` : "";
+      const marker = required.has(name) ? text("required") : text("optional");
+      const description = resolved.description ? ` - ${translate(resolved.description)}` : "";
       lines.push(`${"  ".repeat(depth)}${name}: ${schemaType(property)} [${marker}]${description}`);
       if ((resolved.type === "object" || resolved.properties || resolved.type === "array" || resolved.oneOf) && depth < 3) {
         lines.push(...schemaLines(property, depth + 1, nextSeen));
       }
     });
-    return lines.length ? lines : ["  ".repeat(depth) + "object"];
+    return lines.length ? lines : ["  ".repeat(depth) + text("object")];
   };
 
   const sample = (input, depth = 0, seen = new Set()) => {
@@ -108,14 +121,14 @@
   const requestFormat = input => {
     const schema = resolve(input);
     const constraints = [];
-    if (schema.format) constraints.push(`format: ${schema.format}`);
-    if (schema.const !== undefined) constraints.push(`固定值: ${JSON.stringify(schema.const)}`);
-    if (schema.enum) constraints.push(`可选值: ${schema.enum.map(value => JSON.stringify(value)).join(" | ")}`);
-    if (schema.pattern) constraints.push(`格式: ${schema.pattern}`);
-    if (schema.minimum !== undefined) constraints.push(`最小值: ${schema.minimum}`);
-    if (schema.maximum !== undefined) constraints.push(`最大值: ${schema.maximum}`);
-    if (schema.default !== undefined) constraints.push(`默认值: ${JSON.stringify(schema.default)}`);
-    return constraints.join("；");
+    if (schema.format) constraints.push(`${text("constraintFormat")}: ${schema.format}`);
+    if (schema.const !== undefined) constraints.push(`${text("constant")}: ${JSON.stringify(schema.const)}`);
+    if (schema.enum) constraints.push(`${text("values")}: ${schema.enum.map(value => JSON.stringify(value)).join(" | ")}`);
+    if (schema.pattern) constraints.push(`${text("constraintFormat")}: ${schema.pattern}`);
+    if (schema.minimum !== undefined) constraints.push(`${text("minimum")}: ${schema.minimum}`);
+    if (schema.maximum !== undefined) constraints.push(`${text("maximum")}: ${schema.maximum}`);
+    if (schema.default !== undefined) constraints.push(`${text("defaultValue")}: ${JSON.stringify(schema.default)}`);
+    return constraints.join(currentLanguage === "zh" ? "；" : "; ");
   };
 
   const requiresAuthorization = operation => {
@@ -141,7 +154,7 @@
         required: fieldRequired,
         format: requestFormat(property),
         example: expandable ? undefined : (fieldExample !== undefined ? fieldExample : sample(property)),
-        description: resolved.description || "JSON 请求体字段。"
+        description: translate(resolved.description) || text("requestBodyField")
       });
       if (expandable) rows.push(...bodyRows(property, fieldExample, field, fieldRequired, depth + 1));
       if (resolved.type === "array") {
@@ -165,7 +178,7 @@
         required: true,
         format: "Bearer ovpn_v1.<uuid>.<secret>",
         example: "Bearer ovpn_v1.<uuid>.<secret>",
-        description: "API 身份认证凭据。Bearer 后填写服务生成的 API Key。"
+        description: text("authDescription")
       });
     }
     if (body) {
@@ -174,9 +187,9 @@
         location: "header",
         type: "string",
         required: true,
-        format: "固定值: application/json",
+        format: `${text("constant")}: application/json`,
         example: "application/json",
-        description: "声明请求体使用 JSON 格式。"
+        description: text("contentTypeDescription")
       });
     }
     [...(pathItem.parameters || []), ...(operation.parameters || [])].map(resolve).forEach(parameter => {
@@ -188,7 +201,7 @@
         required: Boolean(parameter.required),
         format: requestFormat(parameter.schema),
         example: parameter.example ?? parameter.schema?.example ?? parameter.schema?.default ?? sample(parameter.schema),
-        description: parameter.description || "请求参数。"
+        description: translate(parameter.description) || text("requestParameter")
       });
     });
     if (body?.schema) {
@@ -230,9 +243,9 @@
     if (row.format) details.push(row.format);
     if (row.example !== undefined) {
       const example = typeof row.example === "string" ? row.example : JSON.stringify(row.example);
-      if (!row.format || !row.format.includes(example)) details.push(`示例: ${example}`);
+      if (!row.format || !row.format.includes(example)) details.push(`${text("example")}: ${example}`);
     }
-    return details.join("；") || "-";
+    return details.join(currentLanguage === "zh" ? "；" : "; ") || "-";
   };
 
   const renderParameterTable = (pane, title, rows) => {
@@ -242,7 +255,7 @@
     const table = element("table", "parameter-table");
     const head = element("thead");
     const header = element("tr");
-    ["字段", "位置", "类型", "必填", "格式 / 示例 / 约束", "用途说明"].forEach(label => header.append(element("th", "", label)));
+    text("tableHeaders").forEach(label => header.append(element("th", "", label)));
     head.append(header);
     const body = element("tbody");
     rows.forEach(row => {
@@ -251,7 +264,7 @@
         tableCell(row.name, true),
         tableCell(row.location, true),
         tableCell(row.type, true),
-        tableCell(row.required ? "是" : "否"),
+        tableCell(row.required ? text("yes") : text("no")),
         tableCell(requestDetails(row), true),
         tableCell(row.description)
       );
@@ -264,19 +277,19 @@
 
   const renderParameters = (pane, operation, pathItem) => {
     const groups = requestRows(operation, pathItem);
-    renderParameterTable(pane, "Header 参数", groups.header);
-    renderParameterTable(pane, "Path 参数", groups.path);
-    renderParameterTable(pane, "Query 参数", groups.query);
-    renderParameterTable(pane, "JSON Body 字段", groups.body);
+    renderParameterTable(pane, text("headerParameters"), groups.header);
+    renderParameterTable(pane, text("pathParameters"), groups.path);
+    renderParameterTable(pane, text("queryParameters"), groups.query);
+    renderParameterTable(pane, text("bodyFields"), groups.body);
     if (!Object.values(groups).some(rows => rows.length)) {
-      pane.append(element("div", "empty", "该接口没有请求参数，也不接受请求体。"));
+      pane.append(element("div", "empty", text("noRequest")));
     }
   };
 
   const renderContractTabs = (operationId, requestPane, responsePane) => {
     const tabs = element("div", "contract-tabs");
     tabs.setAttribute("role", "tablist");
-    tabs.setAttribute("aria-label", "请求和返回内容");
+    tabs.setAttribute("aria-label", text("tabsLabel"));
     const panes = [requestPane, responsePane];
     const activate = selected => {
       Array.from(tabs.children).forEach((tab, index) => {
@@ -286,7 +299,7 @@
         panes[index].hidden = !active;
       });
     };
-    ["请求 Request", "返回 Response"].forEach((label, index) => {
+    [text("requestTab"), text("responseTab")].forEach((label, index) => {
       const tab = element("button", "contract-tab", label);
       tab.type = "button";
       tab.id = `${operationId}-tab-${index}`;
@@ -315,17 +328,19 @@
   const renderOperation = (method, path, pathItem, operation) => {
     const article = element("article", "operation");
     article.id = operation.operationId;
-    article.dataset.search = `${method} ${path} ${operation.summary} ${(operation.tags || []).join(" ")}`.toLowerCase();
+    article.dataset.search = `${method} ${path} ${operation.summary} ${translate(operation.summary)} ${operation.description || ""} ${translate(operation.description)} ${(operation.tags || []).join(" ")}`.toLowerCase();
     const heading = element("div", "operation-heading");
     heading.append(element("span", `method method-${method}`, method.toUpperCase()));
     heading.append(element("h2", "", path));
-    article.append(heading, element("p", "operation-summary", `${operation.summary}. ${operation.description || ""}`));
+    const summary = translate(operation.summary);
+    const description = translate(operation.description);
+    article.append(heading, element("p", "operation-summary", description ? `${summary}${currentLanguage === "zh" ? "。" : ". "}${description}` : summary));
 
     const grid = element("div", "contract-stack");
     const requestPane = element("section", "contract-pane");
     requestPane.id = `${operation.operationId}-request`;
     renderParameters(requestPane, operation, pathItem);
-    appendCode(requestPane, "请求示例", requestExample(method, path, operation, pathItem));
+    appendCode(requestPane, text("requestExample"), requestExample(method, path, operation, pathItem));
 
     const responsePane = element("section", "contract-pane");
     responsePane.id = `${operation.operationId}-response`;
@@ -333,14 +348,14 @@
       const response = resolve(rawResponse);
       const block = element("div", "response");
       const title = element("div", "response-title");
-      title.append(element("span", Number(status) >= 400 ? "status status-error" : "status", `${status} ${statusText[status] || ""}`));
-      title.append(element("span", "", response.description || ""));
+      title.append(element("span", Number(status) >= 400 ? "status status-error" : "status", `${status} ${text("status")[status] || ""}`));
+      title.append(element("span", "", translate(response.description)));
       block.append(title);
       const entries = Object.entries(response.content || {});
-      if (!entries.length) block.append(element("div", "empty", "无响应体。"));
+      if (!entries.length) block.append(element("div", "empty", text("noResponseBody")));
       entries.forEach(([contentType, media]) => {
-        appendCode(block, `返回示例 · ${contentType}`, pretty(mediaExample(media)));
-        if (media.schema) appendCode(block, "返回字段", schemaLines(media.schema).join("\n"), "schema");
+        appendCode(block, `${text("responseExample")} · ${contentType}`, pretty(mediaExample(media)));
+        if (media.schema) appendCode(block, text("responseFields"), schemaLines(media.schema).join("\n"), "schema");
       });
       responsePane.append(block);
     });
@@ -353,6 +368,8 @@
     documentRoot = spec;
     const operations = document.getElementById("operations");
     const navigation = document.getElementById("navigation");
+    operations.replaceChildren();
+    navigation.replaceChildren();
     const groups = new Map();
     let count = 0;
     Object.entries(spec.paths).forEach(([path, pathItem]) => {
@@ -368,7 +385,7 @@
     });
     groups.forEach((items, name) => {
       const group = element("section", "nav-group");
-      group.append(element("h2", "", name));
+      group.append(element("h2", "", text("tags")[name] || name));
       items.forEach(({method, path, operation}) => {
         const link = element("a", "nav-link");
         link.href = `#${operation.operationId}`;
@@ -378,13 +395,13 @@
       });
       navigation.append(group);
     });
-    document.getElementById("operation-count").textContent = `${count} operations`;
-    document.getElementById("loading").remove();
+    document.getElementById("operation-count").textContent = `${count} ${text("operations")}`;
+    document.getElementById("loading")?.remove();
+    applyFilter(document.getElementById("search").value.trim().toLowerCase());
     if (location.hash) document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView();
   };
 
-  const filter = event => {
-    const query = event.target.value.trim().toLowerCase();
+  const applyFilter = query => {
     document.querySelectorAll(".operation").forEach(operation => {
       const visible = !query || operation.dataset.search.includes(query);
       operation.hidden = !visible;
@@ -393,7 +410,47 @@
     });
   };
 
-  document.getElementById("search").addEventListener("input", filter);
+  const applyStaticLanguage = () => {
+    document.documentElement.lang = currentLanguage === "zh" ? "zh-CN" : "en";
+    document.title = text("documentTitle");
+    document.getElementById("brand").setAttribute("aria-label", text("brandLabel"));
+    document.getElementById("search-label").textContent = text("searchLabel");
+    document.getElementById("search").placeholder = text("searchPlaceholder");
+    document.getElementById("sidebar").setAttribute("aria-label", text("navigationLabel"));
+    document.getElementById("interfaces-label").textContent = text("interfaces");
+    document.getElementById("eyebrow").textContent = text("eyebrow");
+    document.getElementById("page-title").textContent = text("title");
+    document.getElementById("intro-before").textContent = text("introBefore");
+    document.getElementById("intro-after").textContent = text("introAfter");
+    document.getElementById("base-path-label").textContent = text("basePath");
+    document.getElementById("format-label").textContent = text("format");
+    const loading = document.getElementById("loading");
+    if (loading) loading.textContent = text("loading");
+    document.querySelectorAll("[data-language]").forEach(button => {
+      button.setAttribute("aria-pressed", String(button.dataset.language === currentLanguage));
+    });
+  };
+
+  const setLanguage = (language, persist) => {
+    if (language !== "zh" && language !== "en") return;
+    currentLanguage = language;
+    if (persist) {
+      try {
+        localStorage.setItem(languageStorageKey, language);
+      } catch (_) {
+        // Keep the in-memory selection when storage is unavailable.
+      }
+    }
+    applyStaticLanguage();
+    if (documentRoot) render(documentRoot);
+  };
+
+  applyStaticLanguage();
+  document.getElementById("search").addEventListener("input", event => applyFilter(event.target.value.trim().toLowerCase()));
+  document.getElementById("language-switch").addEventListener("click", event => {
+    const language = event.target.closest("[data-language]")?.dataset.language;
+    if (language) setLanguage(language, true);
+  });
   fetch("/docs/openapi.json", {headers: {Accept: "application/json"}})
     .then(response => {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -403,6 +460,6 @@
     .catch(error => {
       const loading = document.getElementById("loading");
       loading.className = "error-message";
-      loading.textContent = `接口定义加载失败：${error.message}`;
+      loading.textContent = `${text("loadError")}${error.message}`;
     });
 })();

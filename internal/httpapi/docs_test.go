@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -16,7 +17,8 @@ func TestDocumentationIsEmbeddedAndPublic(t *testing.T) {
 		contentType string
 		body        string
 	}{
-		{"/docs/", "text/html", "API 接口文档"},
+		{"/docs/", "text/html", "language-switch"},
+		{"/docs/i18n.js", "text/javascript", "window.apiDocsI18n"},
 		{"/docs/app.js", "text/javascript", "renderOperation"},
 		{"/docs/style.css", "text/css", ".parameter-table"},
 		{"/docs/openapi.json", "application/vnd.oai.openapi+json", `"openapi": "3.1.0"`},
@@ -44,11 +46,11 @@ func TestDocumentationShowsExplicitRequestContracts(t *testing.T) {
 		`location: "header"`,
 		`type: "string"`,
 		`format: "Bearer ovpn_v1.<uuid>.<secret>"`,
-		`["字段", "位置", "类型", "必填", "格式 / 示例 / 约束", "用途说明"]`,
-		`"Header 参数"`,
-		`"Path 参数"`,
-		`"Query 参数"`,
-		`"JSON Body 字段"`,
+		`text("tableHeaders")`,
+		`text("headerParameters")`,
+		`text("pathParameters")`,
+		`text("queryParameters")`,
+		`text("bodyFields")`,
 		`"contract-tabs"`,
 		`tabs.setAttribute("role", "tablist")`,
 		`tab.setAttribute("role", "tab")`,
@@ -71,6 +73,78 @@ func TestDocumentationShowsExplicitRequestContracts(t *testing.T) {
 	styles := string(stylesheet)
 	if !strings.Contains(styles, `.contract-tab[aria-selected="true"]`) || !strings.Contains(styles, ".contract-pane[hidden]") {
 		t.Fatal("documentation contracts must render as switchable request and response tabs")
+	}
+}
+
+func TestDocumentationSupportsCompleteChineseAndEnglishRendering(t *testing.T) {
+	index, err := documentationFiles.ReadFile("docs/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := string(index)
+	for _, expected := range []string{`data-language="zh"`, `data-language="en"`, `/docs/i18n.js`} {
+		if !strings.Contains(page, expected) {
+			t.Fatalf("documentation index does not contain %q", expected)
+		}
+	}
+
+	applicationBytes, err := documentationFiles.ReadFile("docs/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	application := string(applicationBytes)
+	for _, expected := range []string{
+		`navigator.language`,
+		`.startsWith("zh") ? "zh" : "en"`,
+		`localStorage.getItem(languageStorageKey)`,
+		`localStorage.setItem(languageStorageKey, language)`,
+		`setLanguage(language, true)`,
+		`translate(response.description)`,
+		`translate(parameter.description)`,
+		`translate(resolved.description)`,
+	} {
+		if !strings.Contains(application, expected) {
+			t.Fatalf("documentation language switching does not contain %q", expected)
+		}
+	}
+
+	translationBytes, err := documentationFiles.ReadFile("docs/i18n.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	translationSource := string(translationBytes)
+	for _, expected := range []string{`title: "API 接口文档"`, `title: "API Reference"`, `tableHeaders: ["字段"`, `tableHeaders: ["Field"`} {
+		if !strings.Contains(translationSource, expected) {
+			t.Fatalf("documentation translations do not contain %q", expected)
+		}
+	}
+
+	var contract any
+	if err := json.Unmarshal(openAPIDocument(t), &contract); err != nil {
+		t.Fatal(err)
+	}
+	visibleText := map[string]struct{}{}
+	collectContractText(contract, visibleText)
+	for value := range visibleText {
+		if !strings.Contains(translationSource, strconv.Quote(value)+":") {
+			t.Fatalf("OpenAPI text has no Chinese translation: %q", value)
+		}
+	}
+}
+
+func collectContractText(value any, result map[string]struct{}) {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, child := range typed {
+			if (key == "summary" || key == "description") && child != nil {
+				result[child.(string)] = struct{}{}
+			}
+			collectContractText(child, result)
+		}
+	case []any:
+		for _, child := range typed {
+			collectContractText(child, result)
+		}
 	}
 }
 
@@ -98,7 +172,7 @@ func TestEmbeddedDocumentationDescribesEveryOperation(t *testing.T) {
 }
 
 func TestDocumentationAssetsHaveNoExternalDependencies(t *testing.T) {
-	for _, name := range []string{"docs/index.html", "docs/app.js", "docs/style.css"} {
+	for _, name := range []string{"docs/index.html", "docs/i18n.js", "docs/app.js", "docs/style.css"} {
 		content, err := documentationFiles.ReadFile(name)
 		if err != nil {
 			t.Fatalf("read %s: %v", name, err)
