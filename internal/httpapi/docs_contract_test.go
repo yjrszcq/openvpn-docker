@@ -3,6 +3,8 @@ package httpapi
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -134,6 +136,46 @@ func TestOpenAPIMutationsUseOperationSpecificSuccessExamples(t *testing.T) {
 		}
 		if !strings.Contains(string(example), test.contains) {
 			t.Fatalf("%s %s example %s lacks %s", test.method, test.path, example, test.contains)
+		}
+	}
+}
+
+func TestFrontendGuidesDocumentEachOperationIndependently(t *testing.T) {
+	var document map[string]any
+	if err := json.Unmarshal(openAPIDocument(t), &document); err != nil {
+		t.Fatal(err)
+	}
+	paths := object(t, document["paths"], "paths")
+	for _, guide := range []string{
+		filepath.Join("..", "..", "docs", "cn", "v4", "api.md"),
+		filepath.Join("..", "..", "docs", "en", "v4", "api.md"),
+	} {
+		content, err := os.ReadFile(guide)
+		if err != nil {
+			t.Fatalf("read %s: %v", guide, err)
+		}
+		markdown := string(content)
+		count := 0
+		for path, rawPathItem := range paths {
+			pathItem := object(t, rawPathItem, path)
+			for _, method := range []string{"get", "post", "put", "patch", "delete"} {
+				if pathItem[method] == nil {
+					continue
+				}
+				count++
+				heading := "`" + strings.ToUpper(method) + " " + path + "`"
+				if occurrences := strings.Count(markdown, heading); occurrences != 1 {
+					t.Fatalf("%s contains %d headings for %s", guide, occurrences, heading)
+				}
+			}
+		}
+		if count != 22 || strings.Count(markdown, "\n### ") != 22 {
+			t.Fatalf("%s operation sections=%d OpenAPI operations=%d", guide, strings.Count(markdown, "\n### "), count)
+		}
+		for _, grouped := range []string{"### System", "### Clients", "### Runtime", "### Configuration", "### 请求内容", "### 通用返回模型"} {
+			if strings.Contains(markdown, grouped) {
+				t.Fatalf("%s still contains grouped contract heading %q", guide, grouped)
+			}
 		}
 	}
 }

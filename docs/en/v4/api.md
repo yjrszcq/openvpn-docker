@@ -78,310 +78,483 @@ Do not send keys in URLs, query strings, cookies, or request bodies.
 - `/healthz` is unauthenticated and reports only API process liveness.
 - Profile downloads use `application/x-openvpn-profile` and an attachment filename.
 
-## Route index
+## Per-operation requests and responses
 
-This section is only a quick index, not the frontend implementation contract. Use `/docs/` on the running service for per-operation requests and responses; every operation is one self-contained request/response unit.
+Each of the following 22 operations is a self-contained contract. Except for `/healthz`, every request requires `Authorization: Bearer <API_KEY>`. UUIDs, digests, and timestamps are illustrative.
 
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/healthz` | Minimal unauthenticated liveness check. |
-| `GET` | `/api/v1/version` | Build, data schema, and OpenVPN compatibility. |
-| `GET` | `/api/v1/state` | Instance state summary. |
-| `GET` | `/api/v1/state/doctor` | Detailed SQLite, PKI, and artifact diagnostics. |
-| `GET` | `/api/v1/clients` | List active and revoked clients. |
-| `POST` | `/api/v1/clients` | Create a client. |
-| `GET` | `/api/v1/clients/{id}` | Get one client by complete UUID. |
-| `PATCH` | `/api/v1/clients/{id}` | Rename a client. |
-| `DELETE` | `/api/v1/clients/{id}` | Delete local credentials and retain a UUID tombstone. |
-| `GET` | `/api/v1/clients/{id}/profile` | Download an active client profile. |
-| `POST` | `/api/v1/clients/{id}/revoke` | Revoke a client certificate. |
-| `POST` | `/api/v1/clients/{id}/reissue` | Reissue credentials and a profile. |
-| `PUT` | `/api/v1/clients/{id}/ipv4` | Set IPv4 intent. |
-| `DELETE` | `/api/v1/clients/{id}/ipv4` | Release a revoked client's retained static address. |
-| `POST` | `/api/v1/clients/{id}/disconnect` | Disconnect current sessions. |
-| `GET` | `/api/v1/runtime` | Runtime and connected-client status. |
-| `GET` | `/api/v1/runtime/events?lines=N` | Read 0 through 1000 recent structured events. |
-| `GET` | `/api/v1/config/applied` | Read the applied SQLite revision. |
-| `GET` | `/api/v1/config/desired` | Read normalized desired YAML and its digest. |
-| `PUT` | `/api/v1/config/desired` | Validate and atomically replace desired YAML. |
-| `GET` | `/api/v1/config/plan` | Plan desired-to-applied changes. |
-| `POST` | `/api/v1/config/apply` | Apply the current desired configuration online. |
-
-## Frontend type index
-
-These tables and TypeScript definitions are a searchable field/type index, not a substitute for the per-operation request/response at `/docs/`. Except for `/healthz`, every request requires `Authorization: Bearer <API_KEY>`. An "empty body" operation rejects `{}`, `null`, and any other body content.
-
-### System
-
-| Request | Parameters | JSON body | Success response |
-|---|---|---|---|
-| `GET /healthz` | No authentication or query | None | `200 HealthResponse` |
-| `GET /api/v1/version` | No query | None | `200 VersionResponse` |
-| `GET /api/v1/state` | No query | None | `200 StateResponse` without `issues` |
-| `GET /api/v1/state/doctor` | No query | None | `200 StateResponse`; includes `issues` when present |
-
-### Clients
-
-Every `{client_id}` must be a complete canonical UUID. Names and UUID prefixes are rejected.
-
-| Request | Parameters | JSON body | Success response |
-|---|---|---|---|
-| `GET /api/v1/clients` | No query | None | `200 ClientListResponse` |
-| `POST /api/v1/clients` | No query | `CreateClientRequest` | `201 ClientMutationResponse` plus `Location` header |
-| `GET /api/v1/clients/{client_id}` | UUID path parameter | None | `200 Client` |
-| `PATCH /api/v1/clients/{client_id}` | UUID path parameter | `RenameClientRequest` | `200 ClientMutationResponse` |
-| `DELETE /api/v1/clients/{client_id}` | UUID path parameter | Empty body | `200 ClientMutationResponse` with `client.status="deleted"` |
-| `GET /api/v1/clients/{client_id}/profile` | UUID path parameter | None | `200 application/x-openvpn-profile`, not JSON |
-| `POST /api/v1/clients/{client_id}/revoke` | UUID path parameter | `RevokeClientRequest` | `200 ClientMutationResponse` |
-| `POST /api/v1/clients/{client_id}/reissue` | UUID path parameter | `ReissueClientRequest` | `200 ClientMutationResponse` |
-| `PUT /api/v1/clients/{client_id}/ipv4` | UUID path parameter | `IPv4Request` | `200 AddressMutationResponse` |
-| `DELETE /api/v1/clients/{client_id}/ipv4` | UUID path parameter | Empty body | `200 AddressMutationResponse` |
-| `POST /api/v1/clients/{client_id}/disconnect` | UUID path parameter | Empty body | `200 DisconnectResponse`; no active session is a successful no-op |
-
-### Runtime
-
-| Request | Parameters | JSON body | Success response |
-|---|---|---|---|
-| `GET /api/v1/runtime` | No query | None | `200 RuntimeResponse` |
-| `GET /api/v1/runtime/events` | Optional `lines=0..1000`, default `100` | None | `200 RuntimeEventsResponse` |
-
-### Configuration
-
-| Request | Parameters | JSON body | Success response |
-|---|---|---|---|
-| `GET /api/v1/config/applied` | No query | None | `200 AppliedConfigurationResponse` |
-| `GET /api/v1/config/desired` | No query | None | `200 DesiredConfigurationResponse` plus `ETag: "<digest>"` |
-| `PUT /api/v1/config/desired` | Required `If-Match: "<old digest>"` | Complete bare `Configuration`, not wrapped in `config` | `200 DesiredConfigurationResponse` plus new `ETag` |
-| `GET /api/v1/config/plan` | No query | None | `200 ConfigurationPlanResponse` |
-| `POST /api/v1/config/apply` | No query | `ApplyConfigurationRequest` | `200 ApplyConfigurationResponse` |
-
-### Request bodies
-
-```ts
-interface CreateClientRequest { name: string; ipv4: string }
-interface RenameClientRequest { name: string }
-interface RevokeClientRequest { release_ipv4: boolean }
-interface ReissueClientRequest { ipv4: string }
-
-type IPv4Request =
-  | { mode: "auto" }
-  | { mode: "dynamic" }
-  | { mode: "static"; address: string };
-
-interface ApplyConfigurationRequest {
-  desired_digest: string;
-  current_revision: number;
-  force?: boolean;
-}
-```
-
-`ipv4` on create/reissue accepts `auto`, `dynamic`, or a static IPv4 address. Static mode on `IPv4Request` requires `address`; auto/dynamic forbid it.
-
-### Response models
-
-The following TypeScript matches the actual JSON field names. `?` means the field may be omitted; `null` is distinct from omission.
-
-```ts
-type UUID = string;
-type Digest = string;
-
-interface HealthResponse { status: "ok" }
-interface APIErrorResponse {
-  error: { kind: string; message: string; request_id: UUID };
-}
-
-interface VersionResponse {
-  version: string;
-  data_schema: number;
-  commit: string;
-  build_date: string;
-  go_version: string;
-  dependencies: { sqlite: string; yaml: string };
-  compatibility: {
-    contract_version: number;
-    adapter: string;
-    template_family: string;
-    supported_openvpn_versions: string[];
-  };
-}
-
-interface StateIssue {
-  id: string;
-  severity: "repairable" | "recoverable" | "reissuable" | "critical" | "unrecoverable";
-  action: string;
-  target?: string;
-  owner_id?: string;
-  artifact_kind?: string;
-  detail: string;
-}
-
-interface StateResponse {
-  version: 1;
-  state: "EMPTY" | "HEALTHY" | "DEGRADED_REPAIRABLE" |
-    "DEGRADED_RECOVERABLE" | "DEGRADED_REISSUABLE" | "CRITICAL" | "UNRECOVERABLE";
-  data_schema: number;
-  instance_id?: UUID;
-  revision?: number;
-  scanned_at: string;
-  issue_count: number;
-  pending_operation_count: number;
-  issues?: StateIssue[];
-}
-
-interface ClientIPv4 {
-  mode: "none" | "static" | "dynamic";
-  address: string | null;
-  state: "configured" | "retained" | "unavailable";
-}
-
-interface Client {
-  id: UUID;
-  name: string;
-  status: "active" | "revoked" | "deleted";
-  ipv4: ClientIPv4;
-  connection?: string;
-}
-
-interface ClientListResponse { version: 1; clients: Client[] }
-interface DisconnectResponse {
-  version: 1; client_id: UUID; client_name: string;
-  was_connected: boolean; disconnected: boolean; connections: number;
-}
-interface RuntimeOutcome {
-  client_id?: UUID;
-  status: "ok" | "unavailable";
-  result?: DisconnectResponse;
-}
-interface ClientMutationResponse {
-  version: 1;
-  operation_id: UUID;
-  client: Client;
-  kick_required: boolean;
-  profile_redistribution_required: boolean;
-  runtime?: RuntimeOutcome;
-}
-interface AddressMutationResponse {
-  version: 1;
-  operation_id: UUID;
-  clients: Client[];
-  kick_required: UUID[];
-  runtime: RuntimeOutcome[];
-}
-
-interface RuntimeClient {
-  client_id: UUID;
-  client_name?: string;
-  remote_address?: string;
-  virtual_address?: string;
-}
-interface RuntimeResponse {
-  version: 1; daemon: string; management: string;
-  client_count: number; clients: RuntimeClient[];
-}
-interface RuntimeEvent {
-  timestamp: string; event: string; operation: string; outcome: string;
-  client_id?: UUID | null; client_name?: string | null;
-  [key: string]: unknown;
-}
-interface RuntimeEventsResponse { version: 1; events: RuntimeEvent[] }
-```
-
-### Configuration models
-
-```ts
-interface Configuration {
-  version: 1;
-  server: {
-    endpoint: string; protocol: "udp" | "tcp";
-    family: "auto" | "ipv4" | "ipv6"; port: number;
-    client_to_client: boolean;
-  };
-  ipv4: {
-    network: string; dynamic_pool_size: number;
-    nat_enabled: boolean; nat_interface: string;
-    redirect_gateway: boolean; dns: string[]; routes: string[];
-  };
-  logging: { max_bytes: number; backups: number };
-}
-
-interface AppliedConfigurationResponse {
-  revision: number; digest: Digest; config: Configuration;
-}
-interface DesiredConfigurationResponse { digest: Digest; config: Configuration }
-
-interface ConfigurationComparison {
-  initial: boolean;
-  current_revision: number;
-  target_revision: number;
-  current_digest?: Digest;
-  desired_digest: Digest;
-  in_sync: boolean;
-  changes: Array<{ field: string; before: unknown; after: unknown }>;
-  impact: {
-    restart_required: boolean; address_remap: boolean;
-    firewall_reconcile: boolean; profile_redistribution: boolean;
-    derived_artifacts: string[];
-  };
-}
-
-interface FirewallState {
-  network: string; nat_enabled: boolean; nat_interface: string; routes: string[];
-}
-interface ConfigurationPlanResponse {
-  version: 1;
-  instance_id: UUID;
-  configuration: ConfigurationComparison;
-  address_changes: Array<{
-    client: { id: UUID; name: string };
-    before: { mode: string; address: string | null; state: string };
-    after: { mode: string; address: string | null; state: string };
-  }>;
-  artifacts: Array<{
-    owner_kind: string; owner_id: string; kind: string; key: string;
-    action: "regenerate" | "delete";
-  }>;
-  profile_redistribution: Array<{ id: UUID; name: string }>;
-  firewall: { reconcile: boolean; before: FirewallState | null; after: FirewallState | null };
-}
-interface ApplyConfigurationResponse {
-  version: 1;
-  applied: boolean;
-  operation_id?: UUID;
-  activation: {
-    restart_required: boolean;
-    runtime_restarted: boolean;
-    profile_redistribution: Array<{ id: UUID; name: string }>;
-  };
-  plan: ConfigurationPlanResponse;
-}
-```
-
-The complete constraints, enums, nullable states, request examples, response examples, and per-operation error statuses are authoritative in `/docs/openapi.json`.
-
-## Client requests
-
-Creating a client accepts `auto`, `dynamic`, or one static IPv4 address:
+Error responses use the following JSON shape. Each operation lists its own possible status codes:
 
 ```json
-{"name":"laptop","ipv4":"auto"}
+{"error":{"kind":"client_not_found","message":"client was not found","request_id":"33ba813e-fc63-4af8-b338-7f7486f82202"}}
 ```
 
-A successful create returns `201 Created` and `Location: /api/v1/clients/{id}`. Other client mutation bodies are:
+### 1. `GET /healthz`
 
-| Operation | JSON body |
-|---|---|
-| Rename | `{"name":"new-name"}` |
-| Revoke | `{"release_ipv4":false}` |
-| Reissue | `{"ipv4":"dynamic"}` |
-| Set automatic IPv4 | `{"mode":"auto"}` |
-| Set dynamic IPv4 | `{"mode":"dynamic"}` |
-| Set static IPv4 | `{"mode":"static","address":"10.42.0.20"}` |
+Request:
 
-Delete, IPv4 release, and disconnect accept no body. Reissue accepts the same `auto`, `dynamic`, or static address selection as create.
+```http
+GET /healthz HTTP/1.1
+Host: vpn-admin.example.com
+```
 
-Some committed client and address changes require current sessions to be disconnected. If the broker is unavailable after the durable mutation commits, the response remains successful and reports `runtime.status` as `unavailable`. A direct disconnect request returns `503` when runtime control is unavailable.
+Request body: none. Authentication is not required.
 
-Profiles contain private keys. Treat profile responses as credentials and never store them in browser caches, logs, analytics, or general download directories.
+Successful `200 application/json` response:
+
+```json
+{"status":"ok"}
+```
+
+Error response: `405`, using the error body shown above.
+
+### 2. `GET /api/v1/version`
+
+Request:
+
+```http
+GET /api/v1/version HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+Request body: none.
+
+Successful `200 application/json` response:
+
+```json
+{
+  "version":"4.0.2",
+  "data_schema":4,
+  "commit":"dd9b5213f5002a7e69f160e3fd2615e0b3d8d224",
+  "build_date":"2026-08-19T09:45:40Z",
+  "go_version":"go1.26.5",
+  "dependencies":{"sqlite":"github.com/mattn/go-sqlite3 v1.14.48","yaml":"go.yaml.in/yaml/v3 v3.0.4"},
+  "compatibility":{"contract_version":1,"adapter":"openvpn-2.7","template_family":"openvpn-2.7","supported_openvpn_versions":["2.7.6"]}
+}
+```
+
+Error responses: `401`, `405`, `503`.
+
+### 3. `GET /api/v1/state`
+
+Request:
+
+```http
+GET /api/v1/state HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+Request body: none.
+
+Successful `200 application/json` response:
+
+```json
+{"version":1,"state":"HEALTHY","data_schema":4,"instance_id":"bbffeb8c-2d11-4613-874d-b5fcc804a608","revision":12,"scanned_at":"2026-08-19T09:55:07Z","issue_count":0,"pending_operation_count":0}
+```
+
+Error responses: `401`, `405`, `500`, `503`.
+
+### 4. `GET /api/v1/state/doctor`
+
+Request:
+
+```http
+GET /api/v1/state/doctor HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+Request body: none.
+
+Successful `200 application/json` response:
+
+```json
+{"version":1,"state":"DEGRADED_REPAIRABLE","data_schema":4,"instance_id":"bbffeb8c-2d11-4613-874d-b5fcc804a608","revision":12,"scanned_at":"2026-08-19T09:55:07Z","issue_count":1,"pending_operation_count":0,"issues":[{"id":"DECLARATIVE_CONFIG_UNAVAILABLE","severity":"repairable","action":"export-config","target":"/etc/ovpn-conf/config.yaml","detail":"declarative configuration is unavailable"}]}
+```
+
+`issues` is omitted when empty. Error responses: `401`, `405`, `500`, `503`.
+
+### 5. `GET /api/v1/clients`
+
+Request:
+
+```http
+GET /api/v1/clients HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+Request body: none.
+
+Successful `200 application/json` response:
+
+```json
+{"version":1,"clients":[{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-laptop","status":"active","ipv4":{"mode":"static","address":"10.42.0.30","state":"configured"},"connection":"connected"}]}
+```
+
+`clients` is `[]` when no clients exist. Error responses: `401`, `405`, `500`, `503`.
+
+### 6. `POST /api/v1/clients`
+
+Request:
+
+```http
+POST /api/v1/clients HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+Content-Type: application/json
+
+{"name":"alice-laptop","ipv4":"auto"}
+```
+
+`ipv4` accepts `auto`, `dynamic`, or a static IPv4 address.
+
+Successful `201 application/json` response, with `Location: /api/v1/clients/{client_id}`:
+
+```json
+{"version":1,"operation_id":"7a21e1f8-1ce1-4694-977f-b275eadb8651","client":{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-laptop","status":"active","ipv4":{"mode":"static","address":"10.42.0.2","state":"configured"}},"kick_required":false,"profile_redistribution_required":true}
+```
+
+Error responses: `400`, `401`, `409`, `422`, `500`, `503`.
+
+### 7. `GET /api/v1/clients/{client_id}`
+
+Request:
+
+```http
+GET /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+`client_id` must be a complete canonical UUID. Request body: none.
+
+Successful `200 application/json` response:
+
+```json
+{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-laptop","status":"active","ipv4":{"mode":"static","address":"10.42.0.30","state":"configured"}}
+```
+
+Error responses: `400`, `401`, `404`, `405`, `500`, `503`.
+
+### 8. `PATCH /api/v1/clients/{client_id}`
+
+Request:
+
+```http
+PATCH /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+Content-Type: application/json
+
+{"name":"alice-notebook"}
+```
+
+Successful `200 application/json` response:
+
+```json
+{"version":1,"operation_id":"47260b5b-47dd-4f9b-814f-4803668c5934","client":{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-notebook","status":"active","ipv4":{"mode":"static","address":"10.42.0.30","state":"configured"}},"kick_required":false,"profile_redistribution_required":true}
+```
+
+Error responses: `400`, `401`, `404`, `405`, `409`, `422`, `500`, `503`.
+
+### 9. `DELETE /api/v1/clients/{client_id}`
+
+Request:
+
+```http
+DELETE /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+The request body must be empty; `{}` and `null` are rejected.
+
+Successful `200 application/json` response:
+
+```json
+{"version":1,"operation_id":"47260b5b-47dd-4f9b-814f-4803668c5934","client":{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-notebook","status":"deleted","ipv4":{"mode":"none","address":null,"state":"unavailable"}},"kick_required":false,"profile_redistribution_required":false}
+```
+
+Error responses: `400`, `401`, `404`, `405`, `409`, `422`, `500`, `503`.
+
+### 10. `GET /api/v1/clients/{client_id}/profile`
+
+Request:
+
+```http
+GET /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e/profile HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+Request body: none.
+
+Successful `200 application/x-openvpn-profile` response; this is not JSON:
+
+```http
+Content-Type: application/x-openvpn-profile
+Content-Disposition: attachment; filename=alice-laptop.ovpn
+
+client
+# ovpn-client-id: c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e
+...
+```
+
+The profile contains a private key and must be treated as a credential. Error responses: `400`, `401`, `404`, `405`, `409`, `422`, `500`, `503`.
+
+### 11. `POST /api/v1/clients/{client_id}/revoke`
+
+Request:
+
+```http
+POST /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e/revoke HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+Content-Type: application/json
+
+{"release_ipv4":false}
+```
+
+`false` retains the static address; `true` releases it immediately.
+
+Successful `200 application/json` response:
+
+```json
+{"version":1,"operation_id":"47260b5b-47dd-4f9b-814f-4803668c5934","client":{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-laptop","status":"revoked","ipv4":{"mode":"static","address":"10.42.0.30","state":"retained"}},"kick_required":true,"profile_redistribution_required":false,"runtime":{"status":"ok","result":{"version":1,"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop","was_connected":true,"disconnected":true,"connections":1}}}
+```
+
+Error responses: `400`, `401`, `404`, `405`, `409`, `422`, `500`, `503`.
+
+### 12. `POST /api/v1/clients/{client_id}/reissue`
+
+Request:
+
+```http
+POST /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e/reissue HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+Content-Type: application/json
+
+{"ipv4":"dynamic"}
+```
+
+`ipv4` accepts `auto`, `dynamic`, or a static IPv4 address.
+
+Successful `200 application/json` response:
+
+```json
+{"version":1,"operation_id":"47260b5b-47dd-4f9b-814f-4803668c5934","client":{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-notebook","status":"active","ipv4":{"mode":"dynamic","address":null,"state":"configured"}},"kick_required":true,"profile_redistribution_required":true,"runtime":{"status":"unavailable"}}
+```
+
+Error responses: `400`, `401`, `404`, `405`, `409`, `422`, `500`, `503`.
+
+### 13. `PUT /api/v1/clients/{client_id}/ipv4`
+
+Request:
+
+```http
+PUT /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e/ipv4 HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+Content-Type: application/json
+
+{"mode":"static","address":"10.42.0.30"}
+```
+
+Other valid bodies are `{"mode":"auto"}` and `{"mode":"dynamic"}`; those modes reject `address`.
+
+Successful `200 application/json` response:
+
+```json
+{"version":1,"operation_id":"d41dbfce-b40e-4672-8a62-cb401f8c099c","clients":[{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-laptop","status":"active","ipv4":{"mode":"static","address":"10.42.0.30","state":"configured"}}],"kick_required":["c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e"],"runtime":[{"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","status":"ok","result":{"version":1,"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop","was_connected":false,"disconnected":false,"connections":0}}]}
+```
+
+Error responses: `400`, `401`, `404`, `405`, `409`, `422`, `500`, `503`.
+
+### 14. `DELETE /api/v1/clients/{client_id}/ipv4`
+
+Request:
+
+```http
+DELETE /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e/ipv4 HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+The request body must be empty. Only a revoked client with a retained static address is valid.
+
+Successful `200 application/json` response:
+
+```json
+{"version":1,"operation_id":"d41dbfce-b40e-4672-8a62-cb401f8c099c","clients":[{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-notebook","status":"revoked","ipv4":{"mode":"none","address":null,"state":"unavailable"}}],"kick_required":[],"runtime":[]}
+```
+
+Error responses: `400`, `401`, `404`, `405`, `409`, `422`, `500`, `503`.
+
+### 15. `POST /api/v1/clients/{client_id}/disconnect`
+
+Request:
+
+```http
+POST /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e/disconnect HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+The request body must be empty. No active session is a successful no-op.
+
+Successful `200 application/json` response:
+
+```json
+{"version":1,"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop","was_connected":false,"disconnected":false,"connections":0}
+```
+
+Error responses: `400`, `401`, `404`, `405`, `500`, `503`.
+
+### 16. `GET /api/v1/runtime`
+
+Request:
+
+```http
+GET /api/v1/runtime HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+Request body: none.
+
+Successful `200 application/json` response:
+
+```json
+{"version":1,"daemon":"running","management":"connected","client_count":1,"clients":[{"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop","remote_address":"203.0.113.10:53210","virtual_address":"10.42.0.30"}]}
+```
+
+Error responses: `401`, `405`, `500`, `503`.
+
+### 17. `GET /api/v1/runtime/events`
+
+Request:
+
+```http
+GET /api/v1/runtime/events?lines=100 HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+`lines` is optional, defaults to `100`, and accepts `0..1000`. Request body: none.
+
+Successful `200 application/json` response:
+
+```json
+{"version":1,"events":[{"timestamp":"2026-08-19T09:55:07Z","event":"client-disconnect","operation":"runtime.disconnect","outcome":"success","client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop"}]}
+```
+
+Events may contain operation-specific extra fields. Error responses: `400`, `401`, `405`, `500`, `503`.
+
+### 18. `GET /api/v1/config/applied`
+
+Request:
+
+```http
+GET /api/v1/config/applied HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+Request body: none.
+
+Successful `200 application/json` response:
+
+```json
+{"revision":12,"digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca","config":{"version":1,"server":{"endpoint":"vpn.example.com","protocol":"udp","family":"auto","port":1194,"client_to_client":true},"ipv4":{"network":"10.42.0.0/24","dynamic_pool_size":64,"nat_enabled":false,"nat_interface":"auto","redirect_gateway":false,"dns":["1.1.1.1"],"routes":["10.20.0.0/16"]},"logging":{"max_bytes":10485760,"backups":5}}}
+```
+
+Error responses: `401`, `405`, `409`, `500`, `503`.
+
+### 19. `GET /api/v1/config/desired`
+
+Request:
+
+```http
+GET /api/v1/config/desired HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+Request body: none.
+
+Successful `200 application/json` response, plus `ETag: "<digest>"`:
+
+```json
+{"digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca","config":{"version":1,"server":{"endpoint":"vpn.example.com","protocol":"udp","family":"auto","port":1194,"client_to_client":true},"ipv4":{"network":"10.42.0.0/24","dynamic_pool_size":64,"nat_enabled":false,"nat_interface":"auto","redirect_gateway":false,"dns":["1.1.1.1"],"routes":["10.20.0.0/16"]},"logging":{"max_bytes":10485760,"backups":5}}}
+```
+
+Error responses: `401`, `405`, `409`, `422`, `500`, `503`.
+
+### 20. `PUT /api/v1/config/desired`
+
+The request body is the complete bare `Configuration`; do not wrap it in `config`:
+
+```http
+PUT /api/v1/config/desired HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+Content-Type: application/json
+If-Match: "489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca"
+
+{"version":1,"server":{"endpoint":"vpn.example.com","protocol":"udp","family":"auto","port":1194,"client_to_client":true},"ipv4":{"network":"10.42.0.0/24","dynamic_pool_size":64,"nat_enabled":false,"nat_interface":"auto","redirect_gateway":false,"dns":["1.1.1.1"],"routes":["10.20.0.0/16"]},"logging":{"max_bytes":10485760,"backups":5}}
+```
+
+Successful `200 application/json` response, plus the new `ETag`:
+
+```json
+{"digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca","config":{"version":1,"server":{"endpoint":"vpn.example.com","protocol":"udp","family":"auto","port":1194,"client_to_client":true},"ipv4":{"network":"10.42.0.0/24","dynamic_pool_size":64,"nat_enabled":false,"nat_interface":"auto","redirect_gateway":false,"dns":["1.1.1.1"],"routes":["10.20.0.0/16"]},"logging":{"max_bytes":10485760,"backups":5}}}
+```
+
+Error responses: `400`, `401`, `405`, `409`, `422`, `500`, `503`.
+
+### 21. `GET /api/v1/config/plan`
+
+Request:
+
+```http
+GET /api/v1/config/plan HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+Request body: none.
+
+Successful `200 application/json` response:
+
+```json
+{"version":1,"instance_id":"bbffeb8c-2d11-4613-874d-b5fcc804a608","configuration":{"initial":false,"current_revision":12,"target_revision":12,"current_digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca","desired_digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca","in_sync":true,"changes":[],"impact":{"restart_required":false,"address_remap":false,"firewall_reconcile":false,"profile_redistribution":false,"derived_artifacts":[]}},"address_changes":[],"artifacts":[],"profile_redistribution":[],"firewall":{"reconcile":false,"before":null,"after":null}}
+```
+
+Error responses: `401`, `405`, `409`, `422`, `500`, `503`.
+
+### 22. `POST /api/v1/config/apply`
+
+The digest and revision must come from the immediately preceding desired/plan calls:
+
+```http
+POST /api/v1/config/apply HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+Content-Type: application/json
+
+{"desired_digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca","current_revision":12,"force":false}
+```
+
+Successful `200 application/json` response:
+
+```json
+{"version":1,"applied":false,"activation":{"restart_required":false,"runtime_restarted":false,"profile_redistribution":[]},"plan":{"version":1,"instance_id":"bbffeb8c-2d11-4613-874d-b5fcc804a608","configuration":{"initial":false,"current_revision":12,"target_revision":12,"current_digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca","desired_digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca","in_sync":true,"changes":[],"impact":{"restart_required":false,"address_remap":false,"firewall_reconcile":false,"profile_redistribution":false,"derived_artifacts":[]}},"address_changes":[],"artifacts":[],"profile_redistribution":[],"firewall":{"reconcile":false,"before":null,"after":null}}}
+```
+
+When a change is made, `applied` is `true` and `operation_id` is present; `activation` and `plan` remain complete. Error responses: `400`, `401`, `405`, `409`, `422`, `500`, `503`.
 
 ## Configuration workflow
 

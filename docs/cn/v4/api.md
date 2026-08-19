@@ -78,447 +78,516 @@ curl --fail --silent --show-error \
 - `/healthz` 无需认证，只报告 API 进程存活。
 - profile 下载使用 `application/x-openvpn-profile` 和 attachment 文件名。
 
-## 路由索引
+## 逐接口请求与返回
 
-本节只是快速索引，不作为前端开发契约。逐条接口的请求和返回内容请直接使用运行中服务的 `/docs/`；页面中的每个接口都是独立的“请求 / 返回”单元。
+以下 22 条接口均为独立契约。除 `/healthz` 外，每个请求都必须发送 `Authorization: Bearer <API_KEY>`。示例 UUID、digest 和时间仅用于说明格式。
 
-| Method | Path | 用途 |
-|---|---|---|
-| `GET` | `/healthz` | 最小无认证存活检查。 |
-| `GET` | `/api/v1/version` | 构建、数据 schema 和 OpenVPN 兼容信息。 |
-| `GET` | `/api/v1/state` | 实例状态摘要。 |
-| `GET` | `/api/v1/state/doctor` | SQLite、PKI 和 artifact 详细诊断。 |
-| `GET` | `/api/v1/clients` | 列出 active 和 revoked 客户端。 |
-| `POST` | `/api/v1/clients` | 创建客户端。 |
-| `GET` | `/api/v1/clients/{id}` | 使用完整 UUID 查询客户端。 |
-| `PATCH` | `/api/v1/clients/{id}` | 客户端改名。 |
-| `DELETE` | `/api/v1/clients/{id}` | 删除本地凭据并保留 UUID tombstone。 |
-| `GET` | `/api/v1/clients/{id}/profile` | 下载 active 客户端 profile。 |
-| `POST` | `/api/v1/clients/{id}/revoke` | 吊销客户端证书。 |
-| `POST` | `/api/v1/clients/{id}/reissue` | 重签凭据和 profile。 |
-| `PUT` | `/api/v1/clients/{id}/ipv4` | 设置 IPv4 意图。 |
-| `DELETE` | `/api/v1/clients/{id}/ipv4` | 释放 revoked 客户端保留的静态地址。 |
-| `POST` | `/api/v1/clients/{id}/disconnect` | 断开当前 session。 |
-| `GET` | `/api/v1/runtime` | runtime 与在线客户端状态。 |
-| `GET` | `/api/v1/runtime/events?lines=N` | 读取最近 0 到 1000 条结构化事件。 |
-| `GET` | `/api/v1/config/applied` | 读取 SQLite applied revision。 |
-| `GET` | `/api/v1/config/desired` | 读取规范化 desired YAML 及 digest。 |
-| `PUT` | `/api/v1/config/desired` | 验证并原子替换 desired YAML。 |
-| `GET` | `/api/v1/config/plan` | 规划 desired 到 applied 的变更。 |
-| `POST` | `/api/v1/config/apply` | 在线应用当前 desired 配置。 |
+错误响应都使用以下 JSON 结构；每个接口下方会单独列出它可能返回的状态码：
 
-## 前端类型索引
+```json
+{"error":{"kind":"client_not_found","message":"client was not found","request_id":"33ba813e-fc63-4af8-b338-7f7486f82202"}}
+```
 
-下表和 TypeScript 定义用于搜索字段名及复用类型，不替代 `/docs/` 的逐接口请求/返回。除 `/healthz` 外，每个请求都必须发送 `Authorization: Bearer <API_KEY>`。标记为“空 body”的接口不能发送 `{}`、`null` 或任何其他内容。
+### 1. `GET /healthz`
 
-### System
+请求：
 
-| 请求 | Path/query/header | JSON body | 成功返回 |
-|---|---|---|---|
-| `GET /healthz` | 无认证、无 query | 无 | `200 HealthResponse` |
-| `GET /api/v1/version` | 无 query | 无 | `200 VersionResponse` |
-| `GET /api/v1/state` | 无 query | 无 | `200 StateResponse`，不包含 `issues` |
-| `GET /api/v1/state/doctor` | 无 query | 无 | `200 StateResponse`，发现问题时包含 `issues` |
+```http
+GET /healthz HTTP/1.1
+Host: vpn-admin.example.com
+```
 
-### Clients
+请求体：无。此接口不需要认证。
 
-所有 `{client_id}` 都必须是完整 canonical UUID，例如 `c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e`，不能使用名称或 UUID 前缀。
+成功返回 `200 application/json`：
 
-| 请求 | Path/query/header | JSON body | 成功返回 |
-|---|---|---|---|
-| `GET /api/v1/clients` | 无 query | 无 | `200 ClientListResponse` |
-| `POST /api/v1/clients` | 无 query | `CreateClientRequest` | `201 ClientMutationResponse`；含 `Location` header |
-| `GET /api/v1/clients/{client_id}` | `client_id` path 参数 | 无 | `200 Client` |
-| `PATCH /api/v1/clients/{client_id}` | `client_id` path 参数 | `RenameClientRequest` | `200 ClientMutationResponse` |
-| `DELETE /api/v1/clients/{client_id}` | `client_id` path 参数 | 空 body | `200 ClientMutationResponse`，`client.status="deleted"` |
-| `GET /api/v1/clients/{client_id}/profile` | `client_id` path 参数 | 无 | `200 application/x-openvpn-profile`，不是 JSON |
-| `POST /api/v1/clients/{client_id}/revoke` | `client_id` path 参数 | `RevokeClientRequest` | `200 ClientMutationResponse` |
-| `POST /api/v1/clients/{client_id}/reissue` | `client_id` path 参数 | `ReissueClientRequest` | `200 ClientMutationResponse` |
-| `PUT /api/v1/clients/{client_id}/ipv4` | `client_id` path 参数 | `IPv4Request` | `200 AddressMutationResponse` |
-| `DELETE /api/v1/clients/{client_id}/ipv4` | `client_id` path 参数 | 空 body | `200 AddressMutationResponse` |
-| `POST /api/v1/clients/{client_id}/disconnect` | `client_id` path 参数 | 空 body | `200 DisconnectResponse`；无在线 session 也是成功 |
+```json
+{"status":"ok"}
+```
 
-### Runtime
+错误返回：`405`，body 使用本节开头的错误结构。
 
-| 请求 | Path/query/header | JSON body | 成功返回 |
-|---|---|---|---|
-| `GET /api/v1/runtime` | 无 query | 无 | `200 RuntimeResponse` |
-| `GET /api/v1/runtime/events` | 可选 `lines=0..1000`，默认 `100` | 无 | `200 RuntimeEventsResponse` |
+### 2. `GET /api/v1/version`
 
-### Configuration
+请求：
 
-| 请求 | Path/query/header | JSON body | 成功返回 |
-|---|---|---|---|
-| `GET /api/v1/config/applied` | 无 query | 无 | `200 AppliedConfigurationResponse` |
-| `GET /api/v1/config/desired` | 无 query | 无 | `200 DesiredConfigurationResponse`；含 `ETag: "<digest>"` |
-| `PUT /api/v1/config/desired` | 必须发送 `If-Match: "<旧 digest>"` | 完整的裸 `Configuration`，不能包在 `config` 字段中 | `200 DesiredConfigurationResponse`；含新 `ETag` |
-| `GET /api/v1/config/plan` | 无 query | 无 | `200 ConfigurationPlanResponse` |
-| `POST /api/v1/config/apply` | 无 query | `ApplyConfigurationRequest` | `200 ApplyConfigurationResponse` |
+```http
+GET /api/v1/version HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
 
-### 请求内容
+请求体：无。
 
-```ts
-interface CreateClientRequest {
-  name: string;
-  // "auto"、"dynamic"，或静态区内的 IPv4 地址
-  ipv4: string;
-}
+成功返回 `200 application/json`：
 
-interface RenameClientRequest {
-  name: string;
-}
-
-interface RevokeClientRequest {
-  // false 保留当前地址；true 立即释放
-  release_ipv4: boolean;
-}
-
-interface ReissueClientRequest {
-  // "auto"、"dynamic"，或静态区内的 IPv4 地址
-  ipv4: string;
-}
-
-type IPv4Request =
-  | { mode: "auto" }
-  | { mode: "dynamic" }
-  | { mode: "static"; address: string };
-
-interface ApplyConfigurationRequest {
-  desired_digest: string;   // 64 位小写 SHA-256
-  current_revision: number; // config/plan.configuration.current_revision
-  force?: boolean;          // 默认 false
+```json
+{
+  "version": "4.0.2",
+  "data_schema": 4,
+  "commit": "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224",
+  "build_date": "2026-08-19T09:45:40Z",
+  "go_version": "go1.26.5",
+  "dependencies": {"sqlite":"github.com/mattn/go-sqlite3 v1.14.48","yaml":"go.yaml.in/yaml/v3 v3.0.4"},
+  "compatibility": {"contract_version":1,"adapter":"openvpn-2.7","template_family":"openvpn-2.7","supported_openvpn_versions":["2.7.6"]}
 }
 ```
 
-请求示例：
+错误返回：`401`、`405`、`503`，body 使用本节开头的错误结构。
+
+### 3. `GET /api/v1/state`
+
+请求：
+
+```http
+GET /api/v1/state HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+请求体：无。
+
+成功返回 `200 application/json`：
+
+```json
+{"version":1,"state":"HEALTHY","data_schema":4,"instance_id":"bbffeb8c-2d11-4613-874d-b5fcc804a608","revision":12,"scanned_at":"2026-08-19T09:55:07Z","issue_count":0,"pending_operation_count":0}
+```
+
+错误返回：`401`、`405`、`500`、`503`，body 使用本节开头的错误结构。
+
+### 4. `GET /api/v1/state/doctor`
+
+请求：
+
+```http
+GET /api/v1/state/doctor HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+请求体：无。
+
+成功返回 `200 application/json`：
+
+```json
+{
+  "version":1,
+  "state":"DEGRADED_REPAIRABLE",
+  "data_schema":4,
+  "instance_id":"bbffeb8c-2d11-4613-874d-b5fcc804a608",
+  "revision":12,
+  "scanned_at":"2026-08-19T09:55:07Z",
+  "issue_count":1,
+  "pending_operation_count":0,
+  "issues":[{"id":"DECLARATIVE_CONFIG_UNAVAILABLE","severity":"repairable","action":"export-config","target":"/etc/ovpn-conf/config.yaml","detail":"declarative configuration is unavailable"}]
+}
+```
+
+没有问题时 `issues` 字段省略。错误返回：`401`、`405`、`500`、`503`。
+
+### 5. `GET /api/v1/clients`
+
+请求：
+
+```http
+GET /api/v1/clients HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+请求体：无。
+
+成功返回 `200 application/json`：
+
+```json
+{"version":1,"clients":[{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-laptop","status":"active","ipv4":{"mode":"static","address":"10.42.0.30","state":"configured"},"connection":"connected"}]}
+```
+
+没有客户端时 `clients` 为 `[]`。错误返回：`401`、`405`、`500`、`503`。
+
+### 6. `POST /api/v1/clients`
+
+请求：
 
 ```http
 POST /api/v1/clients HTTP/1.1
+Host: vpn-admin.example.com
 Authorization: Bearer ovpn_v1.<uuid>.<secret>
 Content-Type: application/json
 
 {"name":"alice-laptop","ipv4":"auto"}
 ```
 
+`ipv4` 接受 `auto`、`dynamic` 或静态 IPv4 地址。
+
+成功返回 `201 application/json`，并包含 `Location: /api/v1/clients/{client_id}`：
+
+```json
+{"version":1,"operation_id":"7a21e1f8-1ce1-4694-977f-b275eadb8651","client":{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-laptop","status":"active","ipv4":{"mode":"static","address":"10.42.0.2","state":"configured"}},"kick_required":false,"profile_redistribution_required":true}
+```
+
+错误返回：`400`、`401`、`409`、`422`、`500`、`503`。
+
+### 7. `GET /api/v1/clients/{client_id}`
+
+请求：
+
+```http
+GET /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+`client_id` 必须是完整 canonical UUID。请求体：无。
+
+成功返回 `200 application/json`：
+
+```json
+{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-laptop","status":"active","ipv4":{"mode":"static","address":"10.42.0.30","state":"configured"}}
+```
+
+错误返回：`400`、`401`、`404`、`405`、`500`、`503`。
+
+### 8. `PATCH /api/v1/clients/{client_id}`
+
+请求：
+
+```http
+PATCH /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+Content-Type: application/json
+
+{"name":"alice-notebook"}
+```
+
+成功返回 `200 application/json`：
+
+```json
+{"version":1,"operation_id":"47260b5b-47dd-4f9b-814f-4803668c5934","client":{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-notebook","status":"active","ipv4":{"mode":"static","address":"10.42.0.30","state":"configured"}},"kick_required":false,"profile_redistribution_required":true}
+```
+
+错误返回：`400`、`401`、`404`、`405`、`409`、`422`、`500`、`503`。
+
+### 9. `DELETE /api/v1/clients/{client_id}`
+
+请求：
+
+```http
+DELETE /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+请求体必须为空，不能发送 `{}` 或 `null`。
+
+成功返回 `200 application/json`：
+
+```json
+{"version":1,"operation_id":"47260b5b-47dd-4f9b-814f-4803668c5934","client":{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-notebook","status":"deleted","ipv4":{"mode":"none","address":null,"state":"unavailable"}},"kick_required":false,"profile_redistribution_required":false}
+```
+
+错误返回：`400`、`401`、`404`、`405`、`409`、`422`、`500`、`503`。
+
+### 10. `GET /api/v1/clients/{client_id}/profile`
+
+请求：
+
+```http
+GET /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e/profile HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+请求体：无。
+
+成功返回 `200 application/x-openvpn-profile`，不是 JSON：
+
+```http
+Content-Type: application/x-openvpn-profile
+Content-Disposition: attachment; filename=alice-laptop.ovpn
+
+client
+# ovpn-client-id: c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e
+...
+```
+
+profile 内含私钥，必须按凭据处理。错误返回：`400`、`401`、`404`、`405`、`409`、`422`、`500`、`503`。
+
+### 11. `POST /api/v1/clients/{client_id}/revoke`
+
+请求：
+
+```http
+POST /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e/revoke HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+Content-Type: application/json
+
+{"release_ipv4":false}
+```
+
+`false` 保留静态地址，`true` 立即释放。
+
+成功返回 `200 application/json`：
+
+```json
+{"version":1,"operation_id":"47260b5b-47dd-4f9b-814f-4803668c5934","client":{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-laptop","status":"revoked","ipv4":{"mode":"static","address":"10.42.0.30","state":"retained"}},"kick_required":true,"profile_redistribution_required":false,"runtime":{"status":"ok","result":{"version":1,"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop","was_connected":true,"disconnected":true,"connections":1}}}
+```
+
+错误返回：`400`、`401`、`404`、`405`、`409`、`422`、`500`、`503`。
+
+### 12. `POST /api/v1/clients/{client_id}/reissue`
+
+请求：
+
+```http
+POST /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e/reissue HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+Content-Type: application/json
+
+{"ipv4":"dynamic"}
+```
+
+`ipv4` 接受 `auto`、`dynamic` 或静态 IPv4 地址。
+
+成功返回 `200 application/json`：
+
+```json
+{"version":1,"operation_id":"47260b5b-47dd-4f9b-814f-4803668c5934","client":{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-notebook","status":"active","ipv4":{"mode":"dynamic","address":null,"state":"configured"}},"kick_required":true,"profile_redistribution_required":true,"runtime":{"status":"unavailable"}}
+```
+
+错误返回：`400`、`401`、`404`、`405`、`409`、`422`、`500`、`503`。
+
+### 13. `PUT /api/v1/clients/{client_id}/ipv4`
+
+请求：
+
 ```http
 PUT /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e/ipv4 HTTP/1.1
+Host: vpn-admin.example.com
 Authorization: Bearer ovpn_v1.<uuid>.<secret>
 Content-Type: application/json
 
 {"mode":"static","address":"10.42.0.30"}
 ```
 
-### 通用返回模型
+其他合法 body 为 `{"mode":"auto"}` 或 `{"mode":"dynamic"}`，这两种模式禁止发送 `address`。
 
-以下定义与实际 JSON 字段一致。标有 `?` 的字段可能被省略；`null` 与字段省略是不同状态。
+成功返回 `200 application/json`：
 
-```ts
-type UUID = string;
-type Digest = string;
-
-interface HealthResponse {
-  status: "ok";
-}
-
-interface APIErrorResponse {
-  error: {
-    kind: string;
-    message: string;
-    request_id: UUID;
-  };
-}
-
-interface VersionResponse {
-  version: string;
-  data_schema: number;
-  commit: string;
-  build_date: string;
-  go_version: string;
-  dependencies: { sqlite: string; yaml: string };
-  compatibility: {
-    contract_version: number;
-    adapter: string;
-    template_family: string;
-    supported_openvpn_versions: string[];
-  };
-}
-
-type StateClassification =
-  | "EMPTY" | "HEALTHY" | "DEGRADED_REPAIRABLE"
-  | "DEGRADED_RECOVERABLE" | "DEGRADED_REISSUABLE"
-  | "CRITICAL" | "UNRECOVERABLE";
-
-interface StateIssue {
-  id: string;
-  severity: "repairable" | "recoverable" | "reissuable" | "critical" | "unrecoverable";
-  action: string;
-  target?: string;
-  owner_id?: string;
-  artifact_kind?: string;
-  detail: string;
-}
-
-interface StateResponse {
-  version: 1;
-  state: StateClassification;
-  data_schema: number;
-  instance_id?: UUID;
-  revision?: number;
-  scanned_at: string;
-  issue_count: number;
-  pending_operation_count: number;
-  issues?: StateIssue[];
-}
-
-interface ClientIPv4 {
-  mode: "none" | "static" | "dynamic";
-  address: string | null;
-  state: "configured" | "retained" | "unavailable";
-}
-
-interface Client {
-  id: UUID;
-  name: string;
-  status: "active" | "revoked" | "deleted";
-  ipv4: ClientIPv4;
-  connection?: string;
-}
-
-interface ClientListResponse {
-  version: 1;
-  clients: Client[];
-}
-
-interface DisconnectResponse {
-  version: 1;
-  client_id: UUID;
-  client_name: string;
-  was_connected: boolean;
-  disconnected: boolean;
-  connections: number;
-}
-
-interface RuntimeOutcome {
-  client_id?: UUID;
-  status: "ok" | "unavailable";
-  result?: DisconnectResponse;
-}
-
-interface ClientMutationResponse {
-  version: 1;
-  operation_id: UUID;
-  client: Client;
-  kick_required: boolean;
-  profile_redistribution_required: boolean;
-  runtime?: RuntimeOutcome;
-}
-
-interface AddressMutationResponse {
-  version: 1;
-  operation_id: UUID;
-  clients: Client[];
-  kick_required: UUID[];
-  runtime: RuntimeOutcome[];
-}
+```json
+{"version":1,"operation_id":"d41dbfce-b40e-4672-8a62-cb401f8c099c","clients":[{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-laptop","status":"active","ipv4":{"mode":"static","address":"10.42.0.30","state":"configured"}}],"kick_required":["c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e"],"runtime":[{"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","status":"ok","result":{"version":1,"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop","was_connected":false,"disconnected":false,"connections":0}}]}
 ```
 
-客户端 mutation 返回示例：
+错误返回：`400`、`401`、`404`、`405`、`409`、`422`、`500`、`503`。
+
+### 14. `DELETE /api/v1/clients/{client_id}/ipv4`
+
+请求：
+
+```http
+DELETE /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e/ipv4 HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+请求体必须为空。仅 revoked 且保留了静态地址的客户端可调用。
+
+成功返回 `200 application/json`：
+
+```json
+{"version":1,"operation_id":"d41dbfce-b40e-4672-8a62-cb401f8c099c","clients":[{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-notebook","status":"revoked","ipv4":{"mode":"none","address":null,"state":"unavailable"}}],"kick_required":[],"runtime":[]}
+```
+
+错误返回：`400`、`401`、`404`、`405`、`409`、`422`、`500`、`503`。
+
+### 15. `POST /api/v1/clients/{client_id}/disconnect`
+
+请求：
+
+```http
+POST /api/v1/clients/c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e/disconnect HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+请求体必须为空。没有在线 session 也返回成功。
+
+成功返回 `200 application/json`：
+
+```json
+{"version":1,"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop","was_connected":false,"disconnected":false,"connections":0}
+```
+
+错误返回：`400`、`401`、`404`、`405`、`500`、`503`。
+
+### 16. `GET /api/v1/runtime`
+
+请求：
+
+```http
+GET /api/v1/runtime HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+请求体：无。
+
+成功返回 `200 application/json`：
+
+```json
+{"version":1,"daemon":"running","management":"connected","client_count":1,"clients":[{"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop","remote_address":"203.0.113.10:53210","virtual_address":"10.42.0.30"}]}
+```
+
+错误返回：`401`、`405`、`500`、`503`。
+
+### 17. `GET /api/v1/runtime/events`
+
+请求：
+
+```http
+GET /api/v1/runtime/events?lines=100 HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+`lines` 可选，默认 `100`，范围 `0..1000`。请求体：无。
+
+成功返回 `200 application/json`：
+
+```json
+{"version":1,"events":[{"timestamp":"2026-08-19T09:55:07Z","event":"client-disconnect","operation":"runtime.disconnect","outcome":"success","client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop"}]}
+```
+
+不同 event 可能附加额外字段。错误返回：`400`、`401`、`405`、`500`、`503`。
+
+### 18. `GET /api/v1/config/applied`
+
+请求：
+
+```http
+GET /api/v1/config/applied HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
+
+请求体：无。
+
+成功返回 `200 application/json`：
 
 ```json
 {
-  "version": 1,
-  "operation_id": "47260b5b-47dd-4f9b-814f-4803668c5934",
-  "client": {
-    "id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
-    "name": "alice-laptop",
-    "status": "revoked",
-    "ipv4": {"mode": "static", "address": "10.42.0.30", "state": "retained"}
-  },
-  "kick_required": true,
-  "profile_redistribution_required": false,
-  "runtime": {
-    "status": "ok",
-    "result": {
-      "version": 1,
-      "client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
-      "client_name": "alice-laptop",
-      "was_connected": true,
-      "disconnected": true,
-      "connections": 1
-    }
-  }
+  "revision":12,
+  "digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca",
+  "config":{"version":1,"server":{"endpoint":"vpn.example.com","protocol":"udp","family":"auto","port":1194,"client_to_client":true},"ipv4":{"network":"10.42.0.0/24","dynamic_pool_size":64,"nat_enabled":false,"nat_interface":"auto","redirect_gateway":false,"dns":["1.1.1.1"],"routes":["10.20.0.0/16"]},"logging":{"max_bytes":10485760,"backups":5}}
 }
 ```
 
-### Runtime 返回模型
+错误返回：`401`、`405`、`409`、`500`、`503`。
 
-```ts
-interface RuntimeClient {
-  client_id: UUID;
-  client_name?: string;
-  remote_address?: string;
-  virtual_address?: string;
-}
+### 19. `GET /api/v1/config/desired`
 
-interface RuntimeResponse {
-  version: 1;
-  daemon: string;
-  management: string;
-  client_count: number;
-  clients: RuntimeClient[];
-}
+请求：
 
-interface RuntimeEvent {
-  timestamp: string;
-  event: string;
-  operation: string;
-  outcome: string;
-  client_id?: UUID | null;
-  client_name?: string | null;
-  // 不同 event 可以附加额外字段
-  [key: string]: unknown;
-}
-
-interface RuntimeEventsResponse {
-  version: 1;
-  events: RuntimeEvent[];
-}
+```http
+GET /api/v1/config/desired HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
 ```
+
+请求体：无。
+
+成功返回 `200 application/json`，同时返回 `ETag: "<digest>"`：
 
 ```json
 {
-  "version": 1,
-  "daemon": "running",
-  "management": "connected",
-  "client_count": 1,
-  "clients": [{
-    "client_id": "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e",
-    "client_name": "alice-laptop",
-    "remote_address": "203.0.113.10:53210",
-    "virtual_address": "10.42.0.30"
-  }]
+  "digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca",
+  "config":{"version":1,"server":{"endpoint":"vpn.example.com","protocol":"udp","family":"auto","port":1194,"client_to_client":true},"ipv4":{"network":"10.42.0.0/24","dynamic_pool_size":64,"nat_enabled":false,"nat_interface":"auto","redirect_gateway":false,"dns":["1.1.1.1"],"routes":["10.20.0.0/16"]},"logging":{"max_bytes":10485760,"backups":5}}
 }
 ```
 
-### 配置返回模型
+错误返回：`401`、`405`、`409`、`422`、`500`、`503`。
 
-```ts
-interface Configuration {
-  version: 1;
-  server: {
-    endpoint: string;
-    protocol: "udp" | "tcp";
-    family: "auto" | "ipv4" | "ipv6";
-    port: number;
-    client_to_client: boolean;
-  };
-  ipv4: {
-    network: string;
-    dynamic_pool_size: number;
-    nat_enabled: boolean;
-    nat_interface: string;
-    redirect_gateway: boolean;
-    dns: string[];
-    routes: string[];
-  };
-  logging: { max_bytes: number; backups: number };
-}
+### 20. `PUT /api/v1/config/desired`
 
-interface AppliedConfigurationResponse {
-  revision: number;
-  digest: Digest;
-  config: Configuration;
-}
+请求 body 是完整裸 `Configuration`，不能包在 `config` 字段中：
 
-interface DesiredConfigurationResponse {
-  digest: Digest;
-  config: Configuration;
-}
+```http
+PUT /api/v1/config/desired HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+Content-Type: application/json
+If-Match: "489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca"
 
-interface ConfigurationComparison {
-  initial: boolean;
-  current_revision: number;
-  target_revision: number;
-  current_digest?: Digest;
-  desired_digest: Digest;
-  in_sync: boolean;
-  changes: Array<{ field: string; before: unknown; after: unknown }>;
-  impact: {
-    restart_required: boolean;
-    address_remap: boolean;
-    firewall_reconcile: boolean;
-    profile_redistribution: boolean;
-    derived_artifacts: string[];
-  };
-}
-
-interface ConfigurationPlanResponse {
-  version: 1;
-  instance_id: UUID;
-  configuration: ConfigurationComparison;
-  address_changes: Array<{
-    client: { id: UUID; name: string };
-    before: { mode: string; address: string | null; state: string };
-    after: { mode: string; address: string | null; state: string };
-  }>;
-  artifacts: Array<{
-    owner_kind: string; owner_id: string; kind: string; key: string;
-    action: "regenerate" | "delete";
-  }>;
-  profile_redistribution: Array<{ id: UUID; name: string }>;
-  firewall: {
-    reconcile: boolean;
-    before: FirewallState | null;
-    after: FirewallState | null;
-  };
-}
-
-interface FirewallState {
-  network: string;
-  nat_enabled: boolean;
-  nat_interface: string;
-  routes: string[];
-}
-
-interface ApplyConfigurationResponse {
-  version: 1;
-  applied: boolean;
-  operation_id?: UUID;
-  activation: {
-    restart_required: boolean;
-    runtime_restarted: boolean;
-    profile_redistribution: Array<{ id: UUID; name: string }>;
-  };
-  plan: ConfigurationPlanResponse;
-}
+{"version":1,"server":{"endpoint":"vpn.example.com","protocol":"udp","family":"auto","port":1194,"client_to_client":true},"ipv4":{"network":"10.42.0.0/24","dynamic_pool_size":64,"nat_enabled":false,"nat_interface":"auto","redirect_gateway":false,"dns":["1.1.1.1"],"routes":["10.20.0.0/16"]},"logging":{"max_bytes":10485760,"backups":5}}
 ```
 
-完整字段约束、枚举、nullable 状态和每个错误状态以 `/docs/openapi.json` 为准。
-
-## 客户端请求
-
-创建客户端时，`ipv4` 接受 `auto`、`dynamic` 或一个静态 IPv4 地址：
+成功返回 `200 application/json`，同时返回新 `ETag`：
 
 ```json
-{"name":"laptop","ipv4":"auto"}
+{
+  "digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca",
+  "config":{"version":1,"server":{"endpoint":"vpn.example.com","protocol":"udp","family":"auto","port":1194,"client_to_client":true},"ipv4":{"network":"10.42.0.0/24","dynamic_pool_size":64,"nat_enabled":false,"nat_interface":"auto","redirect_gateway":false,"dns":["1.1.1.1"],"routes":["10.20.0.0/16"]},"logging":{"max_bytes":10485760,"backups":5}}
+}
 ```
 
-创建成功返回 `201 Created` 和 `Location: /api/v1/clients/{id}`。其他 mutation body 如下：
+错误返回：`400`、`401`、`405`、`409`、`422`、`500`、`503`。
 
-| 操作 | JSON body |
-|---|---|
-| 改名 | `{"name":"new-name"}` |
-| 吊销 | `{"release_ipv4":false}` |
-| 重签 | `{"ipv4":"dynamic"}` |
-| 自动 IPv4 | `{"mode":"auto"}` |
-| 动态 IPv4 | `{"mode":"dynamic"}` |
-| 静态 IPv4 | `{"mode":"static","address":"10.42.0.20"}` |
+### 21. `GET /api/v1/config/plan`
 
-删除、IPv4 release 和 disconnect 不接受 body。重签的 IPv4 选择与创建相同。
+请求：
 
-部分已提交的客户端或地址变更需要断开当前 session。如果持久 mutation 已提交但 broker 不可用，响应仍保持成功，并将 `runtime.status` 报告为 `unavailable`。直接 disconnect 在 runtime control 不可用时返回 `503`。
+```http
+GET /api/v1/config/plan HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+```
 
-profile 内含私钥。应将 profile 响应视为凭据，不能进入浏览器缓存、日志、分析系统或普通下载目录。
+请求体：无。
+
+成功返回 `200 application/json`：
+
+```json
+{
+  "version":1,
+  "instance_id":"bbffeb8c-2d11-4613-874d-b5fcc804a608",
+  "configuration":{"initial":false,"current_revision":12,"target_revision":12,"current_digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca","desired_digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca","in_sync":true,"changes":[],"impact":{"restart_required":false,"address_remap":false,"firewall_reconcile":false,"profile_redistribution":false,"derived_artifacts":[]}},
+  "address_changes":[],
+  "artifacts":[],
+  "profile_redistribution":[],
+  "firewall":{"reconcile":false,"before":null,"after":null}
+}
+```
+
+错误返回：`401`、`405`、`409`、`422`、`500`、`503`。
+
+### 22. `POST /api/v1/config/apply`
+
+请求中的 digest 和 revision 必须来自刚读取的 desired/plan：
+
+```http
+POST /api/v1/config/apply HTTP/1.1
+Host: vpn-admin.example.com
+Authorization: Bearer ovpn_v1.<uuid>.<secret>
+Content-Type: application/json
+
+{"desired_digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca","current_revision":12,"force":false}
+```
+
+成功返回 `200 application/json`：
+
+```json
+{
+  "version":1,
+  "applied":false,
+  "activation":{"restart_required":false,"runtime_restarted":false,"profile_redistribution":[]},
+  "plan":{"version":1,"instance_id":"bbffeb8c-2d11-4613-874d-b5fcc804a608","configuration":{"initial":false,"current_revision":12,"target_revision":12,"current_digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca","desired_digest":"489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca","in_sync":true,"changes":[],"impact":{"restart_required":false,"address_remap":false,"firewall_reconcile":false,"profile_redistribution":false,"derived_artifacts":[]}},"address_changes":[],"artifacts":[],"profile_redistribution":[],"firewall":{"reconcile":false,"before":null,"after":null}}
+}
+```
+
+发生实际变更时 `applied` 为 `true`，并出现 `operation_id`；`activation` 和 `plan` 仍完整返回。错误返回：`400`、`401`、`405`、`409`、`422`、`500`、`503`。
 
 ## 配置工作流
 
