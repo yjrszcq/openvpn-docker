@@ -25,7 +25,7 @@ docker compose run --rm openvpn-maintenance state doctor
 
 ```yaml
   openvpn-maintenance:
-    image: szcq/openvpn:2.7.5
+    image: szcq/openvpn:latest
     restart: "no"
     network_mode: host
     environment:

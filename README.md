@@ -41,7 +41,7 @@ Create `docker-compose.yaml`. This version is self-contained and does not requir
 ```yaml
 services:
   openvpn:
-    image: szcq/openvpn:2.7.5
+    image: szcq/openvpn:latest
     container_name: openvpn
     restart: unless-stopped
     network_mode: host
@@ -58,7 +58,7 @@ services:
       - /dev/net/tun:/dev/net/tun
 ```
 
-Docker Hub tags follow the embedded OpenVPN version. The image shown here contains OpenVPN 2.7.5. Pin a concrete tag in production.
+Docker Hub publishes both the rolling `latest` tag shown here and tags matching the embedded OpenVPN version. Pin a concrete version tag in production.
 
 The quick-start file intentionally contains only the live service. For a complete configuration including `openvpn-maintenance`, use the repository's [docker-compose.yaml](docker-compose.yaml); see the [operations guide](docs/en/v4/operations.md#runtime-conventions) for offline diagnosis, repair, migration, backup, and recovery workflows.
 
@@ -113,7 +113,7 @@ Persistent server settings belong in declarative YAML. Environment variables con
 
 | Variable | Runtime default / Compose fallback | `.env.example` value | Purpose |
 |---|---|---|---|
-| `OVPN_IMAGE` | `szcq/openvpn:2.7.5` | `szcq/openvpn:2.7.5` | Image used by Compose. Pin a released tag in production. |
+| `OVPN_IMAGE` | `szcq/openvpn:latest` | `szcq/openvpn:latest` | Image used by Compose. Pin a released version tag in production. |
 | `OVPN_CONFIG_FILE` | `/etc/ovpn-conf/config.yaml` | unset | Desired declarative YAML path. |
 | `OVPN_DATA_DIR` | `/etc/openvpn` | unset | Persistent data directory containing SQLite, PKI, artifacts, logs, and locks. |
 | `OVPN_RUNTIME_DIR` | `/run/openvpn-container` | unset | Ephemeral directory for runtime sockets and the server-process lock. |

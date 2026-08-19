@@ -39,7 +39,7 @@ chmod 750 data config
 ```yaml
 services:
   openvpn:
-    image: szcq/openvpn:2.7.5
+    image: szcq/openvpn:latest
     container_name: openvpn
     restart: unless-stopped
     network_mode: host
@@ -56,7 +56,7 @@ services:
       - /dev/net/tun:/dev/net/tun
 ```
 
-Docker Hub tag 使用镜像内 OpenVPN 版本。这里的镜像内含 OpenVPN 2.7.5；生产环境应固定明确 tag。
+Docker Hub 同时发布示例使用的滚动 `latest` tag，以及与镜像内 OpenVPN 版本一致的版本 tag；生产环境应固定明确的版本 tag。
 
 快速部署文件有意只保留在线服务。包含 `openvpn-maintenance` 的完整配置可直接使用仓库根目录的 [docker-compose.yaml](docker-compose.yaml)；离线诊断、修复、迁移、备份和恢复流程见[操作手册](docs/cn/v4/operations.md#运行环境约定)。
 
@@ -111,7 +111,7 @@ chmod 600 laptop.ovpn
 
 | 变量 | 运行时默认值 / Compose 回退值 | `.env.example` 值 | 说明 |
 |---|---|---|---|
-| `OVPN_IMAGE` | `szcq/openvpn:2.7.5` | `szcq/openvpn:2.7.5` | Compose 使用的镜像。生产环境应固定已发布 tag。 |
+| `OVPN_IMAGE` | `szcq/openvpn:latest` | `szcq/openvpn:latest` | Compose 使用的镜像。生产环境应固定已发布的版本 tag。 |
 | `OVPN_CONFIG_FILE` | `/etc/ovpn-conf/config.yaml` | 未设置 | 期望状态声明式 YAML 的路径。 |
 | `OVPN_DATA_DIR` | `/etc/openvpn` | 未设置 | 保存 SQLite、PKI、artifact、日志和锁的持久数据目录。 |
 | `OVPN_RUNTIME_DIR` | `/run/openvpn-container` | 未设置 | 保存 runtime socket 和服务进程锁的临时目录。 |
