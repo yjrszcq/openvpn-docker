@@ -56,6 +56,19 @@ func TestEmbeddedDocumentationDescribesEveryOperation(t *testing.T) {
 	}
 }
 
+func TestDocumentationAssetsHaveNoExternalDependencies(t *testing.T) {
+	for _, name := range []string{"docs/index.html", "docs/app.js", "docs/style.css"} {
+		content, err := documentationFiles.ReadFile(name)
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		value := strings.ToLower(string(content))
+		if strings.Contains(value, "http://") || strings.Contains(value, "https://") {
+			t.Fatalf("%s references an external dependency", name)
+		}
+	}
+}
+
 func TestDocumentationRoutingIsStrict(t *testing.T) {
 	handler := newTestHandler(t, fakeAuthenticator{})
 	tests := []struct {
