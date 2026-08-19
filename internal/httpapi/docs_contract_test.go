@@ -155,11 +155,22 @@ func TestFrontendGuidesDocumentEachOperationIndependently(t *testing.T) {
 			t.Fatalf("read %s: %v", guide, err)
 		}
 		markdown := string(content)
+		requestParameters := "#### Request parameters"
+		requestExample := "#### Request example"
+		responsesHeading := "#### Responses"
+		responseFields := "Response fields:"
+		if strings.Contains(guide, string(filepath.Separator)+"cn"+string(filepath.Separator)) {
+			requestParameters = "#### 请求参数"
+			requestExample = "#### 请求示例"
+			responsesHeading = "#### 返回"
+			responseFields = "返回字段："
+		}
 		count := 0
 		for path, rawPathItem := range paths {
 			pathItem := object(t, rawPathItem, path)
 			for _, method := range []string{"get", "post", "put", "patch", "delete"} {
-				if pathItem[method] == nil {
+				rawOperation := pathItem[method]
+				if rawOperation == nil {
 					continue
 				}
 				count++
@@ -167,10 +178,53 @@ func TestFrontendGuidesDocumentEachOperationIndependently(t *testing.T) {
 				if occurrences := strings.Count(markdown, heading); occurrences != 1 {
 					t.Fatalf("%s contains %d headings for %s", guide, occurrences, heading)
 				}
+				start := strings.Index(markdown, heading)
+				section := markdown[start:]
+				if end := strings.Index(section, "\n### "); end >= 0 {
+					section = section[:end]
+				}
+				for _, marker := range []string{requestParameters, requestExample, responsesHeading, responseFields} {
+					if !strings.Contains(section, marker) {
+						t.Fatalf("%s section %s lacks %q", guide, heading, marker)
+					}
+				}
+				if path != "/healthz" && !strings.Contains(section, "| `Authorization` | `header` | `string` |") {
+					t.Fatalf("%s section %s lacks the detailed Authorization row", guide, heading)
+				}
+				operation := object(t, rawOperation, method+" "+path)
+				parameters := append([]any{}, pathItemParameters(pathItem)...)
+				parameters = append(parameters, operationParameters(operation)...)
+				for _, rawParameter := range parameters {
+					parameter := referencedObject(t, document, rawParameter, method+" "+path+" parameter")
+					row := "| `" + parameter["name"].(string) + "` | `" + parameter["in"].(string) + "` |"
+					if !strings.Contains(section, row) {
+						t.Fatalf("%s section %s lacks parameter row %q", guide, heading, row)
+					}
+				}
+				if rawBody := operation["requestBody"]; rawBody != nil {
+					body := referencedObject(t, document, rawBody, method+" "+path+" request body")
+					content := object(t, body["content"], method+" "+path+" request content")
+					media := object(t, content["application/json"], method+" "+path+" request media")
+					schema := referencedObject(t, document, media["schema"], method+" "+path+" request schema")
+					for field := range object(t, schema["properties"], method+" "+path+" request properties") {
+						row := "| `" + field + "` | `body` |"
+						if !strings.Contains(section, row) {
+							t.Fatalf("%s section %s lacks request body row %q", guide, heading, row)
+						}
+					}
+				}
+				for status := range object(t, operation["responses"], method+" "+path+" responses") {
+					if !strings.Contains(section, "##### `"+status+" ") {
+						t.Fatalf("%s section %s lacks response status %s", guide, heading, status)
+					}
+				}
 			}
 		}
-		if count != 22 || strings.Count(markdown, "\n### ") != 22 {
+		if count != 22 || strings.Count(markdown, "\n### ") != 22 || strings.Count(markdown, requestParameters) != 22 || strings.Count(markdown, requestExample) != 22 || strings.Count(markdown, responsesHeading) != 22 {
 			t.Fatalf("%s operation sections=%d OpenAPI operations=%d", guide, strings.Count(markdown, "\n### "), count)
+		}
+		if strings.Contains(markdown, "Host: vpn-admin.example.com") {
+			t.Fatalf("%s still contains a synthetic Host header", guide)
 		}
 		for _, grouped := range []string{"### System", "### Clients", "### Runtime", "### Configuration", "### 请求内容", "### 通用返回模型"} {
 			if strings.Contains(markdown, grouped) {
@@ -178,6 +232,16 @@ func TestFrontendGuidesDocumentEachOperationIndependently(t *testing.T) {
 			}
 		}
 	}
+}
+
+func pathItemParameters(pathItem map[string]any) []any {
+	parameters, _ := pathItem["parameters"].([]any)
+	return parameters
+}
+
+func operationParameters(operation map[string]any) []any {
+	parameters, _ := operation["parameters"].([]any)
+	return parameters
 }
 
 func openAPIDocument(t *testing.T) []byte {
