@@ -44,7 +44,7 @@ type CreateResult struct {
 	Version     int    `json:"version"`
 	OperationID string `json:"operation_id"`
 	Key         Key    `json:"key"`
-	Secret      string `json:"secret"`
+	Secret      string `json:"secret,omitempty"`
 }
 
 type DeleteResult struct {

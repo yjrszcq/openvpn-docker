@@ -10,6 +10,7 @@ import (
 
 	"github.com/yjrszcq/openvpn-docker/internal/apperror"
 	"github.com/yjrszcq/openvpn-docker/internal/artifact"
+	"github.com/yjrszcq/openvpn-docker/internal/auditactor"
 	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 	configservice "github.com/yjrszcq/openvpn-docker/internal/config"
 	"github.com/yjrszcq/openvpn-docker/internal/derived"
@@ -48,7 +49,7 @@ func runRepairApply(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return writeErrorMode(stderr, err, jsonMode)
 	}
-	ctx := context.Background()
+	ctx := auditactor.LocalCLI(context.Background())
 	plan, err := buildRepairPlan(ctx, options)
 	if err != nil {
 		return writeRepairError(stderr, err, jsonMode)

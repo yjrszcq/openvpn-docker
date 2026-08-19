@@ -27,7 +27,7 @@ func TestHelpShowsPlannedGroups(t *testing.T) {
 	if code != 0 || stderr != "" {
 		t.Fatalf("help code=%d stderr=%q", code, stderr)
 	}
-	for _, group := range []string{"server", "config", "client", "state", "repair", "migrate", "runtime", "completion", "version"} {
+	for _, group := range []string{"api", "server", "config", "client", "state", "repair", "migrate", "runtime", "completion", "version"} {
 		if !strings.Contains(stdout, group) {
 			t.Errorf("help is missing %q", group)
 		}
@@ -43,6 +43,7 @@ func TestNestedHelp(t *testing.T) {
 
 func TestHelpFormsShareDetailedLeafOutput(t *testing.T) {
 	paths := [][]string{
+		{"api", "key", "create"},
 		{"server", "init"},
 		{"config", "apply"},
 		{"client", "create"},
@@ -72,6 +73,7 @@ func TestHelpFormsShareDetailedLeafOutput(t *testing.T) {
 
 func TestEveryCommandHasUsefulHelp(t *testing.T) {
 	paths := [][]string{
+		{"api"}, {"api", "key"}, {"api", "key", "create"}, {"api", "key", "list"}, {"api", "key", "delete"},
 		{"server"}, {"server", "init"}, {"server", "run"}, {"server", "render"},
 		{"config"}, {"config", "validate"}, {"config", "show"}, {"config", "export"}, {"config", "plan"}, {"config", "apply"},
 		{"client"}, {"client", "create"}, {"client", "list"}, {"client", "export"}, {"client", "rename"}, {"client", "revoke"}, {"client", "reissue"}, {"client", "delete"},

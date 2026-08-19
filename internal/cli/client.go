@@ -15,6 +15,7 @@ import (
 
 	"github.com/yjrszcq/openvpn-docker/internal/apperror"
 	"github.com/yjrszcq/openvpn-docker/internal/artifact"
+	"github.com/yjrszcq/openvpn-docker/internal/auditactor"
 	clientservice "github.com/yjrszcq/openvpn-docker/internal/client"
 	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 	"github.com/yjrszcq/openvpn-docker/internal/initialize"
@@ -177,7 +178,7 @@ func runClientCreate(args []string, stdout, stderr io.Writer) int {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
-	result, err := manager.Create(context.Background(), request)
+	result, err := manager.Create(auditactor.LocalCLI(context.Background()), request)
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
@@ -212,7 +213,7 @@ func runClientRename(args []string, stdout, stderr io.Writer) int {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
-	result, err := manager.Rename(context.Background(), selector, positionals[0])
+	result, err := manager.Rename(auditactor.LocalCLI(context.Background()), selector, positionals[0])
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
@@ -254,7 +255,7 @@ func runClientRevoke(args []string, stdout, stderr io.Writer) int {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
-	result, err := manager.Revoke(context.Background(), selector, release)
+	result, err := manager.Revoke(auditactor.LocalCLI(context.Background()), selector, release)
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
@@ -295,7 +296,7 @@ func runClientReissue(args []string, stdout, stderr io.Writer) int {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
-	result, err := manager.Reissue(context.Background(), selector, ipv4)
+	result, err := manager.Reissue(auditactor.LocalCLI(context.Background()), selector, ipv4)
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
@@ -374,7 +375,7 @@ func runClientDelete(args []string, stdout, stderr io.Writer) int {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
-	result, err := manager.Delete(context.Background(), selector)
+	result, err := manager.Delete(auditactor.LocalCLI(context.Background()), selector)
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
@@ -428,7 +429,7 @@ func runClientAddressSet(args []string, stdout, stderr io.Writer) int {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
-	result, err := manager.AddressSet(context.Background(), selector, ipv4)
+	result, err := manager.AddressSet(auditactor.LocalCLI(context.Background()), selector, ipv4)
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
@@ -455,7 +456,7 @@ func runClientAddressRelease(args []string, stdout, stderr io.Writer) int {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
-	result, err := manager.AddressRelease(context.Background(), selector)
+	result, err := manager.AddressRelease(auditactor.LocalCLI(context.Background()), selector)
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
@@ -572,7 +573,7 @@ func runClientAddressEdit(args []string, stdout, stderr io.Writer) int {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}
 	defer state.Close()
-	result, err := manager.AddressEdit(context.Background(), request)
+	result, err := manager.AddressEdit(auditactor.LocalCLI(context.Background()), request)
 	if err != nil {
 		return writeClientMutationError(stderr, err, options.JSON)
 	}

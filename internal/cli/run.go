@@ -151,6 +151,15 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "client" && args[1] == "list" {
 		return runClientList(args[2:], stdout, stderr)
 	}
+	if len(args) >= 3 && args[0] == "api" && args[1] == "key" && args[2] == "create" {
+		return runAPIKeyCreate(args[3:], stdout, stderr)
+	}
+	if len(args) >= 3 && args[0] == "api" && args[1] == "key" && args[2] == "list" {
+		return runAPIKeyList(args[3:], stdout, stderr)
+	}
+	if len(args) >= 3 && args[0] == "api" && args[1] == "key" && args[2] == "delete" {
+		return runAPIKeyDelete(args[3:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "client" && args[1] == "export" {
 		return runClientExport(args[2:], stdout, stderr)
 	}
