@@ -108,6 +108,36 @@ func TestOpenAPIMutationsDocumentRequestBodies(t *testing.T) {
 	}
 }
 
+func TestOpenAPIMutationsUseOperationSpecificSuccessExamples(t *testing.T) {
+	var document map[string]any
+	if err := json.Unmarshal(openAPIDocument(t), &document); err != nil {
+		t.Fatal(err)
+	}
+	paths := object(t, document["paths"], "paths")
+	tests := []struct {
+		method   string
+		path     string
+		contains string
+	}{
+		{"patch", "/api/v1/clients/{client_id}", `"name":"alice-notebook"`},
+		{"post", "/api/v1/clients/{client_id}/reissue", `"profile_redistribution_required":true`},
+		{"delete", "/api/v1/clients/{client_id}", `"status":"deleted"`},
+		{"delete", "/api/v1/clients/{client_id}/ipv4", `"address":null`},
+	}
+	for _, test := range tests {
+		operation := object(t, object(t, paths[test.path], test.path)[test.method], test.method+" "+test.path)
+		response := referencedObject(t, document, object(t, operation["responses"], "responses")["200"], "success response")
+		media := object(t, object(t, response["content"], "response content")["application/json"], "response media")
+		example, err := json.Marshal(media["example"])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(example), test.contains) {
+			t.Fatalf("%s %s example %s lacks %s", test.method, test.path, example, test.contains)
+		}
+	}
+}
+
 func openAPIDocument(t *testing.T) []byte {
 	t.Helper()
 	content, err := documentationFiles.ReadFile("docs/openapi.json")

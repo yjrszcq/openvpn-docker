@@ -6,7 +6,7 @@ The API is disabled by default. It uses HTTP internally and does not manage TLS 
 
 When enabled, the API serves development documentation directly:
 
-- `http://<OVPN_API_LISTEN>/docs/` is the self-contained browser reference with no CDN dependency.
+- `http://<OVPN_API_LISTEN>/docs/` is the frontend reference. Each of the 22 operations independently shows its complete HTTP request, parameters, body fields, success response, error responses, and JSON examples; developers do not have to assemble a call from grouped models.
 - `http://<OVPN_API_LISTEN>/docs/openapi.json` is the OpenAPI 3.1 contract for Orval, OpenAPI Generator, NSwag, and API clients.
 
 Documentation is public because it contains only the API contract. Actual `/api/v1/*` resources still require an API key.
@@ -78,7 +78,9 @@ Do not send keys in URLs, query strings, cookies, or request bodies.
 - `/healthz` is unauthenticated and reports only API process liveness.
 - Profile downloads use `application/x-openvpn-profile` and an attachment filename.
 
-## Resources
+## Route index
+
+This section is only a quick index, not the frontend implementation contract. Use `/docs/` on the running service for per-operation requests and responses; every operation is one self-contained request/response unit.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -105,9 +107,9 @@ Do not send keys in URLs, query strings, cookies, or request bodies.
 | `GET` | `/api/v1/config/plan` | Plan desired-to-applied changes. |
 | `POST` | `/api/v1/config/apply` | Apply the current desired configuration online. |
 
-## Frontend contract
+## Frontend type index
 
-These tables cover all 22 operations. Except for `/healthz`, every request requires `Authorization: Bearer <API_KEY>`. An "empty body" operation rejects `{}`, `null`, and any other body content.
+These tables and TypeScript definitions are a searchable field/type index, not a substitute for the per-operation request/response at `/docs/`. Except for `/healthz`, every request requires `Authorization: Bearer <API_KEY>`. An "empty body" operation rejects `{}`, `null`, and any other body content.
 
 ### System
 

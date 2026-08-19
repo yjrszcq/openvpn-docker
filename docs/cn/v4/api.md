@@ -6,7 +6,7 @@ API 默认关闭，内部仅使用 HTTP，不管理 TLS 证书。远程访问时
 
 启用 API 后可直接访问内置开发文档：
 
-- `http://<OVPN_API_LISTEN>/docs/`：可浏览的完整接口文档，无外部 CDN 依赖。
+- `http://<OVPN_API_LISTEN>/docs/`：面向前端的完整接口文档。22 条接口各自独立展示自己的完整 HTTP 请求、参数、body 字段、成功返回、错误返回和 JSON 示例，不需要跳到共享模型区拼装。
 - `http://<OVPN_API_LISTEN>/docs/openapi.json`：OpenAPI 3.1 规范，可导入 Orval、OpenAPI Generator、NSwag 或 API 客户端。
 
 文档页面和 OpenAPI 文件不要求 API key；实际 `/api/v1/*` 资源仍然必须认证。
@@ -78,7 +78,9 @@ curl --fail --silent --show-error \
 - `/healthz` 无需认证，只报告 API 进程存活。
 - profile 下载使用 `application/x-openvpn-profile` 和 attachment 文件名。
 
-## 资源
+## 路由索引
+
+本节只是快速索引，不作为前端开发契约。逐条接口的请求和返回内容请直接使用运行中服务的 `/docs/`；页面中的每个接口都是独立的“请求 / 返回”单元。
 
 | Method | Path | 用途 |
 |---|---|---|
@@ -105,9 +107,9 @@ curl --fail --silent --show-error \
 | `GET` | `/api/v1/config/plan` | 规划 desired 到 applied 的变更。 |
 | `POST` | `/api/v1/config/apply` | 在线应用当前 desired 配置。 |
 
-## 前端接口契约
+## 前端类型索引
 
-下表覆盖全部 22 个 operation。除 `/healthz` 外，每个请求都必须发送 `Authorization: Bearer <API_KEY>`。标记为“空 body”的接口不能发送 `{}`、`null` 或任何其他内容。
+下表和 TypeScript 定义用于搜索字段名及复用类型，不替代 `/docs/` 的逐接口请求/返回。除 `/healthz` 外，每个请求都必须发送 `Authorization: Bearer <API_KEY>`。标记为“空 body”的接口不能发送 `{}`、`null` 或任何其他内容。
 
 ### System
 
