@@ -49,6 +49,12 @@ func TestDocumentationShowsExplicitRequestContracts(t *testing.T) {
 		`"Path 参数"`,
 		`"Query 参数"`,
 		`"JSON Body 字段"`,
+		`"contract-tabs"`,
+		`tabs.setAttribute("role", "tablist")`,
+		`tab.setAttribute("role", "tab")`,
+		`tab.setAttribute("aria-controls", panes[index].id)`,
+		`tab.addEventListener("click", () => activate(index))`,
+		`activate(0)`,
 	} {
 		if !strings.Contains(application, expected) {
 			t.Fatalf("documentation JavaScript does not contain %q", expected)
@@ -63,8 +69,8 @@ func TestDocumentationShowsExplicitRequestContracts(t *testing.T) {
 		t.Fatal(err)
 	}
 	styles := string(stylesheet)
-	if !strings.Contains(styles, ".contract-stack") || strings.Contains(styles, ".contract-grid") {
-		t.Fatal("documentation contracts must render as a vertical stack")
+	if !strings.Contains(styles, `.contract-tab[aria-selected="true"]`) || !strings.Contains(styles, ".contract-pane[hidden]") {
+		t.Fatal("documentation contracts must render as switchable request and response tabs")
 	}
 }
 

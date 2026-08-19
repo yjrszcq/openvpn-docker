@@ -273,6 +273,45 @@
     }
   };
 
+  const renderContractTabs = (operationId, requestPane, responsePane) => {
+    const tabs = element("div", "contract-tabs");
+    tabs.setAttribute("role", "tablist");
+    tabs.setAttribute("aria-label", "请求和返回内容");
+    const panes = [requestPane, responsePane];
+    const activate = selected => {
+      Array.from(tabs.children).forEach((tab, index) => {
+        const active = index === selected;
+        tab.setAttribute("aria-selected", String(active));
+        tab.tabIndex = active ? 0 : -1;
+        panes[index].hidden = !active;
+      });
+    };
+    ["请求 Request", "返回 Response"].forEach((label, index) => {
+      const tab = element("button", "contract-tab", label);
+      tab.type = "button";
+      tab.id = `${operationId}-tab-${index}`;
+      tab.setAttribute("role", "tab");
+      tab.setAttribute("aria-controls", panes[index].id);
+      tab.addEventListener("click", () => activate(index));
+      tab.addEventListener("keydown", event => {
+        let next = index;
+        if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (index + 1) % 2;
+        else if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (index + 1) % 2;
+        else if (event.key === "Home") next = 0;
+        else if (event.key === "End") next = 1;
+        else return;
+        event.preventDefault();
+        activate(next);
+        tabs.children[next].focus();
+      });
+      panes[index].setAttribute("role", "tabpanel");
+      panes[index].setAttribute("aria-labelledby", tab.id);
+      tabs.append(tab);
+    });
+    activate(0);
+    return tabs;
+  };
+
   const renderOperation = (method, path, pathItem, operation) => {
     const article = element("article", "operation");
     article.id = operation.operationId;
@@ -284,12 +323,12 @@
 
     const grid = element("div", "contract-stack");
     const requestPane = element("section", "contract-pane");
-    requestPane.append(element("h3", "", "请求 Request"));
+    requestPane.id = `${operation.operationId}-request`;
     renderParameters(requestPane, operation, pathItem);
     appendCode(requestPane, "请求示例", requestExample(method, path, operation, pathItem));
 
     const responsePane = element("section", "contract-pane");
-    responsePane.append(element("h3", "", "返回 Response"));
+    responsePane.id = `${operation.operationId}-response`;
     Object.entries(operation.responses || {}).forEach(([status, rawResponse]) => {
       const response = resolve(rawResponse);
       const block = element("div", "response");
@@ -306,7 +345,7 @@
       responsePane.append(block);
     });
     grid.append(requestPane, responsePane);
-    article.append(grid);
+    article.append(renderContractTabs(operation.operationId, requestPane, responsePane), grid);
     return article;
   };
 
