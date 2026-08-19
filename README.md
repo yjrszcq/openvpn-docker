@@ -6,7 +6,7 @@ This image runs OpenVPN Community Edition with a Go control plane and SQLite sta
 
 ## Features
 
-- Go binaries provide the CLI, entrypoint, OpenVPN hook, process supervisor, and management broker.
+- Go binaries provide the CLI, entrypoint, OpenVPN hook, process supervisor, management broker, and optional authenticated REST API.
 - SQLite at `/etc/openvpn/meta/state.db` as the sole authority for structured configuration, client, address, artifact metadata, audit, and operation state.
 - Easy-RSA remains the PKI authority. Certificates, private keys, CRL, tls-crypt material, profiles, CCD files, and logs remain files under the data directory.
 - Declarative YAML configuration with strict unknown-field, duplicate-field, type, null, and multi-document rejection.
@@ -15,6 +15,8 @@ This image runs OpenVPN Community Edition with a Go control plane and SQLite sta
 - `linux/amd64` and `linux/arm64` images built from checksum-pinned OpenVPN source.
 
 The project does not currently provide a web UI, TAP, LDAP/RADIUS/OIDC, Kubernetes integration, PostgreSQL/MySQL storage, or HA coordination.
+
+REST API v1 is disabled by default and intended for a separate frontend or automation client behind an HTTPS reverse proxy. See the [REST API guide](docs/en/v4/api.md).
 
 ## Quick start
 
@@ -115,6 +117,8 @@ Persistent server settings belong in declarative YAML. Environment variables con
 | `OVPN_CONFIG_FILE` | `/etc/ovpn-conf/config.yaml` | unset | Desired declarative YAML path. |
 | `OVPN_DATA_DIR` | `/etc/openvpn` | unset | Persistent data directory containing SQLite, PKI, artifacts, logs, and locks. |
 | `OVPN_RUNTIME_DIR` | `/run/openvpn-container` | unset | Ephemeral directory for runtime sockets and the server-process lock. |
+| `OVPN_API_LISTEN` | unset (disabled) | empty | Internal HTTP listen address for REST API v1; `127.0.0.1:11940` is recommended behind a host reverse proxy. |
+| `OVPN_API_CORS_ORIGINS` | unset | empty | Optional comma-separated exact browser origins. Wildcards are rejected. |
 | `OVPN_MAINTENANCE` | unset | unset | Must be exactly `true` for `migrate apply`; the Compose maintenance service sets it automatically. |
 | `OVPN_EDITOR` | `EDITOR`, then `nano` | unset | Default editor executable for `client address edit` when `--editor/-e` is omitted. The image includes `nano`, `vim`, and `vi`. |
 | `EDITOR` | `nano` | unset | Standard fallback editor executable when both `--editor/-e` and `OVPN_EDITOR` are unset. |
@@ -151,6 +155,7 @@ These variables replace trusted files, executables, or host networking interface
 | `OVPN_TEMPLATE_ROOT` | `/usr/local/share/openvpn-container/templates` | Root containing the template family selected by the compatibility contract. |
 | `OVPN_OPENVPN_BIN` | `openvpn` | OpenVPN executable used by runtime supervision, PKI validation, and capability inspection. |
 | `OVPN_BROKER_BIN` | `ovpn-broker` | Management broker executable supervised by `server run`. |
+| `OVPN_API_BIN` | `ovpn-api` | REST API executable used only when `OVPN_API_LISTEN` is non-empty. |
 | `OVPN_EASYRSA_BIN` | `/usr/share/easy-rsa/easyrsa`, otherwise `easyrsa` | Easy-RSA executable used for PKI lifecycle operations. |
 | `OVPN_IP_BIN` | `ip` | Linux `ip` executable used by network reconciliation. |
 | `OVPN_IPTABLES_BIN` | `iptables` | Linux `iptables` executable used by firewall reconciliation. |

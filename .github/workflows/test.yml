@@ -41,6 +41,7 @@ jobs:
         run: |
           go build -buildvcs=false -trimpath -o "$RUNNER_TEMP/ovpn" ./cmd/ovpn
           go build -buildvcs=false -trimpath -o "$RUNNER_TEMP/ovpn-broker" ./cmd/ovpn-broker
+          go build -buildvcs=false -trimpath -o "$RUNNER_TEMP/ovpn-api" ./cmd/ovpn-api
       - name: Verify dependency graph and licenses
         run: scripts/verify-go-licenses.sh
 
@@ -64,6 +65,7 @@ jobs:
             scripts/verify-go-toolchain.sh \
             tests/helpers/fake-openssl.sh \
             tests/smoke/container/go-sqlite-handoff-smoke.sh \
+            tests/smoke/container/api-container-smoke.sh \
             tests/smoke/container/backup-restore-container-smoke.sh \
             tests/smoke/container/client-lifecycle-container-smoke.sh \
             tests/smoke/container/cli-ux-container-smoke.sh \
@@ -91,6 +93,7 @@ jobs:
             scripts/verify-go-toolchain.sh \
             tests/helpers/fake-openssl.sh \
             tests/smoke/container/go-sqlite-handoff-smoke.sh \
+            tests/smoke/container/api-container-smoke.sh \
             tests/smoke/container/backup-restore-container-smoke.sh \
             tests/smoke/container/client-lifecycle-container-smoke.sh \
             tests/smoke/container/cli-ux-container-smoke.sh \
@@ -145,6 +148,7 @@ jobs:
         run: |
           OVPN_RUNTIME_SKIP_BUILD=1 OVPN_RUNTIME_REQUIRED=1 OVPN_RUNTIME_IMAGE="$IMAGE" tests/smoke/container/runtime-image-smoke.sh
           OVPN_CLI_UX_SKIP_BUILD=1 OVPN_CLI_UX_REQUIRED=1 OVPN_CLI_UX_IMAGE="$IMAGE" tests/smoke/container/cli-ux-container-smoke.sh
+          OVPN_API_SKIP_BUILD=1 OVPN_API_REQUIRED=1 OVPN_API_IMAGE="$IMAGE" tests/smoke/container/api-container-smoke.sh
       - name: Verify schema 4 backup and restore
         run: OVPN_BACKUP_SKIP_BUILD=1 OVPN_BACKUP_REQUIRED=1 OVPN_BACKUP_IMAGE="$IMAGE" tests/smoke/container/backup-restore-container-smoke.sh
       - name: Verify client lifecycle and UDP/TCP tunnels

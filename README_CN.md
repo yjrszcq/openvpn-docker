@@ -6,7 +6,7 @@
 
 ## 主要能力
 
-- CLI、entrypoint、OpenVPN hook、进程监督器和 management broker 均由 Go 二进制提供。
+- CLI、entrypoint、OpenVPN hook、进程监督器、management broker 和可选的认证 REST API 均由 Go 二进制提供。
 - `/etc/openvpn/meta/state.db` 是配置、客户端、地址、artifact 元数据、审计和 operation 状态的唯一结构化权威来源。
 - Easy-RSA 仍是 PKI 签发权威。证书、私钥、CRL、tls-crypt、profile、CCD 和日志仍作为数据目录中的文件保存。
 - 使用严格 YAML 声明期望配置，拒绝未知字段、重复字段、错误类型、null 和多文档。
@@ -15,6 +15,8 @@
 - 从校验和固定的 OpenVPN 源码构建 `linux/amd64` 和 `linux/arm64` 镜像。
 
 当前不提供 Web UI、TAP、LDAP/RADIUS/OIDC、Kubernetes、PostgreSQL/MySQL 或 HA。
+
+REST API v1 默认关闭，适合由独立前端或自动化客户端通过 HTTPS 反向代理访问。详见 [REST API 指南](docs/cn/v4/api.md)。
 
 ## 快速开始
 
@@ -113,6 +115,8 @@ chmod 600 laptop.ovpn
 | `OVPN_CONFIG_FILE` | `/etc/ovpn-conf/config.yaml` | 未设置 | 期望状态声明式 YAML 的路径。 |
 | `OVPN_DATA_DIR` | `/etc/openvpn` | 未设置 | 保存 SQLite、PKI、artifact、日志和锁的持久数据目录。 |
 | `OVPN_RUNTIME_DIR` | `/run/openvpn-container` | 未设置 | 保存 runtime socket 和服务进程锁的临时目录。 |
+| `OVPN_API_LISTEN` | 未设置（关闭） | 空 | REST API v1 的内部 HTTP 监听地址；宿主机反向代理场景推荐 `127.0.0.1:11940`。 |
+| `OVPN_API_CORS_ORIGINS` | 未设置 | 空 | 可选的逗号分隔精确浏览器 origin；不允许通配符。 |
 | `OVPN_MAINTENANCE` | 未设置 | 未设置 | `migrate apply` 要求该值严格等于 `true`；Compose maintenance 服务会自动设置。 |
 | `OVPN_EDITOR` | `EDITOR`，然后 `nano` | 未设置 | 省略 `--editor/-e` 时，`client address edit` 使用的默认编辑器可执行文件；镜像内置 `nano`、`vim` 和 `vi`。 |
 | `EDITOR` | `nano` | 未设置 | 同时省略 `--editor/-e` 且未设置 `OVPN_EDITOR` 时使用的标准后备编辑器。 |
@@ -149,6 +153,7 @@ chmod 600 laptop.ovpn
 | `OVPN_TEMPLATE_ROOT` | `/usr/local/share/openvpn-container/templates` | compatibility contract 所选模板族的根目录。 |
 | `OVPN_OPENVPN_BIN` | `openvpn` | runtime 监督、PKI 校验和 capability 检查使用的 OpenVPN 可执行文件。 |
 | `OVPN_BROKER_BIN` | `ovpn-broker` | `server run` 监督的 management broker 可执行文件。 |
+| `OVPN_API_BIN` | `ovpn-api` | 仅当 `OVPN_API_LISTEN` 非空时使用的 REST API 可执行文件。 |
 | `OVPN_EASYRSA_BIN` | `/usr/share/easy-rsa/easyrsa`，否则 `easyrsa` | PKI 生命周期操作使用的 Easy-RSA 可执行文件。 |
 | `OVPN_IP_BIN` | `ip` | 网络 reconcile 使用的 Linux `ip` 可执行文件。 |
 | `OVPN_IPTABLES_BIN` | `iptables` | 防火墙 reconcile 使用的 Linux `iptables` 可执行文件。 |

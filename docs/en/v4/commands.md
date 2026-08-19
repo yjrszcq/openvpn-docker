@@ -109,9 +109,14 @@ Every public multi-letter option has a single-token short alias. Long and short 
 
 ```text
 ovpn
+├── api
+│   └── key
+│       ├── create      Create an API key and reveal its secret once.
+│       ├── list        List API key metadata.
+│       └── delete      Delete and immediately invalidate an API key.
 ├── server
 │   ├── init            Initialize an empty OpenVPN instance.
-│   ├── run             Supervise OpenVPN and its management broker.
+│   ├── run             Supervise OpenVPN, its broker, and optional API.
 │   └── render          Render the applied server configuration.
 ├── config
 │   ├── validate        Validate the desired YAML configuration.
@@ -153,7 +158,19 @@ ovpn
 
 All command groups and leaf commands accept `--help` or `-h`.
 
-`ovpn-broker` is an internal standalone binary with its own aliases: `--help/-h`, `--version/-v`, `--listen/-l`, `--backend/-b`, `--raw-log/-r`, `--max-bytes/-m`, `--backups/-B`, and `--timeout/-t`.
+`ovpn-broker` and `ovpn-api` are internal standalone binaries supervised by `ovpn server run`. `ovpn-broker` has its own aliases: `--help/-h`, `--version/-v`, `--listen/-l`, `--backend/-b`, `--raw-log/-r`, `--max-bytes/-m`, `--backups/-B`, and `--timeout/-t`.
+
+## API key commands
+
+```text
+ovpn api key create NAME [--output|-o FILE|-] [--json|-j]
+ovpn api key list [--json|-j]
+ovpn api key delete (NAME|--name|-n NAME|--id|-i ID) [--yes|-y] [--json|-j]
+```
+
+`create` reveals the full Bearer key once. A file output is created mode `0600` and never overwrites an existing path. `list` returns only UUID, name, and creation time. `delete` requires confirmation or `--yes` and invalidates subsequent authentication immediately. Key secrets and digests never appear in list or delete output.
+
+API keys are local administrative credentials, not client certificates. They can be managed only through this CLI, not through REST. See the [REST API guide](api.md) for enabling the listener, authentication, endpoints, configuration concurrency, and security boundaries.
 
 ## Server commands
 
@@ -177,7 +194,7 @@ Syntax:
 ovpn server run
 ```
 
-Loads the applied SQLite snapshot, recovers interrupted operations, reconciles IPv4 forwarding/firewall state, starts the Go broker and OpenVPN, supervises both processes, and forwards TERM, INT, and HUP.
+Loads the applied SQLite snapshot, recovers interrupted operations, reconciles IPv4 forwarding/firewall state, and supervises OpenVPN plus the Go broker. When `OVPN_API_LISTEN` is non-empty it also supervises `ovpn-api`; configuration apply pauses only OpenVPN and the broker so the API remains available. TERM and INT stop all enabled children, while HUP is forwarded to OpenVPN.
 
 Missing or changed YAML causes a warning; runtime continues with the last applied database revision. Configuration is never applied at startup.
 

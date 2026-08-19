@@ -107,9 +107,14 @@ mutation 会先执行只读验证、目标选择和 plan，再请求确认。无
 
 ```text
 ovpn
+├── api
+│   └── key
+│       ├── create      创建 API key，并只显示一次 secret。
+│       ├── list        列出 API key 元数据。
+│       └── delete      删除并立即使 API key 失效。
 ├── server
 │   ├── init            初始化空的 OpenVPN 实例。
-│   ├── run             监督 OpenVPN 和 management broker。
+│   ├── run             监督 OpenVPN、broker 和可选 API。
 │   └── render          渲染 applied 服务端配置。
 ├── config
 │   ├── validate        验证期望 YAML 配置。
@@ -151,7 +156,19 @@ ovpn
 
 所有命令组和 leaf command 都接受 `--help` 或 `-h`。
 
-内部独立二进制 `ovpn-broker` 使用自己的别名空间：`--help/-h`、`--version/-v`、`--listen/-l`、`--backend/-b`、`--raw-log/-r`、`--max-bytes/-m`、`--backups/-B` 和 `--timeout/-t`。
+内部独立二进制 `ovpn-broker` 和 `ovpn-api` 由 `ovpn server run` 监督。`ovpn-broker` 使用自己的别名空间：`--help/-h`、`--version/-v`、`--listen/-l`、`--backend/-b`、`--raw-log/-r`、`--max-bytes/-m`、`--backups/-B` 和 `--timeout/-t`。
+
+## API key 命令
+
+```text
+ovpn api key create NAME [--output|-o FILE|-] [--json|-j]
+ovpn api key list [--json|-j]
+ovpn api key delete (NAME|--name|-n NAME|--id|-i ID) [--yes|-y] [--json|-j]
+```
+
+`create` 只显示一次完整 Bearer key。文件输出以 mode `0600` 创建，并拒绝覆盖已有路径。`list` 只返回 UUID、名称和创建时间。`delete` 需要交互确认或 `--yes`，并立即使后续认证失效。list 和 delete 输出都不会包含 key secret 或 digest。
+
+API key 是本地管理凭据，不是客户端证书；只能通过该 CLI 管理，不能通过 REST 管理。监听启用、认证、endpoint、配置并发和安全边界见 [REST API 指南](api.md)。
 
 ## Server 命令
 
@@ -175,7 +192,7 @@ ovpn server init
 ovpn server run
 ```
 
-加载 applied SQLite 快照，恢复中断 operation，reconcile IPv4 forwarding/防火墙，启动 Go broker 与 OpenVPN，监督两个进程并转发 TERM、INT、HUP。
+加载 applied SQLite 快照，恢复中断 operation，reconcile IPv4 forwarding/防火墙，并监督 OpenVPN 与 Go broker。`OVPN_API_LISTEN` 非空时还会监督 `ovpn-api`；配置 apply 只暂停 OpenVPN 和 broker，API 保持可用。TERM/INT 停止所有已启用子进程，HUP 只转发给 OpenVPN。
 
 YAML 缺失或发生漂移只会产生警告；runtime 继续使用最近 applied revision，启动时绝不会自动 apply。
 
