@@ -20,12 +20,31 @@ services:
   openvpn:
     environment:
       OVPN_API_LISTEN: 127.0.0.1:11940
-      OVPN_API_CORS_ORIGINS: https://vpn-admin.example.com
+      OVPN_API_CORS_ORIGINS: vpn-admin.example.com
 ```
 
-With the project's host-networked Compose service, `127.0.0.1:11940` exposes the API only on the host loopback interface. An empty `OVPN_API_LISTEN` disables the process. Do not add these variables to `openvpn-maintenance`.
+`OVPN_API_LISTEN` uses `address:port` format. The port may be any unused host port from `1` through `65535`:
 
-`OVPN_API_CORS_ORIGINS` is optional. It is a comma-separated list of exact browser origins. Wildcards, paths, credentials in origins, and empty list entries are rejected. CORS is unnecessary for a same-origin frontend or non-browser client.
+| Example | Exposure |
+|---|---|
+| `127.0.0.1:11940` | Listens only on the host IPv4 loopback interface and is recommended with a local HTTPS reverse proxy. Replace `11940` with any other unused port. |
+| `0.0.0.0:11940` | Listens on every host IPv4 interface. Replace `11940` with any other unused port. LAN or Internet reachability also depends on the host firewall, cloud security groups, and routing. |
+
+The project Compose file uses `network_mode: host`, so this directly occupies a host port; a Compose `ports` mapping is neither required nor a way to resolve a conflict. An empty `OVPN_API_LISTEN` disables the API process. Do not include an `http://` or `https://` scheme, and do not add these variables to `openvpn-maintenance`.
+
+`OVPN_API_CORS_ORIGINS` is optional and allows cross-origin browser frontends to access the API. Values omit the `http://` or `https://` scheme and support these forms:
+
+| Value | Meaning |
+|---|---|
+| empty | Disables CORS. A same-origin frontend or non-browser client needs no CORS configuration. |
+| `vpn-admin.example.com` | Allows the domain with either an HTTP or HTTPS browser origin. |
+| `vpn-admin.example.com:3000` | Allows the domain on the specified port. |
+| `192.0.2.10` | Allows the IP address. |
+| `192.0.2.10:3000` | Allows the IP address on the specified port. |
+| `*` | Allows any valid HTTP or HTTPS origin. `*` must be used alone. |
+| `vpn-admin.example.com,192.0.2.10:3000` | Uses commas to separate multiple domains, IP addresses, or values with ports. |
+
+Host matching is case-insensitive and ports must match exactly. Do not include a scheme, path, query, credentials, or an empty list entry such as a trailing comma. `*` broadens browser access and should be enabled only when explicitly required.
 
 A minimal Caddy boundary is:
 
@@ -35,7 +54,7 @@ vpn-admin.example.com {
 }
 ```
 
-The reverse proxy must provide HTTPS, preserve the `Authorization` header, and impose appropriate network access controls. The project does not recommend binding the API directly to a public `0.0.0.0` address.
+The reverse proxy must provide HTTPS, preserve the `Authorization` header, and impose appropriate network access controls. The project does not recommend exposing a `0.0.0.0` binding directly to the Internet.
 
 ## API keys
 

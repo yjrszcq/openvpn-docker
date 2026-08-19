@@ -263,6 +263,9 @@ func parseOrigins(value string) ([]string, error) {
 		if parts[index] == "" {
 			return nil, fmt.Errorf("OVPN_API_CORS_ORIGINS contains an empty origin")
 		}
+		if parts[index] == "*" && len(parts) != 1 {
+			return nil, fmt.Errorf("OVPN_API_CORS_ORIGINS wildcard must be used alone")
+		}
 	}
 	return parts, nil
 }

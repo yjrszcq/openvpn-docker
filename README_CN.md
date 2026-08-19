@@ -115,8 +115,8 @@ chmod 600 laptop.ovpn
 | `OVPN_CONFIG_FILE` | `/etc/ovpn-conf/config.yaml` | 未设置 | 期望状态声明式 YAML 的路径。 |
 | `OVPN_DATA_DIR` | `/etc/openvpn` | 未设置 | 保存 SQLite、PKI、artifact、日志和锁的持久数据目录。 |
 | `OVPN_RUNTIME_DIR` | `/run/openvpn-container` | 未设置 | 保存 runtime socket 和服务进程锁的临时目录。 |
-| `OVPN_API_LISTEN` | 未设置（关闭） | 空 | REST API v1 的内部 HTTP 监听地址；宿主机反向代理场景推荐 `127.0.0.1:11940`。 |
-| `OVPN_API_CORS_ORIGINS` | 未设置 | 空 | 可选的逗号分隔精确浏览器 origin；不允许通配符。 |
+| `OVPN_API_LISTEN` | 未设置 | 空 | REST API v1 HTTP 监听地址，格式为 `地址:端口`；未设置或空值会关闭 API。仅宿主机访问填写 `127.0.0.1:<空闲端口>`，监听所有 IPv4 网卡填写 `0.0.0.0:<空闲端口>`；host network 不需要 `ports` 映射。 |
+| `OVPN_API_CORS_ORIGINS` | 未设置 | 空 | 填写不带协议、可带端口的域名或 IP，多个值用英文逗号分隔；未设置或空值会关闭 CORS。例如 `vpn-admin.example.com,192.0.2.10:3000`；单独填写 `*` 允许任意 HTTP(S) origin。 |
 | `OVPN_MAINTENANCE` | 未设置 | 未设置 | `migrate apply` 要求该值严格等于 `true`；Compose maintenance 服务会自动设置。 |
 | `OVPN_EDITOR` | `EDITOR`，然后 `nano` | 未设置 | 省略 `--editor/-e` 时，`client address edit` 使用的默认编辑器可执行文件；镜像内置 `nano`、`vim` 和 `vi`。 |
 | `EDITOR` | `nano` | 未设置 | 同时省略 `--editor/-e` 且未设置 `OVPN_EDITOR` 时使用的标准后备编辑器。 |

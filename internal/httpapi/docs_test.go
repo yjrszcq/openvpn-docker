@@ -118,7 +118,7 @@ func TestDocumentationSupportsCompleteChineseAndEnglishRendering(t *testing.T) {
 		t.Fatal(err)
 	}
 	translationSource := string(translationBytes)
-	for _, expected := range []string{`title: "API 接口文档"`, `title: "API Reference"`, `tableHeaders: ["字段"`, `tableHeaders: ["Field"`} {
+	for _, expected := range []string{`title: "API 接口文档"`, `title: "API Reference"`, `tableHeaders: ["字段"`, `tableHeaders: ["Field"`, `127.0.0.1:<空闲端口>`, `0.0.0.0:<unused-port>`, `vpn-admin.example.com,192.0.2.10:3000`, `单独填写 *`, `Use * alone`} {
 		if !strings.Contains(translationSource, expected) {
 			t.Fatalf("documentation translations do not contain %q", expected)
 		}

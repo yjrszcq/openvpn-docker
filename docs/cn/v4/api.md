@@ -20,12 +20,31 @@ services:
   openvpn:
     environment:
       OVPN_API_LISTEN: 127.0.0.1:11940
-      OVPN_API_CORS_ORIGINS: https://vpn-admin.example.com
+      OVPN_API_CORS_ORIGINS: vpn-admin.example.com
 ```
 
-项目 Compose 使用 host network，因此 `127.0.0.1:11940` 只在宿主机 loopback 上暴露 API。`OVPN_API_LISTEN` 为空时不会启动 API 进程。不要把这些变量加入 `openvpn-maintenance`。
+`OVPN_API_LISTEN` 使用 `地址:端口` 格式，端口可以是宿主机上任意未占用的 `1-65535` 端口：
 
-`OVPN_API_CORS_ORIGINS` 可选，使用逗号分隔的精确浏览器 origin。通配符、带路径或凭据的 origin、空列表项都会被拒绝。同源前端或非浏览器客户端不需要 CORS。
+| 示例 | 访问范围 |
+|---|---|
+| `127.0.0.1:11940` | 仅监听宿主机 IPv4 loopback，推荐配合本机 HTTPS 反向代理使用。地址后的 `11940` 可替换为其他空闲端口。 |
+| `0.0.0.0:11940` | 监听宿主机所有 IPv4 网卡；地址后的 `11940` 可替换为其他空闲端口。是否能从局域网或公网访问还取决于宿主机防火墙、云安全组和路由。 |
+
+项目 Compose 使用 `network_mode: host`，因此端口直接占用宿主机端口，不需要也不能依靠 Compose `ports` 映射解决冲突。`OVPN_API_LISTEN` 为空时不会启动 API 进程。不要包含 `http://` 或 `https://` 协议前缀，也不要把这些变量加入 `openvpn-maintenance`。
+
+`OVPN_API_CORS_ORIGINS` 可选，用于允许跨域浏览器前端访问 API。配置值不带 `http://` 或 `https://`，支持以下格式：
+
+| 配置值 | 含义 |
+|---|---|
+| 空 | 关闭 CORS；同源前端或非浏览器客户端不需要配置。 |
+| `vpn-admin.example.com` | 允许该域名，不限制浏览器 origin 使用 HTTP 或 HTTPS。 |
+| `vpn-admin.example.com:3000` | 允许该域名的指定端口。 |
+| `192.0.2.10` | 允许该 IP。 |
+| `192.0.2.10:3000` | 允许该 IP 的指定端口。 |
+| `*` | 允许任意合法的 HTTP/HTTPS origin；`*` 必须单独填写。 |
+| `vpn-admin.example.com,192.0.2.10:3000` | 使用英文逗号分隔多个域名、IP 或带端口的值。 |
+
+匹配时主机名不区分大小写，端口必须精确匹配。不要填写协议、路径、query 或凭据；也不要产生空列表项，例如结尾多写逗号。使用 `*` 会扩大浏览器访问范围，只应在明确需要时启用。
 
 最小 Caddy 边界如下：
 
@@ -35,7 +54,7 @@ vpn-admin.example.com {
 }
 ```
 
-反向代理必须提供 HTTPS、保留 `Authorization` header，并设置适当的网络访问控制。不建议将 API 直接绑定到公网 `0.0.0.0` 地址。
+反向代理必须提供 HTTPS、保留 `Authorization` header，并设置适当的网络访问控制。不建议将 API 通过 `0.0.0.0` 直接暴露到公网。
 
 ## API key
 

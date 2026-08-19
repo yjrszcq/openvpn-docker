@@ -107,7 +107,7 @@ func TestAuthenticationStorageFailureIsSanitized(t *testing.T) {
 }
 
 func TestAuthenticatedUnknownRouteAndCORS(t *testing.T) {
-	handler, err := NewHandler(fakeAuthenticator{key: apikey.Key{ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}}, []string{"https://console.example"}, Resources{})
+	handler, err := NewHandler(fakeAuthenticator{key: apikey.Key{ID: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}}, []string{"console.example"}, Resources{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,12 +122,12 @@ func TestAuthenticatedUnknownRouteAndCORS(t *testing.T) {
 }
 
 func TestCORSPreflightUsesExactOriginsAndHeaders(t *testing.T) {
-	handler, err := NewHandler(fakeAuthenticator{}, []string{"https://console.example"}, Resources{})
+	handler, err := NewHandler(fakeAuthenticator{}, []string{"console.example:8443"}, Resources{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	request := httptest.NewRequest(http.MethodOptions, "/api/v1/clients", nil)
-	request.Header.Set("Origin", "https://console.example")
+	request.Header.Set("Origin", "https://console.example:8443")
 	request.Header.Set("Access-Control-Request-Method", http.MethodPost)
 	request.Header.Set("Access-Control-Request-Headers", "authorization, content-type")
 	response := httptest.NewRecorder()
@@ -137,7 +137,7 @@ func TestCORSPreflightUsesExactOriginsAndHeaders(t *testing.T) {
 	}
 
 	request = httptest.NewRequest(http.MethodOptions, "/api/v1/clients", nil)
-	request.Header.Set("Origin", "https://other.example")
+	request.Header.Set("Origin", "https://console.example")
 	request.Header.Set("Access-Control-Request-Method", http.MethodPost)
 	response = httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -147,13 +147,53 @@ func TestCORSPreflightUsesExactOriginsAndHeaders(t *testing.T) {
 }
 
 func TestOriginValidation(t *testing.T) {
-	for _, origin := range []string{"*", "https://example.test/path", "file://example.test", "https://user@example.test"} {
+	for _, origin := range []string{"https://example.test", "example.test/path", "user@example.test", "example.test:", "example.test:invalid", "example.test:0", "example.test:65536", "*.example.test", "example.test?", "example.test#"} {
 		if _, err := NewHandler(fakeAuthenticator{}, []string{origin}, Resources{}); err == nil {
 			t.Fatalf("origin %q was accepted", origin)
 		}
 	}
+	if _, err := NewHandler(fakeAuthenticator{}, []string{"*", "example.test"}, Resources{}); err == nil {
+		t.Fatal("wildcard mixed with an exact origin was accepted")
+	}
+	for _, origin := range []string{"example.test", "example.test:8443", "192.0.2.10", "192.0.2.10:8080", "[2001:db8::10]", "[2001:db8::10]:8443", "*"} {
+		if _, err := NewHandler(fakeAuthenticator{}, []string{origin}, Resources{}); err != nil {
+			t.Fatalf("origin %q was rejected: %v", origin, err)
+		}
+	}
 	if _, err := NewHandler(nil, nil, Resources{}); err == nil {
 		t.Fatal("nil authenticator was accepted")
+	}
+}
+
+func TestCORSHostAllowsHTTPAndHTTPS(t *testing.T) {
+	handler, err := NewHandler(fakeAuthenticator{}, []string{"Console.Example"}, Resources{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, origin := range []string{"http://console.example", "https://console.example"} {
+		request := httptest.NewRequest(http.MethodOptions, "/api/v1/clients", nil)
+		request.Header.Set("Origin", origin)
+		request.Header.Set("Access-Control-Request-Method", http.MethodGet)
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusNoContent || response.Header().Get("Access-Control-Allow-Origin") != origin {
+			t.Fatalf("origin=%s response=%d headers=%v body=%q", origin, response.Code, response.Header(), response.Body.String())
+		}
+	}
+}
+
+func TestCORSWildcardAllowsHTTPOrigins(t *testing.T) {
+	handler, err := NewHandler(fakeAuthenticator{}, []string{"*"}, Resources{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodOptions, "/api/v1/clients", nil)
+	request.Header.Set("Origin", "http://127.0.0.1:3000")
+	request.Header.Set("Access-Control-Request-Method", http.MethodGet)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent || response.Header().Get("Access-Control-Allow-Origin") != "http://127.0.0.1:3000" {
+		t.Fatalf("preflight response=%d headers=%v body=%q", response.Code, response.Header(), response.Body.String())
 	}
 }
 

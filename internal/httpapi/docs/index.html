@@ -34,6 +34,8 @@
         <p id="eyebrow" class="eyebrow">Frontend reference</p>
         <h1 id="page-title">API Reference</h1>
         <p><span id="intro-before">Each operation lists its complete request, responses, and error statuses. All requests except</span> <code>/healthz</code> <span id="intro-after">require a Bearer API key.</span></p>
+        <p id="listen-guidance">Set OVPN_API_LISTEN to 127.0.0.1:&lt;unused-port&gt; for host-only access, or 0.0.0.0:&lt;unused-port&gt; for all IPv4 interfaces. Use an unused host port from 1 through 65535; the host-networked service needs no ports mapping. An empty value disables the API.</p>
+        <p id="cors-guidance">Set OVPN_API_CORS_ORIGINS to comma-separated domains or IP addresses, optionally with ports and without a scheme, for example vpn-admin.example.com,192.0.2.10:3000. Use * alone to allow any HTTP(S) origin, or leave it empty to disable CORS.</p>
         <div class="base-info"><span id="base-path-label">Base path</span><code>/api/v1</code><span id="format-label">Format</span><code>application/json</code></div>
       </section>
       <div id="loading" class="loading" role="status">Loading API definition...</div>

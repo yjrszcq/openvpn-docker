@@ -146,13 +146,17 @@ func NewHandler(authenticator Authenticator, allowedOrigins []string, resources 
 	}
 	origins := make(map[string]struct{}, len(allowedOrigins))
 	for _, origin := range allowedOrigins {
-		if err := validateOrigin(origin); err != nil {
+		normalized, err := normalizeAllowedOrigin(origin)
+		if err != nil {
 			return nil, err
 		}
-		if _, exists := origins[origin]; exists {
+		if normalized == "*" && len(allowedOrigins) != 1 {
+			return nil, errors.New("CORS wildcard must be used alone")
+		}
+		if _, exists := origins[normalized]; exists {
 			return nil, errors.New("CORS origins must be unique")
 		}
-		origins[origin] = struct{}{}
+		origins[normalized] = struct{}{}
 	}
 	return &handler{authenticator: authenticator, origins: origins, resources: resources}, nil
 }
@@ -353,7 +357,12 @@ func (handler *handler) authenticate(request *http.Request) (apikey.Key, error) 
 
 func (handler *handler) applyCORS(response http.ResponseWriter, request *http.Request) bool {
 	origin := request.Header.Get("Origin")
-	if _, ok := handler.origins[origin]; !ok {
+	host, err := originHost(origin)
+	if err != nil {
+		return false
+	}
+	_, wildcard := handler.origins["*"]
+	if _, ok := handler.origins[host]; !ok && !wildcard {
 		return false
 	}
 	response.Header().Set("Access-Control-Allow-Origin", origin)
@@ -385,12 +394,29 @@ func versionedPath(path string) bool {
 	return path == "/api/v1" || strings.HasPrefix(path, "/api/v1/")
 }
 
-func validateOrigin(origin string) error {
-	parsed, err := url.Parse(origin)
-	if err != nil || origin == "" || origin == "*" || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return errors.New("CORS origins must be exact HTTP or HTTPS origins")
+func normalizeAllowedOrigin(origin string) (string, error) {
+	if origin == "*" {
+		return origin, nil
 	}
-	return nil
+	parsed, err := url.Parse("//" + origin)
+	if err != nil || origin == "" || strings.Contains(origin, "://") || strings.ContainsAny(origin, " \t\r\n*#") || parsed.Host == "" || parsed.Hostname() == "" || parsed.User != nil || parsed.Path != "" || parsed.ForceQuery || parsed.RawQuery != "" || parsed.Fragment != "" || strings.HasSuffix(parsed.Host, ":") {
+		return "", errors.New("CORS origins must be hostnames or IP addresses with an optional port, without a scheme")
+	}
+	if port := parsed.Port(); port != "" {
+		number, conversionErr := strconv.Atoi(port)
+		if conversionErr != nil || number < 1 || number > 65535 {
+			return "", errors.New("CORS origin ports must be between 1 and 65535")
+		}
+	}
+	return strings.ToLower(parsed.Host), nil
+}
+
+func originHost(origin string) (string, error) {
+	parsed, err := url.Parse(origin)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.Path != "" || parsed.ForceQuery || parsed.RawQuery != "" || parsed.Fragment != "" || strings.Contains(origin, "#") {
+		return "", errors.New("invalid HTTP origin")
+	}
+	return strings.ToLower(parsed.Host), nil
 }
 
 func allowedCORSMethod(method string) bool {

@@ -429,6 +429,8 @@
     document.getElementById("page-title").textContent = text("title");
     document.getElementById("intro-before").textContent = text("introBefore");
     document.getElementById("intro-after").textContent = text("introAfter");
+    document.getElementById("listen-guidance").textContent = text("listenGuidance");
+    document.getElementById("cors-guidance").textContent = text("corsGuidance");
     document.getElementById("base-path-label").textContent = text("basePath");
     document.getElementById("format-label").textContent = text("format");
     const loading = document.getElementById("loading");

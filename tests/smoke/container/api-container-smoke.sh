@@ -67,6 +67,7 @@ docker run -d --name "$CONTAINER" \
   -v "$WORK_DIR/data:/etc/openvpn" \
   -v "$WORK_DIR/config:/etc/ovpn-conf" \
   -e OVPN_API_LISTEN=0.0.0.0:11940 \
+  -e OVPN_API_CORS_ORIGINS=console.example:8443,192.0.2.10 \
   -p 127.0.0.1::11940 \
   --entrypoint ovpn-api \
   "$IMAGE" >/dev/null
@@ -100,6 +101,11 @@ grep -Fq '/docs/i18n.js' "$WORK_DIR/docs.html"
 grep -Fq 'window.apiDocsI18n' "$WORK_DIR/docs-i18n.js"
 grep -Fq 'title: "API 接口文档"' "$WORK_DIR/docs-i18n.js"
 grep -Fq 'title: "API Reference"' "$WORK_DIR/docs-i18n.js"
+grep -Fq '127.0.0.1:<空闲端口>' "$WORK_DIR/docs-i18n.js"
+grep -Fq '0.0.0.0:<unused-port>' "$WORK_DIR/docs-i18n.js"
+grep -Fq 'vpn-admin.example.com,192.0.2.10:3000' "$WORK_DIR/docs-i18n.js"
+grep -Fq '单独填写 *' "$WORK_DIR/docs-i18n.js"
+grep -Fq 'Use * alone' "$WORK_DIR/docs-i18n.js"
 grep -Fq 'navigator.language' "$WORK_DIR/docs.js"
 grep -Fq 'setLanguage(language, true)' "$WORK_DIR/docs.js"
 grep -Fq 'renderOperation' "$WORK_DIR/docs.js"
@@ -131,6 +137,19 @@ grep -Fq '"kind":"method_not_allowed"' "$WORK_DIR/docs-method.json"
 unauthorized_code="$(curl -sS -o "$WORK_DIR/unauthorized.json" -w '%{http_code}' "$api_url/api/v1/state")"
 test "$unauthorized_code" = 401
 grep -Fq '"kind":"unauthenticated"' "$WORK_DIR/unauthorized.json"
+
+cors_code="$(curl -sS -o /dev/null -D "$WORK_DIR/cors.headers" -w '%{http_code}' -X OPTIONS \
+  -H 'Origin: https://console.example:8443' \
+  -H 'Access-Control-Request-Method: GET' \
+  "$api_url/api/v1/state")"
+test "$cors_code" = 204
+grep -Eiq '^access-control-allow-origin: https://console\.example:8443' "$WORK_DIR/cors.headers"
+cors_refused_code="$(curl -sS -o "$WORK_DIR/cors-refused.json" -w '%{http_code}' -X OPTIONS \
+  -H 'Origin: https://console.example' \
+  -H 'Access-Control-Request-Method: GET' \
+  "$api_url/api/v1/state")"
+test "$cors_refused_code" = 400
+grep -Fq '"kind":"cors_origin_refused"' "$WORK_DIR/cors-refused.json"
 
 authorization="Authorization: Bearer $api_key"
 curl -fsS -H "$authorization" "$api_url/api/v1/version" >"$WORK_DIR/version.json"
@@ -244,4 +263,30 @@ deleted_code="$(curl -sS -o "$WORK_DIR/deleted-key.json" -w '%{http_code}' \
 test "$deleted_code" = 401
 
 test "$operation_count" -eq 22
-printf 'REST API smoke passed (operations=%s client=%s)\n' "$operation_count" "$client_id"
+
+docker rm -f "$CONTAINER" >/dev/null
+CONTAINER="ovpn-api-cors-wildcard-$RANDOM-$$"
+docker run -d --name "$CONTAINER" \
+  -v "$WORK_DIR/data:/etc/openvpn" \
+  -v "$WORK_DIR/config:/etc/ovpn-conf" \
+  -e OVPN_API_LISTEN=0.0.0.0:11940 \
+  -e OVPN_API_CORS_ORIGINS='*' \
+  -p 127.0.0.1::11940 \
+  --entrypoint ovpn-api \
+  "$IMAGE" >/dev/null
+api_port="$(docker port "$CONTAINER" 11940/tcp | sed -n '1s/.*://p')"
+api_url="http://127.0.0.1:$api_port"
+for _ in $(seq 1 50); do
+  if curl -fsS "$api_url/healthz" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.1
+done
+wildcard_code="$(curl -sS -o /dev/null -D "$WORK_DIR/cors-wildcard.headers" -w '%{http_code}' -X OPTIONS \
+  -H 'Origin: http://127.0.0.1:3000' \
+  -H 'Access-Control-Request-Method: GET' \
+  "$api_url/api/v1/state")"
+test "$wildcard_code" = 204
+grep -Eiq '^access-control-allow-origin: http://127\.0\.0\.1:3000' "$WORK_DIR/cors-wildcard.headers"
+
+printf 'REST API smoke passed (operations=%s client=%s cors=exact,multiple,wildcard)\n' "$operation_count" "$client_id"
