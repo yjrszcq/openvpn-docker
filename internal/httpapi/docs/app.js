@@ -95,13 +95,116 @@
 
   const pretty = value => typeof value === "string" ? value : JSON.stringify(value, null, 2);
 
+  const requestType = input => {
+    const schema = resolve(input);
+    if (schema.oneOf) return schema.oneOf.map(requestType).join(" | ");
+    if (schema.anyOf) return schema.anyOf.map(requestType).join(" | ");
+    if (Array.isArray(schema.type)) return schema.type.join(" | ");
+    if (schema.type === "array") return `${requestType(schema.items)}[]`;
+    if (schema.type === "object" || schema.properties) return "object";
+    return schema.type || "any";
+  };
+
+  const requestFormat = input => {
+    const schema = resolve(input);
+    const constraints = [];
+    if (schema.format) constraints.push(`format: ${schema.format}`);
+    if (schema.const !== undefined) constraints.push(`固定值: ${JSON.stringify(schema.const)}`);
+    if (schema.enum) constraints.push(`可选值: ${schema.enum.map(value => JSON.stringify(value)).join(" | ")}`);
+    if (schema.pattern) constraints.push(`格式: ${schema.pattern}`);
+    if (schema.minimum !== undefined) constraints.push(`最小值: ${schema.minimum}`);
+    if (schema.maximum !== undefined) constraints.push(`最大值: ${schema.maximum}`);
+    if (schema.default !== undefined) constraints.push(`默认值: ${JSON.stringify(schema.default)}`);
+    return constraints.join("；");
+  };
+
+  const requiresAuthorization = operation => {
+    const security = operation.security === undefined ? documentRoot.security : operation.security;
+    return Array.isArray(security) && security.length > 0;
+  };
+
+  const bodyRows = (input, example, prefix = "", parentRequired = true, depth = 0) => {
+    if (depth > 6) return [];
+    const schema = resolve(input);
+    const required = new Set(schema.required || []);
+    const rows = [];
+    Object.entries(schema.properties || {}).forEach(([name, property]) => {
+      const resolved = resolve(property);
+      const field = prefix ? `${prefix}.${name}` : name;
+      const fieldRequired = parentRequired && required.has(name);
+      const fieldExample = example && typeof example === "object" ? example[name] : undefined;
+      const expandable = resolved.type === "object" || resolved.properties;
+      rows.push({
+        name: field,
+        location: "body",
+        type: requestType(property),
+        required: fieldRequired,
+        format: requestFormat(property),
+        example: expandable ? undefined : (fieldExample !== undefined ? fieldExample : sample(property)),
+        description: resolved.description || "JSON 请求体字段。"
+      });
+      if (expandable) rows.push(...bodyRows(property, fieldExample, field, fieldRequired, depth + 1));
+      if (resolved.type === "array") {
+        const items = resolve(resolved.items);
+        if (items.type === "object" || items.properties) {
+          rows.push(...bodyRows(resolved.items, Array.isArray(fieldExample) ? fieldExample[0] : undefined, `${field}[]`, fieldRequired, depth + 1));
+        }
+      }
+    });
+    return rows;
+  };
+
+  const requestRows = (operation, pathItem) => {
+    const groups = {header: [], path: [], query: [], body: []};
+    const body = operation.requestBody && resolve(operation.requestBody).content?.["application/json"];
+    if (requiresAuthorization(operation)) {
+      groups.header.push({
+        name: "Authorization",
+        location: "header",
+        type: "string",
+        required: true,
+        format: "Bearer ovpn_v1.<uuid>.<secret>",
+        example: "Bearer ovpn_v1.<uuid>.<secret>",
+        description: "API 身份认证凭据。Bearer 后填写服务生成的 API Key。"
+      });
+    }
+    if (body) {
+      groups.header.push({
+        name: "Content-Type",
+        location: "header",
+        type: "string",
+        required: true,
+        format: "固定值: application/json",
+        example: "application/json",
+        description: "声明请求体使用 JSON 格式。"
+      });
+    }
+    [...(pathItem.parameters || []), ...(operation.parameters || [])].map(resolve).forEach(parameter => {
+      if (!groups[parameter.in]) return;
+      groups[parameter.in].push({
+        name: parameter.name,
+        location: parameter.in,
+        type: requestType(parameter.schema),
+        required: Boolean(parameter.required),
+        format: requestFormat(parameter.schema),
+        example: parameter.example ?? parameter.schema?.example ?? parameter.schema?.default ?? sample(parameter.schema),
+        description: parameter.description || "请求参数。"
+      });
+    });
+    if (body?.schema) {
+      const requestBody = resolve(operation.requestBody);
+      groups.body.push(...bodyRows(body.schema, mediaExample(body), "", Boolean(requestBody.required)));
+    }
+    return groups;
+  };
+
   const requestExample = (method, path, operation, pathItem) => {
     let target = path.replace("{client_id}", sampleUUID);
     const parameters = [...(pathItem.parameters || []), ...(operation.parameters || [])].map(resolve);
     const query = parameters.filter(parameter => parameter.in === "query").map(parameter => `${parameter.name}=${parameter.example ?? parameter.schema?.default ?? sample(parameter.schema)}`);
     if (query.length) target += `?${query.join("&")}`;
-    const lines = [`${method.toUpperCase()} ${target} HTTP/1.1`, "Host: vpn-admin.example.com"];
-    if (path !== "/healthz") lines.push("Authorization: Bearer ovpn_v1.<uuid>.<secret>");
+    const lines = [`${method.toUpperCase()} ${target} HTTP/1.1`];
+    if (requiresAuthorization(operation)) lines.push("Authorization: Bearer ovpn_v1.<uuid>.<secret>");
     parameters.filter(parameter => parameter.in === "header").forEach(parameter => lines.push(`${parameter.name}: ${parameter.example || '"<current-digest>"'}`));
     const body = operation.requestBody && resolve(operation.requestBody).content?.["application/json"];
     if (body) {
@@ -115,15 +218,59 @@
     parent.append(element("pre", className, value));
   };
 
-  const renderParameters = (pane, operation, pathItem) => {
-    const parameters = [...(pathItem.parameters || []), ...(operation.parameters || [])].map(resolve);
-    if (!parameters.length) return;
-    const list = element("dl", "meta");
-    parameters.forEach(parameter => {
-      list.append(element("dt", "", `${parameter.in}: ${parameter.name}`));
-      list.append(element("dd", "", `${parameter.required ? "必填" : "可选"} · ${schemaType(parameter.schema)} · ${parameter.description || ""}`));
+  const tableCell = (value, code = false) => {
+    const cell = element("td");
+    if (code && value !== "") cell.append(element("code", "", String(value)));
+    else cell.textContent = value === undefined || value === "" ? "-" : String(value);
+    return cell;
+  };
+
+  const requestDetails = row => {
+    const details = [];
+    if (row.format) details.push(row.format);
+    if (row.example !== undefined) {
+      const example = typeof row.example === "string" ? row.example : JSON.stringify(row.example);
+      if (!row.format || !row.format.includes(example)) details.push(`示例: ${example}`);
+    }
+    return details.join("；") || "-";
+  };
+
+  const renderParameterTable = (pane, title, rows) => {
+    if (!rows.length) return;
+    pane.append(element("h4", "parameter-title", title));
+    const wrapper = element("div", "parameter-table-wrap");
+    const table = element("table", "parameter-table");
+    const head = element("thead");
+    const header = element("tr");
+    ["字段", "位置", "类型", "必填", "格式 / 示例 / 约束", "用途说明"].forEach(label => header.append(element("th", "", label)));
+    head.append(header);
+    const body = element("tbody");
+    rows.forEach(row => {
+      const tr = element("tr");
+      tr.append(
+        tableCell(row.name, true),
+        tableCell(row.location, true),
+        tableCell(row.type, true),
+        tableCell(row.required ? "是" : "否"),
+        tableCell(requestDetails(row), true),
+        tableCell(row.description)
+      );
+      body.append(tr);
     });
-    pane.append(list);
+    table.append(head, body);
+    wrapper.append(table);
+    pane.append(wrapper);
+  };
+
+  const renderParameters = (pane, operation, pathItem) => {
+    const groups = requestRows(operation, pathItem);
+    renderParameterTable(pane, "Header 参数", groups.header);
+    renderParameterTable(pane, "Path 参数", groups.path);
+    renderParameterTable(pane, "Query 参数", groups.query);
+    renderParameterTable(pane, "JSON Body 字段", groups.body);
+    if (!Object.values(groups).some(rows => rows.length)) {
+      pane.append(element("div", "empty", "该接口没有请求参数，也不接受请求体。"));
+    }
   };
 
   const renderOperation = (method, path, pathItem, operation) => {
@@ -135,14 +282,11 @@
     heading.append(element("h2", "", path));
     article.append(heading, element("p", "operation-summary", `${operation.summary}. ${operation.description || ""}`));
 
-    const grid = element("div", "contract-grid");
+    const grid = element("div", "contract-stack");
     const requestPane = element("section", "contract-pane");
     requestPane.append(element("h3", "", "请求 Request"));
     renderParameters(requestPane, operation, pathItem);
-    appendCode(requestPane, "完整 HTTP 请求", requestExample(method, path, operation, pathItem));
-    const requestBody = operation.requestBody && resolve(operation.requestBody).content?.["application/json"];
-    if (requestBody?.schema) appendCode(requestPane, "请求字段", schemaLines(requestBody.schema).join("\n"), "schema");
-    else requestPane.append(element("div", "empty", "该接口不接受请求体。"));
+    appendCode(requestPane, "请求示例", requestExample(method, path, operation, pathItem));
 
     const responsePane = element("section", "contract-pane");
     responsePane.append(element("h3", "", "返回 Response"));
@@ -197,6 +341,7 @@
     });
     document.getElementById("operation-count").textContent = `${count} operations`;
     document.getElementById("loading").remove();
+    if (location.hash) document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView();
   };
 
   const filter = event => {

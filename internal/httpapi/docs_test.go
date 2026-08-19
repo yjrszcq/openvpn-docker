@@ -18,7 +18,7 @@ func TestDocumentationIsEmbeddedAndPublic(t *testing.T) {
 	}{
 		{"/docs/", "text/html", "API 接口文档"},
 		{"/docs/app.js", "text/javascript", "renderOperation"},
-		{"/docs/style.css", "text/css", ".contract-grid"},
+		{"/docs/style.css", "text/css", ".parameter-table"},
 		{"/docs/openapi.json", "application/vnd.oai.openapi+json", `"openapi": "3.1.0"`},
 	}
 	for _, test := range tests {
@@ -30,6 +30,41 @@ func TestDocumentationIsEmbeddedAndPublic(t *testing.T) {
 		if response.Header().Get("Content-Security-Policy") != documentationCSP || response.Header().Get("Cache-Control") != "no-store" {
 			t.Fatalf("GET %s security headers=%v", test.path, response.Header())
 		}
+	}
+}
+
+func TestDocumentationShowsExplicitRequestContracts(t *testing.T) {
+	javascript, err := documentationFiles.ReadFile("docs/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	application := string(javascript)
+	for _, expected := range []string{
+		`name: "Authorization"`,
+		`location: "header"`,
+		`type: "string"`,
+		`format: "Bearer ovpn_v1.<uuid>.<secret>"`,
+		`["字段", "位置", "类型", "必填", "格式 / 示例 / 约束", "用途说明"]`,
+		`"Header 参数"`,
+		`"Path 参数"`,
+		`"Query 参数"`,
+		`"JSON Body 字段"`,
+	} {
+		if !strings.Contains(application, expected) {
+			t.Fatalf("documentation JavaScript does not contain %q", expected)
+		}
+	}
+	if strings.Contains(application, "Host: vpn-admin.example.com") {
+		t.Fatal("documentation request example still contains a synthetic Host header")
+	}
+
+	stylesheet, err := documentationFiles.ReadFile("docs/style.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	styles := string(stylesheet)
+	if !strings.Contains(styles, ".contract-stack") || strings.Contains(styles, ".contract-grid") {
+		t.Fatal("documentation contracts must render as a vertical stack")
 	}
 }
 

@@ -110,13 +110,22 @@ h1 { font-size: 34px; line-height: 1.2; margin: 0; }
 .method-delete { background: #b33f43; }
 .operation h2 { font-size: 21px; line-height: 1.3; margin: 0; overflow-wrap: anywhere; }
 .operation-summary { color: var(--muted); margin: 0 0 24px; max-width: 800px; }
-.contract-grid { display: grid; gap: 22px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.contract-stack { display: grid; gap: 38px; }
 .contract-pane { min-width: 0; }
 .contract-pane > h3 { font-size: 13px; margin: 0 0 10px; text-transform: uppercase; }
-.meta { border-top: 1px solid var(--border); display: grid; font-size: 13px; grid-template-columns: 110px minmax(0, 1fr); margin: 0 0 16px; }
-.meta dt, .meta dd { border-bottom: 1px solid var(--border); margin: 0; padding: 8px 0; }
-.meta dt { color: var(--muted); }
-.meta dd { overflow-wrap: anywhere; }
+.contract-pane + .contract-pane { border-top: 1px solid var(--border); padding-top: 32px; }
+.parameter-title { color: #52606c; font-size: 12px; margin: 18px 0 7px; }
+.parameter-table-wrap { margin-bottom: 18px; overflow-x: auto; }
+.parameter-table { border-collapse: collapse; font-size: 12px; min-width: 880px; table-layout: fixed; width: 100%; }
+.parameter-table th, .parameter-table td { border: 1px solid var(--border); overflow-wrap: anywhere; padding: 9px 10px; text-align: left; vertical-align: top; }
+.parameter-table th { background: #eef1f3; color: #52606c; font-size: 11px; white-space: nowrap; }
+.parameter-table th:nth-child(1) { width: 16%; }
+.parameter-table th:nth-child(2) { width: 9%; }
+.parameter-table th:nth-child(3) { width: 10%; }
+.parameter-table th:nth-child(4) { width: 7%; }
+.parameter-table th:nth-child(5) { width: 24%; }
+.parameter-table th:nth-child(6) { width: 34%; }
+.parameter-table code { color: #263746; font-size: 11px; white-space: pre-wrap; }
 .code-block { background: var(--code); border-radius: 6px; color: #edf3f7; margin: 0 0 16px; max-height: 430px; overflow: auto; padding: 16px; white-space: pre; }
 .code-label { align-items: center; color: var(--muted); display: flex; font-size: 11px; font-weight: 700; justify-content: space-between; margin: 16px 0 7px; text-transform: uppercase; }
 .schema { background: #fff; border: 1px solid var(--border); border-radius: 6px; color: #34414c; font-size: 12px; margin: 0 0 16px; max-height: 300px; overflow: auto; padding: 14px; white-space: pre-wrap; }
@@ -130,7 +139,6 @@ h1 { font-size: 34px; line-height: 1.2; margin: 0; }
 .error-message { background: #fff1f1; border: 1px solid #edcaca; border-radius: 6px; color: #8c3135; padding: 14px; }
 @media (max-width: 960px) {
   .layout { grid-template-columns: 220px minmax(0, 1fr); }
-  .contract-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 720px) {
   .topbar { height: auto; padding: 12px 16px; position: static; }
