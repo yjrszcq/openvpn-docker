@@ -58,19 +58,18 @@ vpn-admin.example.com {
 
 ## API key
 
-API key 只能通过本地 CLI 创建、列出和删除：
+API key 只能通过容器内本地 CLI 创建、列出和删除。从宿主机执行时，命令格式约定为 `docker exec openvpn ovpn <command>`；以下示例仅列出 `ovpn ...` 简写：
 
 ```bash
-docker exec openvpn ovpn api key create frontend-production
-docker exec openvpn ovpn api key list
-docker exec openvpn ovpn api key delete frontend-production --yes
+ovpn api key create frontend-production
+ovpn api key list
+ovpn api key delete frontend-production --yes
 ```
 
 完整 key 只在创建时输出一次。为避免终端历史或输出采集，可直接写入新的 mode-`0600` 文件：
 
 ```bash
-docker exec openvpn \
-  ovpn api key create frontend-production --output /etc/openvpn/frontend.key
+ovpn api key create frontend-production --output /etc/openvpn/frontend.key
 ```
 
 key 格式为 `ovpn_v1.<uuid>.<secret>`。SQLite 只保存其 SHA-256 摘要。删除后下一次请求立即失效；历史审计只保留 key UUID，不保留认证材料。

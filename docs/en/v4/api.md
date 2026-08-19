@@ -58,19 +58,18 @@ The reverse proxy must provide HTTPS, preserve the `Authorization` header, and i
 
 ## API keys
 
-API keys can be created, listed, and deleted only through the local CLI:
+API keys can be created, listed, and deleted only through the local CLI inside the container. When running from the host, use `docker exec openvpn ovpn <command>`; the examples below use the shortened `ovpn ...` form:
 
 ```bash
-docker exec openvpn ovpn api key create frontend-production
-docker exec openvpn ovpn api key list
-docker exec openvpn ovpn api key delete frontend-production --yes
+ovpn api key create frontend-production
+ovpn api key list
+ovpn api key delete frontend-production --yes
 ```
 
 Create prints the complete key once. To avoid terminal history or captured output, write it directly to a new mode-`0600` file:
 
 ```bash
-docker exec openvpn \
-  ovpn api key create frontend-production --output /etc/openvpn/frontend.key
+ovpn api key create frontend-production --output /etc/openvpn/frontend.key
 ```
 
 The key format is `ovpn_v1.<uuid>.<secret>`. SQLite stores only its SHA-256 digest. Deleting a key invalidates the next request immediately; historical audit records retain the key UUID but no credential material.
