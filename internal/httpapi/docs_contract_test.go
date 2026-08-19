@@ -140,12 +140,54 @@ func TestOpenAPIMutationsUseOperationSpecificSuccessExamples(t *testing.T) {
 	}
 }
 
+func TestOpenAPISchemasDescribeEveryFieldInBothLanguages(t *testing.T) {
+	var document map[string]any
+	if err := json.Unmarshal(openAPIDocument(t), &document); err != nil {
+		t.Fatal(err)
+	}
+	components := object(t, document["components"], "components")
+	schemas := object(t, components["schemas"], "components.schemas")
+	for name, rawSchema := range schemas {
+		assertSchemaDescriptions(t, object(t, rawSchema, "schema "+name), "components.schemas."+name)
+	}
+}
+
+func assertSchemaDescriptions(t *testing.T, schema map[string]any, location string) {
+	t.Helper()
+	if schema["$ref"] == nil {
+		if description, ok := schema["description"].(string); !ok || description == "" {
+			t.Fatalf("%s has no English description", location)
+		}
+		if description, ok := schema["x-description-zh"].(string); !ok || description == "" {
+			t.Fatalf("%s has no Chinese description", location)
+		}
+	}
+	if properties, ok := schema["properties"].(map[string]any); ok {
+		for name, rawProperty := range properties {
+			assertSchemaDescriptions(t, object(t, rawProperty, location+"."+name), location+"."+name)
+		}
+	}
+	if items, ok := schema["items"].(map[string]any); ok && items["$ref"] == nil && (items["properties"] != nil || items["type"] == "array") {
+		assertSchemaDescriptions(t, items, location+"[]")
+	}
+	for _, keyword := range []string{"oneOf", "anyOf"} {
+		variants, _ := schema[keyword].([]any)
+		for index, rawVariant := range variants {
+			variant := object(t, rawVariant, fmt.Sprintf("%s.%s[%d]", location, keyword, index))
+			if variant["$ref"] == nil && (variant["properties"] != nil || variant["type"] == "array") {
+				assertSchemaDescriptions(t, variant, fmt.Sprintf("%s.%s[%d]", location, keyword, index))
+			}
+		}
+	}
+}
+
 func TestFrontendGuidesDocumentEachOperationIndependently(t *testing.T) {
 	var document map[string]any
 	if err := json.Unmarshal(openAPIDocument(t), &document); err != nil {
 		t.Fatal(err)
 	}
 	paths := object(t, document["paths"], "paths")
+	englishContractText, chineseContractText := localizedContractText(document)
 	for _, guide := range []string{
 		filepath.Join("..", "..", "docs", "cn", "v4", "api.md"),
 		filepath.Join("..", "..", "docs", "en", "v4", "api.md"),
@@ -226,12 +268,55 @@ func TestFrontendGuidesDocumentEachOperationIndependently(t *testing.T) {
 		if strings.Contains(markdown, "Host: vpn-admin.example.com") {
 			t.Fatalf("%s still contains a synthetic Host header", guide)
 		}
+		if strings.Contains(markdown, "| - |\n") {
+			t.Fatalf("%s contains a field without a purpose description", guide)
+		}
+		if strings.Contains(guide, string(filepath.Separator)+"cn"+string(filepath.Separator)) {
+			for _, value := range englishContractText {
+				if strings.Contains(markdown, value) {
+					t.Fatalf("%s contains untranslated English contract text %q", guide, value)
+				}
+			}
+		} else {
+			for _, value := range chineseContractText {
+				if strings.Contains(markdown, value) {
+					t.Fatalf("%s contains Chinese contract text %q", guide, value)
+				}
+			}
+		}
 		for _, grouped := range []string{"### System", "### Clients", "### Runtime", "### Configuration", "### 请求内容", "### 通用返回模型"} {
 			if strings.Contains(markdown, grouped) {
 				t.Fatalf("%s still contains grouped contract heading %q", guide, grouped)
 			}
 		}
 	}
+}
+
+func localizedContractText(value any) (english, chinese []string) {
+	switch typed := value.(type) {
+	case map[string]any:
+		if summary, ok := typed["summary"].(string); ok && summary != "" {
+			english = append(english, summary)
+		}
+		if description, ok := typed["description"].(string); ok && description != "" {
+			english = append(english, description)
+		}
+		if description, ok := typed["x-description-zh"].(string); ok && description != "" {
+			chinese = append(chinese, description)
+		}
+		for _, nested := range typed {
+			nestedEnglish, nestedChinese := localizedContractText(nested)
+			english = append(english, nestedEnglish...)
+			chinese = append(chinese, nestedChinese...)
+		}
+	case []any:
+		for _, nested := range typed {
+			nestedEnglish, nestedChinese := localizedContractText(nested)
+			english = append(english, nestedEnglish...)
+			chinese = append(chinese, nestedChinese...)
+		}
+	}
+	return english, chinese
 }
 
 func pathItemParameters(pathItem map[string]any) []any {

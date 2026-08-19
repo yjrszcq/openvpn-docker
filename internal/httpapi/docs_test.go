@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -101,7 +102,8 @@ func TestDocumentationSupportsCompleteChineseAndEnglishRendering(t *testing.T) {
 		`setLanguage(language, true)`,
 		`translate(response.description)`,
 		`translate(parameter.description)`,
-		`translate(resolved.description)`,
+		`schema["x-description-zh"]`,
+		`schemaDescription(property)`,
 	} {
 		if !strings.Contains(application, expected) {
 			t.Fatalf("documentation language switching does not contain %q", expected)
@@ -123,27 +125,29 @@ func TestDocumentationSupportsCompleteChineseAndEnglishRendering(t *testing.T) {
 	if err := json.Unmarshal(openAPIDocument(t), &contract); err != nil {
 		t.Fatal(err)
 	}
-	visibleText := map[string]struct{}{}
-	collectContractText(contract, visibleText)
-	for value := range visibleText {
-		if !strings.Contains(translationSource, strconv.Quote(value)+":") {
-			t.Fatalf("OpenAPI text has no Chinese translation: %q", value)
-		}
-	}
+	assertContractTextIsTranslated(t, contract, translationSource, "#")
 }
 
-func collectContractText(value any, result map[string]struct{}) {
+func assertContractTextIsTranslated(t *testing.T, value any, translations, location string) {
+	t.Helper()
 	switch typed := value.(type) {
 	case map[string]any:
 		for key, child := range typed {
 			if (key == "summary" || key == "description") && child != nil {
-				result[child.(string)] = struct{}{}
+				if key == "description" {
+					if translated, ok := typed["x-description-zh"].(string); ok && translated != "" {
+						continue
+					}
+				}
+				if !strings.Contains(translations, strconv.Quote(child.(string))+":") {
+					t.Fatalf("OpenAPI text at %s/%s has no Chinese translation: %q", location, key, child)
+				}
 			}
-			collectContractText(child, result)
+			assertContractTextIsTranslated(t, child, translations, location+"/"+key)
 		}
 	case []any:
-		for _, child := range typed {
-			collectContractText(child, result)
+		for index, child := range typed {
+			assertContractTextIsTranslated(t, child, translations, fmt.Sprintf("%s/%d", location, index))
 		}
 	}
 }

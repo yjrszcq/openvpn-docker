@@ -18,6 +18,12 @@
 
   const text = key => translations.ui[currentLanguage][key];
   const translate = value => currentLanguage === "zh" && value ? (translations.zh[value] || value) : (value || "");
+  const schemaDescription = input => {
+    const schema = resolve(input);
+    return currentLanguage === "zh"
+      ? (schema["x-description-zh"] || translate(schema.description))
+      : (schema.description || "");
+  };
 
   const element = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -60,7 +66,8 @@
     Object.entries(schema.properties || {}).forEach(([name, property]) => {
       const resolved = resolve(property);
       const marker = required.has(name) ? text("required") : text("optional");
-      const description = resolved.description ? ` - ${translate(resolved.description)}` : "";
+      const descriptionText = schemaDescription(property);
+      const description = descriptionText ? ` - ${descriptionText}` : "";
       lines.push(`${"  ".repeat(depth)}${name}: ${schemaType(property)} [${marker}]${description}`);
       if ((resolved.type === "object" || resolved.properties || resolved.type === "array" || resolved.oneOf) && depth < 3) {
         lines.push(...schemaLines(property, depth + 1, nextSeen));
@@ -154,7 +161,7 @@
         required: fieldRequired,
         format: requestFormat(property),
         example: expandable ? undefined : (fieldExample !== undefined ? fieldExample : sample(property)),
-        description: translate(resolved.description) || text("requestBodyField")
+        description: schemaDescription(property) || text("requestBodyField")
       });
       if (expandable) rows.push(...bodyRows(property, fieldExample, field, fieldRequired, depth + 1));
       if (resolved.type === "array") {

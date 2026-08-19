@@ -84,7 +84,7 @@ curl --fail --silent --show-error \
 
 ### 1. `GET /healthz`
 
-Check API process liveness. Unauthenticated liveness check. It does not report OpenVPN or storage health.
+检查 API 进程存活状态。无需认证的存活检查，不报告 OpenVPN 或存储健康状态。
 
 #### 请求参数
 
@@ -98,9 +98,9 @@ GET /healthz HTTP/1.1
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-API process is alive.
+API 进程正常运行。
 
 内容类型：`application/json`
 
@@ -116,11 +116,11 @@ API process is alive.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `status` | `string` | 是 | 固定值: "ok" | - |
+| `status` | `string` | 是 | 固定值: "ok" | 存活状态；成功响应时始终为 ok。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -140,14 +140,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 2. `GET /api/v1/version`
 
-Read build and compatibility metadata
+读取构建与兼容性元数据
 
 #### 请求参数
 
@@ -166,9 +166,9 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Build and compatibility metadata.
+构建与兼容性元数据。
 
 内容类型：`application/json`
 
@@ -200,23 +200,23 @@ Build and compatibility metadata.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `string` | 是 | 示例: "4.0.2" | - |
-| `data_schema` | `integer` | 是 | 示例: 4 | - |
-| `commit` | `string` | 是 | 示例: "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224" | - |
-| `build_date` | `string` | 是 | 示例: "2026-08-19T09:45:40Z" | - |
-| `go_version` | `string` | 是 | 示例: "go1.26.5" | - |
-| `dependencies` | `object` | 是 | - | - |
-| `dependencies.sqlite` | `string` | 是 | 示例: "github.com/mattn/go-sqlite3 v1.14.48" | - |
-| `dependencies.yaml` | `string` | 是 | 示例: "go.yaml.in/yaml/v3 v3.0.4" | - |
-| `compatibility` | `object` | 是 | - | - |
-| `compatibility.contract_version` | `integer` | 是 | 示例: 1 | - |
-| `compatibility.adapter` | `string` | 是 | 示例: "openvpn-2.7" | - |
-| `compatibility.template_family` | `string` | 是 | 示例: "openvpn-2.7" | - |
-| `compatibility.supported_openvpn_versions` | `string[]` | 是 | 示例: ["2.7.6"] | - |
+| `version` | `string` | 是 | 示例: "4.0.2" | OpenVPN Docker 发布版本。 |
+| `data_schema` | `integer` | 是 | 示例: 4 | 权威数据 schema 版本。 |
+| `commit` | `string` | 是 | 示例: "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224" | 构建二进制时使用的源码版本。 |
+| `build_date` | `string` | 是 | 示例: "2026-08-19T09:45:40Z" | 二进制构建时的 UTC 时间。 |
+| `go_version` | `string` | 是 | 示例: "go1.26.5" | 构建二进制时使用的 Go 工具链版本。 |
+| `dependencies` | `object` | 是 | - | 构建时使用的库依赖版本。 |
+| `dependencies.sqlite` | `string` | 是 | 示例: "github.com/mattn/go-sqlite3 v1.14.48" | SQLite 驱动模块及版本。 |
+| `dependencies.yaml` | `string` | 是 | 示例: "go.yaml.in/yaml/v3 v3.0.4" | YAML 解析模块及版本。 |
+| `compatibility` | `object` | 是 | - | 运行时兼容性契约及支持的版本。 |
+| `compatibility.contract_version` | `integer` | 是 | 示例: 1 | 兼容性契约 schema 版本。 |
+| `compatibility.adapter` | `string` | 是 | 示例: "openvpn-2.7" | 为当前运行时选择的兼容性适配器。 |
+| `compatibility.template_family` | `string` | 是 | 示例: "openvpn-2.7" | 生成 OpenVPN 文件时选择的模板系列。 |
+| `compatibility.supported_openvpn_versions` | `string[]` | 是 | 示例: ["2.7.6"] | 该兼容性契约接受的 OpenVPN 版本。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -236,14 +236,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -263,14 +263,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -290,14 +290,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 3. `GET /api/v1/state`
 
-Read instance health summary
+读取实例健康摘要
 
 #### 请求参数
 
@@ -316,9 +316,9 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Instance state summary.
+实例状态摘要。
 
 内容类型：`application/json`
 
@@ -341,26 +341,26 @@ Instance state summary.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `state` | `string` | 是 | 可选值: "EMPTY", "HEALTHY", "DEGRADED_REPAIRABLE", "DEGRADED_RECOVERABLE", "DEGRADED_REISSUABLE", "CRITICAL", "UNRECOVERABLE" | - |
-| `data_schema` | `integer` | 是 | 示例: 4 | - |
-| `instance_id` | `string` | 否 | 格式: uuid；示例: "bbffeb8c-2d11-4613-874d-b5fcc804a608" | - |
-| `revision` | `integer` | 否 | 最小值: 1；示例: 12 | - |
-| `scanned_at` | `string` | 是 | 格式: date-time；示例: "2026-08-19T09:55:07Z" | - |
-| `issue_count` | `integer` | 是 | 最小值: 0 | - |
-| `pending_operation_count` | `integer` | 是 | 最小值: 0 | - |
-| `issues` | `object[]` | 否 | - | - |
-| `issues[].id` | `string` | 否 | 示例: "string" | - |
-| `issues[].severity` | `string` | 否 | 可选值: "repairable", "recoverable", "reissuable", "critical", "unrecoverable" | - |
-| `issues[].action` | `string` | 否 | 示例: "string" | - |
-| `issues[].target` | `string` | 否 | 示例: "string" | - |
-| `issues[].owner_id` | `string` | 否 | 示例: "string" | - |
-| `issues[].artifact_kind` | `string` | 否 | 示例: "string" | - |
-| `issues[].detail` | `string` | 否 | 示例: "string" | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `state` | `"EMPTY" \| "HEALTHY" \| "DEGRADED_REPAIRABLE" \| "DEGRADED_RECOVERABLE" \| "DEGRADED_REISSUABLE" \| "CRITICAL" \| "UNRECOVERABLE"` | 是 | 可选值: "EMPTY" \| "HEALTHY" \| "DEGRADED_REPAIRABLE" \| "DEGRADED_RECOVERABLE" \| "DEGRADED_REISSUABLE" \| "CRITICAL" \| "UNRECOVERABLE" | 权威实例整体健康状态。 |
+| `data_schema` | `integer` | 是 | 示例: 4 | 权威数据 schema 版本。 |
+| `instance_id` | `string` | 否 | 格式: uuid；示例: "bbffeb8c-2d11-4613-874d-b5fcc804a608" | 已初始化 OpenVPN 实例的不可变 UUID。 |
+| `revision` | `integer` | 否 | 最小值: 1；示例: 12 | 单调递增的已应用配置版本。 |
+| `scanned_at` | `string` | 是 | 格式: date-time；示例: "2026-08-19T09:55:07Z" | 状态扫描的 UTC 时间。 |
+| `issue_count` | `integer` | 是 | 最小值: 0；示例: 0 | 当前检测到的诊断问题数量。 |
+| `pending_operation_count` | `integer` | 是 | 最小值: 0；示例: 0 | 未完成 journal 操作的数量。 |
+| `issues` | `object[]` | 否 | - | 详细诊断问题；为空时省略。 |
+| `issues[].id` | `string` | 否 | - | 稳定的诊断问题标识符。 |
+| `issues[].severity` | `"repairable" \| "recoverable" \| "reissuable" \| "critical" \| "unrecoverable"` | 否 | 可选值: "repairable" \| "recoverable" \| "reissuable" \| "critical" \| "unrecoverable" | 诊断严重程度和恢复类别。 |
+| `issues[].action` | `string` | 否 | - | 针对该问题建议执行的运维动作。 |
+| `issues[].target` | `string` | 否 | - | 适用时受影响的路径或资源。 |
+| `issues[].owner_id` | `string` | 否 | - | 所属对象的稳定标识符。 |
+| `issues[].artifact_kind` | `string` | 否 | - | 受影响派生制品的类型。 |
+| `issues[].detail` | `string` | 否 | - | 可读的诊断详情。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -380,14 +380,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -407,14 +407,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -434,14 +434,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -461,14 +461,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 4. `GET /api/v1/state/doctor`
 
-Read detailed instance diagnostics. Returns the state summary plus an issues array when diagnostic issues exist.
+读取实例详细诊断。返回状态摘要；存在诊断问题时还会返回 issues 数组。
 
 #### 请求参数
 
@@ -487,9 +487,9 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Detailed instance diagnostics. `issues` is omitted when empty.
+实例详细诊断；没有问题时省略 `issues`。
 
 内容类型：`application/json`
 
@@ -521,26 +521,26 @@ Detailed instance diagnostics. `issues` is omitted when empty.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `state` | `string` | 是 | 可选值: "EMPTY", "HEALTHY", "DEGRADED_REPAIRABLE", "DEGRADED_RECOVERABLE", "DEGRADED_REISSUABLE", "CRITICAL", "UNRECOVERABLE" | - |
-| `data_schema` | `integer` | 是 | 示例: 4 | - |
-| `instance_id` | `string` | 否 | 格式: uuid；示例: "bbffeb8c-2d11-4613-874d-b5fcc804a608" | - |
-| `revision` | `integer` | 否 | 最小值: 1；示例: 12 | - |
-| `scanned_at` | `string` | 是 | 格式: date-time；示例: "2026-08-19T09:55:07Z" | - |
-| `issue_count` | `integer` | 是 | 最小值: 0；示例: 1 | - |
-| `pending_operation_count` | `integer` | 是 | 最小值: 0 | - |
-| `issues` | `object[]` | 否 | 示例: [{"id":"DECLARATIVE_CONFIG_UNAVAILABLE","severity":"repairable","action":"export-config","target":"/etc/ovpn-conf/config.yaml","detail":"declarative configuration is unavailable"}] | - |
-| `issues[].id` | `string` | 否 | 示例: "DECLARATIVE_CONFIG_UNAVAILABLE" | - |
-| `issues[].severity` | `string` | 否 | 可选值: "repairable", "recoverable", "reissuable", "critical", "unrecoverable" | - |
-| `issues[].action` | `string` | 否 | 示例: "export-config" | - |
-| `issues[].target` | `string` | 否 | 示例: "/etc/ovpn-conf/config.yaml" | - |
-| `issues[].owner_id` | `string` | 否 | 示例: "string" | - |
-| `issues[].artifact_kind` | `string` | 否 | 示例: "string" | - |
-| `issues[].detail` | `string` | 否 | 示例: "declarative configuration is unavailable" | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `state` | `"EMPTY" \| "HEALTHY" \| "DEGRADED_REPAIRABLE" \| "DEGRADED_RECOVERABLE" \| "DEGRADED_REISSUABLE" \| "CRITICAL" \| "UNRECOVERABLE"` | 是 | 可选值: "EMPTY" \| "HEALTHY" \| "DEGRADED_REPAIRABLE" \| "DEGRADED_RECOVERABLE" \| "DEGRADED_REISSUABLE" \| "CRITICAL" \| "UNRECOVERABLE" | 权威实例整体健康状态。 |
+| `data_schema` | `integer` | 是 | 示例: 4 | 权威数据 schema 版本。 |
+| `instance_id` | `string` | 否 | 格式: uuid；示例: "bbffeb8c-2d11-4613-874d-b5fcc804a608" | 已初始化 OpenVPN 实例的不可变 UUID。 |
+| `revision` | `integer` | 否 | 最小值: 1；示例: 12 | 单调递增的已应用配置版本。 |
+| `scanned_at` | `string` | 是 | 格式: date-time；示例: "2026-08-19T09:55:07Z" | 状态扫描的 UTC 时间。 |
+| `issue_count` | `integer` | 是 | 最小值: 0；示例: 1 | 当前检测到的诊断问题数量。 |
+| `pending_operation_count` | `integer` | 是 | 最小值: 0；示例: 0 | 未完成 journal 操作的数量。 |
+| `issues` | `object[]` | 否 | 示例: [{"id":"DECLARATIVE_CONFIG_UNAVAILABLE","severity":"repairable","action":"export-config","target":"/etc/ovpn-conf/config.yaml","detail":"declarative configuration is unavailable"}] | 详细诊断问题；为空时省略。 |
+| `issues[].id` | `string` | 否 | 示例: "DECLARATIVE_CONFIG_UNAVAILABLE" | 稳定的诊断问题标识符。 |
+| `issues[].severity` | `"repairable" \| "recoverable" \| "reissuable" \| "critical" \| "unrecoverable"` | 否 | 可选值: "repairable" \| "recoverable" \| "reissuable" \| "critical" \| "unrecoverable" | 诊断严重程度和恢复类别。 |
+| `issues[].action` | `string` | 否 | 示例: "export-config" | 针对该问题建议执行的运维动作。 |
+| `issues[].target` | `string` | 否 | 示例: "/etc/ovpn-conf/config.yaml" | 适用时受影响的路径或资源。 |
+| `issues[].owner_id` | `string` | 否 | - | 所属对象的稳定标识符。 |
+| `issues[].artifact_kind` | `string` | 否 | - | 受影响派生制品的类型。 |
+| `issues[].detail` | `string` | 否 | 示例: "declarative configuration is unavailable" | 可读的诊断详情。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -560,14 +560,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -587,14 +587,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -614,14 +614,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -641,14 +641,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 5. `GET /api/v1/clients`
 
-List active, revoked, and deleted clients
+列出有效、已吊销和已删除的客户端
 
 #### 请求参数
 
@@ -667,9 +667,9 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Client list.
+客户端列表。
 
 内容类型：`application/json`
 
@@ -698,20 +698,20 @@ Client list.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `clients` | `object[]` | 是 | 示例: [{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-laptop","status":"active","ipv4":{"mode":"static","address":"10.42.0.30","state":"configured"},"connection":"connected"}] | - |
-| `clients[].id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `clients[].name` | `string` | 是 | 格式: `^[A-Za-z0-9][A-Za-z0-9_.-]*$`；示例: "alice-laptop" | - |
-| `clients[].status` | `string` | 是 | 可选值: "active", "revoked", "deleted" | - |
-| `clients[].ipv4` | `object` | 是 | - | - |
-| `clients[].ipv4.mode` | `string` | 是 | 可选值: "none", "static", "dynamic" | - |
-| `clients[].ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | - |
-| `clients[].ipv4.state` | `string` | 是 | 可选值: "configured", "retained", "unavailable" | - |
-| `clients[].connection` | `string` | 否 | 示例: "connected" | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `clients` | `object[]` | 是 | 示例: [{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-laptop","status":"active","ipv4":{"mode":"static","address":"10.42.0.30","state":"configured"},"connection":"connected"}] | 该响应包含的客户端。 |
+| `clients[].id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 该对象的稳定标识符。 |
+| `clients[].name` | `string` | 是 | 格式: ^[A-Za-z0-9][A-Za-z0-9_.-]*$；示例: "alice-laptop" | 稳定且可读的名称。 |
+| `clients[].status` | `"active" \| "revoked" \| "deleted"` | 是 | 可选值: "active" \| "revoked" \| "deleted" | 客户端凭据生命周期状态。 |
+| `clients[].ipv4` | `object` | 是 | - | 当前客户端 IPv4 分配视图。 |
+| `clients[].ipv4.mode` | `"none" \| "static" \| "dynamic"` | 是 | 可选值: "none" \| "static" \| "dynamic" | IPv4 分配模式。 |
+| `clients[].ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | IPv4 地址；未分配地址时为 null。 |
+| `clients[].ipv4.state` | `"configured" \| "retained" \| "unavailable"` | 是 | 可选值: "configured" \| "retained" \| "unavailable" | 客户端地址分配的可用状态。 |
+| `clients[].connection` | `string` | 否 | 示例: "connected" | 运行时数据可用时的当前连接状态。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -731,14 +731,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -758,14 +758,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -785,14 +785,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -812,14 +812,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 6. `POST /api/v1/clients`
 
-Create client credentials and profile
+创建客户端凭据和配置文件
 
 #### 请求参数
 
@@ -834,8 +834,8 @@ Create client credentials and profile
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `name` | `body` | `string` | 是 | 格式: `^[A-Za-z0-9][A-Za-z0-9_.-]*$`；示例: "alice-laptop" | Stable client name. Starts with an alphanumeric character and may contain letters, digits, underscores, dots, and hyphens. |
-| `ipv4` | `body` | `string` | 是 | 示例: "auto" | IPv4 allocation intent: auto, dynamic, or a valid static IPv4 address. |
+| `name` | `body` | `string` | 是 | 格式: ^[A-Za-z0-9][A-Za-z0-9_.-]*$；示例: "alice-laptop" | 稳定的客户端名称。必须以字母或数字开头，可包含字母、数字、下划线、点和连字符。 |
+| `ipv4` | `body` | `string` | 是 | 示例: "auto" | IPv4 分配方式：auto、dynamic 或有效的静态 IPv4 地址。 |
 
 #### 请求示例
 
@@ -852,9 +852,9 @@ Content-Type: application/json
 
 #### 返回
 
-##### `201 Created`
+##### `201 已创建`
 
-Client created.
+客户端已创建。
 
 内容类型：`application/json`
 
@@ -883,33 +883,33 @@ Client created.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `operation_id` | `string` | 是 | 格式: uuid；示例: "7a21e1f8-1ce1-4694-977f-b275eadb8651" | - |
-| `client` | `object` | 是 | - | - |
-| `client.id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `client.name` | `string` | 是 | 格式: `^[A-Za-z0-9][A-Za-z0-9_.-]*$`；示例: "alice-laptop" | - |
-| `client.status` | `string` | 是 | 可选值: "active", "revoked", "deleted" | - |
-| `client.ipv4` | `object` | 是 | - | - |
-| `client.ipv4.mode` | `string` | 是 | 可选值: "none", "static", "dynamic" | - |
-| `client.ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.2" | - |
-| `client.ipv4.state` | `string` | 是 | 可选值: "configured", "retained", "unavailable" | - |
-| `client.connection` | `string` | 否 | 示例: "string" | - |
-| `kick_required` | `boolean` | 是 | 示例: false | - |
-| `profile_redistribution_required` | `boolean` | 是 | 示例: true | - |
-| `runtime` | `object` | 否 | - | - |
-| `runtime.client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `runtime.status` | `string` | 否 | 可选值: "ok", "unavailable" | - |
-| `runtime.result` | `object` | 否 | - | - |
-| `runtime.result.version` | `integer` | 否 | 固定值: 1 | - |
-| `runtime.result.client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `runtime.result.client_name` | `string` | 否 | 示例: "string" | - |
-| `runtime.result.was_connected` | `boolean` | 否 | 示例: false | - |
-| `runtime.result.disconnected` | `boolean` | 否 | 示例: false | - |
-| `runtime.result.connections` | `integer` | 否 | 最小值: 0 | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `operation_id` | `string` | 是 | 格式: uuid；示例: "7a21e1f8-1ce1-4694-977f-b275eadb8651" | 已提交 journal 操作的 UUID。 |
+| `client` | `object` | 是 | - | 权威客户端身份与生命周期状态。 |
+| `client.id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 该对象的稳定标识符。 |
+| `client.name` | `string` | 是 | 格式: ^[A-Za-z0-9][A-Za-z0-9_.-]*$；示例: "alice-laptop" | 稳定且可读的名称。 |
+| `client.status` | `"active" \| "revoked" \| "deleted"` | 是 | 可选值: "active" \| "revoked" \| "deleted" | 客户端凭据生命周期状态。 |
+| `client.ipv4` | `object` | 是 | - | 当前客户端 IPv4 分配视图。 |
+| `client.ipv4.mode` | `"none" \| "static" \| "dynamic"` | 是 | 可选值: "none" \| "static" \| "dynamic" | IPv4 分配模式。 |
+| `client.ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.2" | IPv4 地址；未分配地址时为 null。 |
+| `client.ipv4.state` | `"configured" \| "retained" \| "unavailable"` | 是 | 可选值: "configured" \| "retained" \| "unavailable" | 客户端地址分配的可用状态。 |
+| `client.connection` | `string` | 否 | - | 运行时数据可用时的当前连接状态。 |
+| `kick_required` | `boolean` | 是 | 示例: false | 是否必须断开已变更客户端的活动会话。 |
+| `profile_redistribution_required` | `boolean` | 是 | 示例: true | 是否必须重新分发该客户端生成的配置文件。 |
+| `runtime` | `object` | 否 | - | 变更后单个客户端的运行时收敛结果。 |
+| `runtime.client_id` | `string` | 否 | 格式: uuid | 不可变的客户端 UUID。 |
+| `runtime.status` | `"ok" \| "unavailable"` | 否 | 可选值: "ok" \| "unavailable" | 请求的运行时操作是否完成或不可用。 |
+| `runtime.result` | `object` | 否 | - | 请求断开客户端会话的结果。 |
+| `runtime.result.version` | `integer` | 否 | 固定值: 1 | 响应契约 schema 版本。 |
+| `runtime.result.client_id` | `string` | 否 | 格式: uuid | 不可变的客户端 UUID。 |
+| `runtime.result.client_name` | `string` | 否 | - | 与会话关联的可读客户端名称。 |
+| `runtime.result.was_connected` | `boolean` | 否 | - | 请求前是否存在匹配会话。 |
+| `runtime.result.disconnected` | `boolean` | 否 | - | 是否至少断开了一个匹配会话。 |
+| `runtime.result.connections` | `integer` | 否 | 最小值: 0 | 断开请求处理的匹配会话数量。 |
 
-##### `400 Bad Request`
+##### `400 错误请求`
 
-Malformed path, query, header, media type, body, or JSON.
+path、query、header、媒体类型、请求体或 JSON 格式错误。
 
 内容类型：`application/json`
 
@@ -929,14 +929,14 @@ Malformed path, query, header, media type, body, or JSON.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_json" | - |
-| `error.message` | `string` | 是 | 示例: "request body is invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_json" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request body is invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -956,14 +956,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `409 Conflict`
+##### `409 冲突`
 
-Digest, revision, state, uniqueness, lock, or recovery conflict.
+摘要、版本、状态、唯一性、锁或恢复流程发生冲突。
 
 内容类型：`application/json`
 
@@ -983,14 +983,14 @@ Digest, revision, state, uniqueness, lock, or recovery conflict.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | - |
-| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `422 Unprocessable Entity`
+##### `422 无法处理`
 
-JSON is valid but violates client, IPv4, or configuration semantics.
+JSON 格式有效，但违反客户端、IPv4 或配置语义规则。
 
 内容类型：`application/json`
 
@@ -1010,14 +1010,14 @@ JSON is valid but violates client, IPv4, or configuration semantics.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_client" | - |
-| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_client" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -1037,14 +1037,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -1064,14 +1064,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 7. `GET /api/v1/clients/{client_id}`
 
-Read one client
+读取单个客户端
 
 #### 请求参数
 
@@ -1085,7 +1085,7 @@ Read one client
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | Complete canonical immutable client UUID; names and UUID prefixes are rejected. |
+| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 完整、规范且不可变的客户端 UUID；不接受名称或 UUID 前缀。 |
 
 #### 请求示例
 
@@ -1096,9 +1096,9 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Client detail.
+客户端详情。
 
 内容类型：`application/json`
 
@@ -1121,18 +1121,18 @@ Client detail.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `name` | `string` | 是 | 格式: `^[A-Za-z0-9][A-Za-z0-9_.-]*$`；示例: "alice-laptop" | - |
-| `status` | `string` | 是 | 可选值: "active", "revoked", "deleted" | - |
-| `ipv4` | `object` | 是 | - | - |
-| `ipv4.mode` | `string` | 是 | 可选值: "none", "static", "dynamic" | - |
-| `ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | - |
-| `ipv4.state` | `string` | 是 | 可选值: "configured", "retained", "unavailable" | - |
-| `connection` | `string` | 否 | 示例: "string" | - |
+| `id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 该对象的稳定标识符。 |
+| `name` | `string` | 是 | 格式: ^[A-Za-z0-9][A-Za-z0-9_.-]*$；示例: "alice-laptop" | 稳定且可读的名称。 |
+| `status` | `"active" \| "revoked" \| "deleted"` | 是 | 可选值: "active" \| "revoked" \| "deleted" | 客户端凭据生命周期状态。 |
+| `ipv4` | `object` | 是 | - | 当前客户端 IPv4 分配视图。 |
+| `ipv4.mode` | `"none" \| "static" \| "dynamic"` | 是 | 可选值: "none" \| "static" \| "dynamic" | IPv4 分配模式。 |
+| `ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | IPv4 地址；未分配地址时为 null。 |
+| `ipv4.state` | `"configured" \| "retained" \| "unavailable"` | 是 | 可选值: "configured" \| "retained" \| "unavailable" | 客户端地址分配的可用状态。 |
+| `connection` | `string` | 否 | - | 运行时数据可用时的当前连接状态。 |
 
-##### `400 Bad Request`
+##### `400 错误请求`
 
-Malformed path, query, header, media type, body, or JSON.
+path、query、header、媒体类型、请求体或 JSON 格式错误。
 
 内容类型：`application/json`
 
@@ -1152,14 +1152,14 @@ Malformed path, query, header, media type, body, or JSON.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_json" | - |
-| `error.message` | `string` | 是 | 示例: "request body is invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_json" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request body is invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -1179,14 +1179,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `404 Not Found`
+##### `404 未找到`
 
-Resource or client does not exist.
+资源或客户端不存在。
 
 内容类型：`application/json`
 
@@ -1206,14 +1206,14 @@ Resource or client does not exist.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "client_not_found" | - |
-| `error.message` | `string` | 是 | 示例: "client was not found" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "client_not_found" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client was not found" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -1233,14 +1233,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -1260,14 +1260,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -1287,14 +1287,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 8. `PATCH /api/v1/clients/{client_id}`
 
-Rename a client
+重命名客户端
 
 #### 请求参数
 
@@ -1309,13 +1309,13 @@ Rename a client
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | Complete canonical immutable client UUID; names and UUID prefixes are rejected. |
+| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 完整、规范且不可变的客户端 UUID；不接受名称或 UUID 前缀。 |
 
 ##### JSON Body 字段
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `name` | `body` | `string` | 是 | 格式: `^[A-Za-z0-9][A-Za-z0-9_.-]*$`；示例: "alice-notebook" | New stable client name. Uses the same format as client creation. |
+| `name` | `body` | `string` | 是 | 格式: ^[A-Za-z0-9][A-Za-z0-9_.-]*$；示例: "alice-notebook" | 新的稳定客户端名称，格式与创建客户端时相同。 |
 
 #### 请求示例
 
@@ -1331,9 +1331,9 @@ Content-Type: application/json
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Client renamed and profile regenerated.
+客户端已重命名并重新生成配置文件。
 
 内容类型：`application/json`
 
@@ -1362,33 +1362,33 @@ Client renamed and profile regenerated.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `operation_id` | `string` | 是 | 格式: uuid；示例: "47260b5b-47dd-4f9b-814f-4803668c5934" | - |
-| `client` | `object` | 是 | - | - |
-| `client.id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `client.name` | `string` | 是 | 格式: `^[A-Za-z0-9][A-Za-z0-9_.-]*$`；示例: "alice-notebook" | - |
-| `client.status` | `string` | 是 | 可选值: "active", "revoked", "deleted" | - |
-| `client.ipv4` | `object` | 是 | - | - |
-| `client.ipv4.mode` | `string` | 是 | 可选值: "none", "static", "dynamic" | - |
-| `client.ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | - |
-| `client.ipv4.state` | `string` | 是 | 可选值: "configured", "retained", "unavailable" | - |
-| `client.connection` | `string` | 否 | 示例: "string" | - |
-| `kick_required` | `boolean` | 是 | 示例: false | - |
-| `profile_redistribution_required` | `boolean` | 是 | 示例: true | - |
-| `runtime` | `object` | 否 | - | - |
-| `runtime.client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `runtime.status` | `string` | 否 | 可选值: "ok", "unavailable" | - |
-| `runtime.result` | `object` | 否 | - | - |
-| `runtime.result.version` | `integer` | 否 | 固定值: 1 | - |
-| `runtime.result.client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `runtime.result.client_name` | `string` | 否 | 示例: "string" | - |
-| `runtime.result.was_connected` | `boolean` | 否 | 示例: false | - |
-| `runtime.result.disconnected` | `boolean` | 否 | 示例: false | - |
-| `runtime.result.connections` | `integer` | 否 | 最小值: 0 | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `operation_id` | `string` | 是 | 格式: uuid；示例: "47260b5b-47dd-4f9b-814f-4803668c5934" | 已提交 journal 操作的 UUID。 |
+| `client` | `object` | 是 | - | 权威客户端身份与生命周期状态。 |
+| `client.id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 该对象的稳定标识符。 |
+| `client.name` | `string` | 是 | 格式: ^[A-Za-z0-9][A-Za-z0-9_.-]*$；示例: "alice-notebook" | 稳定且可读的名称。 |
+| `client.status` | `"active" \| "revoked" \| "deleted"` | 是 | 可选值: "active" \| "revoked" \| "deleted" | 客户端凭据生命周期状态。 |
+| `client.ipv4` | `object` | 是 | - | 当前客户端 IPv4 分配视图。 |
+| `client.ipv4.mode` | `"none" \| "static" \| "dynamic"` | 是 | 可选值: "none" \| "static" \| "dynamic" | IPv4 分配模式。 |
+| `client.ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | IPv4 地址；未分配地址时为 null。 |
+| `client.ipv4.state` | `"configured" \| "retained" \| "unavailable"` | 是 | 可选值: "configured" \| "retained" \| "unavailable" | 客户端地址分配的可用状态。 |
+| `client.connection` | `string` | 否 | - | 运行时数据可用时的当前连接状态。 |
+| `kick_required` | `boolean` | 是 | 示例: false | 是否必须断开已变更客户端的活动会话。 |
+| `profile_redistribution_required` | `boolean` | 是 | 示例: true | 是否必须重新分发该客户端生成的配置文件。 |
+| `runtime` | `object` | 否 | - | 变更后单个客户端的运行时收敛结果。 |
+| `runtime.client_id` | `string` | 否 | 格式: uuid | 不可变的客户端 UUID。 |
+| `runtime.status` | `"ok" \| "unavailable"` | 否 | 可选值: "ok" \| "unavailable" | 请求的运行时操作是否完成或不可用。 |
+| `runtime.result` | `object` | 否 | - | 请求断开客户端会话的结果。 |
+| `runtime.result.version` | `integer` | 否 | 固定值: 1 | 响应契约 schema 版本。 |
+| `runtime.result.client_id` | `string` | 否 | 格式: uuid | 不可变的客户端 UUID。 |
+| `runtime.result.client_name` | `string` | 否 | - | 与会话关联的可读客户端名称。 |
+| `runtime.result.was_connected` | `boolean` | 否 | - | 请求前是否存在匹配会话。 |
+| `runtime.result.disconnected` | `boolean` | 否 | - | 是否至少断开了一个匹配会话。 |
+| `runtime.result.connections` | `integer` | 否 | 最小值: 0 | 断开请求处理的匹配会话数量。 |
 
-##### `400 Bad Request`
+##### `400 错误请求`
 
-Malformed path, query, header, media type, body, or JSON.
+path、query、header、媒体类型、请求体或 JSON 格式错误。
 
 内容类型：`application/json`
 
@@ -1408,14 +1408,14 @@ Malformed path, query, header, media type, body, or JSON.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_json" | - |
-| `error.message` | `string` | 是 | 示例: "request body is invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_json" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request body is invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -1435,14 +1435,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `404 Not Found`
+##### `404 未找到`
 
-Resource or client does not exist.
+资源或客户端不存在。
 
 内容类型：`application/json`
 
@@ -1462,14 +1462,14 @@ Resource or client does not exist.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "client_not_found" | - |
-| `error.message` | `string` | 是 | 示例: "client was not found" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "client_not_found" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client was not found" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -1489,14 +1489,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `409 Conflict`
+##### `409 冲突`
 
-Digest, revision, state, uniqueness, lock, or recovery conflict.
+摘要、版本、状态、唯一性、锁或恢复流程发生冲突。
 
 内容类型：`application/json`
 
@@ -1516,14 +1516,14 @@ Digest, revision, state, uniqueness, lock, or recovery conflict.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | - |
-| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `422 Unprocessable Entity`
+##### `422 无法处理`
 
-JSON is valid but violates client, IPv4, or configuration semantics.
+JSON 格式有效，但违反客户端、IPv4 或配置语义规则。
 
 内容类型：`application/json`
 
@@ -1543,14 +1543,14 @@ JSON is valid but violates client, IPv4, or configuration semantics.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_client" | - |
-| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_client" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -1570,14 +1570,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -1597,14 +1597,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 9. `DELETE /api/v1/clients/{client_id}`
 
-Delete local client credentials. Requires an empty body. The immutable client UUID tombstone remains in authoritative state.
+删除本地客户端凭据。请求体必须为空。权威状态中仍会保留不可变的客户端 UUID 墓碑记录。
 
 #### 请求参数
 
@@ -1618,7 +1618,7 @@ Delete local client credentials. Requires an empty body. The immutable client UU
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | Complete canonical immutable client UUID; names and UUID prefixes are rejected. |
+| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 完整、规范且不可变的客户端 UUID；不接受名称或 UUID 前缀。 |
 
 #### 请求示例
 
@@ -1629,9 +1629,9 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Client credentials deleted; the UUID tombstone remains.
+客户端凭据已删除；UUID 墓碑记录仍保留。
 
 内容类型：`application/json`
 
@@ -1660,33 +1660,33 @@ Client credentials deleted; the UUID tombstone remains.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `operation_id` | `string` | 是 | 格式: uuid；示例: "47260b5b-47dd-4f9b-814f-4803668c5934" | - |
-| `client` | `object` | 是 | - | - |
-| `client.id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `client.name` | `string` | 是 | 格式: `^[A-Za-z0-9][A-Za-z0-9_.-]*$`；示例: "alice-notebook" | - |
-| `client.status` | `string` | 是 | 可选值: "active", "revoked", "deleted" | - |
-| `client.ipv4` | `object` | 是 | - | - |
-| `client.ipv4.mode` | `string` | 是 | 可选值: "none", "static", "dynamic" | - |
-| `client.ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | - |
-| `client.ipv4.state` | `string` | 是 | 可选值: "configured", "retained", "unavailable" | - |
-| `client.connection` | `string` | 否 | 示例: "string" | - |
-| `kick_required` | `boolean` | 是 | 示例: false | - |
-| `profile_redistribution_required` | `boolean` | 是 | 示例: false | - |
-| `runtime` | `object` | 否 | - | - |
-| `runtime.client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `runtime.status` | `string` | 否 | 可选值: "ok", "unavailable" | - |
-| `runtime.result` | `object` | 否 | - | - |
-| `runtime.result.version` | `integer` | 否 | 固定值: 1 | - |
-| `runtime.result.client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `runtime.result.client_name` | `string` | 否 | 示例: "string" | - |
-| `runtime.result.was_connected` | `boolean` | 否 | 示例: false | - |
-| `runtime.result.disconnected` | `boolean` | 否 | 示例: false | - |
-| `runtime.result.connections` | `integer` | 否 | 最小值: 0 | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `operation_id` | `string` | 是 | 格式: uuid；示例: "47260b5b-47dd-4f9b-814f-4803668c5934" | 已提交 journal 操作的 UUID。 |
+| `client` | `object` | 是 | - | 权威客户端身份与生命周期状态。 |
+| `client.id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 该对象的稳定标识符。 |
+| `client.name` | `string` | 是 | 格式: ^[A-Za-z0-9][A-Za-z0-9_.-]*$；示例: "alice-notebook" | 稳定且可读的名称。 |
+| `client.status` | `"active" \| "revoked" \| "deleted"` | 是 | 可选值: "active" \| "revoked" \| "deleted" | 客户端凭据生命周期状态。 |
+| `client.ipv4` | `object` | 是 | - | 当前客户端 IPv4 分配视图。 |
+| `client.ipv4.mode` | `"none" \| "static" \| "dynamic"` | 是 | 可选值: "none" \| "static" \| "dynamic" | IPv4 分配模式。 |
+| `client.ipv4.address` | `string \| null` | 是 | 格式: ipv4 | IPv4 地址；未分配地址时为 null。 |
+| `client.ipv4.state` | `"configured" \| "retained" \| "unavailable"` | 是 | 可选值: "configured" \| "retained" \| "unavailable" | 客户端地址分配的可用状态。 |
+| `client.connection` | `string` | 否 | - | 运行时数据可用时的当前连接状态。 |
+| `kick_required` | `boolean` | 是 | 示例: false | 是否必须断开已变更客户端的活动会话。 |
+| `profile_redistribution_required` | `boolean` | 是 | 示例: false | 是否必须重新分发该客户端生成的配置文件。 |
+| `runtime` | `object` | 否 | - | 变更后单个客户端的运行时收敛结果。 |
+| `runtime.client_id` | `string` | 否 | 格式: uuid | 不可变的客户端 UUID。 |
+| `runtime.status` | `"ok" \| "unavailable"` | 否 | 可选值: "ok" \| "unavailable" | 请求的运行时操作是否完成或不可用。 |
+| `runtime.result` | `object` | 否 | - | 请求断开客户端会话的结果。 |
+| `runtime.result.version` | `integer` | 否 | 固定值: 1 | 响应契约 schema 版本。 |
+| `runtime.result.client_id` | `string` | 否 | 格式: uuid | 不可变的客户端 UUID。 |
+| `runtime.result.client_name` | `string` | 否 | - | 与会话关联的可读客户端名称。 |
+| `runtime.result.was_connected` | `boolean` | 否 | - | 请求前是否存在匹配会话。 |
+| `runtime.result.disconnected` | `boolean` | 否 | - | 是否至少断开了一个匹配会话。 |
+| `runtime.result.connections` | `integer` | 否 | 最小值: 0 | 断开请求处理的匹配会话数量。 |
 
-##### `400 Bad Request`
+##### `400 错误请求`
 
-Malformed path, query, header, media type, body, or JSON.
+path、query、header、媒体类型、请求体或 JSON 格式错误。
 
 内容类型：`application/json`
 
@@ -1706,14 +1706,14 @@ Malformed path, query, header, media type, body, or JSON.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_json" | - |
-| `error.message` | `string` | 是 | 示例: "request body is invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_json" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request body is invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -1733,14 +1733,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `404 Not Found`
+##### `404 未找到`
 
-Resource or client does not exist.
+资源或客户端不存在。
 
 内容类型：`application/json`
 
@@ -1760,14 +1760,14 @@ Resource or client does not exist.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "client_not_found" | - |
-| `error.message` | `string` | 是 | 示例: "client was not found" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "client_not_found" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client was not found" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -1787,14 +1787,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `409 Conflict`
+##### `409 冲突`
 
-Digest, revision, state, uniqueness, lock, or recovery conflict.
+摘要、版本、状态、唯一性、锁或恢复流程发生冲突。
 
 内容类型：`application/json`
 
@@ -1814,14 +1814,14 @@ Digest, revision, state, uniqueness, lock, or recovery conflict.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | - |
-| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `422 Unprocessable Entity`
+##### `422 无法处理`
 
-JSON is valid but violates client, IPv4, or configuration semantics.
+JSON 格式有效，但违反客户端、IPv4 或配置语义规则。
 
 内容类型：`application/json`
 
@@ -1841,14 +1841,14 @@ JSON is valid but violates client, IPv4, or configuration semantics.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_client" | - |
-| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_client" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -1868,14 +1868,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -1895,14 +1895,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 10. `GET /api/v1/clients/{client_id}/profile`
 
-Download an OpenVPN client profile. The response contains a private key and must be handled as a credential.
+下载 OpenVPN 客户端配置文件。响应包含私钥，必须按凭据进行安全处理。
 
 #### 请求参数
 
@@ -1916,7 +1916,7 @@ Download an OpenVPN client profile. The response contains a private key and must
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | Complete canonical immutable client UUID; names and UUID prefixes are rejected. |
+| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 完整、规范且不可变的客户端 UUID；不接受名称或 UUID 前缀。 |
 
 #### 请求示例
 
@@ -1927,9 +1927,9 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-OpenVPN profile containing private credentials.
+包含私密凭据的 OpenVPN 配置文件。
 
 内容类型：`application/x-openvpn-profile`
 
@@ -1943,11 +1943,11 @@ string
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `$body` | `string` | 是 | 格式: binary；示例: "string" | - |
+| `response` | `string` | 是 | 格式: binary；示例: "string" | 包含私密凭据的 OpenVPN 配置文件。 |
 
-##### `400 Bad Request`
+##### `400 错误请求`
 
-Malformed path, query, header, media type, body, or JSON.
+path、query、header、媒体类型、请求体或 JSON 格式错误。
 
 内容类型：`application/json`
 
@@ -1967,14 +1967,14 @@ Malformed path, query, header, media type, body, or JSON.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_json" | - |
-| `error.message` | `string` | 是 | 示例: "request body is invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_json" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request body is invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -1994,14 +1994,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `404 Not Found`
+##### `404 未找到`
 
-Resource or client does not exist.
+资源或客户端不存在。
 
 内容类型：`application/json`
 
@@ -2021,14 +2021,14 @@ Resource or client does not exist.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "client_not_found" | - |
-| `error.message` | `string` | 是 | 示例: "client was not found" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "client_not_found" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client was not found" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -2048,14 +2048,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `409 Conflict`
+##### `409 冲突`
 
-Digest, revision, state, uniqueness, lock, or recovery conflict.
+摘要、版本、状态、唯一性、锁或恢复流程发生冲突。
 
 内容类型：`application/json`
 
@@ -2075,14 +2075,14 @@ Digest, revision, state, uniqueness, lock, or recovery conflict.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | - |
-| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `422 Unprocessable Entity`
+##### `422 无法处理`
 
-JSON is valid but violates client, IPv4, or configuration semantics.
+JSON 格式有效，但违反客户端、IPv4 或配置语义规则。
 
 内容类型：`application/json`
 
@@ -2102,14 +2102,14 @@ JSON is valid but violates client, IPv4, or configuration semantics.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_client" | - |
-| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_client" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -2129,14 +2129,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -2156,14 +2156,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 11. `POST /api/v1/clients/{client_id}/revoke`
 
-Revoke client credentials
+吊销客户端凭据
 
 #### 请求参数
 
@@ -2178,13 +2178,13 @@ Revoke client credentials
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | Complete canonical immutable client UUID; names and UUID prefixes are rejected. |
+| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 完整、规范且不可变的客户端 UUID；不接受名称或 UUID 前缀。 |
 
 ##### JSON Body 字段
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `release_ipv4` | `body` | `boolean` | 是 | 示例: false | true releases the assignment; false retains it for later release or reissue. |
+| `release_ipv4` | `body` | `boolean` | 是 | 示例: false | true 表示释放地址分配；false 表示保留，以便之后释放或重新签发。 |
 
 #### 请求示例
 
@@ -2200,9 +2200,9 @@ Content-Type: application/json
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Committed client mutation. Runtime convergence is reported separately when required.
+已提交客户端变更；需要时会单独报告运行时收敛结果。
 
 内容类型：`application/json`
 
@@ -2242,33 +2242,33 @@ Committed client mutation. Runtime convergence is reported separately when requi
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `operation_id` | `string` | 是 | 格式: uuid；示例: "47260b5b-47dd-4f9b-814f-4803668c5934" | - |
-| `client` | `object` | 是 | - | - |
-| `client.id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `client.name` | `string` | 是 | 格式: `^[A-Za-z0-9][A-Za-z0-9_.-]*$`；示例: "alice-laptop" | - |
-| `client.status` | `string` | 是 | 可选值: "active", "revoked", "deleted" | - |
-| `client.ipv4` | `object` | 是 | - | - |
-| `client.ipv4.mode` | `string` | 是 | 可选值: "none", "static", "dynamic" | - |
-| `client.ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | - |
-| `client.ipv4.state` | `string` | 是 | 可选值: "configured", "retained", "unavailable" | - |
-| `client.connection` | `string` | 否 | 示例: "string" | - |
-| `kick_required` | `boolean` | 是 | 示例: true | - |
-| `profile_redistribution_required` | `boolean` | 是 | 示例: false | - |
-| `runtime` | `object` | 否 | - | - |
-| `runtime.client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `runtime.status` | `string` | 否 | 可选值: "ok", "unavailable" | - |
-| `runtime.result` | `object` | 否 | - | - |
-| `runtime.result.version` | `integer` | 否 | 固定值: 1 | - |
-| `runtime.result.client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `runtime.result.client_name` | `string` | 否 | 示例: "alice-laptop" | - |
-| `runtime.result.was_connected` | `boolean` | 否 | 示例: true | - |
-| `runtime.result.disconnected` | `boolean` | 否 | 示例: true | - |
-| `runtime.result.connections` | `integer` | 否 | 最小值: 0；示例: 1 | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `operation_id` | `string` | 是 | 格式: uuid；示例: "47260b5b-47dd-4f9b-814f-4803668c5934" | 已提交 journal 操作的 UUID。 |
+| `client` | `object` | 是 | - | 权威客户端身份与生命周期状态。 |
+| `client.id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 该对象的稳定标识符。 |
+| `client.name` | `string` | 是 | 格式: ^[A-Za-z0-9][A-Za-z0-9_.-]*$；示例: "alice-laptop" | 稳定且可读的名称。 |
+| `client.status` | `"active" \| "revoked" \| "deleted"` | 是 | 可选值: "active" \| "revoked" \| "deleted" | 客户端凭据生命周期状态。 |
+| `client.ipv4` | `object` | 是 | - | 当前客户端 IPv4 分配视图。 |
+| `client.ipv4.mode` | `"none" \| "static" \| "dynamic"` | 是 | 可选值: "none" \| "static" \| "dynamic" | IPv4 分配模式。 |
+| `client.ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | IPv4 地址；未分配地址时为 null。 |
+| `client.ipv4.state` | `"configured" \| "retained" \| "unavailable"` | 是 | 可选值: "configured" \| "retained" \| "unavailable" | 客户端地址分配的可用状态。 |
+| `client.connection` | `string` | 否 | - | 运行时数据可用时的当前连接状态。 |
+| `kick_required` | `boolean` | 是 | 示例: true | 是否必须断开已变更客户端的活动会话。 |
+| `profile_redistribution_required` | `boolean` | 是 | 示例: false | 是否必须重新分发该客户端生成的配置文件。 |
+| `runtime` | `object` | 否 | - | 变更后单个客户端的运行时收敛结果。 |
+| `runtime.client_id` | `string` | 否 | 格式: uuid | 不可变的客户端 UUID。 |
+| `runtime.status` | `"ok" \| "unavailable"` | 否 | 可选值: "ok" \| "unavailable" | 请求的运行时操作是否完成或不可用。 |
+| `runtime.result` | `object` | 否 | - | 请求断开客户端会话的结果。 |
+| `runtime.result.version` | `integer` | 否 | 固定值: 1 | 响应契约 schema 版本。 |
+| `runtime.result.client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 不可变的客户端 UUID。 |
+| `runtime.result.client_name` | `string` | 否 | 示例: "alice-laptop" | 与会话关联的可读客户端名称。 |
+| `runtime.result.was_connected` | `boolean` | 否 | 示例: true | 请求前是否存在匹配会话。 |
+| `runtime.result.disconnected` | `boolean` | 否 | 示例: true | 是否至少断开了一个匹配会话。 |
+| `runtime.result.connections` | `integer` | 否 | 最小值: 0；示例: 1 | 断开请求处理的匹配会话数量。 |
 
-##### `400 Bad Request`
+##### `400 错误请求`
 
-Malformed path, query, header, media type, body, or JSON.
+path、query、header、媒体类型、请求体或 JSON 格式错误。
 
 内容类型：`application/json`
 
@@ -2288,14 +2288,14 @@ Malformed path, query, header, media type, body, or JSON.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_json" | - |
-| `error.message` | `string` | 是 | 示例: "request body is invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_json" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request body is invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -2315,14 +2315,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `404 Not Found`
+##### `404 未找到`
 
-Resource or client does not exist.
+资源或客户端不存在。
 
 内容类型：`application/json`
 
@@ -2342,14 +2342,14 @@ Resource or client does not exist.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "client_not_found" | - |
-| `error.message` | `string` | 是 | 示例: "client was not found" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "client_not_found" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client was not found" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -2369,14 +2369,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `409 Conflict`
+##### `409 冲突`
 
-Digest, revision, state, uniqueness, lock, or recovery conflict.
+摘要、版本、状态、唯一性、锁或恢复流程发生冲突。
 
 内容类型：`application/json`
 
@@ -2396,14 +2396,14 @@ Digest, revision, state, uniqueness, lock, or recovery conflict.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | - |
-| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `422 Unprocessable Entity`
+##### `422 无法处理`
 
-JSON is valid but violates client, IPv4, or configuration semantics.
+JSON 格式有效，但违反客户端、IPv4 或配置语义规则。
 
 内容类型：`application/json`
 
@@ -2423,14 +2423,14 @@ JSON is valid but violates client, IPv4, or configuration semantics.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_client" | - |
-| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_client" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -2450,14 +2450,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -2477,14 +2477,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 12. `POST /api/v1/clients/{client_id}/reissue`
 
-Reissue client credentials and profile
+重新签发客户端凭据和配置文件
 
 #### 请求参数
 
@@ -2499,13 +2499,13 @@ Reissue client credentials and profile
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | Complete canonical immutable client UUID; names and UUID prefixes are rejected. |
+| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 完整、规范且不可变的客户端 UUID；不接受名称或 UUID 前缀。 |
 
 ##### JSON Body 字段
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `ipv4` | `body` | `string` | 是 | 示例: "dynamic" | auto, dynamic, or a valid static IPv4 address. |
+| `ipv4` | `body` | `string` | 是 | 示例: "dynamic" | auto、dynamic 或有效的静态 IPv4 地址。 |
 
 #### 请求示例
 
@@ -2521,9 +2521,9 @@ Content-Type: application/json
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Client credentials and profile reissued.
+客户端凭据和配置文件已重新签发。
 
 内容类型：`application/json`
 
@@ -2555,33 +2555,33 @@ Client credentials and profile reissued.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `operation_id` | `string` | 是 | 格式: uuid；示例: "47260b5b-47dd-4f9b-814f-4803668c5934" | - |
-| `client` | `object` | 是 | - | - |
-| `client.id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `client.name` | `string` | 是 | 格式: `^[A-Za-z0-9][A-Za-z0-9_.-]*$`；示例: "alice-notebook" | - |
-| `client.status` | `string` | 是 | 可选值: "active", "revoked", "deleted" | - |
-| `client.ipv4` | `object` | 是 | - | - |
-| `client.ipv4.mode` | `string` | 是 | 可选值: "none", "static", "dynamic" | - |
-| `client.ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | - |
-| `client.ipv4.state` | `string` | 是 | 可选值: "configured", "retained", "unavailable" | - |
-| `client.connection` | `string` | 否 | 示例: "string" | - |
-| `kick_required` | `boolean` | 是 | 示例: true | - |
-| `profile_redistribution_required` | `boolean` | 是 | 示例: true | - |
-| `runtime` | `object` | 否 | - | - |
-| `runtime.client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `runtime.status` | `string` | 否 | 可选值: "ok", "unavailable" | - |
-| `runtime.result` | `object` | 否 | - | - |
-| `runtime.result.version` | `integer` | 否 | 固定值: 1 | - |
-| `runtime.result.client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `runtime.result.client_name` | `string` | 否 | 示例: "string" | - |
-| `runtime.result.was_connected` | `boolean` | 否 | 示例: false | - |
-| `runtime.result.disconnected` | `boolean` | 否 | 示例: false | - |
-| `runtime.result.connections` | `integer` | 否 | 最小值: 0 | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `operation_id` | `string` | 是 | 格式: uuid；示例: "47260b5b-47dd-4f9b-814f-4803668c5934" | 已提交 journal 操作的 UUID。 |
+| `client` | `object` | 是 | - | 权威客户端身份与生命周期状态。 |
+| `client.id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 该对象的稳定标识符。 |
+| `client.name` | `string` | 是 | 格式: ^[A-Za-z0-9][A-Za-z0-9_.-]*$；示例: "alice-notebook" | 稳定且可读的名称。 |
+| `client.status` | `"active" \| "revoked" \| "deleted"` | 是 | 可选值: "active" \| "revoked" \| "deleted" | 客户端凭据生命周期状态。 |
+| `client.ipv4` | `object` | 是 | - | 当前客户端 IPv4 分配视图。 |
+| `client.ipv4.mode` | `"none" \| "static" \| "dynamic"` | 是 | 可选值: "none" \| "static" \| "dynamic" | IPv4 分配模式。 |
+| `client.ipv4.address` | `string \| null` | 是 | 格式: ipv4 | IPv4 地址；未分配地址时为 null。 |
+| `client.ipv4.state` | `"configured" \| "retained" \| "unavailable"` | 是 | 可选值: "configured" \| "retained" \| "unavailable" | 客户端地址分配的可用状态。 |
+| `client.connection` | `string` | 否 | - | 运行时数据可用时的当前连接状态。 |
+| `kick_required` | `boolean` | 是 | 示例: true | 是否必须断开已变更客户端的活动会话。 |
+| `profile_redistribution_required` | `boolean` | 是 | 示例: true | 是否必须重新分发该客户端生成的配置文件。 |
+| `runtime` | `object` | 否 | - | 变更后单个客户端的运行时收敛结果。 |
+| `runtime.client_id` | `string` | 否 | 格式: uuid | 不可变的客户端 UUID。 |
+| `runtime.status` | `"ok" \| "unavailable"` | 否 | 可选值: "ok" \| "unavailable" | 请求的运行时操作是否完成或不可用。 |
+| `runtime.result` | `object` | 否 | - | 请求断开客户端会话的结果。 |
+| `runtime.result.version` | `integer` | 否 | 固定值: 1 | 响应契约 schema 版本。 |
+| `runtime.result.client_id` | `string` | 否 | 格式: uuid | 不可变的客户端 UUID。 |
+| `runtime.result.client_name` | `string` | 否 | - | 与会话关联的可读客户端名称。 |
+| `runtime.result.was_connected` | `boolean` | 否 | - | 请求前是否存在匹配会话。 |
+| `runtime.result.disconnected` | `boolean` | 否 | - | 是否至少断开了一个匹配会话。 |
+| `runtime.result.connections` | `integer` | 否 | 最小值: 0 | 断开请求处理的匹配会话数量。 |
 
-##### `400 Bad Request`
+##### `400 错误请求`
 
-Malformed path, query, header, media type, body, or JSON.
+path、query、header、媒体类型、请求体或 JSON 格式错误。
 
 内容类型：`application/json`
 
@@ -2601,14 +2601,14 @@ Malformed path, query, header, media type, body, or JSON.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_json" | - |
-| `error.message` | `string` | 是 | 示例: "request body is invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_json" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request body is invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -2628,14 +2628,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `404 Not Found`
+##### `404 未找到`
 
-Resource or client does not exist.
+资源或客户端不存在。
 
 内容类型：`application/json`
 
@@ -2655,14 +2655,14 @@ Resource or client does not exist.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "client_not_found" | - |
-| `error.message` | `string` | 是 | 示例: "client was not found" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "client_not_found" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client was not found" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -2682,14 +2682,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `409 Conflict`
+##### `409 冲突`
 
-Digest, revision, state, uniqueness, lock, or recovery conflict.
+摘要、版本、状态、唯一性、锁或恢复流程发生冲突。
 
 内容类型：`application/json`
 
@@ -2709,14 +2709,14 @@ Digest, revision, state, uniqueness, lock, or recovery conflict.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | - |
-| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `422 Unprocessable Entity`
+##### `422 无法处理`
 
-JSON is valid but violates client, IPv4, or configuration semantics.
+JSON 格式有效，但违反客户端、IPv4 或配置语义规则。
 
 内容类型：`application/json`
 
@@ -2736,14 +2736,14 @@ JSON is valid but violates client, IPv4, or configuration semantics.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_client" | - |
-| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_client" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -2763,14 +2763,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -2790,14 +2790,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 13. `PUT /api/v1/clients/{client_id}/ipv4`
 
-Set client IPv4 intent. Use auto or dynamic without address. Use static with an address from the configured static region.
+设置客户端 IPv4 分配方式。auto 或 dynamic 模式不能提供 address；static 模式必须提供已配置静态区域内的地址。
 
 #### 请求参数
 
@@ -2812,14 +2812,14 @@ Set client IPv4 intent. Use auto or dynamic without address. Use static with an 
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | Complete canonical immutable client UUID; names and UUID prefixes are rejected. |
+| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 完整、规范且不可变的客户端 UUID；不接受名称或 UUID 前缀。 |
 
 ##### JSON Body 字段
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `mode` | `body` | `string` | 是 | 可选值: "auto", "dynamic", "static" | Address selection mode: automatic allocation, dynamic allocation, or a specific static address. |
-| `address` | `body` | `string` | 否 | 格式: ipv4；示例: "10.42.0.30" | Static IPv4 address. Required only for static mode and forbidden for auto/dynamic. |
+| `mode` | `body` | `"auto" \| "dynamic" \| "static"` | 是 | 可选值: "auto" \| "dynamic" \| "static" | 地址选择模式：自动分配、动态分配或指定静态地址。 |
+| `address` | `body` | `string` | 否 | 格式: ipv4 | 静态 IPv4 地址。仅 static 模式必填，auto/dynamic 模式禁止提供。 |
 
 #### 请求示例
 
@@ -2835,9 +2835,9 @@ Content-Type: application/json
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Committed address mutation and per-client runtime outcomes.
+已提交地址变更以及各客户端的运行时结果。
 
 内容类型：`application/json`
 
@@ -2883,32 +2883,32 @@ Committed address mutation and per-client runtime outcomes.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `operation_id` | `string` | 是 | 格式: uuid；示例: "d41dbfce-b40e-4672-8a62-cb401f8c099c" | - |
-| `clients` | `object[]` | 是 | 示例: [{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-laptop","status":"active","ipv4":{"mode":"static","address":"10.42.0.30","state":"configured"}}] | - |
-| `clients[].id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `clients[].name` | `string` | 是 | 格式: `^[A-Za-z0-9][A-Za-z0-9_.-]*$`；示例: "alice-laptop" | - |
-| `clients[].status` | `string` | 是 | 可选值: "active", "revoked", "deleted" | - |
-| `clients[].ipv4` | `object` | 是 | - | - |
-| `clients[].ipv4.mode` | `string` | 是 | 可选值: "none", "static", "dynamic" | - |
-| `clients[].ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | - |
-| `clients[].ipv4.state` | `string` | 是 | 可选值: "configured", "retained", "unavailable" | - |
-| `clients[].connection` | `string` | 否 | 示例: "string" | - |
-| `kick_required` | `string[]` | 是 | 示例: ["c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e"] | - |
-| `runtime` | `object[]` | 是 | 示例: [{"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","status":"ok","result":{"version":1,"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop","was_connected":false,"disconnected":false,"connections":0}}] | - |
-| `runtime[].client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `runtime[].status` | `string` | 是 | 可选值: "ok", "unavailable" | - |
-| `runtime[].result` | `object` | 否 | - | - |
-| `runtime[].result.version` | `integer` | 否 | 固定值: 1 | - |
-| `runtime[].result.client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `runtime[].result.client_name` | `string` | 否 | 示例: "alice-laptop" | - |
-| `runtime[].result.was_connected` | `boolean` | 否 | 示例: false | - |
-| `runtime[].result.disconnected` | `boolean` | 否 | 示例: false | - |
-| `runtime[].result.connections` | `integer` | 否 | 最小值: 0 | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `operation_id` | `string` | 是 | 格式: uuid；示例: "d41dbfce-b40e-4672-8a62-cb401f8c099c" | 已提交 journal 操作的 UUID。 |
+| `clients` | `object[]` | 是 | 示例: [{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-laptop","status":"active","ipv4":{"mode":"static","address":"10.42.0.30","state":"configured"}}] | 该响应包含的客户端。 |
+| `clients[].id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 该对象的稳定标识符。 |
+| `clients[].name` | `string` | 是 | 格式: ^[A-Za-z0-9][A-Za-z0-9_.-]*$；示例: "alice-laptop" | 稳定且可读的名称。 |
+| `clients[].status` | `"active" \| "revoked" \| "deleted"` | 是 | 可选值: "active" \| "revoked" \| "deleted" | 客户端凭据生命周期状态。 |
+| `clients[].ipv4` | `object` | 是 | - | 当前客户端 IPv4 分配视图。 |
+| `clients[].ipv4.mode` | `"none" \| "static" \| "dynamic"` | 是 | 可选值: "none" \| "static" \| "dynamic" | IPv4 分配模式。 |
+| `clients[].ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | IPv4 地址；未分配地址时为 null。 |
+| `clients[].ipv4.state` | `"configured" \| "retained" \| "unavailable"` | 是 | 可选值: "configured" \| "retained" \| "unavailable" | 客户端地址分配的可用状态。 |
+| `clients[].connection` | `string` | 否 | - | 运行时数据可用时的当前连接状态。 |
+| `kick_required` | `string[]` | 是 | 示例: ["c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e"] | 必须断开活动会话的客户端。 |
+| `runtime` | `object[]` | 是 | 示例: [{"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","status":"ok","result":{"version":1,"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop","was_connected":false,"disconnected":false,"connections":0}}] | 尝试实时操作时的运行时收敛结果。 |
+| `runtime[].client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 不可变的客户端 UUID。 |
+| `runtime[].status` | `"ok" \| "unavailable"` | 是 | 可选值: "ok" \| "unavailable" | 请求的运行时操作是否完成或不可用。 |
+| `runtime[].result` | `object` | 否 | - | 请求断开客户端会话的结果。 |
+| `runtime[].result.version` | `integer` | 否 | 固定值: 1 | 响应契约 schema 版本。 |
+| `runtime[].result.client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 不可变的客户端 UUID。 |
+| `runtime[].result.client_name` | `string` | 否 | 示例: "alice-laptop" | 与会话关联的可读客户端名称。 |
+| `runtime[].result.was_connected` | `boolean` | 否 | 示例: false | 请求前是否存在匹配会话。 |
+| `runtime[].result.disconnected` | `boolean` | 否 | 示例: false | 是否至少断开了一个匹配会话。 |
+| `runtime[].result.connections` | `integer` | 否 | 最小值: 0；示例: 0 | 断开请求处理的匹配会话数量。 |
 
-##### `400 Bad Request`
+##### `400 错误请求`
 
-Malformed path, query, header, media type, body, or JSON.
+path、query、header、媒体类型、请求体或 JSON 格式错误。
 
 内容类型：`application/json`
 
@@ -2928,14 +2928,14 @@ Malformed path, query, header, media type, body, or JSON.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_json" | - |
-| `error.message` | `string` | 是 | 示例: "request body is invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_json" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request body is invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -2955,14 +2955,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `404 Not Found`
+##### `404 未找到`
 
-Resource or client does not exist.
+资源或客户端不存在。
 
 内容类型：`application/json`
 
@@ -2982,14 +2982,14 @@ Resource or client does not exist.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "client_not_found" | - |
-| `error.message` | `string` | 是 | 示例: "client was not found" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "client_not_found" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client was not found" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -3009,14 +3009,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `409 Conflict`
+##### `409 冲突`
 
-Digest, revision, state, uniqueness, lock, or recovery conflict.
+摘要、版本、状态、唯一性、锁或恢复流程发生冲突。
 
 内容类型：`application/json`
 
@@ -3036,14 +3036,14 @@ Digest, revision, state, uniqueness, lock, or recovery conflict.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | - |
-| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `422 Unprocessable Entity`
+##### `422 无法处理`
 
-JSON is valid but violates client, IPv4, or configuration semantics.
+JSON 格式有效，但违反客户端、IPv4 或配置语义规则。
 
 内容类型：`application/json`
 
@@ -3063,14 +3063,14 @@ JSON is valid but violates client, IPv4, or configuration semantics.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_client" | - |
-| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_client" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -3090,14 +3090,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -3117,14 +3117,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 14. `DELETE /api/v1/clients/{client_id}/ipv4`
 
-Release a revoked client's retained IPv4. Requires an empty body and is valid only for a revoked client with a retained assignment.
+释放已吊销客户端保留的 IPv4 地址。请求体必须为空，且仅适用于仍保留地址分配的已吊销客户端。
 
 #### 请求参数
 
@@ -3138,7 +3138,7 @@ Release a revoked client's retained IPv4. Requires an empty body and is valid on
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | Complete canonical immutable client UUID; names and UUID prefixes are rejected. |
+| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 完整、规范且不可变的客户端 UUID；不接受名称或 UUID 前缀。 |
 
 #### 请求示例
 
@@ -3149,9 +3149,9 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Revoked client's retained address released.
+已释放被吊销客户端保留的地址。
 
 内容类型：`application/json`
 
@@ -3182,32 +3182,32 @@ Revoked client's retained address released.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `operation_id` | `string` | 是 | 格式: uuid；示例: "d41dbfce-b40e-4672-8a62-cb401f8c099c" | - |
-| `clients` | `object[]` | 是 | 示例: [{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-notebook","status":"revoked","ipv4":{"mode":"none","address":null,"state":"unavailable"}}] | - |
-| `clients[].id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `clients[].name` | `string` | 是 | 格式: `^[A-Za-z0-9][A-Za-z0-9_.-]*$`；示例: "alice-notebook" | - |
-| `clients[].status` | `string` | 是 | 可选值: "active", "revoked", "deleted" | - |
-| `clients[].ipv4` | `object` | 是 | - | - |
-| `clients[].ipv4.mode` | `string` | 是 | 可选值: "none", "static", "dynamic" | - |
-| `clients[].ipv4.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | - |
-| `clients[].ipv4.state` | `string` | 是 | 可选值: "configured", "retained", "unavailable" | - |
-| `clients[].connection` | `string` | 否 | 示例: "string" | - |
-| `kick_required` | `string[]` | 是 | 示例: [] | - |
-| `runtime` | `object[]` | 是 | 示例: [] | - |
-| `runtime[].client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `runtime[].status` | `string` | 是 | 可选值: "ok", "unavailable" | - |
-| `runtime[].result` | `object` | 否 | - | - |
-| `runtime[].result.version` | `integer` | 否 | 固定值: 1 | - |
-| `runtime[].result.client_id` | `string` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `runtime[].result.client_name` | `string` | 否 | 示例: "string" | - |
-| `runtime[].result.was_connected` | `boolean` | 否 | 示例: false | - |
-| `runtime[].result.disconnected` | `boolean` | 否 | 示例: false | - |
-| `runtime[].result.connections` | `integer` | 否 | 最小值: 0 | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `operation_id` | `string` | 是 | 格式: uuid；示例: "d41dbfce-b40e-4672-8a62-cb401f8c099c" | 已提交 journal 操作的 UUID。 |
+| `clients` | `object[]` | 是 | 示例: [{"id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","name":"alice-notebook","status":"revoked","ipv4":{"mode":"none","address":null,"state":"unavailable"}}] | 该响应包含的客户端。 |
+| `clients[].id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 该对象的稳定标识符。 |
+| `clients[].name` | `string` | 是 | 格式: ^[A-Za-z0-9][A-Za-z0-9_.-]*$；示例: "alice-notebook" | 稳定且可读的名称。 |
+| `clients[].status` | `"active" \| "revoked" \| "deleted"` | 是 | 可选值: "active" \| "revoked" \| "deleted" | 客户端凭据生命周期状态。 |
+| `clients[].ipv4` | `object` | 是 | - | 当前客户端 IPv4 分配视图。 |
+| `clients[].ipv4.mode` | `"none" \| "static" \| "dynamic"` | 是 | 可选值: "none" \| "static" \| "dynamic" | IPv4 分配模式。 |
+| `clients[].ipv4.address` | `string \| null` | 是 | 格式: ipv4 | IPv4 地址；未分配地址时为 null。 |
+| `clients[].ipv4.state` | `"configured" \| "retained" \| "unavailable"` | 是 | 可选值: "configured" \| "retained" \| "unavailable" | 客户端地址分配的可用状态。 |
+| `clients[].connection` | `string` | 否 | - | 运行时数据可用时的当前连接状态。 |
+| `kick_required` | `string[]` | 是 | 示例: [] | 必须断开活动会话的客户端。 |
+| `runtime` | `object[]` | 是 | 示例: [] | 尝试实时操作时的运行时收敛结果。 |
+| `runtime[].client_id` | `string` | 否 | 格式: uuid | 不可变的客户端 UUID。 |
+| `runtime[].status` | `"ok" \| "unavailable"` | 是 | 可选值: "ok" \| "unavailable" | 请求的运行时操作是否完成或不可用。 |
+| `runtime[].result` | `object` | 否 | - | 请求断开客户端会话的结果。 |
+| `runtime[].result.version` | `integer` | 否 | 固定值: 1 | 响应契约 schema 版本。 |
+| `runtime[].result.client_id` | `string` | 否 | 格式: uuid | 不可变的客户端 UUID。 |
+| `runtime[].result.client_name` | `string` | 否 | - | 与会话关联的可读客户端名称。 |
+| `runtime[].result.was_connected` | `boolean` | 否 | - | 请求前是否存在匹配会话。 |
+| `runtime[].result.disconnected` | `boolean` | 否 | - | 是否至少断开了一个匹配会话。 |
+| `runtime[].result.connections` | `integer` | 否 | 最小值: 0 | 断开请求处理的匹配会话数量。 |
 
-##### `400 Bad Request`
+##### `400 错误请求`
 
-Malformed path, query, header, media type, body, or JSON.
+path、query、header、媒体类型、请求体或 JSON 格式错误。
 
 内容类型：`application/json`
 
@@ -3227,14 +3227,14 @@ Malformed path, query, header, media type, body, or JSON.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_json" | - |
-| `error.message` | `string` | 是 | 示例: "request body is invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_json" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request body is invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -3254,14 +3254,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `404 Not Found`
+##### `404 未找到`
 
-Resource or client does not exist.
+资源或客户端不存在。
 
 内容类型：`application/json`
 
@@ -3281,14 +3281,14 @@ Resource or client does not exist.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "client_not_found" | - |
-| `error.message` | `string` | 是 | 示例: "client was not found" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "client_not_found" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client was not found" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -3308,14 +3308,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `409 Conflict`
+##### `409 冲突`
 
-Digest, revision, state, uniqueness, lock, or recovery conflict.
+摘要、版本、状态、唯一性、锁或恢复流程发生冲突。
 
 内容类型：`application/json`
 
@@ -3335,14 +3335,14 @@ Digest, revision, state, uniqueness, lock, or recovery conflict.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | - |
-| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `422 Unprocessable Entity`
+##### `422 无法处理`
 
-JSON is valid but violates client, IPv4, or configuration semantics.
+JSON 格式有效，但违反客户端、IPv4 或配置语义规则。
 
 内容类型：`application/json`
 
@@ -3362,14 +3362,14 @@ JSON is valid but violates client, IPv4, or configuration semantics.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_client" | - |
-| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_client" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -3389,14 +3389,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -3416,14 +3416,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 15. `POST /api/v1/clients/{client_id}/disconnect`
 
-Disconnect current client sessions. Requires an empty body. A client with no active session returns 200 with was_connected=false.
+断开客户端当前会话。请求体必须为空。客户端没有活动会话时返回 200，且 `was_connected=false`。
 
 #### 请求参数
 
@@ -3437,7 +3437,7 @@ Disconnect current client sessions. Requires an empty body. A client with no act
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | Complete canonical immutable client UUID; names and UUID prefixes are rejected. |
+| `client_id` | `path` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 完整、规范且不可变的客户端 UUID；不接受名称或 UUID 前缀。 |
 
 #### 请求示例
 
@@ -3448,9 +3448,9 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Disconnect outcome, including successful no-op when no session exists.
+断开结果；没有会话时也会成功返回且不执行操作。
 
 内容类型：`application/json`
 
@@ -3471,16 +3471,16 @@ Disconnect outcome, including successful no-op when no session exists.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `client_id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `client_name` | `string` | 是 | 示例: "alice-laptop" | - |
-| `was_connected` | `boolean` | 是 | 示例: false | - |
-| `disconnected` | `boolean` | 是 | 示例: false | - |
-| `connections` | `integer` | 是 | 最小值: 0 | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `client_id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 不可变的客户端 UUID。 |
+| `client_name` | `string` | 是 | 示例: "alice-laptop" | 与会话关联的可读客户端名称。 |
+| `was_connected` | `boolean` | 是 | 示例: false | 请求前是否存在匹配会话。 |
+| `disconnected` | `boolean` | 是 | 示例: false | 是否至少断开了一个匹配会话。 |
+| `connections` | `integer` | 是 | 最小值: 0；示例: 0 | 断开请求处理的匹配会话数量。 |
 
-##### `400 Bad Request`
+##### `400 错误请求`
 
-Malformed path, query, header, media type, body, or JSON.
+path、query、header、媒体类型、请求体或 JSON 格式错误。
 
 内容类型：`application/json`
 
@@ -3500,14 +3500,14 @@ Malformed path, query, header, media type, body, or JSON.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_json" | - |
-| `error.message` | `string` | 是 | 示例: "request body is invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_json" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request body is invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -3527,14 +3527,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `404 Not Found`
+##### `404 未找到`
 
-Resource or client does not exist.
+资源或客户端不存在。
 
 内容类型：`application/json`
 
@@ -3554,14 +3554,14 @@ Resource or client does not exist.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "client_not_found" | - |
-| `error.message` | `string` | 是 | 示例: "client was not found" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "client_not_found" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client was not found" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -3581,14 +3581,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -3608,14 +3608,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -3635,14 +3635,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 16. `GET /api/v1/runtime`
 
-Read OpenVPN runtime status and sessions
+读取 OpenVPN 运行状态和会话
 
 #### 请求参数
 
@@ -3661,9 +3661,9 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-OpenVPN runtime status.
+OpenVPN 运行状态。
 
 内容类型：`application/json`
 
@@ -3690,19 +3690,19 @@ OpenVPN runtime status.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `daemon` | `string` | 是 | 示例: "running" | - |
-| `management` | `string` | 是 | 示例: "connected" | - |
-| `client_count` | `integer` | 是 | 最小值: 0；示例: 1 | - |
-| `clients` | `object[]` | 是 | 示例: [{"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop","remote_address":"203.0.113.10:53210","virtual_address":"10.42.0.30"}] | - |
-| `clients[].client_id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `clients[].client_name` | `string` | 否 | 示例: "alice-laptop" | - |
-| `clients[].remote_address` | `string` | 否 | 示例: "203.0.113.10:53210" | - |
-| `clients[].virtual_address` | `string` | 否 | 格式: ipv4；示例: "10.42.0.30" | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `daemon` | `string` | 是 | 示例: "running" | OpenVPN daemon 进程状态。 |
+| `management` | `string` | 是 | 示例: "connected" | OpenVPN 管理接口连接状态。 |
+| `client_count` | `integer` | 是 | 最小值: 0；示例: 1 | 运行时报告的客户端会话数量。 |
+| `clients` | `object[]` | 是 | 示例: [{"client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop","remote_address":"203.0.113.10:53210","virtual_address":"10.42.0.30"}] | 该响应包含的客户端。 |
+| `clients[].client_id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 不可变的客户端 UUID。 |
+| `clients[].client_name` | `string` | 否 | 示例: "alice-laptop" | 与会话关联的可读客户端名称。 |
+| `clients[].remote_address` | `string` | 否 | 示例: "203.0.113.10:53210" | 已连接客户端的远端网络地址。 |
+| `clients[].virtual_address` | `string` | 否 | 格式: ipv4；示例: "10.42.0.30" | 分配给会话的 VPN 虚拟 IPv4 地址。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -3722,14 +3722,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -3749,14 +3749,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -3776,14 +3776,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -3803,14 +3803,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 17. `GET /api/v1/runtime/events`
 
-Read recent structured runtime events
+读取最近的结构化运行事件
 
 #### 请求参数
 
@@ -3824,7 +3824,7 @@ Read recent structured runtime events
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `lines` | `query` | `integer` | 否 | 最小值: 0；最大值: 1000；默认值: 100 | Number of most recent events. Defaults to 100. |
+| `lines` | `query` | `integer` | 否 | 最小值: 0；最大值: 1000；默认值: 100；示例: 100 | 返回最近事件的数量，默认为 100。 |
 
 #### 请求示例
 
@@ -3835,9 +3835,9 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Recent structured runtime events.
+最近的结构化运行事件。
 
 内容类型：`application/json`
 
@@ -3863,18 +3863,18 @@ Recent structured runtime events.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `events` | `object[]` | 是 | 示例: [{"timestamp":"2026-08-19T09:55:07Z","event":"client-disconnect","operation":"runtime.disconnect","outcome":"success","client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop"}] | - |
-| `events[].timestamp` | `string` | 是 | 格式: date-time；示例: "2026-08-19T09:55:07Z" | - |
-| `events[].event` | `string` | 是 | 示例: "client-disconnect" | - |
-| `events[].operation` | `string` | 是 | 示例: "runtime.disconnect" | - |
-| `events[].outcome` | `string` | 是 | 示例: "success" | - |
-| `events[].client_id` | `string \| null` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `events[].client_name` | `string \| null` | 否 | 示例: "alice-laptop" | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `events` | `object[]` | 是 | 示例: [{"timestamp":"2026-08-19T09:55:07Z","event":"client-disconnect","operation":"runtime.disconnect","outcome":"success","client_id":"c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e","client_name":"alice-laptop"}] | 按时间顺序排列的最近结构化运行事件。 |
+| `events[].timestamp` | `string` | 是 | 格式: date-time；示例: "2026-08-19T09:55:07Z" | 运行事件发生时的 UTC 时间。 |
+| `events[].event` | `string` | 是 | 示例: "client-disconnect" | 稳定的运行事件名称。 |
+| `events[].operation` | `string` | 是 | 示例: "runtime.disconnect" | 产生该事件的稳定操作名称。 |
+| `events[].outcome` | `string` | 是 | 示例: "success" | 稳定的事件结果值。 |
+| `events[].client_id` | `string \| null` | 否 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | 与事件关联的客户端 UUID；非客户端事件时为 null。 |
+| `events[].client_name` | `string \| null` | 否 | 示例: "alice-laptop" | 与事件关联的客户端名称；不可用时为 null。 |
 
-##### `400 Bad Request`
+##### `400 错误请求`
 
-Malformed path, query, header, media type, body, or JSON.
+path、query、header、媒体类型、请求体或 JSON 格式错误。
 
 内容类型：`application/json`
 
@@ -3894,14 +3894,14 @@ Malformed path, query, header, media type, body, or JSON.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_json" | - |
-| `error.message` | `string` | 是 | 示例: "request body is invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_json" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request body is invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -3921,14 +3921,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -3948,14 +3948,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -3975,14 +3975,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -4002,14 +4002,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 18. `GET /api/v1/config/applied`
 
-Read the applied configuration revision
+读取已应用的配置版本
 
 #### 请求参数
 
@@ -4028,9 +4028,9 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Applied revision and normalized configuration.
+已应用的版本号和规范化配置。
 
 内容类型：`application/json`
 
@@ -4070,31 +4070,31 @@ Applied revision and normalized configuration.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `revision` | `integer` | 是 | 最小值: 1；示例: 12 | - |
-| `digest` | `string` | 是 | 格式: `^[0-9a-f]{64}$`；示例: "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042" | Lowercase SHA-256 digest identifying an exact desired configuration. |
-| `config` | `object` | 是 | - | - |
-| `config.version` | `integer` | 是 | 固定值: 1 | Configuration schema version. Must be 1. |
-| `config.server` | `object` | 是 | - | OpenVPN listener and transport settings. |
-| `config.server.endpoint` | `string` | 是 | 示例: "vpn.example.com" | Public hostname or IP address placed in generated client profiles. |
-| `config.server.protocol` | `string` | 是 | 可选值: "udp", "tcp" | OpenVPN transport protocol. |
-| `config.server.family` | `string` | 是 | 可选值: "auto", "ipv4", "ipv6" | Address family used for the server transport. |
-| `config.server.port` | `integer` | 是 | 最小值: 1；最大值: 65535；示例: 1194 | OpenVPN listener port. |
-| `config.server.client_to_client` | `boolean` | 是 | 示例: true | Whether connected VPN clients may communicate directly. |
-| `config.ipv4` | `object` | 是 | - | Server IPv4 network, allocation, NAT, DNS, and route settings. |
-| `config.ipv4.network` | `string` | 是 | 格式: ipv4-cidr；示例: "10.42.0.0/24" | VPN IPv4 network in CIDR notation. |
-| `config.ipv4.dynamic_pool_size` | `integer` | 是 | 最小值: 0；示例: 64 | Number of addresses reserved for dynamic allocation. |
-| `config.ipv4.nat_enabled` | `boolean` | 是 | 示例: false | Whether outbound traffic from the VPN network is masqueraded. |
-| `config.ipv4.nat_interface` | `string` | 是 | 示例: "auto" | Outbound interface for NAT, or auto for automatic detection. |
-| `config.ipv4.redirect_gateway` | `boolean` | 是 | 示例: false | Whether generated profiles redirect the default IPv4 route through VPN. |
-| `config.ipv4.dns` | `string[]` | 是 | 示例: [] | IPv4 DNS servers pushed to clients. |
-| `config.ipv4.routes` | `string[]` | 是 | 示例: [] | Additional IPv4 CIDR routes pushed to clients. |
-| `config.logging` | `object` | 是 | - | Runtime log rotation settings. |
-| `config.logging.max_bytes` | `integer` | 是 | 最小值: 1；示例: 10485760 | Maximum active log file size before rotation. |
-| `config.logging.backups` | `integer` | 是 | 最小值: 0；示例: 5 | Number of rotated log files retained. |
+| `revision` | `integer` | 是 | 最小值: 1；示例: 12 | 单调递增的已应用配置版本。 |
+| `digest` | `string` | 是 | 格式: ^[0-9a-f]{64}$；示例: "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042" | 用于精确标识期望配置的小写 SHA-256 摘要。 |
+| `config` | `object` | 是 | - | 完整且规范化的 OpenVPN 服务端配置。 |
+| `config.version` | `integer` | 是 | 固定值: 1 | 配置 schema 版本，必须为 1。 |
+| `config.server` | `object` | 是 | - | OpenVPN 监听和传输设置。 |
+| `config.server.endpoint` | `string` | 是 | 示例: "vpn.example.com" | 写入生成客户端配置文件的公网主机名或 IP 地址。 |
+| `config.server.protocol` | `"udp" \| "tcp"` | 是 | 可选值: "udp" \| "tcp" | OpenVPN 传输协议。 |
+| `config.server.family` | `"auto" \| "ipv4" \| "ipv6"` | 是 | 可选值: "auto" \| "ipv4" \| "ipv6" | 服务端传输使用的地址族。 |
+| `config.server.port` | `integer` | 是 | 最小值: 1；最大值: 65535；示例: 1194 | OpenVPN 监听端口。 |
+| `config.server.client_to_client` | `boolean` | 是 | 示例: true | 是否允许已连接的 VPN 客户端直接通信。 |
+| `config.ipv4` | `object` | 是 | - | 服务端 IPv4 网络、地址分配、NAT、DNS 和路由设置。 |
+| `config.ipv4.network` | `string` | 是 | 格式: ipv4-cidr；示例: "10.42.0.0/24" | CIDR 格式的 VPN IPv4 网络。 |
+| `config.ipv4.dynamic_pool_size` | `integer` | 是 | 最小值: 0；示例: 64 | 为动态分配保留的地址数量。 |
+| `config.ipv4.nat_enabled` | `boolean` | 是 | 示例: false | 是否对 VPN 网络的出站流量执行地址伪装。 |
+| `config.ipv4.nat_interface` | `string` | 是 | 示例: "auto" | NAT 使用的出口接口；使用 auto 时自动检测。 |
+| `config.ipv4.redirect_gateway` | `boolean` | 是 | 示例: false | 生成的配置文件是否将默认 IPv4 路由重定向到 VPN。 |
+| `config.ipv4.dns` | `string[]` | 是 | 示例: [] | 推送给客户端的 IPv4 DNS 服务器。 |
+| `config.ipv4.routes` | `string[]` | 是 | 示例: [] | 推送给客户端的其他 IPv4 CIDR 路由。 |
+| `config.logging` | `object` | 是 | - | 运行时日志轮转设置。 |
+| `config.logging.max_bytes` | `integer` | 是 | 最小值: 1；示例: 10485760 | 触发轮转前活动日志文件的最大字节数。 |
+| `config.logging.backups` | `integer` | 是 | 最小值: 0；示例: 5 | 保留的轮转日志文件数量。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -4114,14 +4114,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -4141,14 +4141,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `409 Conflict`
+##### `409 冲突`
 
-Digest, revision, state, uniqueness, lock, or recovery conflict.
+摘要、版本、状态、唯一性、锁或恢复流程发生冲突。
 
 内容类型：`application/json`
 
@@ -4168,14 +4168,14 @@ Digest, revision, state, uniqueness, lock, or recovery conflict.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | - |
-| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -4195,14 +4195,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -4222,14 +4222,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 19. `GET /api/v1/config/desired`
 
-Read desired configuration and CAS digest
+读取期望配置和 CAS 摘要
 
 #### 请求参数
 
@@ -4248,9 +4248,9 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Desired digest and normalized configuration.
+期望配置摘要和规范化配置。
 
 内容类型：`application/json`
 
@@ -4289,30 +4289,30 @@ Desired digest and normalized configuration.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `digest` | `string` | 是 | 格式: `^[0-9a-f]{64}$`；示例: "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042" | Lowercase SHA-256 digest identifying an exact desired configuration. |
-| `config` | `object` | 是 | - | - |
-| `config.version` | `integer` | 是 | 固定值: 1 | Configuration schema version. Must be 1. |
-| `config.server` | `object` | 是 | - | OpenVPN listener and transport settings. |
-| `config.server.endpoint` | `string` | 是 | 示例: "vpn.example.com" | Public hostname or IP address placed in generated client profiles. |
-| `config.server.protocol` | `string` | 是 | 可选值: "udp", "tcp" | OpenVPN transport protocol. |
-| `config.server.family` | `string` | 是 | 可选值: "auto", "ipv4", "ipv6" | Address family used for the server transport. |
-| `config.server.port` | `integer` | 是 | 最小值: 1；最大值: 65535；示例: 1194 | OpenVPN listener port. |
-| `config.server.client_to_client` | `boolean` | 是 | 示例: true | Whether connected VPN clients may communicate directly. |
-| `config.ipv4` | `object` | 是 | - | Server IPv4 network, allocation, NAT, DNS, and route settings. |
-| `config.ipv4.network` | `string` | 是 | 格式: ipv4-cidr；示例: "10.42.0.0/24" | VPN IPv4 network in CIDR notation. |
-| `config.ipv4.dynamic_pool_size` | `integer` | 是 | 最小值: 0；示例: 64 | Number of addresses reserved for dynamic allocation. |
-| `config.ipv4.nat_enabled` | `boolean` | 是 | 示例: false | Whether outbound traffic from the VPN network is masqueraded. |
-| `config.ipv4.nat_interface` | `string` | 是 | 示例: "auto" | Outbound interface for NAT, or auto for automatic detection. |
-| `config.ipv4.redirect_gateway` | `boolean` | 是 | 示例: false | Whether generated profiles redirect the default IPv4 route through VPN. |
-| `config.ipv4.dns` | `string[]` | 是 | 示例: [] | IPv4 DNS servers pushed to clients. |
-| `config.ipv4.routes` | `string[]` | 是 | 示例: [] | Additional IPv4 CIDR routes pushed to clients. |
-| `config.logging` | `object` | 是 | - | Runtime log rotation settings. |
-| `config.logging.max_bytes` | `integer` | 是 | 最小值: 1；示例: 10485760 | Maximum active log file size before rotation. |
-| `config.logging.backups` | `integer` | 是 | 最小值: 0；示例: 5 | Number of rotated log files retained. |
+| `digest` | `string` | 是 | 格式: ^[0-9a-f]{64}$；示例: "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042" | 用于精确标识期望配置的小写 SHA-256 摘要。 |
+| `config` | `object` | 是 | - | 完整且规范化的 OpenVPN 服务端配置。 |
+| `config.version` | `integer` | 是 | 固定值: 1 | 配置 schema 版本，必须为 1。 |
+| `config.server` | `object` | 是 | - | OpenVPN 监听和传输设置。 |
+| `config.server.endpoint` | `string` | 是 | 示例: "vpn.example.com" | 写入生成客户端配置文件的公网主机名或 IP 地址。 |
+| `config.server.protocol` | `"udp" \| "tcp"` | 是 | 可选值: "udp" \| "tcp" | OpenVPN 传输协议。 |
+| `config.server.family` | `"auto" \| "ipv4" \| "ipv6"` | 是 | 可选值: "auto" \| "ipv4" \| "ipv6" | 服务端传输使用的地址族。 |
+| `config.server.port` | `integer` | 是 | 最小值: 1；最大值: 65535；示例: 1194 | OpenVPN 监听端口。 |
+| `config.server.client_to_client` | `boolean` | 是 | 示例: true | 是否允许已连接的 VPN 客户端直接通信。 |
+| `config.ipv4` | `object` | 是 | - | 服务端 IPv4 网络、地址分配、NAT、DNS 和路由设置。 |
+| `config.ipv4.network` | `string` | 是 | 格式: ipv4-cidr；示例: "10.42.0.0/24" | CIDR 格式的 VPN IPv4 网络。 |
+| `config.ipv4.dynamic_pool_size` | `integer` | 是 | 最小值: 0；示例: 64 | 为动态分配保留的地址数量。 |
+| `config.ipv4.nat_enabled` | `boolean` | 是 | 示例: false | 是否对 VPN 网络的出站流量执行地址伪装。 |
+| `config.ipv4.nat_interface` | `string` | 是 | 示例: "auto" | NAT 使用的出口接口；使用 auto 时自动检测。 |
+| `config.ipv4.redirect_gateway` | `boolean` | 是 | 示例: false | 生成的配置文件是否将默认 IPv4 路由重定向到 VPN。 |
+| `config.ipv4.dns` | `string[]` | 是 | 示例: [] | 推送给客户端的 IPv4 DNS 服务器。 |
+| `config.ipv4.routes` | `string[]` | 是 | 示例: [] | 推送给客户端的其他 IPv4 CIDR 路由。 |
+| `config.logging` | `object` | 是 | - | 运行时日志轮转设置。 |
+| `config.logging.max_bytes` | `integer` | 是 | 最小值: 1；示例: 10485760 | 触发轮转前活动日志文件的最大字节数。 |
+| `config.logging.backups` | `integer` | 是 | 最小值: 0；示例: 5 | 保留的轮转日志文件数量。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -4332,14 +4332,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -4359,14 +4359,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `409 Conflict`
+##### `409 冲突`
 
-Digest, revision, state, uniqueness, lock, or recovery conflict.
+摘要、版本、状态、唯一性、锁或恢复流程发生冲突。
 
 内容类型：`application/json`
 
@@ -4386,14 +4386,14 @@ Digest, revision, state, uniqueness, lock, or recovery conflict.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | - |
-| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `422 Unprocessable Entity`
+##### `422 无法处理`
 
-JSON is valid but violates client, IPv4, or configuration semantics.
+JSON 格式有效，但违反客户端、IPv4 或配置语义规则。
 
 内容类型：`application/json`
 
@@ -4413,14 +4413,14 @@ JSON is valid but violates client, IPv4, or configuration semantics.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_client" | - |
-| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_client" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -4440,14 +4440,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -4467,14 +4467,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 20. `PUT /api/v1/config/desired`
 
-Replace desired configuration with CAS. Send the previous desired digest as a quoted If-Match value and the complete normalized configuration as the body.
+使用 CAS 替换期望配置。将上一次期望配置摘要作为带双引号的 If-Match 值，并在请求体中发送完整的规范化配置。
 
 #### 请求参数
 
@@ -4484,30 +4484,30 @@ Replace desired configuration with CAS. Send the previous desired digest as a qu
 |---|---|---|---|---|---|
 | `Authorization` | `header` | `string` | 是 | Bearer ovpn_v1.<uuid>.<secret> | API 身份认证凭据。Bearer 后填写服务生成的 API Key。 |
 | `Content-Type` | `header` | `string` | 是 | application/json | 声明请求体使用 JSON 格式。 |
-| `If-Match` | `header` | `string` | 是 | 格式: `^"[0-9a-f]{64}"$`；示例: "\"be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042\"" | Exactly one quoted lowercase SHA-256 digest from the previous desired response ETag. |
+| `If-Match` | `header` | `string` | 是 | 格式: ^"[0-9a-f]{64}"$；示例: "\"be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042\"" | 上一次期望配置响应 ETag 中带双引号的小写 SHA-256 摘要，只能提供一个。 |
 
 ##### JSON Body 字段
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `version` | `body` | `integer` | 是 | 固定值: 1 | Configuration schema version. Must be 1. |
-| `server` | `body` | `object` | 是 | - | OpenVPN listener and transport settings. |
-| `server.endpoint` | `body` | `string` | 是 | 示例: "vpn.example.com" | Public hostname or IP address placed in generated client profiles. |
-| `server.protocol` | `body` | `string` | 是 | 可选值: "udp", "tcp" | OpenVPN transport protocol. |
-| `server.family` | `body` | `string` | 是 | 可选值: "auto", "ipv4", "ipv6" | Address family used for the server transport. |
-| `server.port` | `body` | `integer` | 是 | 最小值: 1；最大值: 65535；示例: 1194 | OpenVPN listener port. |
-| `server.client_to_client` | `body` | `boolean` | 是 | 示例: true | Whether connected VPN clients may communicate directly. |
-| `ipv4` | `body` | `object` | 是 | - | Server IPv4 network, allocation, NAT, DNS, and route settings. |
-| `ipv4.network` | `body` | `string` | 是 | 格式: ipv4-cidr；示例: "10.42.0.0/24" | VPN IPv4 network in CIDR notation. |
-| `ipv4.dynamic_pool_size` | `body` | `integer` | 是 | 最小值: 0；示例: 64 | Number of addresses reserved for dynamic allocation. |
-| `ipv4.nat_enabled` | `body` | `boolean` | 是 | 示例: false | Whether outbound traffic from the VPN network is masqueraded. |
-| `ipv4.nat_interface` | `body` | `string` | 是 | 示例: "auto" | Outbound interface for NAT, or auto for automatic detection. |
-| `ipv4.redirect_gateway` | `body` | `boolean` | 是 | 示例: false | Whether generated profiles redirect the default IPv4 route through VPN. |
-| `ipv4.dns` | `body` | `string[]` | 是 | 示例: ["1.1.1.1"] | IPv4 DNS servers pushed to clients. |
-| `ipv4.routes` | `body` | `string[]` | 是 | 示例: ["10.20.0.0/16"] | Additional IPv4 CIDR routes pushed to clients. |
-| `logging` | `body` | `object` | 是 | - | Runtime log rotation settings. |
-| `logging.max_bytes` | `body` | `integer` | 是 | 最小值: 1；示例: 10485760 | Maximum active log file size before rotation. |
-| `logging.backups` | `body` | `integer` | 是 | 最小值: 0；示例: 5 | Number of rotated log files retained. |
+| `version` | `body` | `integer` | 是 | 固定值: 1 | 配置 schema 版本，必须为 1。 |
+| `server` | `body` | `object` | 是 | - | OpenVPN 监听和传输设置。 |
+| `server.endpoint` | `body` | `string` | 是 | 示例: "vpn.example.com" | 写入生成客户端配置文件的公网主机名或 IP 地址。 |
+| `server.protocol` | `body` | `"udp" \| "tcp"` | 是 | 可选值: "udp" \| "tcp" | OpenVPN 传输协议。 |
+| `server.family` | `body` | `"auto" \| "ipv4" \| "ipv6"` | 是 | 可选值: "auto" \| "ipv4" \| "ipv6" | 服务端传输使用的地址族。 |
+| `server.port` | `body` | `integer` | 是 | 最小值: 1；最大值: 65535；示例: 1194 | OpenVPN 监听端口。 |
+| `server.client_to_client` | `body` | `boolean` | 是 | 示例: true | 是否允许已连接的 VPN 客户端直接通信。 |
+| `ipv4` | `body` | `object` | 是 | - | 服务端 IPv4 网络、地址分配、NAT、DNS 和路由设置。 |
+| `ipv4.network` | `body` | `string` | 是 | 格式: ipv4-cidr；示例: "10.42.0.0/24" | CIDR 格式的 VPN IPv4 网络。 |
+| `ipv4.dynamic_pool_size` | `body` | `integer` | 是 | 最小值: 0；示例: 64 | 为动态分配保留的地址数量。 |
+| `ipv4.nat_enabled` | `body` | `boolean` | 是 | 示例: false | 是否对 VPN 网络的出站流量执行地址伪装。 |
+| `ipv4.nat_interface` | `body` | `string` | 是 | 示例: "auto" | NAT 使用的出口接口；使用 auto 时自动检测。 |
+| `ipv4.redirect_gateway` | `body` | `boolean` | 是 | 示例: false | 生成的配置文件是否将默认 IPv4 路由重定向到 VPN。 |
+| `ipv4.dns` | `body` | `string[]` | 是 | 示例: ["1.1.1.1"] | 推送给客户端的 IPv4 DNS 服务器。 |
+| `ipv4.routes` | `body` | `string[]` | 是 | 示例: ["10.20.0.0/16"] | 推送给客户端的其他 IPv4 CIDR 路由。 |
+| `logging` | `body` | `object` | 是 | - | 运行时日志轮转设置。 |
+| `logging.max_bytes` | `body` | `integer` | 是 | 最小值: 1；示例: 10485760 | 触发轮转前活动日志文件的最大字节数。 |
+| `logging.backups` | `body` | `integer` | 是 | 最小值: 0；示例: 5 | 保留的轮转日志文件数量。 |
 
 #### 请求示例
 
@@ -4548,9 +4548,9 @@ Content-Type: application/json
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Desired digest and normalized configuration.
+期望配置摘要和规范化配置。
 
 内容类型：`application/json`
 
@@ -4589,30 +4589,30 @@ Desired digest and normalized configuration.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `digest` | `string` | 是 | 格式: `^[0-9a-f]{64}$`；示例: "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042" | Lowercase SHA-256 digest identifying an exact desired configuration. |
-| `config` | `object` | 是 | - | - |
-| `config.version` | `integer` | 是 | 固定值: 1 | Configuration schema version. Must be 1. |
-| `config.server` | `object` | 是 | - | OpenVPN listener and transport settings. |
-| `config.server.endpoint` | `string` | 是 | 示例: "vpn.example.com" | Public hostname or IP address placed in generated client profiles. |
-| `config.server.protocol` | `string` | 是 | 可选值: "udp", "tcp" | OpenVPN transport protocol. |
-| `config.server.family` | `string` | 是 | 可选值: "auto", "ipv4", "ipv6" | Address family used for the server transport. |
-| `config.server.port` | `integer` | 是 | 最小值: 1；最大值: 65535；示例: 1194 | OpenVPN listener port. |
-| `config.server.client_to_client` | `boolean` | 是 | 示例: true | Whether connected VPN clients may communicate directly. |
-| `config.ipv4` | `object` | 是 | - | Server IPv4 network, allocation, NAT, DNS, and route settings. |
-| `config.ipv4.network` | `string` | 是 | 格式: ipv4-cidr；示例: "10.42.0.0/24" | VPN IPv4 network in CIDR notation. |
-| `config.ipv4.dynamic_pool_size` | `integer` | 是 | 最小值: 0；示例: 64 | Number of addresses reserved for dynamic allocation. |
-| `config.ipv4.nat_enabled` | `boolean` | 是 | 示例: false | Whether outbound traffic from the VPN network is masqueraded. |
-| `config.ipv4.nat_interface` | `string` | 是 | 示例: "auto" | Outbound interface for NAT, or auto for automatic detection. |
-| `config.ipv4.redirect_gateway` | `boolean` | 是 | 示例: false | Whether generated profiles redirect the default IPv4 route through VPN. |
-| `config.ipv4.dns` | `string[]` | 是 | 示例: [] | IPv4 DNS servers pushed to clients. |
-| `config.ipv4.routes` | `string[]` | 是 | 示例: [] | Additional IPv4 CIDR routes pushed to clients. |
-| `config.logging` | `object` | 是 | - | Runtime log rotation settings. |
-| `config.logging.max_bytes` | `integer` | 是 | 最小值: 1；示例: 10485760 | Maximum active log file size before rotation. |
-| `config.logging.backups` | `integer` | 是 | 最小值: 0；示例: 5 | Number of rotated log files retained. |
+| `digest` | `string` | 是 | 格式: ^[0-9a-f]{64}$；示例: "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042" | 用于精确标识期望配置的小写 SHA-256 摘要。 |
+| `config` | `object` | 是 | - | 完整且规范化的 OpenVPN 服务端配置。 |
+| `config.version` | `integer` | 是 | 固定值: 1 | 配置 schema 版本，必须为 1。 |
+| `config.server` | `object` | 是 | - | OpenVPN 监听和传输设置。 |
+| `config.server.endpoint` | `string` | 是 | 示例: "vpn.example.com" | 写入生成客户端配置文件的公网主机名或 IP 地址。 |
+| `config.server.protocol` | `"udp" \| "tcp"` | 是 | 可选值: "udp" \| "tcp" | OpenVPN 传输协议。 |
+| `config.server.family` | `"auto" \| "ipv4" \| "ipv6"` | 是 | 可选值: "auto" \| "ipv4" \| "ipv6" | 服务端传输使用的地址族。 |
+| `config.server.port` | `integer` | 是 | 最小值: 1；最大值: 65535；示例: 1194 | OpenVPN 监听端口。 |
+| `config.server.client_to_client` | `boolean` | 是 | 示例: true | 是否允许已连接的 VPN 客户端直接通信。 |
+| `config.ipv4` | `object` | 是 | - | 服务端 IPv4 网络、地址分配、NAT、DNS 和路由设置。 |
+| `config.ipv4.network` | `string` | 是 | 格式: ipv4-cidr；示例: "10.42.0.0/24" | CIDR 格式的 VPN IPv4 网络。 |
+| `config.ipv4.dynamic_pool_size` | `integer` | 是 | 最小值: 0；示例: 64 | 为动态分配保留的地址数量。 |
+| `config.ipv4.nat_enabled` | `boolean` | 是 | 示例: false | 是否对 VPN 网络的出站流量执行地址伪装。 |
+| `config.ipv4.nat_interface` | `string` | 是 | 示例: "auto" | NAT 使用的出口接口；使用 auto 时自动检测。 |
+| `config.ipv4.redirect_gateway` | `boolean` | 是 | 示例: false | 生成的配置文件是否将默认 IPv4 路由重定向到 VPN。 |
+| `config.ipv4.dns` | `string[]` | 是 | 示例: [] | 推送给客户端的 IPv4 DNS 服务器。 |
+| `config.ipv4.routes` | `string[]` | 是 | 示例: [] | 推送给客户端的其他 IPv4 CIDR 路由。 |
+| `config.logging` | `object` | 是 | - | 运行时日志轮转设置。 |
+| `config.logging.max_bytes` | `integer` | 是 | 最小值: 1；示例: 10485760 | 触发轮转前活动日志文件的最大字节数。 |
+| `config.logging.backups` | `integer` | 是 | 最小值: 0；示例: 5 | 保留的轮转日志文件数量。 |
 
-##### `400 Bad Request`
+##### `400 错误请求`
 
-Malformed path, query, header, media type, body, or JSON.
+path、query、header、媒体类型、请求体或 JSON 格式错误。
 
 内容类型：`application/json`
 
@@ -4632,14 +4632,14 @@ Malformed path, query, header, media type, body, or JSON.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_json" | - |
-| `error.message` | `string` | 是 | 示例: "request body is invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_json" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request body is invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -4659,14 +4659,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -4686,14 +4686,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `409 Conflict`
+##### `409 冲突`
 
-Digest, revision, state, uniqueness, lock, or recovery conflict.
+摘要、版本、状态、唯一性、锁或恢复流程发生冲突。
 
 内容类型：`application/json`
 
@@ -4713,14 +4713,14 @@ Digest, revision, state, uniqueness, lock, or recovery conflict.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | - |
-| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `422 Unprocessable Entity`
+##### `422 无法处理`
 
-JSON is valid but violates client, IPv4, or configuration semantics.
+JSON 格式有效，但违反客户端、IPv4 或配置语义规则。
 
 内容类型：`application/json`
 
@@ -4740,14 +4740,14 @@ JSON is valid but violates client, IPv4, or configuration semantics.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_client" | - |
-| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_client" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -4767,14 +4767,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -4794,14 +4794,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 21. `GET /api/v1/config/plan`
 
-Plan desired-to-applied changes
+规划从期望配置到已应用配置的变更
 
 #### 请求参数
 
@@ -4820,9 +4820,9 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Complete desired-to-applied plan.
+从期望配置到已应用配置的完整计划。
 
 内容类型：`application/json`
 
@@ -4872,54 +4872,54 @@ Complete desired-to-applied plan.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `instance_id` | `string` | 是 | 格式: uuid；示例: "bbffeb8c-2d11-4613-874d-b5fcc804a608" | - |
-| `configuration` | `object` | 是 | - | - |
-| `configuration.initial` | `boolean` | 是 | 示例: false | - |
-| `configuration.current_revision` | `integer` | 是 | 最小值: 0；示例: 12 | - |
-| `configuration.target_revision` | `integer` | 是 | 最小值: 1；示例: 13 | - |
-| `configuration.current_digest` | `string` | 否 | 格式: `^[0-9a-f]{64}$`；示例: "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042" | Lowercase SHA-256 digest identifying an exact desired configuration. |
-| `configuration.desired_digest` | `string` | 是 | 格式: `^[0-9a-f]{64}$`；示例: "489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca" | Lowercase SHA-256 digest identifying an exact desired configuration. |
-| `configuration.in_sync` | `boolean` | 是 | 示例: false | - |
-| `configuration.changes` | `object[]` | 是 | 示例: [{"field":"server.endpoint","before":"vpn.example.com","after":"vpn-new.example.com"}] | - |
-| `configuration.changes[].field` | `string` | 是 | 示例: "server.endpoint" | - |
-| `configuration.changes[].before` | `any` | 是 | 示例: "vpn.example.com" | - |
-| `configuration.changes[].after` | `any` | 是 | 示例: "vpn-new.example.com" | - |
-| `configuration.impact` | `object` | 是 | - | - |
-| `configuration.impact.restart_required` | `boolean` | 是 | 示例: true | - |
-| `configuration.impact.address_remap` | `boolean` | 是 | 示例: false | - |
-| `configuration.impact.firewall_reconcile` | `boolean` | 是 | 示例: false | - |
-| `configuration.impact.profile_redistribution` | `boolean` | 是 | 示例: true | - |
-| `configuration.impact.derived_artifacts` | `string[]` | 是 | 示例: ["server_config","client_profiles"] | - |
-| `address_changes` | `object[]` | 是 | 示例: [] | - |
-| `address_changes[].client` | `object` | 是 | - | - |
-| `address_changes[].client.id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `address_changes[].client.name` | `string` | 是 | 示例: "string" | - |
-| `address_changes[].before` | `object` | 是 | - | - |
-| `address_changes[].before.mode` | `string` | 是 | 示例: "string" | - |
-| `address_changes[].before.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | - |
-| `address_changes[].before.state` | `string` | 是 | 示例: "string" | - |
-| `address_changes[].after` | `object` | 是 | - | - |
-| `address_changes[].after.mode` | `string` | 是 | 示例: "string" | - |
-| `address_changes[].after.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | - |
-| `address_changes[].after.state` | `string` | 是 | 示例: "string" | - |
-| `artifacts` | `object[]` | 是 | 示例: [] | - |
-| `artifacts[].owner_kind` | `string` | 是 | 示例: "string" | - |
-| `artifacts[].owner_id` | `string` | 是 | 示例: "string" | - |
-| `artifacts[].kind` | `string` | 是 | 示例: "string" | - |
-| `artifacts[].key` | `string` | 是 | 示例: "string" | - |
-| `artifacts[].action` | `string` | 是 | 可选值: "regenerate", "delete" | - |
-| `profile_redistribution` | `object[]` | 是 | 示例: [] | - |
-| `profile_redistribution[].id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `profile_redistribution[].name` | `string` | 是 | 示例: "string" | - |
-| `firewall` | `object` | 是 | - | - |
-| `firewall.reconcile` | `boolean` | 是 | 示例: false | - |
-| `firewall.before` | `object \| null` | 是 | 示例: {"network":"string","nat_enabled":false,"nat_interface":"string","routes":["string"]} | - |
-| `firewall.after` | `object \| null` | 是 | 示例: {"network":"string","nat_enabled":false,"nat_interface":"string","routes":["string"]} | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `instance_id` | `string` | 是 | 格式: uuid；示例: "bbffeb8c-2d11-4613-874d-b5fcc804a608" | 已初始化 OpenVPN 实例的不可变 UUID。 |
+| `configuration` | `object` | 是 | - | 版本、摘要、变更和影响的对比结果。 |
+| `configuration.initial` | `boolean` | 是 | 示例: false | 该计划是否创建首个已应用版本。 |
+| `configuration.current_revision` | `integer` | 是 | 最小值: 0；示例: 12 | 用于比较的当前已应用配置版本。 |
+| `configuration.target_revision` | `integer` | 是 | 最小值: 1；示例: 13 | 执行该计划后将产生的已应用版本。 |
+| `configuration.current_digest` | `string` | 否 | 格式: ^[0-9a-f]{64}$；示例: "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042" | 用于精确标识期望配置的小写 SHA-256 摘要。 |
+| `configuration.desired_digest` | `string` | 是 | 格式: ^[0-9a-f]{64}$；示例: "489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca" | 用于精确标识期望配置的小写 SHA-256 摘要。 |
+| `configuration.in_sync` | `boolean` | 是 | 示例: false | 期望配置与已应用配置是否一致。 |
+| `configuration.changes` | `object[]` | 是 | 示例: [{"field":"server.endpoint","before":"vpn.example.com","after":"vpn-new.example.com"}] | 该计划中的字段级配置变更。 |
+| `configuration.changes[].field` | `string` | 是 | 示例: "server.endpoint" | 发生变更的配置字段规范点分路径。 |
+| `configuration.changes[].before` | `any` | 是 | 示例: "vpn.example.com" | 建议配置变更前的已应用值。 |
+| `configuration.changes[].after` | `any` | 是 | 示例: "vpn-new.example.com" | 建议配置变更后的期望值。 |
+| `configuration.impact` | `object` | 是 | - | 配置变更对运行时和制品的影响。 |
+| `configuration.impact.restart_required` | `boolean` | 是 | 示例: true | 应用该计划是否需要重启 OpenVPN。 |
+| `configuration.impact.address_remap` | `boolean` | 是 | 示例: false | 是否必须重新计算客户端地址分配。 |
+| `configuration.impact.firewall_reconcile` | `boolean` | 是 | 示例: false | 是否必须协调防火墙规则。 |
+| `configuration.impact.profile_redistribution` | `boolean` | 是 | 示例: true | 必须重新分发生成配置文件的客户端。 |
+| `configuration.impact.derived_artifacts` | `string[]` | 是 | 示例: ["server_config","client_profiles"] | 必须重新生成或删除的派生制品。 |
+| `address_changes` | `object[]` | 是 | 示例: [] | 该计划要求执行的客户端地址变更。 |
+| `address_changes[].client` | `object` | 是 | - | 计划报告中使用的稳定客户端身份。 |
+| `address_changes[].client.id` | `string` | 是 | 格式: uuid | 该对象的稳定标识符。 |
+| `address_changes[].client.name` | `string` | 是 | - | 稳定且可读的名称。 |
+| `address_changes[].before` | `object` | 是 | - | 某一时刻的客户端 IPv4 分配意图。 |
+| `address_changes[].before.mode` | `string` | 是 | - | IPv4 分配模式。 |
+| `address_changes[].before.address` | `string \| null` | 是 | 格式: ipv4 | IPv4 地址；未分配地址时为 null。 |
+| `address_changes[].before.state` | `string` | 是 | - | 该地址意图的生命周期状态。 |
+| `address_changes[].after` | `object` | 是 | - | 某一时刻的客户端 IPv4 分配意图。 |
+| `address_changes[].after.mode` | `string` | 是 | - | IPv4 分配模式。 |
+| `address_changes[].after.address` | `string \| null` | 是 | 格式: ipv4 | IPv4 地址；未分配地址时为 null。 |
+| `address_changes[].after.state` | `string` | 是 | - | 该地址意图的生命周期状态。 |
+| `artifacts` | `object[]` | 是 | 示例: [] | 该计划要求执行的派生制品操作。 |
+| `artifacts[].owner_kind` | `string` | 是 | - | 拥有该制品的对象类型。 |
+| `artifacts[].owner_id` | `string` | 是 | - | 所属对象的稳定标识符。 |
+| `artifacts[].kind` | `string` | 是 | - | 派生制品类型。 |
+| `artifacts[].key` | `string` | 是 | - | 用于标识派生制品的稳定 key。 |
+| `artifacts[].action` | `"regenerate" \| "delete"` | 是 | 可选值: "regenerate" \| "delete" | 重新生成还是删除该制品。 |
+| `profile_redistribution` | `object[]` | 是 | 示例: [] | 必须重新分发生成配置文件的客户端。 |
+| `profile_redistribution[].id` | `string` | 是 | 格式: uuid | 该对象的稳定标识符。 |
+| `profile_redistribution[].name` | `string` | 是 | - | 稳定且可读的名称。 |
+| `firewall` | `object` | 是 | - | 防火墙变更前后状态及协调要求。 |
+| `firewall.reconcile` | `boolean` | 是 | 示例: false | 应用期间是否必须协调防火墙状态。 |
+| `firewall.before` | `object \| null` | 是 | - | 应用前的防火墙状态；初始配置时为 null。 |
+| `firewall.after` | `object \| null` | 是 | - | 期望配置要求的防火墙状态；不存在时为 null。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -4939,14 +4939,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -4966,14 +4966,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `409 Conflict`
+##### `409 冲突`
 
-Digest, revision, state, uniqueness, lock, or recovery conflict.
+摘要、版本、状态、唯一性、锁或恢复流程发生冲突。
 
 内容类型：`application/json`
 
@@ -4993,14 +4993,14 @@ Digest, revision, state, uniqueness, lock, or recovery conflict.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | - |
-| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `422 Unprocessable Entity`
+##### `422 无法处理`
 
-JSON is valid but violates client, IPv4, or configuration semantics.
+JSON 格式有效，但违反客户端、IPv4 或配置语义规则。
 
 内容类型：`application/json`
 
@@ -5020,14 +5020,14 @@ JSON is valid but violates client, IPv4, or configuration semantics.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_client" | - |
-| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_client" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -5047,14 +5047,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -5074,14 +5074,14 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ### 22. `POST /api/v1/config/apply`
 
-Apply the current desired configuration online. Use desired_digest from GET/PUT desired and current_revision from GET plan. The API remains available while OpenVPN and the broker restart.
+在线应用当前期望配置。使用 GET/PUT desired 返回的 desired_digest 和 GET plan 返回的 current_revision。OpenVPN 与 broker 重启期间 API 仍保持可用。
 
 #### 请求参数
 
@@ -5096,9 +5096,9 @@ Apply the current desired configuration online. Use desired_digest from GET/PUT 
 
 | 字段 | 位置 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|---|
-| `desired_digest` | `body` | `string` | 是 | 格式: `^[0-9a-f]{64}$`；示例: "489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca" | Lowercase SHA-256 digest identifying an exact desired configuration. |
-| `current_revision` | `body` | `integer` | 是 | 最小值: 1；示例: 12 | Applied revision returned by the configuration plan. |
-| `force` | `body` | `boolean` | 否 | 默认值: false | Bypasses only confirmed health-preflight warnings; never bypasses schema, CAS, lock, or recovery checks. |
+| `desired_digest` | `body` | `string` | 是 | 格式: ^[0-9a-f]{64}$；示例: "489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca" | 用于精确标识期望配置的小写 SHA-256 摘要。 |
+| `current_revision` | `body` | `integer` | 是 | 最小值: 1；示例: 12 | 配置计划返回的已应用版本号。 |
+| `force` | `body` | `boolean` | 否 | 默认值: false；示例: false | 仅绕过已确认的健康预检警告；不会绕过 schema、CAS、锁或恢复检查。 |
 
 #### 请求示例
 
@@ -5116,9 +5116,9 @@ Content-Type: application/json
 
 #### 返回
 
-##### `200 OK`
+##### `200 成功`
 
-Apply transaction and runtime activation outcome.
+应用事务及运行时激活结果。
 
 内容类型：`application/json`
 
@@ -5169,64 +5169,64 @@ Apply transaction and runtime activation outcome.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `integer` | 是 | 固定值: 1 | - |
-| `applied` | `boolean` | 是 | 示例: true | - |
-| `operation_id` | `string` | 否 | 格式: uuid；示例: "5b781e08-3d44-41fb-81db-42edeedc61e1" | - |
-| `activation` | `object` | 是 | - | - |
-| `activation.restart_required` | `boolean` | 是 | 示例: true | - |
-| `activation.runtime_restarted` | `boolean` | 是 | 示例: true | - |
-| `activation.profile_redistribution` | `object[]` | 是 | 示例: [] | - |
-| `activation.profile_redistribution[].id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `activation.profile_redistribution[].name` | `string` | 是 | 示例: "string" | - |
-| `plan` | `object` | 是 | - | - |
-| `plan.version` | `integer` | 是 | 固定值: 1 | - |
-| `plan.instance_id` | `string` | 是 | 格式: uuid；示例: "bbffeb8c-2d11-4613-874d-b5fcc804a608" | - |
-| `plan.configuration` | `object` | 是 | - | - |
-| `plan.configuration.initial` | `boolean` | 是 | 示例: false | - |
-| `plan.configuration.current_revision` | `integer` | 是 | 最小值: 0；示例: 12 | - |
-| `plan.configuration.target_revision` | `integer` | 是 | 最小值: 1；示例: 13 | - |
-| `plan.configuration.current_digest` | `string` | 否 | 格式: `^[0-9a-f]{64}$`；示例: "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042" | Lowercase SHA-256 digest identifying an exact desired configuration. |
-| `plan.configuration.desired_digest` | `string` | 是 | 格式: `^[0-9a-f]{64}$`；示例: "489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca" | Lowercase SHA-256 digest identifying an exact desired configuration. |
-| `plan.configuration.in_sync` | `boolean` | 是 | 示例: false | - |
-| `plan.configuration.changes` | `object[]` | 是 | 示例: [] | - |
-| `plan.configuration.changes[].field` | `string` | 是 | 示例: "server.endpoint" | - |
-| `plan.configuration.changes[].before` | `any` | 是 | 示例: "string" | - |
-| `plan.configuration.changes[].after` | `any` | 是 | 示例: "string" | - |
-| `plan.configuration.impact` | `object` | 是 | - | - |
-| `plan.configuration.impact.restart_required` | `boolean` | 是 | 示例: true | - |
-| `plan.configuration.impact.address_remap` | `boolean` | 是 | 示例: false | - |
-| `plan.configuration.impact.firewall_reconcile` | `boolean` | 是 | 示例: false | - |
-| `plan.configuration.impact.profile_redistribution` | `boolean` | 是 | 示例: false | - |
-| `plan.configuration.impact.derived_artifacts` | `string[]` | 是 | 示例: [] | - |
-| `plan.address_changes` | `object[]` | 是 | 示例: [] | - |
-| `plan.address_changes[].client` | `object` | 是 | - | - |
-| `plan.address_changes[].client.id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `plan.address_changes[].client.name` | `string` | 是 | 示例: "string" | - |
-| `plan.address_changes[].before` | `object` | 是 | - | - |
-| `plan.address_changes[].before.mode` | `string` | 是 | 示例: "string" | - |
-| `plan.address_changes[].before.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | - |
-| `plan.address_changes[].before.state` | `string` | 是 | 示例: "string" | - |
-| `plan.address_changes[].after` | `object` | 是 | - | - |
-| `plan.address_changes[].after.mode` | `string` | 是 | 示例: "string" | - |
-| `plan.address_changes[].after.address` | `string \| null` | 是 | 格式: ipv4；示例: "10.42.0.30" | - |
-| `plan.address_changes[].after.state` | `string` | 是 | 示例: "string" | - |
-| `plan.artifacts` | `object[]` | 是 | 示例: [] | - |
-| `plan.artifacts[].owner_kind` | `string` | 是 | 示例: "string" | - |
-| `plan.artifacts[].owner_id` | `string` | 是 | 示例: "string" | - |
-| `plan.artifacts[].kind` | `string` | 是 | 示例: "string" | - |
-| `plan.artifacts[].key` | `string` | 是 | 示例: "string" | - |
-| `plan.artifacts[].action` | `string` | 是 | 可选值: "regenerate", "delete" | - |
-| `plan.profile_redistribution` | `object[]` | 是 | 示例: [] | - |
-| `plan.profile_redistribution[].id` | `string` | 是 | 格式: uuid；示例: "c0d4f871-6ea6-42b3-9e7b-f00cc1ec354e" | - |
-| `plan.profile_redistribution[].name` | `string` | 是 | 示例: "string" | - |
-| `plan.firewall` | `object` | 是 | - | - |
-| `plan.firewall.reconcile` | `boolean` | 是 | 示例: false | - |
-| `plan.firewall.before` | `object \| null` | 是 | 示例: {"network":"string","nat_enabled":false,"nat_interface":"string","routes":["string"]} | - |
-| `plan.firewall.after` | `object \| null` | 是 | 示例: {"network":"string","nat_enabled":false,"nat_interface":"string","routes":["string"]} | - |
+| `version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `applied` | `boolean` | 是 | 示例: true | 本次请求是否提交了新的已应用版本。 |
+| `operation_id` | `string` | 否 | 格式: uuid；示例: "5b781e08-3d44-41fb-81db-42edeedc61e1" | 已提交 journal 操作的 UUID。 |
+| `activation` | `object` | 是 | - | 配置提交后执行的运行时激活动作。 |
+| `activation.restart_required` | `boolean` | 是 | 示例: true | 应用该计划是否需要重启 OpenVPN。 |
+| `activation.runtime_restarted` | `boolean` | 是 | 示例: true | 是否已重启受管 OpenVPN 运行时。 |
+| `activation.profile_redistribution` | `object[]` | 是 | 示例: [] | 必须重新分发生成配置文件的客户端。 |
+| `activation.profile_redistribution[].id` | `string` | 是 | 格式: uuid | 该对象的稳定标识符。 |
+| `activation.profile_redistribution[].name` | `string` | 是 | - | 稳定且可读的名称。 |
+| `plan` | `object` | 是 | - | 应用期望配置的完整计划。 |
+| `plan.version` | `integer` | 是 | 固定值: 1 | 响应契约 schema 版本。 |
+| `plan.instance_id` | `string` | 是 | 格式: uuid；示例: "bbffeb8c-2d11-4613-874d-b5fcc804a608" | 已初始化 OpenVPN 实例的不可变 UUID。 |
+| `plan.configuration` | `object` | 是 | - | 版本、摘要、变更和影响的对比结果。 |
+| `plan.configuration.initial` | `boolean` | 是 | 示例: false | 该计划是否创建首个已应用版本。 |
+| `plan.configuration.current_revision` | `integer` | 是 | 最小值: 0；示例: 12 | 用于比较的当前已应用配置版本。 |
+| `plan.configuration.target_revision` | `integer` | 是 | 最小值: 1；示例: 13 | 执行该计划后将产生的已应用版本。 |
+| `plan.configuration.current_digest` | `string` | 否 | 格式: ^[0-9a-f]{64}$；示例: "be7ed82796b39a77ce949201a4d9483cf09e56648f14b8b9b192bb83d2c4d042" | 用于精确标识期望配置的小写 SHA-256 摘要。 |
+| `plan.configuration.desired_digest` | `string` | 是 | 格式: ^[0-9a-f]{64}$；示例: "489b950c0d134b5d7e8f350b2cb4bfa4d6d163d841f840964baf6d74c65cc8ca" | 用于精确标识期望配置的小写 SHA-256 摘要。 |
+| `plan.configuration.in_sync` | `boolean` | 是 | 示例: false | 期望配置与已应用配置是否一致。 |
+| `plan.configuration.changes` | `object[]` | 是 | 示例: [] | 该计划中的字段级配置变更。 |
+| `plan.configuration.changes[].field` | `string` | 是 | - | 发生变更的配置字段规范点分路径。 |
+| `plan.configuration.changes[].before` | `any` | 是 | - | 建议配置变更前的已应用值。 |
+| `plan.configuration.changes[].after` | `any` | 是 | - | 建议配置变更后的期望值。 |
+| `plan.configuration.impact` | `object` | 是 | - | 配置变更对运行时和制品的影响。 |
+| `plan.configuration.impact.restart_required` | `boolean` | 是 | 示例: true | 应用该计划是否需要重启 OpenVPN。 |
+| `plan.configuration.impact.address_remap` | `boolean` | 是 | 示例: false | 是否必须重新计算客户端地址分配。 |
+| `plan.configuration.impact.firewall_reconcile` | `boolean` | 是 | 示例: false | 是否必须协调防火墙规则。 |
+| `plan.configuration.impact.profile_redistribution` | `boolean` | 是 | 示例: false | 必须重新分发生成配置文件的客户端。 |
+| `plan.configuration.impact.derived_artifacts` | `string[]` | 是 | 示例: [] | 必须重新生成或删除的派生制品。 |
+| `plan.address_changes` | `object[]` | 是 | 示例: [] | 该计划要求执行的客户端地址变更。 |
+| `plan.address_changes[].client` | `object` | 是 | - | 计划报告中使用的稳定客户端身份。 |
+| `plan.address_changes[].client.id` | `string` | 是 | 格式: uuid | 该对象的稳定标识符。 |
+| `plan.address_changes[].client.name` | `string` | 是 | - | 稳定且可读的名称。 |
+| `plan.address_changes[].before` | `object` | 是 | - | 某一时刻的客户端 IPv4 分配意图。 |
+| `plan.address_changes[].before.mode` | `string` | 是 | - | IPv4 分配模式。 |
+| `plan.address_changes[].before.address` | `string \| null` | 是 | 格式: ipv4 | IPv4 地址；未分配地址时为 null。 |
+| `plan.address_changes[].before.state` | `string` | 是 | - | 该地址意图的生命周期状态。 |
+| `plan.address_changes[].after` | `object` | 是 | - | 某一时刻的客户端 IPv4 分配意图。 |
+| `plan.address_changes[].after.mode` | `string` | 是 | - | IPv4 分配模式。 |
+| `plan.address_changes[].after.address` | `string \| null` | 是 | 格式: ipv4 | IPv4 地址；未分配地址时为 null。 |
+| `plan.address_changes[].after.state` | `string` | 是 | - | 该地址意图的生命周期状态。 |
+| `plan.artifacts` | `object[]` | 是 | 示例: [] | 该计划要求执行的派生制品操作。 |
+| `plan.artifacts[].owner_kind` | `string` | 是 | - | 拥有该制品的对象类型。 |
+| `plan.artifacts[].owner_id` | `string` | 是 | - | 所属对象的稳定标识符。 |
+| `plan.artifacts[].kind` | `string` | 是 | - | 派生制品类型。 |
+| `plan.artifacts[].key` | `string` | 是 | - | 用于标识派生制品的稳定 key。 |
+| `plan.artifacts[].action` | `"regenerate" \| "delete"` | 是 | 可选值: "regenerate" \| "delete" | 重新生成还是删除该制品。 |
+| `plan.profile_redistribution` | `object[]` | 是 | 示例: [] | 必须重新分发生成配置文件的客户端。 |
+| `plan.profile_redistribution[].id` | `string` | 是 | 格式: uuid | 该对象的稳定标识符。 |
+| `plan.profile_redistribution[].name` | `string` | 是 | - | 稳定且可读的名称。 |
+| `plan.firewall` | `object` | 是 | - | 防火墙变更前后状态及协调要求。 |
+| `plan.firewall.reconcile` | `boolean` | 是 | 示例: false | 应用期间是否必须协调防火墙状态。 |
+| `plan.firewall.before` | `object \| null` | 是 | - | 应用前的防火墙状态；初始配置时为 null。 |
+| `plan.firewall.after` | `object \| null` | 是 | - | 期望配置要求的防火墙状态；不存在时为 null。 |
 
-##### `400 Bad Request`
+##### `400 错误请求`
 
-Malformed path, query, header, media type, body, or JSON.
+path、query、header、媒体类型、请求体或 JSON 格式错误。
 
 内容类型：`application/json`
 
@@ -5246,14 +5246,14 @@ Malformed path, query, header, media type, body, or JSON.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_json" | - |
-| `error.message` | `string` | 是 | 示例: "request body is invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_json" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request body is invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `401 Unauthorized`
+##### `401 未认证`
 
-Bearer API key is missing, malformed, unknown, or deleted.
+Bearer API key 缺失、格式错误、未知或已删除。
 
 内容类型：`application/json`
 
@@ -5273,14 +5273,14 @@ Bearer API key is missing, malformed, unknown, or deleted.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "unauthenticated" | - |
-| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "unauthenticated" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "API key is missing or invalid" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `405 Method Not Allowed`
+##### `405 方法不允许`
 
-HTTP method is not accepted; inspect the Allow header.
+不接受该 HTTP 方法；请检查 Allow header。
 
 内容类型：`application/json`
 
@@ -5300,14 +5300,14 @@ HTTP method is not accepted; inspect the Allow header.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | - |
-| `error.message` | `string` | 是 | 示例: "method is not allowed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "method_not_allowed" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "method is not allowed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `409 Conflict`
+##### `409 冲突`
 
-Digest, revision, state, uniqueness, lock, or recovery conflict.
+摘要、版本、状态、唯一性、锁或恢复流程发生冲突。
 
 内容类型：`application/json`
 
@@ -5327,14 +5327,14 @@ Digest, revision, state, uniqueness, lock, or recovery conflict.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | - |
-| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "configuration_conflict" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "configuration state changed or is busy" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `422 Unprocessable Entity`
+##### `422 无法处理`
 
-JSON is valid but violates client, IPv4, or configuration semantics.
+JSON 格式有效，但违反客户端、IPv4 或配置语义规则。
 
 内容类型：`application/json`
 
@@ -5354,14 +5354,14 @@ JSON is valid but violates client, IPv4, or configuration semantics.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "invalid_client" | - |
-| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "invalid_client" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "client request is not valid for the current state" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `500 Internal Server Error`
+##### `500 服务器内部错误`
 
-Unclassified internal failure with no implementation details exposed.
+未分类的内部错误，不会暴露实现细节。
 
 内容类型：`application/json`
 
@@ -5381,14 +5381,14 @@ Unclassified internal failure with no implementation details exposed.
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "internal_error" | - |
-| `error.message` | `string` | 是 | 示例: "request could not be completed" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "internal_error" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "request could not be completed" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
-##### `503 Service Unavailable`
+##### `503 服务不可用`
 
-Authentication storage, PKI, OpenVPN, broker, supervisor, or another required dependency is unavailable.
+认证存储、PKI、OpenVPN、broker、supervisor 或其他必要依赖不可用。
 
 内容类型：`application/json`
 
@@ -5408,10 +5408,10 @@ Authentication storage, PKI, OpenVPN, broker, supervisor, or another required de
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `error` | `object` | 是 | - | - |
-| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | - |
-| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | - |
-| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | - |
+| `error` | `object` | 是 | - | 可供程序读取的 API 错误详情。 |
+| `error.kind` | `string` | 是 | 示例: "runtime_unavailable" | 稳定且可供程序读取的错误类型。 |
+| `error.message` | `string` | 是 | 示例: "OpenVPN runtime is unavailable" | 可安全展示的错误消息。 |
+| `error.request_id` | `string` | 是 | 格式: uuid；示例: "33ba813e-fc63-4af8-b338-7f7486f82202" | 用于关联请求与服务器日志的 UUID。 |
 
 ## 配置工作流
 
