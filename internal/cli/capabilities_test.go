@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 )
 
 type capabilityRunner struct {
@@ -30,10 +33,20 @@ func capabilitiesContractPath() string {
 	return filepath.Join("..", "..", "compatibility", "contract.json")
 }
 
+func supportedOpenVPNVersion(t *testing.T) string {
+	t.Helper()
+	contract, err := compatibility.Load(capabilitiesContractPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return contract.SupportedOpenVPNVersions[0]
+}
+
 func TestRuntimeCapabilitiesJSON(t *testing.T) {
 	var stdout, stderr bytes.Buffer
+	version := supportedOpenVPNVersion(t)
 	runner := capabilityRunner{
-		version: []byte("OpenVPN 2.7.5 test-build\n"),
+		version: []byte(fmt.Sprintf("OpenVPN %s test-build\n", version)),
 		help:    []byte("--tls-crypt key\n--data-ciphers list\n--crl-verify crl\n--topology t: 'subnet'\n"),
 	}
 	code := runRuntimeCapabilitiesWith([]string{"--json"}, &stdout, &stderr, capabilitiesContractPath(), "openvpn", runner)
@@ -44,19 +57,20 @@ func TestRuntimeCapabilitiesJSON(t *testing.T) {
 
 func TestRuntimeCapabilitiesHumanOutput(t *testing.T) {
 	var stdout, stderr bytes.Buffer
+	version := supportedOpenVPNVersion(t)
 	runner := capabilityRunner{
-		version: []byte("OpenVPN 2.7.5 test-build\n"),
+		version: []byte(fmt.Sprintf("OpenVPN %s test-build\n", version)),
 		help:    []byte("--tls-crypt key\n--data-ciphers list\n--crl-verify crl\n--topology t: 'subnet'\n"),
 	}
 	code := runRuntimeCapabilitiesWith(nil, &stdout, &stderr, capabilitiesContractPath(), "openvpn", runner)
-	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "OpenVPN: 2.7.5 (verified)") || !strings.Contains(stdout.String(), "feature topology-subnet: true") {
+	if code != 0 || stderr.Len() != 0 || !strings.Contains(stdout.String(), "OpenVPN: "+version+" (verified)") || !strings.Contains(stdout.String(), "feature topology-subnet: true") {
 		t.Fatalf("capabilities code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }
 
 func TestRuntimeCapabilitiesPolicyAndDependencyErrors(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	runner := capabilityRunner{version: []byte("OpenVPN 2.7.6 test-build\n")}
+	runner := capabilityRunner{version: []byte("OpenVPN 99.0.0 test-build\n")}
 	code := runRuntimeCapabilitiesWith([]string{"--json"}, &stdout, &stderr, capabilitiesContractPath(), "openvpn", runner)
 	if code != 78 || !strings.Contains(stdout.String(), `"supported_version":false`) || !strings.Contains(stderr.String(), `"kind":"unsupported_openvpn"`) {
 		t.Fatalf("unsupported capabilities code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())

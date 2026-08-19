@@ -6,6 +6,7 @@ SCRIPT="$ROOT_DIR/scripts/update-openvpn.sh"
 TMP_DIR="$(mktemp -d)"
 FAKE_BIN="$TMP_DIR/bin"
 VERSIONS_ENV="$TMP_DIR/versions.env"
+COMPATIBILITY_FILE="$TMP_DIR/contract.json"
 CURL_LOG="$TMP_DIR/curl.log"
 
 cleanup() {
@@ -44,16 +45,26 @@ OPENVPN_SOURCE_SHA256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 EASYRSA_VERSION=system
 OPENVPN_CANDIDATE_RANGE=">=2.7.0 <2.8.0"
 EOF_VERSIONS
+cat >"$COMPATIBILITY_FILE" <<'EOF_COMPATIBILITY'
+{
+  "version": 1,
+  "supported_openvpn_versions": [
+    "2.7.5"
+  ]
+}
+EOF_COMPATIBILITY
 
 OVPN_VERSIONS_ENV="$VERSIONS_ENV" \
+  OVPN_COMPATIBILITY_FILE="$COMPATIBILITY_FILE" \
   OPENVPN_UPDATE_CURL="$FAKE_BIN/curl" \
   OVPN_TEST_CURL_LOG="$CURL_LOG" \
   "$SCRIPT" 2.7.6 >"$TMP_DIR/update.out"
 expected_sha="$(printf '%s\n' 'official test archive' | sha256sum | awk '{print $1}')"
 grep -Fqx 'OPENVPN_VERSION=2.7.6' "$VERSIONS_ENV"
 grep -Fqx "OPENVPN_SOURCE_SHA256=$expected_sha" "$VERSIONS_ENV"
+test "$(jq -r '.supported_openvpn_versions | join(",")' "$COMPATIBILITY_FILE")" = '2.7.6'
 grep -Fqx 'https://github.com/OpenVPN/openvpn/releases/download/v2.7.6/openvpn-2.7.6.tar.gz' "$CURL_LOG"
-grep -Fq 'updated OpenVPN source to 2.7.6' "$TMP_DIR/update.out"
+grep -Fq 'updated OpenVPN source and compatibility contract to 2.7.6' "$TMP_DIR/update.out"
 
 cat >"$FAKE_BIN/fail-curl" <<'FAIL_CURL'
 #!/usr/bin/env bash
@@ -61,8 +72,10 @@ exit 99
 FAIL_CURL
 chmod +x "$FAKE_BIN/fail-curl"
 provided_sha=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-OVPN_VERSIONS_ENV="$VERSIONS_ENV" OPENVPN_UPDATE_CURL="$FAKE_BIN/fail-curl" "$SCRIPT" 2.7.7 "$provided_sha"
+OVPN_VERSIONS_ENV="$VERSIONS_ENV" OVPN_COMPATIBILITY_FILE="$COMPATIBILITY_FILE" \
+  OPENVPN_UPDATE_CURL="$FAKE_BIN/fail-curl" "$SCRIPT" 2.7.7 "$provided_sha"
 grep -Fqx 'OPENVPN_VERSION=2.7.7' "$VERSIONS_ENV"
 grep -Fqx "OPENVPN_SOURCE_SHA256=$provided_sha" "$VERSIONS_ENV"
+test "$(jq -r '.supported_openvpn_versions | join(",")' "$COMPATIBILITY_FILE")" = '2.7.7'
 
 printf 'update OpenVPN smoke passed\n'

@@ -3,6 +3,7 @@ package compatibility_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -35,8 +36,9 @@ func mustContract(t *testing.T) compatibility.Contract {
 }
 
 func TestInspectSupportedRuntime(t *testing.T) {
-	capabilities, err := compatibility.Inspect(context.Background(), mustContract(t), "openvpn", fakeRunner{
-		version: []byte("OpenVPN 2.7.5 test-build\n"),
+	contract := mustContract(t)
+	capabilities, err := compatibility.Inspect(context.Background(), contract, "openvpn", fakeRunner{
+		version: []byte(fmt.Sprintf("OpenVPN %s test-build\n", contract.SupportedOpenVPNVersions[0])),
 		help:    []byte("--tls-crypt key\n--data-ciphers list\n--crl-verify crl\n--topology t: 'subnet'\n"),
 	})
 	if err != nil {
@@ -49,7 +51,7 @@ func TestInspectSupportedRuntime(t *testing.T) {
 
 func TestInspectReportsUnsupportedVersionWithoutAdapter(t *testing.T) {
 	capabilities, err := compatibility.Inspect(context.Background(), mustContract(t), "openvpn", fakeRunner{
-		version: []byte("OpenVPN 2.7.6 test-build\n"),
+		version: []byte("OpenVPN 99.0.0 test-build\n"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -65,8 +67,9 @@ func TestInspectReportsUnsupportedVersionWithoutAdapter(t *testing.T) {
 }
 
 func TestInspectReportsMissingFeature(t *testing.T) {
-	capabilities, err := compatibility.Inspect(context.Background(), mustContract(t), "openvpn", fakeRunner{
-		version: []byte("OpenVPN 2.7.5 test-build\n"),
+	contract := mustContract(t)
+	capabilities, err := compatibility.Inspect(context.Background(), contract, "openvpn", fakeRunner{
+		version: []byte(fmt.Sprintf("OpenVPN %s test-build\n", contract.SupportedOpenVPNVersions[0])),
 		help:    []byte("--data-ciphers list\n--crl-verify crl\n--topology t: 'subnet'\n"),
 	})
 	if err != nil {

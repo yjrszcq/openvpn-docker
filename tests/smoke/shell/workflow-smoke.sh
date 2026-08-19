@@ -87,6 +87,7 @@ fi
 grep -Fq 'schedule:' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'scripts/update-openvpn.sh' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'scripts/verify-release-metadata.sh' "$WORKFLOWS/upstream-check.yml"
+grep -Fq 'git add versions.env compatibility/contract.json' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'OPENVPN_CANDIDATE_RANGE' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'in_range=true' "$WORKFLOWS/upstream-check.yml"
 grep -Fq 'gh pr create' "$WORKFLOWS/upstream-check.yml"

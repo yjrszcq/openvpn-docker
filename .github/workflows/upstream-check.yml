@@ -65,11 +65,11 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git checkout -b "$branch"
-          git add versions.env
+          git add versions.env compatibility/contract.json
           git commit -m "build: update OpenVPN to $target"
           git push origin "$branch"
           gh pr create \
             --base dev \
             --head "$branch" \
             --title "build: update OpenVPN to $target" \
-            --body "Updates versions.env with the official OpenVPN $target release and its SHA-256. Candidate and compatibility workflows must pass before promotion."
+            --body "Updates versions.env and the compatibility contract for the official OpenVPN $target release and its SHA-256. Candidate and compatibility workflows must pass before promotion."
