@@ -98,6 +98,11 @@ curl -fsS "$api_url/docs/openapi.json" >"$WORK_DIR/openapi.json"
 grep -Fq '<title>OpenVPN Docker API Reference</title>' "$WORK_DIR/docs.html"
 grep -Fq '/docs/app.js' "$WORK_DIR/docs.html"
 grep -Fq '/docs/i18n.js' "$WORK_DIR/docs.html"
+grep -Fq 'id="configuration-table"' "$WORK_DIR/docs.html"
+if grep -Fq 'Frontend reference' "$WORK_DIR/docs.html"; then
+  printf 'REST API smoke failed: documentation still contains the removed frontend-reference eyebrow\n' >&2
+  exit 1
+fi
 grep -Fq 'window.apiDocsI18n' "$WORK_DIR/docs-i18n.js"
 grep -Fq 'title: "API 接口文档"' "$WORK_DIR/docs-i18n.js"
 grep -Fq 'title: "API Reference"' "$WORK_DIR/docs-i18n.js"
@@ -106,6 +111,7 @@ grep -Fq '0.0.0.0:<unused-port>' "$WORK_DIR/docs-i18n.js"
 grep -Fq 'vpn-admin.example.com,192.0.2.10:3000' "$WORK_DIR/docs-i18n.js"
 grep -Fq '单独填写 *' "$WORK_DIR/docs-i18n.js"
 grep -Fq 'Use * alone' "$WORK_DIR/docs-i18n.js"
+grep -Fq 'configurationHeaders: ["变量", "默认值", "可填写值", "说明"]' "$WORK_DIR/docs-i18n.js"
 grep -Fq 'navigator.language' "$WORK_DIR/docs.js"
 grep -Fq 'setLanguage(language, true)' "$WORK_DIR/docs.js"
 grep -Fq 'renderOperation' "$WORK_DIR/docs.js"

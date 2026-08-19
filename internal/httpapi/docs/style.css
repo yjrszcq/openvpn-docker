@@ -109,9 +109,8 @@ code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospac
 .nav-path { font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 main { max-width: 1440px; padding: 52px clamp(24px, 5vw, 76px) 120px; width: 100%; }
 .intro { border-bottom: 1px solid var(--border); padding-bottom: 38px; }
-.eyebrow { color: var(--accent); font-size: 12px; font-weight: 750; margin: 0 0 8px; text-transform: uppercase; }
 h1 { font-size: 34px; line-height: 1.2; margin: 0; }
-.intro > p:not(.eyebrow) { color: var(--muted); max-width: 720px; }
+.intro > p { color: var(--muted); max-width: 720px; }
 .base-info { align-items: center; display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 22px; }
 .base-info span { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; }
 .base-info code { background: #e9edf0; border-radius: 4px; padding: 3px 7px; }
@@ -158,6 +157,13 @@ h1 { font-size: 34px; line-height: 1.2; margin: 0; }
 .parameter-table th:nth-child(5) { width: 24%; }
 .parameter-table th:nth-child(6) { width: 34%; }
 .parameter-table code { color: #263746; font-size: 11px; white-space: pre-wrap; }
+.configuration-table-wrap { margin: 24px 0 0; }
+.configuration-table { min-width: 720px; }
+.configuration-table th:nth-child(1) { width: 22%; }
+.configuration-table th:nth-child(2) { width: 10%; }
+.configuration-table th:nth-child(3) { width: 28%; }
+.configuration-table th:nth-child(4) { width: 40%; }
+.configuration-table td:nth-child(3) { white-space: pre-line; }
 .code-block { background: var(--code); border-radius: 6px; color: #edf3f7; margin: 0 0 16px; max-height: 430px; overflow: auto; padding: 16px; white-space: pre; }
 .code-label { align-items: center; color: var(--muted); display: flex; font-size: 11px; font-weight: 700; justify-content: space-between; margin: 16px 0 7px; text-transform: uppercase; }
 .schema { background: #fff; border: 1px solid var(--border); border-radius: 6px; color: #34414c; font-size: 12px; margin: 0 0 16px; max-height: 300px; overflow: auto; padding: 14px; white-space: pre-wrap; }

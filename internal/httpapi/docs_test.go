@@ -86,10 +86,13 @@ func TestDocumentationSupportsCompleteChineseAndEnglishRendering(t *testing.T) {
 		t.Fatal(err)
 	}
 	page := string(index)
-	for _, expected := range []string{`data-language="zh"`, `data-language="en"`, `/docs/i18n.js`} {
+	for _, expected := range []string{`data-language="zh"`, `data-language="en"`, `/docs/i18n.js`, `id="configuration-table"`} {
 		if !strings.Contains(page, expected) {
 			t.Fatalf("documentation index does not contain %q", expected)
 		}
+	}
+	if strings.Contains(page, "Frontend reference") {
+		t.Fatal("documentation index still contains the removed frontend-reference eyebrow")
 	}
 
 	applicationBytes, err := documentationFiles.ReadFile("docs/app.js")
@@ -118,10 +121,13 @@ func TestDocumentationSupportsCompleteChineseAndEnglishRendering(t *testing.T) {
 		t.Fatal(err)
 	}
 	translationSource := string(translationBytes)
-	for _, expected := range []string{`title: "API 接口文档"`, `title: "API Reference"`, `tableHeaders: ["字段"`, `tableHeaders: ["Field"`, `127.0.0.1:<空闲端口>`, `0.0.0.0:<unused-port>`, `vpn-admin.example.com,192.0.2.10:3000`, `单独填写 *`, `Use * alone`} {
+	for _, expected := range []string{`title: "API 接口文档"`, `title: "API Reference"`, `tableHeaders: ["字段"`, `tableHeaders: ["Field"`, `configurationHeaders: ["变量", "默认值", "可填写值", "说明"]`, `configurationHeaders: ["Variable", "Default", "Accepted values", "Description"]`, `127.0.0.1:<空闲端口>`, `0.0.0.0:<unused-port>`, `vpn-admin.example.com,192.0.2.10:3000`, `单独填写 *`, `Use * alone`} {
 		if !strings.Contains(translationSource, expected) {
 			t.Fatalf("documentation translations do not contain %q", expected)
 		}
+	}
+	if strings.Contains(translationSource, "前端开发参考") || strings.Contains(translationSource, "Frontend reference") {
+		t.Fatal("documentation translations still contain the removed frontend-reference eyebrow")
 	}
 
 	var contract any

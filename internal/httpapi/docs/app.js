@@ -425,12 +425,18 @@
     document.getElementById("search").placeholder = text("searchPlaceholder");
     document.getElementById("sidebar").setAttribute("aria-label", text("navigationLabel"));
     document.getElementById("interfaces-label").textContent = text("interfaces");
-    document.getElementById("eyebrow").textContent = text("eyebrow");
     document.getElementById("page-title").textContent = text("title");
     document.getElementById("intro-before").textContent = text("introBefore");
     document.getElementById("intro-after").textContent = text("introAfter");
-    document.getElementById("listen-guidance").textContent = text("listenGuidance");
-    document.getElementById("cors-guidance").textContent = text("corsGuidance");
+    document.querySelectorAll("#configuration-table th").forEach((header, index) => {
+      header.textContent = text("configurationHeaders")[index];
+    });
+    document.getElementById("listen-default").textContent = text("emptyValue");
+    document.getElementById("listen-values").textContent = text("listenValues");
+    document.getElementById("listen-description").textContent = text("listenDescription");
+    document.getElementById("cors-default").textContent = text("emptyValue");
+    document.getElementById("cors-values").textContent = text("corsValues");
+    document.getElementById("cors-description").textContent = text("corsDescription");
     document.getElementById("base-path-label").textContent = text("basePath");
     document.getElementById("format-label").textContent = text("format");
     const loading = document.getElementById("loading");
