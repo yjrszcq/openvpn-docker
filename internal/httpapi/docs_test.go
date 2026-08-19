@@ -86,7 +86,7 @@ func TestDocumentationSupportsCompleteChineseAndEnglishRendering(t *testing.T) {
 		t.Fatal(err)
 	}
 	page := string(index)
-	for _, expected := range []string{`data-language="zh"`, `data-language="en"`, `/docs/i18n.js`, `id="configuration-table"`} {
+	for _, expected := range []string{`data-language="zh"`, `data-language="en"`, `/docs/i18n.js`, `id="configuration-table"`, `id="api-key-table"`, `docker exec openvpn ovpn api key create frontend-production`, `docker exec openvpn ovpn api key list`, `docker exec openvpn ovpn api key delete frontend-production --yes`} {
 		if !strings.Contains(page, expected) {
 			t.Fatalf("documentation index does not contain %q", expected)
 		}
@@ -121,7 +121,7 @@ func TestDocumentationSupportsCompleteChineseAndEnglishRendering(t *testing.T) {
 		t.Fatal(err)
 	}
 	translationSource := string(translationBytes)
-	for _, expected := range []string{`title: "API 接口文档"`, `title: "API Reference"`, `tableHeaders: ["字段"`, `tableHeaders: ["Field"`, `configurationHeaders: ["变量", "默认值", "可填写值", "说明"]`, `configurationHeaders: ["Variable", "Default", "Accepted values", "Description"]`, `127.0.0.1:<空闲端口>`, `0.0.0.0:<unused-port>`, `vpn-admin.example.com,192.0.2.10:3000`, `单独填写 *`, `Use * alone`} {
+	for _, expected := range []string{`title: "API 接口文档"`, `title: "API Reference"`, `tableHeaders: ["字段"`, `tableHeaders: ["Field"`, `configurationHeaders: ["变量", "默认值", "可填写值", "说明"]`, `configurationHeaders: ["Variable", "Default", "Accepted values", "Description"]`, `apiKeyHeaders: ["命令", "说明"]`, `apiKeyHeaders: ["Command", "Description"]`, `完整 secret 只会显示一次`, `prints its complete secret once`, `127.0.0.1:<空闲端口>`, `0.0.0.0:<unused-port>`, `vpn-admin.example.com,192.0.2.10:3000`, `单独填写 *`, `Use * alone`} {
 		if !strings.Contains(translationSource, expected) {
 			t.Fatalf("documentation translations do not contain %q", expected)
 		}

@@ -164,6 +164,11 @@ h1 { font-size: 34px; line-height: 1.2; margin: 0; }
 .configuration-table th:nth-child(3) { width: 28%; }
 .configuration-table th:nth-child(4) { width: 40%; }
 .configuration-table td:nth-child(3) { white-space: pre-line; }
+.intro-section-title { color: #263746; font-size: 16px; margin: 28px 0 10px; }
+.api-key-table-wrap { margin-bottom: 0; }
+.api-key-table { min-width: 760px; }
+.api-key-table th:nth-child(1) { width: 64%; }
+.api-key-table th:nth-child(2) { width: 36%; }
 .code-block { background: var(--code); border-radius: 6px; color: #edf3f7; margin: 0 0 16px; max-height: 430px; overflow: auto; padding: 16px; white-space: pre; }
 .code-label { align-items: center; color: var(--muted); display: flex; font-size: 11px; font-weight: 700; justify-content: space-between; margin: 16px 0 7px; text-transform: uppercase; }
 .schema { background: #fff; border: 1px solid var(--border); border-radius: 6px; color: #34414c; font-size: 12px; margin: 0 0 16px; max-height: 300px; overflow: auto; padding: 14px; white-space: pre-wrap; }

@@ -437,6 +437,14 @@
     document.getElementById("cors-default").textContent = text("emptyValue");
     document.getElementById("cors-values").textContent = text("corsValues");
     document.getElementById("cors-description").textContent = text("corsDescription");
+    document.getElementById("api-key-title").textContent = text("apiKeyTitle");
+    document.querySelectorAll("#api-key-table th").forEach((header, index) => {
+      header.textContent = text("apiKeyHeaders")[index];
+    });
+    document.getElementById("api-key-create-description").textContent = text("apiKeyCreateDescription");
+    document.getElementById("api-key-output-description").textContent = text("apiKeyOutputDescription");
+    document.getElementById("api-key-list-description").textContent = text("apiKeyListDescription");
+    document.getElementById("api-key-delete-description").textContent = text("apiKeyDeleteDescription");
     document.getElementById("base-path-label").textContent = text("basePath");
     document.getElementById("format-label").textContent = text("format");
     const loading = document.getElementById("loading");
