@@ -245,14 +245,7 @@ func runServerRun(args []string, stdout, stderr io.Writer) int {
 	} else if digest, digestErr := configservice.Digest(desired); digestErr != nil || digest != instance.Applied.Digest {
 		fmt.Fprintf(stderr, "ovpn: warning: declarative configuration differs from applied revision %d; using the applied snapshot\n", instance.Applied.Revision)
 	}
-	openvpnBinary := environmentOr("OVPN_OPENVPN_BIN", "openvpn")
-	brokerBinary := environmentOr("OVPN_BROKER_BIN", "ovpn-broker")
-	apiBinary := ""
-	dependencies := []string{openvpnBinary, brokerBinary}
-	if os.Getenv("OVPN_API_LISTEN") != "" {
-		apiBinary = environmentOr("OVPN_API_BIN", "ovpn-api")
-		dependencies = append(dependencies, apiBinary)
-	}
+	openvpnBinary, brokerBinary, apiBinary, dependencies := runtimeDependencyBinaries()
 	for _, dependency := range dependencies {
 		if _, err := exec.LookPath(dependency); err != nil {
 			return writeError(stderr, apperror.Wrap(apperror.ExitUnavailable, "dependency_unavailable", "runtime dependency is unavailable", err))
@@ -274,6 +267,17 @@ func runServerRun(args []string, stdout, stderr io.Writer) int {
 		return writeError(stderr, apperror.Wrap(apperror.ExitFailure, "runtime_failed", "OpenVPN runtime failed", err))
 	}
 	return int(apperror.ExitSuccess)
+}
+
+func runtimeDependencyBinaries() (openvpnBinary, brokerBinary, apiBinary string, dependencies []string) {
+	openvpnBinary = environmentOr("OVPN_OPENVPN_BIN", "openvpn")
+	brokerBinary = environmentOr("OVPN_BROKER_BIN", "ovpn-broker")
+	dependencies = []string{openvpnBinary, brokerBinary}
+	if os.Getenv("OVPN_API_LISTEN") != "" {
+		apiBinary = environmentOr("OVPN_API_BIN", "ovpn-api")
+		dependencies = append(dependencies, apiBinary)
+	}
+	return openvpnBinary, brokerBinary, apiBinary, dependencies
 }
 
 // RunEntrypoint preserves direct OpenVPN/shell execution while making an empty
