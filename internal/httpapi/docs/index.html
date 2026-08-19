@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>OpenVPN Docker API Reference</title>
+  <link rel="stylesheet" href="/docs/style.css">
+  <script src="/docs/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/docs/" aria-label="OpenVPN Docker API documentation">
+      <span class="brand-mark" aria-hidden="true">O</span>
+      <span><strong>OpenVPN Docker</strong><small>REST API v1</small></span>
+    </a>
+    <div class="top-actions">
+      <label class="search"><span>搜索接口</span><input id="search" type="search" placeholder="路径、方法或名称" autocomplete="off"></label>
+      <a class="spec-link" href="/docs/openapi.json" download>OpenAPI JSON</a>
+    </div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar" aria-label="接口导航">
+      <div class="sidebar-title"><span>接口</span><span id="operation-count">...</span></div>
+      <nav id="navigation"></nav>
+    </aside>
+    <main id="content">
+      <section class="intro">
+        <p class="eyebrow">Frontend reference</p>
+        <h1>API 接口文档</h1>
+        <p>每条接口独立列出完整请求、返回内容和错误状态。除 <code>/healthz</code> 外，请求需使用 Bearer API key。</p>
+        <div class="base-info"><span>Base path</span><code>/api/v1</code><span>Format</span><code>application/json</code></div>
+      </section>
+      <div id="loading" class="loading" role="status">正在加载接口定义...</div>
+      <div id="operations"></div>
+    </main>
+  </div>
+</body>
+</html>

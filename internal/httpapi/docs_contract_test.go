@@ -1,19 +1,15 @@
 package httpapi
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 )
 
-//go:embed docs/openapi.json
-var openAPIContract []byte
-
 func TestOpenAPIContractCoversImplementedOperations(t *testing.T) {
 	var document map[string]any
-	if err := json.Unmarshal(openAPIContract, &document); err != nil {
+	if err := json.Unmarshal(openAPIDocument(t), &document); err != nil {
 		t.Fatalf("parse OpenAPI contract: %v", err)
 	}
 	if document["openapi"] != "3.1.0" {
@@ -86,7 +82,7 @@ func TestOpenAPIContractCoversImplementedOperations(t *testing.T) {
 
 func TestOpenAPIMutationsDocumentRequestBodies(t *testing.T) {
 	var document map[string]any
-	if err := json.Unmarshal(openAPIContract, &document); err != nil {
+	if err := json.Unmarshal(openAPIDocument(t), &document); err != nil {
 		t.Fatal(err)
 	}
 	paths := object(t, document["paths"], "paths")
@@ -110,6 +106,15 @@ func TestOpenAPIMutationsDocumentRequestBodies(t *testing.T) {
 			t.Fatalf("%s lacks request schema or example", operation)
 		}
 	}
+}
+
+func openAPIDocument(t *testing.T) []byte {
+	t.Helper()
+	content, err := documentationFiles.ReadFile("docs/openapi.json")
+	if err != nil {
+		t.Fatalf("read embedded OpenAPI document: %v", err)
+	}
+	return content
 }
 
 func object(t *testing.T, value any, label string) map[string]any {

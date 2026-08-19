@@ -166,6 +166,9 @@ func (handler *handler) ServeHTTP(response http.ResponseWriter, request *http.Re
 	response.Header().Set("X-Content-Type-Options", "nosniff")
 	response.Header().Set("Cache-Control", "no-store")
 
+	if handler.routeDocumentation(response, request, requestID) {
+		return
+	}
 	if request.URL.Path == "/healthz" {
 		handler.health(response, request, requestID)
 		return
