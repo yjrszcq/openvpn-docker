@@ -105,5 +105,17 @@ grep -Fq 'DOCKERHUB_IMAGE: openvpn' "$WORKFLOWS/release.yml"
 grep -Fq 'secrets.DOCKER_TOKEN' "$WORKFLOWS/release.yml"
 grep -Fq "GHCR_TOKEN: \${{ github.token }}" "$WORKFLOWS/release.yml"
 # shellcheck disable=SC2016 # This asserts the literal shell assignment in the workflow.
-grep -Fq 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"' "$WORKFLOWS/release.yml"
+test "$(grep -Fc 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"' "$WORKFLOWS/release.yml")" -eq 2
+# shellcheck disable=SC2016 # This asserts the literal shell assignment in the workflow.
+test "$(grep -Fc 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:latest"' "$WORKFLOWS/release.yml")" -eq 2
+for publish_block in \
+  "$(sed -n '/^  publish-same-branch:/,/^  publish-cross-branch:/p' "$WORKFLOWS/release.yml")" \
+  "$(sed -n '/^  publish-cross-branch:/,$p' "$WORKFLOWS/release.yml")"; do
+  version_line="$(grep -nF 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"' <<<"$publish_block" | cut -d: -f1)"
+  latest_line="$(grep -nF 'target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:latest"' <<<"$publish_block" | cut -d: -f1)"
+  if [ -z "$version_line" ] || [ -z "$latest_line" ] || [ "$version_line" -ge "$latest_line" ]; then
+    echo 'Docker Hub latest tag must be published after the OpenVPN version tag' >&2
+    exit 1
+  fi
+done
 printf 'workflow smoke passed\n'

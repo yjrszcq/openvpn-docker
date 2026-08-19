@@ -132,6 +132,14 @@ jobs:
           source_image="ghcr.io/${GITHUB_REPOSITORY,,}:ovpn$OPENVPN_VERSION"
           target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"
           docker buildx imagetools create --tag "$target_image" "$source_image"
+      - name: Publish latest tag to Docker Hub
+        run: |
+          set -a
+          . ./versions.env
+          set +a
+          source_image="ghcr.io/${GITHUB_REPOSITORY,,}:ovpn$OPENVPN_VERSION"
+          target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:latest"
+          docker buildx imagetools create --tag "$target_image" "$source_image"
 
   publish-cross-branch:
     name: Promote cross-branch candidate after approval
@@ -192,4 +200,12 @@ jobs:
           set +a
           source_image="ghcr.io/${GITHUB_REPOSITORY,,}:ovpn$OPENVPN_VERSION"
           target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:$OPENVPN_VERSION"
+          docker buildx imagetools create --tag "$target_image" "$source_image"
+      - name: Publish latest tag to Docker Hub
+        run: |
+          set -a
+          . ./versions.env
+          set +a
+          source_image="ghcr.io/${GITHUB_REPOSITORY,,}:ovpn$OPENVPN_VERSION"
+          target_image="$DOCKERHUB_USERNAME/$DOCKERHUB_IMAGE:latest"
           docker buildx imagetools create --tag "$target_image" "$source_image"
