@@ -16,11 +16,16 @@ concurrency:
 jobs:
   discover:
     runs-on: ubuntu-latest
+    outputs:
+      pr_created: ${{ steps.discover.outputs.pr_created }}
+      pr_url: ${{ steps.discover.outputs.pr_url }}
+      version: ${{ steps.discover.outputs.version }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Discover and propose the latest official OpenVPN release
+      - id: discover
+        name: Discover and propose the latest official OpenVPN release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -68,24 +73,32 @@ jobs:
           git add versions.env compatibility/contract.json
           git commit -m "build: update OpenVPN to $target"
           git push origin "$branch"
-          gh pr create \
-            --base dev \
-            --head "$branch" \
-            --title "build: update OpenVPN to $target" \
-            --body "Updates versions.env and the compatibility contract for the official OpenVPN $target release and its SHA-256. Candidate and compatibility workflows must pass before promotion."
+          pr_url="$(
+            gh pr create \
+              --base dev \
+              --head "$branch" \
+              --title "build: update OpenVPN to $target" \
+              --body "Updates versions.env and the compatibility contract for the official OpenVPN $target release and its SHA-256. Candidate and compatibility workflows must pass before promotion."
+          )"
+          {
+            echo 'pr_created=true'
+            echo "pr_url=$pr_url"
+            echo "version=$target"
+          } >> "$GITHUB_OUTPUT"
 
   notify:
     name: Send Gotify upstream-check notification
     needs: discover
-    if: always()
+    if: needs.discover.outputs.pr_created == 'true'
     uses: yjrszcq/github-workflows/.github/workflows/gotify-notify.yml@main
     with:
-      title: ${{ format('{0} 上游版本检查', github.repository) }}
+      title: ${{ format('{0} 发现 OpenVPN {1}', github.repository, needs.discover.outputs.version) }}
       message: |
-        检查结果：${{ needs.discover.result }}
-        触发方式：${{ github.event_name }}
+        已成功创建新版本更新 PR。
+        OpenVPN 版本：${{ needs.discover.outputs.version }}
+        PR 地址：${{ needs.discover.outputs.pr_url }}
         运行详情：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      priority: ${{ needs.discover.result == 'failure' && 8 || 5 }}
+      priority: 5
     secrets:
       gotify_url: ${{ secrets.GOTIFY_URL }}
       gotify_token: ${{ secrets.GOTIFY_TOKEN }}
