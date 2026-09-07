@@ -1,7 +1,7 @@
 {
   "version": 1,
   "supported_openvpn_versions": [
-    "2.7.6"
+    "2.7.7"
   ],
   "adapter": {
     "name": "openvpn-2.7",
@@ -11,19 +11,28 @@
   "required_features": [
     {
       "name": "tls-crypt",
-      "help_contains": ["--tls-crypt key"]
+      "help_contains": [
+        "--tls-crypt key"
+      ]
     },
     {
       "name": "data-ciphers",
-      "help_contains": ["--data-ciphers list"]
+      "help_contains": [
+        "--data-ciphers list"
+      ]
     },
     {
       "name": "crl-verify",
-      "help_contains": ["--crl-verify crl"]
+      "help_contains": [
+        "--crl-verify crl"
+      ]
     },
     {
       "name": "topology-subnet",
-      "help_contains": ["--topology t", "'subnet'"]
+      "help_contains": [
+        "--topology t",
+        "'subnet'"
+      ]
     }
   ]
 }

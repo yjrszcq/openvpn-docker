@@ -194,21 +194,21 @@ Response example:
 
 ```json
 {
-  "version": "4.1.0",
-  "data_schema": 4,
+  "version": "<image-version>",
+  "data_schema": 0,
   "commit": "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224",
   "build_date": "2026-08-19T09:45:40Z",
-  "go_version": "go1.26.5",
+  "go_version": "go<version>",
   "dependencies": {
-    "sqlite": "github.com/mattn/go-sqlite3 v1.14.48",
-    "yaml": "go.yaml.in/yaml/v3 v3.0.4"
+    "sqlite": "github.com/mattn/go-sqlite3 <version>",
+    "yaml": "go.yaml.in/yaml/v3 <version>"
   },
   "compatibility": {
     "contract_version": 1,
-    "adapter": "openvpn-2.7",
-    "template_family": "openvpn-2.7",
+    "adapter": "openvpn-<series>",
+    "template_family": "openvpn-<series>",
     "supported_openvpn_versions": [
-      "2.7.6"
+      "<openvpn-version>"
     ]
   }
 }
@@ -218,19 +218,19 @@ Response fields:
 
 | Field | Type | Required | Format / example / constraints | Purpose |
 |---|---|---|---|---|
-| `version` | `string` | yes | example: "4.1.0" | OpenVPN Docker release version. |
-| `data_schema` | `integer` | yes | example: 4 | Authoritative data schema version. |
+| `version` | `string` | yes | format: `X.Y.Z` | OpenVPN Docker release version. |
+| `data_schema` | `integer` | yes | positive integer | Authoritative data schema version. |
 | `commit` | `string` | yes | example: "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224" | Source control revision used to build the binary. |
 | `build_date` | `string` | yes | example: "2026-08-19T09:45:40Z" | UTC timestamp when the binary was built. |
-| `go_version` | `string` | yes | example: "go1.26.5" | Go toolchain version used to build the binary. |
+| `go_version` | `string` | yes | format: `goX.Y.Z` | Go toolchain version used to build the binary. |
 | `dependencies` | `object` | yes | - | Build-time library dependency versions. |
-| `dependencies.sqlite` | `string` | yes | example: "github.com/mattn/go-sqlite3 v1.14.48" | SQLite driver module and version. |
-| `dependencies.yaml` | `string` | yes | example: "go.yaml.in/yaml/v3 v3.0.4" | YAML parser module and version. |
+| `dependencies.sqlite` | `string` | yes | format: module and version | SQLite driver module and version. |
+| `dependencies.yaml` | `string` | yes | format: module and version | YAML parser module and version. |
 | `compatibility` | `object` | yes | - | Runtime compatibility contract and supported versions. |
 | `compatibility.contract_version` | `integer` | yes | example: 1 | Compatibility contract schema version. |
 | `compatibility.adapter` | `string` | yes | example: "openvpn-2.7" | Compatibility adapter selected for this runtime. |
 | `compatibility.template_family` | `string` | yes | example: "openvpn-2.7" | Template family selected for generated OpenVPN files. |
-| `compatibility.supported_openvpn_versions` | `string[]` | yes | example: ["2.7.6"] | OpenVPN versions accepted by this compatibility contract. |
+| `compatibility.supported_openvpn_versions` | `string[]` | yes | format: `["X.Y.Z"]` | OpenVPN versions accepted by this compatibility contract. |
 
 ##### `401 Unauthorized`
 

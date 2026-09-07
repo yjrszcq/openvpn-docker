@@ -11,13 +11,6 @@ git -C "$ROOT_DIR" archive HEAD | tar -x -C "$FIXTURE"
 tracked_files=(
   versions.env
   internal/buildinfo/info.go
-  internal/cli/run_test.go
-  tests/smoke/shell/release-metadata-smoke.sh
-  docs/en/image-update-policy.md
-  docs/cn/image-update-policy.md
-  internal/httpapi/docs/openapi.json
-  docs/en/v4/rest-api.md
-  docs/cn/v4/rest-api.md
 )
 for file in "${tracked_files[@]}"; do
   cp "$ROOT_DIR/$file" "$FIXTURE/$file"
@@ -36,7 +29,7 @@ grep -Fqx "image version is already $current_version; metadata is consistent" "$
 
 before="$(git -C "$FIXTURE" hash-object internal/buildinfo/info.go)"
 set +e
-"$SCRIPT" 4.0 >"$TMP_DIR/invalid.out" 2>"$TMP_DIR/invalid.err"
+"$SCRIPT" invalid >"$TMP_DIR/invalid.out" 2>"$TMP_DIR/invalid.err"
 status=$?
 set -e
 test "$status" -eq 64
@@ -47,17 +40,10 @@ test "$before" = "$(git -C "$FIXTURE" hash-object internal/buildinfo/info.go)"
 grep -Fqx "updated project image version from $current_version to $next_version" "$TMP_DIR/update.out"
 grep -Fqx "IMAGE_VERSION=$next_version" "$FIXTURE/versions.env"
 grep -Fq "Version   = \"$next_version\"" "$FIXTURE/internal/buildinfo/info.go"
-grep -Fq "\"version\": \"$next_version\"" "$FIXTURE/internal/httpapi/docs/openapi.json"
-test "$(grep -Fc "$next_version" "$FIXTURE/docs/en/v4/rest-api.md")" -eq 2
-test "$(grep -Fc "$next_version" "$FIXTURE/docs/cn/v4/rest-api.md")" -eq 2
-grep -Fq "\`$next_major.0\`" "$FIXTURE/docs/en/image-update-policy.md"
-grep -Fq "\`$next_major\`" "$FIXTURE/docs/en/image-update-policy.md"
-grep -Fq "\`$next_major.0\`" "$FIXTURE/docs/cn/image-update-policy.md"
-grep -Fq "\`$next_major\`" "$FIXTURE/docs/cn/image-update-policy.md"
 "$FIXTURE/scripts/verify-release-metadata.sh" >/dev/null
 
 "$SCRIPT" "$current_version" >/dev/null
-sed -i "s/Version   = \"$current_version\"/Version   = \"9.9.9\"/" "$FIXTURE/internal/buildinfo/info.go"
+sed -i "s/Version   = \"$current_version\"/Version   = \"metadata-mismatch\"/" "$FIXTURE/internal/buildinfo/info.go"
 set +e
 "$SCRIPT" "$current_version" >"$TMP_DIR/drift.out" 2>"$TMP_DIR/drift.err"
 status=$?
@@ -65,7 +51,7 @@ set -e
 test "$status" -eq 65
 grep -Fq "internal/buildinfo/info.go: expected 1 occurrence(s) of $current_version, found 0" "$TMP_DIR/drift.err"
 
-sed -i "s/Version   = \"9.9.9\"/Version   = \"$current_version\"/" "$FIXTURE/internal/buildinfo/info.go"
+sed -i "s/Version   = \"metadata-mismatch\"/Version   = \"$current_version\"/" "$FIXTURE/internal/buildinfo/info.go"
 before_hashes="$(for file in "${tracked_files[@]}"; do git -C "$FIXTURE" hash-object "$file"; done)"
 cat >"$FIXTURE/scripts/verify-release-metadata.sh" <<'FAIL_SECOND_VALIDATION'
 #!/usr/bin/env bash

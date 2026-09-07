@@ -194,21 +194,21 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 ```json
 {
-  "version": "4.1.0",
-  "data_schema": 4,
+  "version": "<image-version>",
+  "data_schema": 0,
   "commit": "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224",
   "build_date": "2026-08-19T09:45:40Z",
-  "go_version": "go1.26.5",
+  "go_version": "go<version>",
   "dependencies": {
-    "sqlite": "github.com/mattn/go-sqlite3 v1.14.48",
-    "yaml": "go.yaml.in/yaml/v3 v3.0.4"
+    "sqlite": "github.com/mattn/go-sqlite3 <version>",
+    "yaml": "go.yaml.in/yaml/v3 <version>"
   },
   "compatibility": {
     "contract_version": 1,
-    "adapter": "openvpn-2.7",
-    "template_family": "openvpn-2.7",
+    "adapter": "openvpn-<series>",
+    "template_family": "openvpn-<series>",
     "supported_openvpn_versions": [
-      "2.7.6"
+      "<openvpn-version>"
     ]
   }
 }
@@ -218,19 +218,19 @@ Authorization: Bearer ovpn_v1.<uuid>.<secret>
 
 | 字段 | 类型 | 必填 | 格式 / 示例 / 约束 | 用途说明 |
 |---|---|---|---|---|
-| `version` | `string` | 是 | 示例: "4.1.0" | OpenVPN Docker 发布版本。 |
-| `data_schema` | `integer` | 是 | 示例: 4 | 权威数据 schema 版本。 |
+| `version` | `string` | 是 | 格式: `X.Y.Z` | OpenVPN Docker 发布版本。 |
+| `data_schema` | `integer` | 是 | 正整数 | 权威数据 schema 版本。 |
 | `commit` | `string` | 是 | 示例: "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224" | 构建二进制时使用的源码版本。 |
 | `build_date` | `string` | 是 | 示例: "2026-08-19T09:45:40Z" | 二进制构建时的 UTC 时间。 |
-| `go_version` | `string` | 是 | 示例: "go1.26.5" | 构建二进制时使用的 Go 工具链版本。 |
+| `go_version` | `string` | 是 | 格式: `goX.Y.Z` | 构建二进制时使用的 Go 工具链版本。 |
 | `dependencies` | `object` | 是 | - | 构建时使用的库依赖版本。 |
-| `dependencies.sqlite` | `string` | 是 | 示例: "github.com/mattn/go-sqlite3 v1.14.48" | SQLite 驱动模块及版本。 |
-| `dependencies.yaml` | `string` | 是 | 示例: "go.yaml.in/yaml/v3 v3.0.4" | YAML 解析模块及版本。 |
+| `dependencies.sqlite` | `string` | 是 | 格式: module 和版本 | SQLite 驱动模块及版本。 |
+| `dependencies.yaml` | `string` | 是 | 格式: module 和版本 | YAML 解析模块及版本。 |
 | `compatibility` | `object` | 是 | - | 运行时兼容性契约及支持的版本。 |
 | `compatibility.contract_version` | `integer` | 是 | 示例: 1 | 兼容性契约 schema 版本。 |
 | `compatibility.adapter` | `string` | 是 | 示例: "openvpn-2.7" | 为当前运行时选择的兼容性适配器。 |
 | `compatibility.template_family` | `string` | 是 | 示例: "openvpn-2.7" | 生成 OpenVPN 文件时选择的模板系列。 |
-| `compatibility.supported_openvpn_versions` | `string[]` | 是 | 示例: ["2.7.6"] | 该兼容性契约接受的 OpenVPN 版本。 |
+| `compatibility.supported_openvpn_versions` | `string[]` | 是 | 格式: `["X.Y.Z"]` | 该兼容性契约接受的 OpenVPN 版本。 |
 
 ##### `401 未认证`
 

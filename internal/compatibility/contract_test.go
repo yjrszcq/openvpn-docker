@@ -1,6 +1,7 @@
 package compatibility_test
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,6 +9,23 @@ import (
 
 	"github.com/yjrszcq/openvpn-docker/internal/compatibility"
 )
+
+func contractWithEmptyProbes(t *testing.T, data []byte) []byte {
+	t.Helper()
+	var contract compatibility.Contract
+	if err := json.Unmarshal(data, &contract); err != nil {
+		t.Fatal(err)
+	}
+	if len(contract.RequiredFeatures) == 0 {
+		t.Fatal("repository contract has no required features")
+	}
+	contract.RequiredFeatures[0].HelpContains = []string{}
+	encoded, err := json.Marshal(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
+}
 
 func repositoryContract(t *testing.T) []byte {
 	t.Helper()
@@ -51,19 +69,20 @@ func TestRepositoryContract(t *testing.T) {
 }
 
 func TestContractStrictness(t *testing.T) {
-	valid := string(repositoryContract(t))
+	validBytes := repositoryContract(t)
+	valid := string(validBytes)
 	supported := repositoryOpenVPNVersion(t)
-	tests := map[string]string{
-		"unknown-field":      strings.Replace(valid, `"version": 1,`, `"version": 1, "unknown": true,`, 1),
-		"duplicate-field":    strings.Replace(valid, `"version": 1,`, `"version": 1, "version": 1,`, 1),
-		"trailing-document":  valid + `{}`,
-		"unordered-versions": strings.Replace(valid, `"`+supported+`"`, `"99.0.0", "`+supported+`"`, 1),
-		"duplicate-feature":  strings.Replace(valid, `"name": "data-ciphers"`, `"name": "tls-crypt"`, 1),
-		"empty-probes":       strings.Replace(valid, `["--tls-crypt key"]`, `[]`, 1),
+	tests := map[string][]byte{
+		"unknown-field":      []byte(strings.Replace(valid, `"version": 1,`, `"version": 1, "unknown": true,`, 1)),
+		"duplicate-field":    []byte(strings.Replace(valid, `"version": 1,`, `"version": 1, "version": 1,`, 1)),
+		"trailing-document":  []byte(valid + `{}`),
+		"unordered-versions": []byte(strings.Replace(valid, `"`+supported+`"`, `"99.0.0", "`+supported+`"`, 1)),
+		"duplicate-feature":  []byte(strings.Replace(valid, `"name": "data-ciphers"`, `"name": "tls-crypt"`, 1)),
+		"empty-probes":       contractWithEmptyProbes(t, validBytes),
 	}
 	for name, data := range tests {
 		t.Run(name, func(t *testing.T) {
-			if _, err := compatibility.Parse([]byte(data)); err == nil {
+			if _, err := compatibility.Parse(data); err == nil {
 				t.Fatal("invalid compatibility contract was accepted")
 			}
 		})
