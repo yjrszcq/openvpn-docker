@@ -31,10 +31,10 @@ source_schema=$(sed -n 's/^const DataSchema = \([0-9][0-9]*\)$/\1/p' internal/bu
 version_coupled_files="$(
   for root in docs tests/smoke; do
     [ -d "$root" ] || continue
-    find "$root" -type f -exec grep -Fl -- "$IMAGE_VERSION" {} +
+    find "$root" -type f -exec grep -Fl -- "$IMAGE_VERSION" {} + || :
   done
   if [ -d internal ]; then
-    find internal -type f -name '*_test.go' -exec grep -Fl -- "$IMAGE_VERSION" {} +
+    find internal -type f -name '*_test.go' -exec grep -Fl -- "$IMAGE_VERSION" {} + || :
   fi
 )"
 [ -z "$version_coupled_files" ] || {
