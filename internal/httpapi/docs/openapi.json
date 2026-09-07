@@ -1028,21 +1028,21 @@
               "$ref": "#/components/schemas/Version"
             },
             "example": {
-              "version": "4.1.0",
-              "data_schema": 4,
+              "version": "<image-version>",
+              "data_schema": 0,
               "commit": "dd9b5213f5002a7e69f160e3fd2615e0b3d8d224",
               "build_date": "2026-08-19T09:45:40Z",
-              "go_version": "go1.26.5",
+              "go_version": "go<version>",
               "dependencies": {
-                "sqlite": "github.com/mattn/go-sqlite3 v1.14.48",
-                "yaml": "go.yaml.in/yaml/v3 v3.0.4"
+                "sqlite": "github.com/mattn/go-sqlite3 <version>",
+                "yaml": "go.yaml.in/yaml/v3 <version>"
               },
               "compatibility": {
                 "contract_version": 1,
-                "adapter": "openvpn-2.7",
-                "template_family": "openvpn-2.7",
+                "adapter": "openvpn-<series>",
+                "template_family": "openvpn-<series>",
                 "supported_openvpn_versions": [
-                  "2.7.6"
+                  "<openvpn-version>"
                 ]
               }
             }

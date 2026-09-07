@@ -28,6 +28,19 @@ source_schema=$(sed -n 's/^const DataSchema = \([0-9][0-9]*\)$/\1/p' internal/bu
   echo 'versions.env and buildinfo source version must match' >&2
   exit 78
 }
+version_coupled_files="$(
+  for root in docs tests/smoke; do
+    [ -d "$root" ] || continue
+    find "$root" -type f -exec grep -Fl -- "$IMAGE_VERSION" {} +
+  done
+  if [ -d internal ]; then
+    find internal -type f -name '*_test.go' -exec grep -Fl -- "$IMAGE_VERSION" {} +
+  fi
+)"
+[ -z "$version_coupled_files" ] || {
+  echo "project version must not be duplicated in documentation or tests: $version_coupled_files" >&2
+  exit 78
+}
 [ "$DATA_SCHEMA" = "$source_schema" ] || {
   echo 'versions.env and buildinfo data schema must match' >&2
   exit 78
