@@ -83,12 +83,23 @@ grep -Fq '"profile_redistribution_required":true' "$WORK_DIR/rename.json"
 run_ovpn client address set --name beta --ipv4 10.70.0.10 --json >"$WORK_DIR/address-set.json"
 grep -Fq "\"kick_required\":[\"$client_id\"]" "$WORK_DIR/address-set.json"
 grep -Fq '"status":"pending"' "$WORK_DIR/address-set.json"
-run_ovpn client address edit beta -e /bin/true --yes --json >"$WORK_DIR/address-edit.json"
+cat >"$WORK_DIR/data/test-editor" <<'EDITOR_SCRIPT'
+#!/bin/sh
+set -eu
+sed -i 's/10.70.0.10/10.70.0.11/g' "$1"
+EDITOR_SCRIPT
+chmod +x "$WORK_DIR/data/test-editor"
+run_ovpn client address edit beta -e /etc/openvpn/test-editor --yes --json >"$WORK_DIR/address-edit.json"
 grep -Fq "\"id\":\"$client_id\"" "$WORK_DIR/address-edit.json"
-run_ovpn client revoke --name beta --release-ipv4 --json >"$WORK_DIR/revoke.json"
+grep -Fq '"address":"10.70.0.11"' "$WORK_DIR/address-edit.json"
+run_ovpn client revoke --name beta --json >"$WORK_DIR/revoke.json"
 grep -Fq '"kick_required":true' "$WORK_DIR/revoke.json"
 grep -Fq '"runtime":{"client_id"' "$WORK_DIR/revoke.json"
 grep -Fq '"status":"pending"' "$WORK_DIR/revoke.json"
+grep -Fq '"state":"retained"' "$WORK_DIR/revoke.json"
+run_ovpn client address release --id "$prefix" --json >"$WORK_DIR/release.json"
+run_ovpn client list --json >"$WORK_DIR/after-release.json"
+grep -Fq '"ipv4":{"mode":"none","address":null,"state":"unavailable"}' "$WORK_DIR/after-release.json"
 run_ovpn client reissue --id "$prefix" --ipv4 dynamic --output /etc/openvpn/beta-reissued.ovpn --json >"$WORK_DIR/reissue.json"
 grep -Fq '"profile_redistribution_required":true' "$WORK_DIR/reissue.json"
 grep -Fq '"profile_output":{"destination":"/etc/openvpn/beta-reissued.ovpn","written":true}' "$WORK_DIR/reissue.json"
@@ -109,5 +120,37 @@ test "$(head -n 1 "$WORK_DIR/list-detail.txt" | tr -s ' ')" = 'CLIENT ID NAME ST
 grep -Fq 'configured' "$WORK_DIR/list-detail.txt"
 run_ovpn state doctor --json >"$WORK_DIR/doctor.json"
 grep -Fq '"state":"HEALTHY"' "$WORK_DIR/doctor.json"
+
+# Derived artifacts must be recoverable without changing client identity.
+run_ovpn state show --json >"$WORK_DIR/state.json"
+run_ovpn config show --json >"$WORK_DIR/config.json"
+run_ovpn config export --output - >"$WORK_DIR/exported.yaml"
+run_ovpn server render >"$WORK_DIR/server.conf"
+run_ovpn runtime capabilities --json >"$WORK_DIR/capabilities.json"
+run_ovpn api key create lifecycle --json >"$WORK_DIR/key.json"
+run_ovpn api key list --json >"$WORK_DIR/keys.json"
+grep -Fq '"name":"lifecycle"' "$WORK_DIR/keys.json"
+run_ovpn api key delete lifecycle --yes --json >"$WORK_DIR/key-delete.json"
+
+docker run --rm -v "$WORK_DIR/data:/etc/openvpn" --entrypoint sh "$IMAGE" \
+  -ec 'rm /etc/openvpn/clients/active/*.ovpn'
+run_ovpn repair plan --json >"$WORK_DIR/repair-plan.json"
+grep -Fq 'REFRESH_CLIENT_ARTIFACTS' "$WORK_DIR/repair-plan.json"
+run_ovpn repair apply --yes --json >"$WORK_DIR/repair.json"
+run_ovpn client export beta --output - >"$WORK_DIR/repaired.ovpn"
+grep -Fq "# ovpn-client-id: $replacement_id" "$WORK_DIR/repaired.ovpn"
+run_ovpn state doctor --json >"$WORK_DIR/doctor-after-repair.json"
+grep -Fq '"state":"HEALTHY"' "$WORK_DIR/doctor-after-repair.json"
+
+# Network/pool changes must remap automatic addresses and regenerate profiles.
+sed -i -e 's/10.70.0.0\/24/10.71.0.0\/24/' \
+  -e 's/dynamicPoolSize: 64/dynamicPoolSize: 32/' "$WORK_DIR/config/config.yaml"
+run_ovpn config plan --json >"$WORK_DIR/network-plan.json"
+run_ovpn config apply --yes --json >"$WORK_DIR/network-apply.json"
+grep -Fq '"applied":true' "$WORK_DIR/network-apply.json"
+run_ovpn client list --json >"$WORK_DIR/remapped.json"
+grep -Fq '"address":"10.71.0.2"' "$WORK_DIR/remapped.json"
+run_ovpn state doctor --json >"$WORK_DIR/doctor-after-network.json"
+grep -Fq '"state":"HEALTHY"' "$WORK_DIR/doctor-after-network.json"
 
 printf 'Go client lifecycle smoke passed (tombstone=%s replacement=%s)\n' "$client_id" "$replacement_id"

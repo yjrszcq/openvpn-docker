@@ -231,19 +231,6 @@ Restore into empty target directories while the service is stopped, preserve own
 - [image update policy](docs/en/image-update-policy.md)
 - Historical references: [v1](docs/en/v1/commands.md), [v2](docs/en/v2/commands.md), and [v3](docs/en/v3/commands.md)
 
-## Development
-
-Version inputs live in `versions.env`. Use `scripts/update-image-version.sh X.Y.Z` to update the project image version and its tracked metadata consistently. Go dependencies use `GOPROXY=direct`; the build wrapper forwards the host's standard proxy variables to Docker.
-
-```bash
-scripts/verify-go-toolchain.sh
-tests/smoke/shell/check.sh
-tests/smoke/shell/workflow-smoke.sh
-scripts/docker-build.sh -t szcq/openvpn-server:dev .
-```
-
-CI runs Go formatting, vet, unit and race tests, dependency-license checks, retained Shell contracts, data migration and rollback, real UDP/TCP tunnels, and amd64/arm64 builds.
-
 ## License
 
 Copyright (C) 2026 yjrszcq.

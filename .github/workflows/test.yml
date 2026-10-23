@@ -28,7 +28,7 @@ jobs:
         run: scripts/verify-release-metadata.sh
       - uses: actions/setup-go@v6
         with:
-          go-version: 1.26.5
+          go-version: 1.27.3
           cache: true
       - name: Check formatting
         run: test -z "$(gofmt -l cmd internal)"
