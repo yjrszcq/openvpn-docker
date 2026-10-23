@@ -231,21 +231,6 @@ Restore into empty target directories while the service is stopped, preserve own
 - [image update policy](docs/en/image-update-policy.md)
 - Historical references: [v1](docs/en/v1/commands.md), [v2](docs/en/v2/commands.md), and [v3](docs/en/v3/commands.md)
 
-## Development
-
-Version inputs live in `versions.env`. Use `scripts/update-image-version.sh X.Y.Z` to update the project image version and its tracked metadata consistently. Go dependencies use `GOPROXY=direct`; the build wrapper forwards the host's standard proxy variables to Docker.
-
-Local development and tests use Go 1.27.3. `scripts/go-tool.sh` prefers `~/sdk/go1.27.3/bin/go`, then checks for the exact version on PATH, and otherwise uses the pinned Go Docker image. For example, run `scripts/go-tool.sh test ./...`. Before running Go commands directly, run `export PATH="$HOME/sdk/go1.27.3/bin:$PATH"` and `export GOTOOLCHAIN=local`.
-
-```bash
-scripts/verify-go-toolchain.sh
-tests/smoke/shell/check.sh
-tests/smoke/shell/workflow-smoke.sh
-scripts/docker-build.sh -t szcq/openvpn-server:dev .
-```
-
-CI covers Go formatting, vet, unit and race tests, dependency licenses, Shell contracts, data migration and rollback, client lifecycle and repair, REST API, and amd64/arm64 builds. End-to-end tests verify UDP/TCP tunnels over IPv4/IPv6 public transport, static/dynamic IPv4 addresses, client-to-client connectivity, real HTTPS traffic, NAT, route and DNS pushes, and live API configuration apply.
-
 ## License
 
 Copyright (C) 2026 yjrszcq.

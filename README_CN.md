@@ -229,21 +229,6 @@ docker compose start
 - [镜像更新政策](docs/cn/image-update-policy.md)
 - 历史版本：[v1](docs/cn/v1/commands.md)、[v2](docs/cn/v2/commands.md)、[v3](docs/cn/v3/commands.md)
 
-## 开发
-
-版本输入集中在 `versions.env`。更新项目镜像版本时使用 `scripts/update-image-version.sh X.Y.Z`，由脚本同步全部已跟踪的版本元数据。Go 依赖使用 `GOPROXY=direct`，构建脚本把宿主机的标准代理变量转发给 Docker。
-
-本地开发和测试使用 Go 1.27.3。`scripts/go-tool.sh` 优先使用 `~/sdk/go1.27.3/bin/go`，然后检查 PATH 中的同版本 Go；均不可用时使用固定版本的 Go Docker 镜像。例如运行 `scripts/go-tool.sh test ./...`。直接运行 Go 命令时，先执行 `export PATH="$HOME/sdk/go1.27.3/bin:$PATH"` 和 `export GOTOOLCHAIN=local`。
-
-```bash
-scripts/verify-go-toolchain.sh
-tests/smoke/shell/check.sh
-tests/smoke/shell/workflow-smoke.sh
-scripts/docker-build.sh -t szcq/openvpn-server:dev .
-```
-
-CI 覆盖 Go format、vet、unit/race、依赖许可证、Shell 契约、数据迁移与回滚、客户端生命周期与修复、REST API，以及 amd64/arm64 构建。端到端测试验证 IPv4/IPv6 公网传输上的 UDP/TCP 隧道、静态/动态 IPv4 地址、客户端互访、实际 HTTPS 流量、NAT、路由与 DNS 推送，以及运行中的 API 配置应用。
-
 ## 许可证
 
 Copyright (C) 2026 yjrszcq。
