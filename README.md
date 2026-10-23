@@ -244,7 +244,7 @@ tests/smoke/shell/workflow-smoke.sh
 scripts/docker-build.sh -t szcq/openvpn-server:dev .
 ```
 
-CI runs Go formatting, vet, unit and race tests, dependency-license checks, retained Shell contracts, data migration and rollback, real UDP/TCP tunnels, and amd64/arm64 builds.
+CI covers Go formatting, vet, unit and race tests, dependency licenses, Shell contracts, data migration and rollback, client lifecycle and repair, REST API, and amd64/arm64 builds. End-to-end tests verify UDP/TCP tunnels over IPv4/IPv6 public transport, static/dynamic IPv4 addresses, client-to-client connectivity, real HTTPS traffic, NAT, route and DNS pushes, and live API configuration apply.
 
 ## License
 

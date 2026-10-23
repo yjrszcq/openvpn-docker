@@ -242,7 +242,7 @@ tests/smoke/shell/workflow-smoke.sh
 scripts/docker-build.sh -t szcq/openvpn-server:dev .
 ```
 
-CI 覆盖 Go format、vet、unit/race、依赖许可证、保留的 Shell 契约、数据迁移与回滚、真实 UDP/TCP 隧道以及 amd64/arm64 构建。
+CI 覆盖 Go format、vet、unit/race、依赖许可证、Shell 契约、数据迁移与回滚、客户端生命周期与修复、REST API，以及 amd64/arm64 构建。端到端测试验证 IPv4/IPv6 公网传输上的 UDP/TCP 隧道、静态/动态 IPv4 地址、客户端互访、实际 HTTPS 流量、NAT、路由与 DNS 推送，以及运行中的 API 配置应用。
 
 ## 许可证
 
