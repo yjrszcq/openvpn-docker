@@ -233,6 +233,8 @@ docker compose start
 
 版本输入集中在 `versions.env`。更新项目镜像版本时使用 `scripts/update-image-version.sh X.Y.Z`，由脚本同步全部已跟踪的版本元数据。Go 依赖使用 `GOPROXY=direct`，构建脚本把宿主机的标准代理变量转发给 Docker。
 
+本地开发和测试使用 Go 1.27.3。`scripts/go-tool.sh` 优先使用 `~/sdk/go1.27.3/bin/go`，然后检查 PATH 中的同版本 Go；均不可用时使用固定版本的 Go Docker 镜像。例如运行 `scripts/go-tool.sh test ./...`。直接运行 Go 命令时，先执行 `export PATH="$HOME/sdk/go1.27.3/bin:$PATH"` 和 `export GOTOOLCHAIN=local`。
+
 ```bash
 scripts/verify-go-toolchain.sh
 tests/smoke/shell/check.sh

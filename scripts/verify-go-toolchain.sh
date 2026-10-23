@@ -2,7 +2,7 @@
 set -eu
 
 project_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-go_image=${GO_IMAGE:-golang:1.26.5-trixie}
+go_image=${GO_IMAGE:-golang:1.27.3-trixie}
 
 for platform in linux/amd64 linux/arm64; do
   docker run --rm \

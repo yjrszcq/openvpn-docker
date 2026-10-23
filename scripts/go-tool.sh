@@ -2,7 +2,7 @@
 set -eu
 
 project_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-go_image=${GO_IMAGE:-golang:1.26.5-trixie}
+go_image=${GO_IMAGE:-golang:1.27.3-trixie}
 
 case "$(uname -m)" in
 x86_64) native_platform=linux/amd64 ;;
@@ -14,13 +14,18 @@ aarch64 | arm64) native_platform=linux/arm64 ;;
 esac
 go_platform=${GO_PLATFORM:-$native_platform}
 
-local_go_version=''
-if command -v go >/dev/null 2>&1; then
-  local_go_version=$(go env GOVERSION 2>/dev/null || true)
-fi
-if [ "$local_go_version" = go1.26.5 ]; then
-  exec go "$@"
-fi
+# Prefer the versioned SDK over the system default Go installation.
+# GOTOOLCHAIN=local prevents an automatic toolchain download from masking a
+# mismatched executable during the version check or the requested command.
+for go_binary in "${HOME}/sdk/go1.27.3/bin/go" go; do
+  if command -v "$go_binary" >/dev/null 2>&1; then
+    local_go_version=$(GOTOOLCHAIN=local "$go_binary" env GOVERSION 2>/dev/null || true)
+    if [ "$local_go_version" = go1.27.3 ]; then
+      export GOTOOLCHAIN=local
+      exec "$go_binary" "$@"
+    fi
+  fi
+done
 
 exec docker run --rm \
   --platform "$go_platform" \

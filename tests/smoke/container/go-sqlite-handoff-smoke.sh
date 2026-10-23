@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 SOURCE_IMAGE="${OVPN_GO_HANDOFF_SOURCE_IMAGE:-szcq/openvpn-server:sh-ver-handoff}"
-GO_IMAGE="${OVPN_GO_HANDOFF_GO_IMAGE:-golang:1.26.5-trixie}"
+GO_IMAGE="${OVPN_GO_HANDOFF_GO_IMAGE:-golang:1.27.3-trixie}"
 GO_CACHE_DIR="${OVPN_GO_HANDOFF_CACHE_DIR:-${TMPDIR:-/tmp}/ovpn-go-handoff-cache}"
 REQUIRED="${OVPN_GO_HANDOFF_REQUIRED:-0}"
 SKIP_SOURCE_BUILD="${OVPN_GO_HANDOFF_SKIP_SOURCE_BUILD:-0}"

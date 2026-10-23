@@ -235,6 +235,8 @@ Restore into empty target directories while the service is stopped, preserve own
 
 Version inputs live in `versions.env`. Use `scripts/update-image-version.sh X.Y.Z` to update the project image version and its tracked metadata consistently. Go dependencies use `GOPROXY=direct`; the build wrapper forwards the host's standard proxy variables to Docker.
 
+Local development and tests use Go 1.27.3. `scripts/go-tool.sh` prefers `~/sdk/go1.27.3/bin/go`, then checks for the exact version on PATH, and otherwise uses the pinned Go Docker image. For example, run `scripts/go-tool.sh test ./...`. Before running Go commands directly, run `export PATH="$HOME/sdk/go1.27.3/bin:$PATH"` and `export GOTOOLCHAIN=local`.
+
 ```bash
 scripts/verify-go-toolchain.sh
 tests/smoke/shell/check.sh
