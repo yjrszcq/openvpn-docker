@@ -94,14 +94,14 @@ if [ "${OVPN_CLI_UX_NATIVE:-0}" = 1 ]; then
   fi
   grep -Fq 'config.example.yaml' "$WORK_DIR/first-start.out"
 else
-command_overview="$(run_image)"
-grep -Fq 'Command tree:' <<<"$command_overview"
-grep -Fq 'ovpn client address edit' <<<"$command_overview"
-grep -Fq 'ovpn runtime disconnect' <<<"$command_overview"
-if grep -Fq 'Examples:' <<<"$command_overview"; then
-  printf 'bare ovpn output is not compact\n' >&2
-  exit 1
-fi
+  command_overview="$(run_image)"
+  grep -Fq 'Command tree:' <<<"$command_overview"
+  grep -Fq 'ovpn client address edit' <<<"$command_overview"
+  grep -Fq 'ovpn runtime disconnect' <<<"$command_overview"
+  if grep -Fq 'Examples:' <<<"$command_overview"; then
+    printf 'bare ovpn output is not compact\n' >&2
+    exit 1
+  fi
 
 fi
 
