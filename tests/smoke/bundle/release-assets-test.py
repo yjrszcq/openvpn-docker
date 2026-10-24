@@ -5,12 +5,14 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import re
 import sys
 import tarfile
 import tempfile
 import threading
 import unittest
 import urllib.parse
+from urllib.error import HTTPError
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.dont_write_bytecode = True
@@ -18,6 +20,7 @@ spec = importlib.util.spec_from_file_location('release_assets', ROOT / 'scripts/
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 VERSIONS = dict(line.split('=', 1) for line in (ROOT / 'versions.env').read_text().splitlines() if '=' in line and not line.startswith('#'))
+GO_VERSION = re.search(r'^go ([0-9]+\.[0-9]+\.[0-9]+)$', (ROOT / 'go.mod').read_text(), re.MULTILINE).group(1)
 
 
 class ReleaseAssets(unittest.TestCase):
@@ -39,7 +42,7 @@ class ReleaseAssets(unittest.TestCase):
             self.names.append(name)
             data = json.dumps({'version': self.tag[1:], 'architecture': arch, 'commit': self.commit,
                                'data_schema': int(VERSIONS['DATA_SCHEMA']), 'openvpn_version': VERSIONS['OPENVPN_VERSION'],
-                               'go_version': VERSIONS['GO_RUNTIME_VERSION']}).encode()
+                               'go_version': GO_VERSION}).encode()
             with tarfile.open(self.directory / name, 'w:gz') as stream:
                 member = tarfile.TarInfo('openvpn-server/runtime/manifest.json')
                 member.size = len(data)
@@ -121,7 +124,7 @@ class ReleaseAssets(unittest.TestCase):
 
     def test_missing_release_never_created(self):
         self.present = False
-        with self.assertRaises(Exception):
+        with self.assertRaises(HTTPError):
             self.publish()
         self.assertEqual(self.uploads, [])
 
@@ -144,6 +147,22 @@ class ReleaseAssets(unittest.TestCase):
         (self.directory / 'SHA256SUMS').write_text('')
         with self.assertRaisesRegex(ValueError, 'both architectures'):
             self.publish()
+
+    def test_wrong_archive_provenance_refused_before_upload(self):
+        path = self.directory / self.names[0]
+        with tarfile.open(path) as stream:
+            data = json.load(stream.extractfile('openvpn-server/runtime/manifest.json'))
+        data['commit'] = '2' * 40
+        payload = json.dumps(data).encode()
+        with tarfile.open(path, 'w:gz') as stream:
+            member = tarfile.TarInfo('openvpn-server/runtime/manifest.json')
+            member.size = len(payload)
+            stream.addfile(member, io.BytesIO(payload))
+        (self.directory / 'SHA256SUMS').write_text(''.join(
+            f'{hashlib.sha256((self.directory / name).read_bytes()).hexdigest()}  {name}\n' for name in self.names[:-1]))
+        with self.assertRaisesRegex(ValueError, 'provenance mismatch'):
+            self.publish()
+        self.assertEqual(self.uploads, [])
 
 
 if __name__ == '__main__':

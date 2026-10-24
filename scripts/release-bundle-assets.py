@@ -19,8 +19,10 @@ class PrivateRedirect(urllib.request.HTTPRedirectHandler):
         return redirected
 
 
-def publish(directory, tag, commit, repository, api, token):
-    versions = dict(line.split('=', 1) for line in (Path(__file__).resolve().parent.parent / 'versions.env').read_text().splitlines() if '=' in line and not line.startswith('#'))
+def verify_archives(directory, tag, commit):
+    root = Path(__file__).resolve().parent.parent
+    versions = dict(line.split('=', 1) for line in (root / 'versions.env').read_text().splitlines() if '=' in line and not line.startswith('#'))
+    go_version = re.search(r'^go ([0-9]+\.[0-9]+\.[0-9]+)$', (root / 'go.mod').read_text(), re.MULTILINE).group(1)
     if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+', tag) or tag != 'v' + versions['IMAGE_VERSION']:
         raise ValueError('Release tag must match the project version')
     if not re.fullmatch(r'[0-9a-f]{40}', commit):
@@ -43,11 +45,15 @@ def publish(directory, tag, commit, repository, api, token):
         if any(metadata.get(key) != value for key, value in {
             'version': tag[1:], 'architecture': arch, 'commit': commit,
             'data_schema': int(versions['DATA_SCHEMA']), 'openvpn_version': versions['OPENVPN_VERSION'],
-            'go_version': versions['GO_RUNTIME_VERSION'],
+            'go_version': go_version,
         }.items()):
             raise ValueError(f'archive provenance mismatch: {name}')
     names.append('SHA256SUMS')
+    return names
 
+
+def publish(directory, tag, commit, repository, api, token):
+    names = verify_archives(directory, tag, commit)
     opener = urllib.request.build_opener(PrivateRedirect())
 
     def request(url, data=None, binary=False):

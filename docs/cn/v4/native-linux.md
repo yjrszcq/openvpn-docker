@@ -75,7 +75,7 @@ sudo ovpn config plan
 sudo ovpn config apply --yes
 ```
 
-CLI、可选 REST API 和已有 `OVPN_*` 覆盖继续有效。托管 systemd 服务可通过 `systemctl edit ovpn`，在 `[Service]` 中使用相应的 `Environment=...` 设置。启动诊断可通过 `journalctl -u ovpn` 查看；OpenRC 将其写入 `run/service*.log`。API 的启用和保护方式见 [REST API 指南](rest-api.md)。
+CLI、可选 REST API 和已有 `OVPN_*` 覆盖继续有效。覆盖按进程生效，服务与 CLI 应使用相同设置。使用安装器管理更新时，请将可写状态保留在安装目录内的 `config/`、`data/` 和 `run/` 中，确保恢复快照包含这些状态。启动诊断可通过 `journalctl -u ovpn` 查看；OpenRC 将其写入 `run/service*.log`。API 的启用和保护方式见 [REST API 指南](rest-api.md)。
 
 ## 更新与恢复
 

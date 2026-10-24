@@ -36,6 +36,7 @@ docker run --rm --entrypoint sh "$image" -ec '
  cd /tmp
  ovpn version --json
  openssl version
+ openssl list -providers -provider default -provider legacy
  openvpn --version
  cd /opt/ovpn
  sha256sum -c MANIFEST.sha256 >/dev/null

@@ -61,6 +61,7 @@ jobs:
             test -n "$RELEASE_TAG"
             gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq 'select(.draft == false) | .id' | grep -Eq '^[0-9]+$'
           fi
+          python3 tests/smoke/bundle/release-assets-test.py
       - name: Build self-contained archive
         env:
           BUNDLE_ARCH: ${{ matrix.arch }}

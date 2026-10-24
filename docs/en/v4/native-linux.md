@@ -75,7 +75,7 @@ sudo ovpn config plan
 sudo ovpn config apply --yes
 ```
 
-The CLI and optional REST API retain their existing interfaces and `OVPN_*` overrides. For a managed systemd service, configure environment overrides with `systemctl edit ovpn` and an appropriate `[Service] Environment=...` setting. Use `journalctl -u ovpn` for service startup diagnostics; OpenRC writes them under `run/service*.log`. The [REST API guide](rest-api.md) documents enabling and securing the API.
+The CLI and optional REST API retain their existing interfaces and `OVPN_*` overrides. Overrides apply to each process; use the same settings for the service and CLI. For installer-managed updates, keep writable state under the installation's `config/`, `data/` and `run/` directories so it is included in recovery snapshots. Use `journalctl -u ovpn` for service startup diagnostics; OpenRC writes them under `run/service*.log`. The [REST API guide](rest-api.md) documents enabling and securing the API.
 
 ## Update and recover
 
