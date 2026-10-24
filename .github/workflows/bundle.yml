@@ -1,0 +1,108 @@
+name: Linux Bundles
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing vX.Y.Z tag (empty builds the selected ref)
+        type: string
+        default: ''
+      attach:
+        description: Attach to the existing published Release
+        type: boolean
+        default: false
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bundles-${{ github.event.release.tag_name || inputs.release_tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and validate ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            machine: x86_64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            machine: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.release_tag || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check native architecture, source and Release identity
+        env:
+          EXPECTED_MACHINE: ${{ matrix.machine }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+          ATTACH: ${{ github.event_name == 'release' || inputs.attach }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(uname -m)" = "$EXPECTED_MACHINE"
+          scripts/verify-release-metadata.sh
+          . ./versions.env
+          if [ -n "$RELEASE_TAG" ]; then
+            test "$RELEASE_TAG" = "v$IMAGE_VERSION"
+            test "$(git rev-parse HEAD)" = "$(git rev-parse "$RELEASE_TAG^{commit}")"
+          fi
+          if [ "$ATTACH" = true ]; then
+            test -n "$RELEASE_TAG"
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" --jq 'select(.draft == false) | .id' | grep -Eq '^[0-9]+$'
+          fi
+      - name: Build self-contained archive
+        env:
+          BUNDLE_ARCH: ${{ matrix.arch }}
+          GOPROXY: direct
+        run: scripts/build-bundle.sh "$BUNDLE_ARCH"
+      - name: Validate every supported distribution and isolated service boot
+        env:
+          BUNDLE_ARCH: ${{ matrix.arch }}
+        run: tests/smoke/bundle/check.sh "$BUNDLE_ARCH"
+      - name: Upload verified architecture archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-bundle-${{ matrix.arch }}
+          path: temp/dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  attach:
+    name: Attach complete verified asset set
+    needs: build
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.attach)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.release_tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: linux-bundle-*
+          path: temp/dist
+          merge-multiple: true
+      - name: Verify and attach archives and SHA256SUMS
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          . ./versions.env
+          test "$RELEASE_TAG" = "v$IMAGE_VERSION"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "$RELEASE_TAG^{commit}")"
+          (cd temp/dist && sha256sum "openvpn-server-$IMAGE_VERSION-linux-amd64.tar.gz" "openvpn-server-$IMAGE_VERSION-linux-arm64.tar.gz" > SHA256SUMS)
+          python3 scripts/release-bundle-assets.py --directory temp/dist --tag "$RELEASE_TAG" --commit "$(git rev-parse HEAD)"

@@ -20,6 +20,8 @@ REST API v1 默认关闭，适合由独立前端或自动化客户端通过 HTTP
 
 ## 快速开始
 
+无需 Docker 的部署方式请使用自包含 amd64/arm64 压缩包及在线安装器，详见 [Linux 裸机安装指南](docs/cn/v4/native-linux.md)。
+
 ### 环境要求
 
 - Docker Engine 和 Docker Compose plugin。

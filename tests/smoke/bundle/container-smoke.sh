@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 archive="${1:?archive required}"
 base="${2:-debian:13-slim}"
 platform="${3:-linux/amd64}"
-image="ovpn-bundle-test:$(printf '%s' "$base-$platform" | tr '/:' '--')"
+image="ovpn-bundle-test:$(printf '%s' "${base%@*}-$platform" | tr '/:' '--')"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 tar -xzf "$archive" -C "$work"
