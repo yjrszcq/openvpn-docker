@@ -36,6 +36,8 @@ for _ in $(seq 1 30); do
 done
 export OVPN_DOWNLOAD_BASE_URL=http://127.0.0.1:18080
 export OVPN_VERSION
+export OVPN_INSTALL_DIR
+OVPN_INSTALL_DIR="$(cat /fixtures/install-dir)"
 for scenario in corrupt missing unsafe wrong-arch wrong-schema unlisted; do
   if OVPN_VERSION="$(cat /fixtures/new-version)" OVPN_INSTALL_DIR=/opt/ovpn-negative OVPN_COMMAND_LINK=/usr/local/bin/ovpn-negative OVPN_DOWNLOAD_BASE_URL="http://127.0.0.1:18080/$scenario" bash /fixtures/install.sh >/run/negative.log 2>&1; then
     echo "invalid asset accepted: $scenario"
@@ -47,8 +49,19 @@ for scenario in corrupt missing unsafe wrong-arch wrong-schema unlisted; do
   echo "asset rejection passed: $scenario"
 done
 OVPN_VERSION="$(cat /fixtures/old-version)"
+if [ -d /run/systemd/system ]; then unit=/etc/systemd/system/ovpn.service; else unit=/etc/init.d/ovpn; fi
+ln -s /nonexistent/ovpn-foreign "$unit"
+if bash /fixtures/install.sh >/run/unit-conflict.log 2>&1; then exit 1; fi
+grep -Fq 'must not be replaced' /run/unit-conflict.log
+test -L "$unit"
+test ! -e "$OVPN_INSTALL_DIR"
+rm "$unit"
 bash /fixtures/install.sh
 test -L /usr/local/bin/ovpn
+if [ "$OVPN_INSTALL_DIR" != /opt/ovpn ]; then
+  ln -s "$OVPN_INSTALL_DIR" /opt/ovpn
+  ln -s "$OVPN_INSTALL_DIR.install-lock" /opt/ovpn.install-lock
+fi
 bash /fixtures/install.sh
 cp /opt/ovpn/config/config.example.yaml /opt/ovpn/config/config.yaml
 sed -i 's/vpn.example.com/127.0.0.1/' /opt/ovpn/config/config.yaml
@@ -85,10 +98,16 @@ chmod 640 /opt/ovpn/config/vm-client.ovpn
 profile="$(sha256sum /opt/ovpn/config/vm-client.ovpn)"
 service_action stop
 OVPN_VERSION="$(cat /fixtures/middle-version)" OVPN_INSTALL_ACTION=update bash /fixtures/install.sh
-if service_action status; then echo 'stopped upgrade unexpectedly started service'; exit 1; fi
+if service_action status; then
+  echo 'stopped upgrade unexpectedly started service'
+  exit 1
+fi
 test "$(ovpn version --short)" = "$(cat /fixtures/middle-version)"
 service_action start
-for _ in $(seq 1 60); do if ovpn runtime health; then break; fi; sleep 1; done
+for _ in $(seq 1 60); do
+  if ovpn runtime health; then break; fi
+  sleep 1
+done
 # The lock must reject another live updater without stopping the service.
 exec 9<>/opt/ovpn.install-lock
 /opt/ovpn/bin/flock -n 9
@@ -105,7 +124,10 @@ test "$(ovpn version --short)" = "$(cat /fixtures/new-version)"
 service_action stop
 ovpn >/run/unmanaged.log 2>&1 &
 unmanaged=$!
-for _ in $(seq 1 60); do if ovpn runtime health; then break; fi; sleep 1; done
+for _ in $(seq 1 60); do
+  if ovpn runtime health; then break; fi
+  sleep 1
+done
 ovpn runtime health
 if OVPN_VERSION="$(cat /fixtures/bad-version)" OVPN_DOWNLOAD_BASE_URL=http://127.0.0.1:18080/bad OVPN_INSTALL_ACTION=update bash /fixtures/install.sh >/run/unmanaged-update.log 2>&1; then exit 1; fi
 grep -Fq 'unmanaged instance detected' /run/unmanaged-update.log

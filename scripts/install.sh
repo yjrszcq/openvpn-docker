@@ -200,6 +200,7 @@ if [ -e "$root" ]; then
     rm -rf -- "${root:?}/$name"
     cp -a "$package/$name" "$root/$name"
   done
+  cp -a "$package/config/config.example.yaml" "$root/config/config.example.yaml"
   exec 8>&-
   if [ "$was_running" = 1 ]; then
     service start
@@ -249,11 +250,29 @@ SERVICE
 #!/sbin/openrc-run
 name="ovpn"
 command="$root/ovpn"
-command_background=true
 pidfile="/run/ovpn-service.pid"
 output_log="$root/run/service.log"
 error_log="$root/run/service-error.log"
 depend() { need net; }
+start() {
+ ebegin "Starting ovpn"
+ start-stop-daemon --start --background --make-pidfile --pidfile "\$pidfile" \
+  --exec "\$command" --stdout "\$output_log" --stderr "\$error_log"
+ eend \$?
+}
+stop() {
+ ebegin "Stopping ovpn"
+ if start-stop-daemon --stop --test --quiet --pidfile "\$pidfile"; then
+  start-stop-daemon --stop --retry TERM/30/KILL/5 --pidfile "\$pidfile" || { eend 1; return 1; }
+ fi
+ rm -f "\$pidfile"
+ eend 0
+}
+status() {
+ if start-stop-daemon --stop --test --quiet --pidfile "\$pidfile"; then einfo "ovpn is started"; return 0; fi
+ einfo "ovpn is stopped"
+ return 3
+}
 SERVICE
     chmod 755 /etc/init.d/ovpn
     printf 'Configure %s/config/config.yaml, then: rc-update add ovpn default; rc-service ovpn start\n' "$root"

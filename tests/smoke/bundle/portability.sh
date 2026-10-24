@@ -19,10 +19,17 @@ cp "$root/config/config.example.yaml" "$root/config/config.yaml"
 sed -i 's/vpn.example.com/127.0.0.1/' "$root/config/config.yaml"
 # No arguments must initialize empty state and start the real server.
 pid=''
-cleanup() { if [ -n "$pid" ]; then
-  kill -TERM "$pid" 2>/dev/null || true
-  wait "$pid" || true
-fi; }
+client_pid=''
+cleanup() {
+  if [ -n "$client_pid" ]; then
+    kill -TERM "$client_pid" 2>/dev/null || true
+    wait "$client_pid" || true
+  fi
+  if [ -n "$pid" ]; then
+    kill -TERM "$pid" 2>/dev/null || true
+    wait "$pid" || true
+  fi
+}
 trap cleanup EXIT
 iptables -N unrelated_fixture
 /tmp/my-vpn >/tmp/portable.log 2>&1 &
@@ -38,6 +45,20 @@ if ! ovpn runtime health; then
 fi
 ovpn client create portable-client --ipv4 auto
 ovpn client export portable-client --output /tmp/portable-client.ovpn
+openvpn --config /tmp/portable-client.ovpn --dev tun-client --route-nopull >/tmp/portable-client.log 2>&1 &
+client_pid=$!
+for _ in $(seq 1 60); do
+  if grep -Fq 'Initialization Sequence Completed' /tmp/portable-client.log; then break; fi
+  sleep 1
+done
+if ! grep -Fq 'Initialization Sequence Completed' /tmp/portable-client.log; then
+  cat /tmp/portable-client.log
+  tail -n 80 "$root/data/logs/openvpn.log" || true
+  exit 1
+fi
+kill -TERM "$client_pid"
+wait "$client_pid"
+client_pid=''
 kill -TERM "$pid"
 wait "$pid"
 pid=''

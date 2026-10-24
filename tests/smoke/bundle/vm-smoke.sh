@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 archive="$(realpath "${1:?archive required}")"
 base="${2:-debian:13-slim}"
+install_dir="${3:-/opt/ovpn}"
 case "$archive" in *-linux-amd64.tar.gz) architecture=amd64 ;; *-linux-arm64.tar.gz) architecture=arm64 ;; *)
   echo 'unknown archive architecture' >&2
   exit 1
@@ -22,6 +23,7 @@ mkdir -p "$work/fixtures/releases"
 python3 "$ROOT_DIR/tests/smoke/bundle/fixtures.py" "$archive" "$work/fixtures"
 cp "$ROOT_DIR/scripts/install.sh" "$work/fixtures/"
 cp "$ROOT_DIR/tests/smoke/bundle/vm-guest.sh" "$work/fixtures/"
+printf '%s\n' "$install_dir" >"$work/fixtures/install-dir"
 docker build --build-arg "KERNEL_PLATFORM=linux/$architecture" -t "$driver" -f "$ROOT_DIR/packaging/bundle/vm/Dockerfile" "$ROOT_DIR"
 rm -rf "$work/fixtures/releases/openvpn-server"
 image="ovpn-vm-guest:$(printf '%s' "$base" | tr '/:' '--')-$architecture"
