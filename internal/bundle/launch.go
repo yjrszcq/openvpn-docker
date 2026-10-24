@@ -41,6 +41,7 @@ func Prepare(executable, invoked string, args, environment []string) (Invocation
 		"EASYRSA": filepath.Join(root, "runtime", "share", "easy-rsa"), "EASYRSA_OPENSSL": filepath.Join(root, "bin", "openssl"),
 		"OPENSSL_MODULES": filepath.Join(root, "runtime", "lib", "ossl-modules"), "OPENSSL_CONF": filepath.Join(root, "runtime", "etc", "ssl", "openssl.cnf"),
 		"SSL_CERT_FILE": filepath.Join(root, "runtime", "etc", "ssl", "cert.pem"), "XTABLES_LIBDIR": filepath.Join(root, "runtime", "lib", "xtables"),
+		"TERMINFO": filepath.Join(root, "runtime", "share", "terminfo"),
 	}
 	for k, v := range defaults {
 		if env[k] == "" {
@@ -52,6 +53,14 @@ func Prepare(executable, invoked string, args, environment []string) (Invocation
 	// Never export LD_LIBRARY_PATH into the host environment. Each dynamic program
 	// is executed through the bundled musl loader with its own search path.
 	name := filepath.Base(invoked)
+	if name != "ovpn" {
+		_, wrapperErr := os.Lstat(filepath.Join(root, "bin", name))
+		_, programErr := os.Lstat(filepath.Join(root, "runtime", "bin", name))
+		if wrapperErr != nil && programErr != nil {
+			// An arbitrary user-created symlink still invokes the main CLI.
+			name = "ovpn"
+		}
+	}
 	binary := filepath.Join(root, "runtime", "bin", name)
 	argv := append([]string{name}, args...)
 	switch name {
@@ -65,6 +74,8 @@ func Prepare(executable, invoked string, args, environment []string) (Invocation
 			binary = filepath.Join(root, "runtime", "bin", "ovpn-core")
 			env["OVPN_EXEC_MODE"] = "hook"
 		}
+	case "busybox":
+		binary = filepath.Join(root, "runtime", "bin", "busybox")
 	case "easyrsa":
 		binary = filepath.Join(root, "runtime", "bin", "busybox")
 		argv = append([]string{"busybox", "sh", filepath.Join(env["EASYRSA"], "easyrsa")}, args...)

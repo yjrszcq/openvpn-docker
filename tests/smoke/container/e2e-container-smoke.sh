@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# The traffic fixtures use fixed subnets. Serialize concurrent distribution runs
+# so Docker's address-pool overlap protection does not affect the test result.
+exec 9>"${TMPDIR:-/tmp}/ovpn-e2e-network.lock"
+flock 9
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 IMAGE="${OVPN_E2E_IMAGE:-szcq/openvpn-server:e2e-smoke}"
 REQUIRED="${OVPN_E2E_REQUIRED:-0}"

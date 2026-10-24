@@ -83,6 +83,9 @@ func (renderer Renderer) Server(config domain.Config, paths Paths) ([]byte, erro
 	values["OVPN_CCD_DIR"] = configToken(filepath.Join(paths.DataDir, "ccd"))
 	command := configToken(renderer.hookBinary) + " pool-persist"
 	values["OVPN_HOOK_COMMAND"] = strconv.Quote(command)
+	if renderer.hookBinary != "/usr/local/bin/ovpn-hook" {
+		values["OVPN_HOOK_ENV"] = "setenv OVPN_DATA_DIR " + configToken(paths.DataDir) + "\n"
+	}
 	for _, file := range []string{"pki/ca.crt", "pki/issued/openvpn-server.crt", "pki/private/openvpn-server.key", "secrets/tls-crypt.key", "pki/crl.pem"} {
 		values["FILE_"+strings.NewReplacer("/", "_", ".", "_", "-", "_").Replace(file)] = configToken(filepath.Join(paths.DataDir, file))
 	}
@@ -167,7 +170,7 @@ var templateVariables = []string{
 	"OVPN_MANAGEMENT_SOCKET", "OVPN_OPENVPN_MANAGEMENT_SOCKET",
 	"OVPN_CLIENT_TO_CLIENT_DIRECTIVE", "OVPN_REDIRECT_GATEWAY_PUSH", "OVPN_ROUTE_PUSHES",
 	"OVPN_DNS_PUSHES", "CA_CERT", "CLIENT_ID", "CLIENT_NAME", "CLIENT_CERT", "CLIENT_KEY",
-	"TLS_CRYPT_KEY", "OVPN_HOOK_COMMAND", "FILE_pki_ca_crt", "FILE_pki_issued_openvpn_server_crt", "FILE_pki_private_openvpn_server_key", "FILE_secrets_tls_crypt_key", "FILE_pki_crl_pem",
+	"TLS_CRYPT_KEY", "OVPN_HOOK_COMMAND", "OVPN_HOOK_ENV", "FILE_pki_ca_crt", "FILE_pki_issued_openvpn_server_crt", "FILE_pki_private_openvpn_server_key", "FILE_secrets_tls_crypt_key", "FILE_pki_crl_pem",
 }
 
 func (renderer Renderer) execute(name string, values map[string]string) ([]byte, error) {

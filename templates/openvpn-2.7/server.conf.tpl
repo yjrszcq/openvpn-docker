@@ -8,7 +8,7 @@ server {{OVPN_NETWORK_ADDRESS}} {{OVPN_NETWORK_NETMASK}} nopool
 {{OVPN_DYNAMIC_POOL_DIRECTIVE}}
 client-config-dir {{OVPN_CCD_DIR}}
 script-security 2
-client-connect {{OVPN_HOOK_COMMAND}}
+{{OVPN_HOOK_ENV}}client-connect {{OVPN_HOOK_COMMAND}}
 client-disconnect {{OVPN_HOOK_COMMAND}}
 management {{OVPN_OPENVPN_MANAGEMENT_SOCKET}} unix
 management-client-user root

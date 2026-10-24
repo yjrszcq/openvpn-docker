@@ -1,0 +1,17 @@
+{
+  "verified_at": "2026-10-24",
+  "distributions": [
+    {"name": "Debian 13.7", "image": "debian:13-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad"},
+    {"name": "Ubuntu 26.10", "image": "ubuntu:26.10@sha256:93e29beff5257b2cdf1c024d831f6d2997e53655a653ff76a811fc9e6564a719"},
+    {"name": "Rocky Linux 10.2", "image": "quay.io/rockylinux/rockylinux:10.2@sha256:827d37bc128288ccf160ee318bb3cb92d591164cb217e92f8bc61e3982ae1834"},
+    {"name": "Alpine 3.24.3", "image": "alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a"}
+  ],
+  "arch_amd64": {"name": "Arch Linux 20261018.0.612668", "image": "archlinux:base@sha256:52dfbd5afb23a220d5ee92dafcb4c788d96c026ed04179890c23adef4c897fa0"},
+  "arch_arm64": {
+    "name": "Arch Linux ARM 2026-08-05 rootfs",
+    "image": "ovpn-archlinuxarm:20260805",
+    "url": "https://mirror.math.princeton.edu/pub/archlinuxarm/os/ArchLinuxARM-aarch64-latest.tar.gz",
+    "sha256": "42a4eeaa038994ffd31fa173256ef2f0ef511358eeb41b9ea1f8626391b9b319",
+    "signing_key": "68B3537F39A313B3E574D06777193F152BDBE6A6"
+  }
+}

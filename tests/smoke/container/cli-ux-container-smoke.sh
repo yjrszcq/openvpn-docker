@@ -87,6 +87,13 @@ grep -Fq 'completion' <<<"$root_help"
 test "$root_help" = "$(run_image help)"
 run_image completion bash >"$WORK_DIR/ovpn.bash"
 grep -Fq "help --version" "$WORK_DIR/ovpn.bash"
+if [ "${OVPN_CLI_UX_NATIVE:-0}" = 1 ]; then
+  if run_image >"$WORK_DIR/first-start.out" 2>&1; then
+    echo 'native first start without configuration unexpectedly succeeded' >&2
+    exit 1
+  fi
+  grep -Fq 'config.example.yaml' "$WORK_DIR/first-start.out"
+else
 command_overview="$(run_image)"
 grep -Fq 'Command tree:' <<<"$command_overview"
 grep -Fq 'ovpn client address edit' <<<"$command_overview"
@@ -94,6 +101,8 @@ grep -Fq 'ovpn runtime disconnect' <<<"$command_overview"
 if grep -Fq 'Examples:' <<<"$command_overview"; then
   printf 'bare ovpn output is not compact\n' >&2
   exit 1
+fi
+
 fi
 
 while IFS= read -r path; do

@@ -284,6 +284,12 @@ func runtimeDependencyBinaries() (openvpnBinary, brokerBinary, apiBinary string,
 // container command start the Go runtime.
 func RunEntrypoint(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
+		if root := os.Getenv("OVPN_BUNDLE_ROOT"); root != "" {
+			path := environmentOr("OVPN_CONFIG_FILE", configservice.DefaultPath)
+			if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+				return writeError(stderr, apperror.New(apperror.ExitPolicy, "configuration_missing", "copy "+filepath.Join(root, "config", "config.example.yaml")+" to "+path+", edit the public endpoint, then start ovpn again"))
+			}
+		}
 		dataDir := environmentOr("OVPN_DATA_DIR", initialize.DefaultDataDir)
 		empty, err := dataDirectoryEmpty(dataDir)
 		if err != nil {
@@ -459,7 +465,7 @@ func runRuntimeCapabilities(args []string, stdout, stderr io.Writer) int {
 	if binary == "" {
 		binary = "openvpn"
 	}
-	return runRuntimeCapabilitiesWith(args, stdout, stderr, compatibility.DefaultContractPath, binary, compatibility.ExecRunner{})
+	return runRuntimeCapabilitiesWith(args, stdout, stderr, environmentOr("OVPN_COMPATIBILITY_FILE", compatibility.DefaultContractPath), binary, compatibility.ExecRunner{})
 }
 
 func runRuntimeCapabilitiesWith(args []string, stdout, stderr io.Writer, contractPath, binary string, runner compatibility.CommandRunner) int {

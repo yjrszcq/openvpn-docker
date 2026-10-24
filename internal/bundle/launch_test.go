@@ -34,6 +34,10 @@ func TestRelocationAndOverrides(t *testing.T) {
 	if inv.Path != filepath.Join(root, "runtime", "bin", "ovpn-core") {
 		t.Fatal(inv)
 	}
+	alias, err := Prepare(link, "my-vpn", []string{"version"}, nil)
+	if err != nil || alias.Path != inv.Path {
+		t.Fatalf("user symlink: %+v %v", alias, err)
+	}
 	inv, err = Prepare(link, "openssl", []string{"version"}, nil)
 	// Dynamic dispatch is tested against a real placeholder file.
 	if err != nil {
