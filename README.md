@@ -18,6 +18,8 @@ The project does not currently provide a web UI, TAP, LDAP/RADIUS/OIDC, Kubernet
 
 REST API v1 is disabled by default and intended for a separate frontend or automation client behind an HTTPS reverse proxy. See the [REST API guide](docs/en/v4/rest-api.md).
 
+For deployment without Docker, use the self-contained amd64/arm64 archives and online installer described in the [native Linux guide](docs/en/v4/native-linux.md).
+
 ## Quick start
 
 ### Requirements

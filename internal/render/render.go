@@ -43,6 +43,7 @@ type ClientMaterial struct {
 // Renderer uses the template family selected by immutable compatibility data.
 type Renderer struct {
 	templateDir string
+	hookBinary  string
 }
 
 // New constructs a renderer without probing the runtime executable.
@@ -53,7 +54,14 @@ func New(templateRoot string, contract compatibility.Contract) (Renderer, error)
 	if templateRoot == "" {
 		return Renderer{}, fmt.Errorf("template root is empty")
 	}
-	return Renderer{templateDir: filepath.Join(templateRoot, contract.Adapter.TemplateFamily)}, nil
+	hook := os.Getenv("OVPN_HOOK_BIN")
+	if hook == "" {
+		hook = "/usr/local/bin/ovpn-hook"
+	}
+	if !filepath.IsAbs(hook) || strings.ContainsAny(hook, "\x00\r\n") {
+		return Renderer{}, fmt.Errorf("invalid hook binary path")
+	}
+	return Renderer{templateDir: filepath.Join(templateRoot, contract.Adapter.TemplateFamily), hookBinary: hook}, nil
 }
 
 // Server renders server.conf from normalized configuration.
@@ -72,8 +80,16 @@ func (renderer Renderer) Server(config domain.Config, paths Paths) ([]byte, erro
 	values := baseValues(config, paths, serverProtocol, clientProtocol, bindDirective)
 	values["OVPN_NETWORK_ADDRESS"] = config.IPv4.Network.Prefix().Addr().String()
 	values["OVPN_NETWORK_NETMASK"] = layout.Netmask.String()
-	values["OVPN_CCD_DIR"] = filepath.Join(paths.DataDir, "ccd")
-	values["OVPN_OPENVPN_MANAGEMENT_SOCKET"] = filepath.Join(paths.RuntimeDir, "openvpn-management.sock")
+	values["OVPN_CCD_DIR"] = configToken(filepath.Join(paths.DataDir, "ccd"))
+	command := configToken(renderer.hookBinary) + " pool-persist"
+	values["OVPN_HOOK_COMMAND"] = strconv.Quote(command)
+	if renderer.hookBinary != "/usr/local/bin/ovpn-hook" {
+		values["OVPN_HOOK_ENV"] = "setenv OVPN_DATA_DIR " + configToken(paths.DataDir) + "\n"
+	}
+	for _, file := range []string{"pki/ca.crt", "pki/issued/openvpn-server.crt", "pki/private/openvpn-server.key", "secrets/tls-crypt.key", "pki/crl.pem"} {
+		values["FILE_"+strings.NewReplacer("/", "_", ".", "_", "-", "_").Replace(file)] = configToken(filepath.Join(paths.DataDir, file))
+	}
+	values["OVPN_OPENVPN_MANAGEMENT_SOCKET"] = configToken(filepath.Join(paths.RuntimeDir, "openvpn-management.sock"))
 	if !layout.Dynamic.Empty() {
 		values["OVPN_DYNAMIC_POOL_DIRECTIVE"] = "ifconfig-pool " + layout.Dynamic.First.String() + " " + layout.Dynamic.Last.String()
 	}
@@ -154,7 +170,7 @@ var templateVariables = []string{
 	"OVPN_MANAGEMENT_SOCKET", "OVPN_OPENVPN_MANAGEMENT_SOCKET",
 	"OVPN_CLIENT_TO_CLIENT_DIRECTIVE", "OVPN_REDIRECT_GATEWAY_PUSH", "OVPN_ROUTE_PUSHES",
 	"OVPN_DNS_PUSHES", "CA_CERT", "CLIENT_ID", "CLIENT_NAME", "CLIENT_CERT", "CLIENT_KEY",
-	"TLS_CRYPT_KEY",
+	"TLS_CRYPT_KEY", "OVPN_HOOK_COMMAND", "OVPN_HOOK_ENV", "FILE_pki_ca_crt", "FILE_pki_issued_openvpn_server_crt", "FILE_pki_private_openvpn_server_key", "FILE_secrets_tls_crypt_key", "FILE_pki_crl_pem",
 }
 
 func (renderer Renderer) execute(name string, values map[string]string) ([]byte, error) {
@@ -261,4 +277,12 @@ func validatePaths(paths Paths) error {
 		}
 	}
 	return nil
+}
+
+// configToken preserves the historical rendering unless quoting is necessary.
+func configToken(value string) string {
+	if strings.ContainsAny(value, " \t\\\"") {
+		return strconv.Quote(value)
+	}
+	return value
 }

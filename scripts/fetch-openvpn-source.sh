@@ -60,7 +60,7 @@ if [ "$downloaded" != true ]; then
   exit 1
 fi
 
-printf '%s  %s\n' "$OPENVPN_SOURCE_SHA256" "$temporary_path" | sha256sum --check --status
+printf '%s  %s\n' "$OPENVPN_SOURCE_SHA256" "$temporary_path" | sha256sum -c >/dev/null
 mv "$temporary_path" "$archive_path"
 trap - EXIT
 

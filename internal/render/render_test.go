@@ -200,3 +200,16 @@ func hasLine(output []byte, want string) bool {
 	}
 	return false
 }
+
+func TestRelocatableHookAndPathsWithSpaces(t *testing.T) {
+	t.Setenv("OVPN_HOOK_BIN", "/opt/my vpn/bin/ovpn-hook")
+	output, err := newRenderer(t).Server(parseConfig(t, fullConfig), render.Paths{DataDir: "/opt/my vpn/data", RuntimeDir: "/opt/my vpn/run"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`ca "/opt/my vpn/data/pki/ca.crt"`, `management "/opt/my vpn/run/openvpn-management.sock" unix`, `client-connect "\"/opt/my vpn/bin/ovpn-hook\" pool-persist"`, `setenv OVPN_DATA_DIR "/opt/my vpn/data"`} {
+		if !strings.Contains(string(output), want) {
+			t.Fatalf("missing %s in %s", want, output)
+		}
+	}
+}

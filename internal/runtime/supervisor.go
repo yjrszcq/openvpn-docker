@@ -239,6 +239,11 @@ func (supervisor Supervisor) startProcesses(ctx context.Context, instance stores
 	openvpnCommand := commandBuilder(supervisor.OpenVPNBinary, "--config", filepath.Join(supervisor.DataDir, "server", "server.conf"))
 	brokerCommand.Stderr = os.Stderr
 	openvpnCommand.Stderr = os.Stderr
+	if os.Getenv("OVPN_BUNDLE_ROOT") != "" {
+		// OpenVPN writes early startup errors to stdout, before management logging
+		// exists. Keep those diagnostics visible to foreground/service users.
+		openvpnCommand.Stdout = os.Stderr
+	}
 	brokerProcess, err := startProcess(brokerCommand)
 	if err != nil {
 		return nil, fmt.Errorf("start management broker: %w", err)

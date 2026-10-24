@@ -8,20 +8,20 @@ server {{OVPN_NETWORK_ADDRESS}} {{OVPN_NETWORK_NETMASK}} nopool
 {{OVPN_DYNAMIC_POOL_DIRECTIVE}}
 client-config-dir {{OVPN_CCD_DIR}}
 script-security 2
-client-connect "/usr/local/bin/ovpn-hook pool-persist"
-client-disconnect "/usr/local/bin/ovpn-hook pool-persist"
+{{OVPN_HOOK_ENV}}client-connect {{OVPN_HOOK_COMMAND}}
+client-disconnect {{OVPN_HOOK_COMMAND}}
 management {{OVPN_OPENVPN_MANAGEMENT_SOCKET}} unix
 management-client-user root
 
 
-ca {{OVPN_DATA_DIR}}/pki/ca.crt
-cert {{OVPN_DATA_DIR}}/pki/issued/openvpn-server.crt
-key {{OVPN_DATA_DIR}}/pki/private/openvpn-server.key
+ca {{FILE_pki_ca_crt}}
+cert {{FILE_pki_issued_openvpn_server_crt}}
+key {{FILE_pki_private_openvpn_server_key}}
 
 dh none
 
-tls-crypt {{OVPN_DATA_DIR}}/secrets/tls-crypt.key
-crl-verify {{OVPN_DATA_DIR}}/pki/crl.pem
+tls-crypt {{FILE_secrets_tls_crypt_key}}
+crl-verify {{FILE_pki_crl_pem}}
 
 keepalive 10 120
 persist-key
