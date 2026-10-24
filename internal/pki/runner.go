@@ -283,6 +283,11 @@ func controlledEnvironment(overrides map[string]string) []string {
 	if pathValue := os.Getenv("PATH"); pathValue != "" {
 		values = append(values, "PATH="+pathValue)
 	}
+	for _, key := range []string{"EASYRSA", "EASYRSA_OPENSSL", "OPENSSL_MODULES", "OPENSSL_CONF", "SSL_CERT_FILE"} {
+		if value := os.Getenv(key); value != "" {
+			values = append(values, key+"="+value)
+		}
+	}
 	keys := []string{"EASYRSA_BATCH", "EASYRSA_PKI", "EASYRSA_REQ_CN"}
 	for _, key := range keys {
 		if value, exists := overrides[key]; exists {
