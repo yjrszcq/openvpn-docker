@@ -3,8 +3,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/yjrszcq/openvpn-docker/internal/bundle"
 	"os"
+
+	"github.com/yjrszcq/openvpn-docker/internal/bundle"
 )
 
 func main() {

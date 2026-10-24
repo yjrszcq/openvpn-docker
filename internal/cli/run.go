@@ -638,10 +638,16 @@ func withCLIHint(err error) error {
 		hint = "stop the OpenVPN service and retry the maintenance operation"
 	case "runtime_unavailable", "runtime_unhealthy":
 		hint = "run this command in the active OpenVPN service container and check 'ovpn runtime health'"
+		if os.Getenv("OVPN_BUNDLE_ROOT") != "" {
+			hint = "check the instance service, TUN device, network permissions, and logs/openvpn.log"
+		}
 	case "client_state_refused", "configuration_state_refused", "runtime_state_refused":
 		hint = "run 'ovpn state doctor' and follow the reported recovery action"
 	case "maintenance_required":
 		hint = "run the command through the openvpn-maintenance service"
+		if os.Getenv("OVPN_BUNDLE_ROOT") != "" {
+			hint = "stop the instance service, then retry with OVPN_MAINTENANCE=true"
+		}
 	case "migration_upgrade_required":
 		hint = "upgrade the source instance to schema 3 with sh-ver before retrying"
 	}

@@ -12,9 +12,13 @@ tar -xzf "$archive" -C "$work"
 mkdir -p "$work/rootfs/tmp"
 chmod 1777 "$work/rootfs/tmp"
 if [ "$base" = scratch ]; then
-  mkdir -p "$work/rootfs/etc"
+  mkdir -p "$work/rootfs/etc" "$work/rootfs/bin" "$work/rootfs/usr/bin"
   printf 'root:x:0:0:root:/root:/bin/sh\n' >"$work/rootfs/etc/passwd"
   printf 'root:x:0:\n' >"$work/rootfs/etc/group"
+  # User-supplied editor fixtures use this conventional shebang. The only shell
+  # installed in this otherwise empty rootfs is the shipped static runtime.
+  ln -s /opt/ovpn/bin/sh "$work/rootfs/bin/sh"
+  ln -s /opt/ovpn/bin/timeout "$work/rootfs/usr/bin/timeout"
 fi
 cat >"$work/Dockerfile" <<'DOCKERFILE'
 ARG BASE=debian:13-slim
